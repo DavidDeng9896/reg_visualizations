@@ -11,7 +11,8 @@ product/
 
 | 目录 | 作用 |
 | --- | --- |
-| [features/charts/](./features/charts/) | 图表 Type / Layout / 导出等已确认功能点 |
+| [features/charts/](./features/charts/) | LabKey 来源：已确认图表功能点 |
+| [features/benchling-charts/](./features/benchling-charts/) | Benchling 来源：图表功能点初稿（待确认） |
 | [requirements/](./requirements/) | 数据表 + 图表等需求文档 |
 
 参考调研原文（非开发依据）：[`../reference/`](../reference/)

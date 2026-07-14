@@ -5,6 +5,7 @@
 | 子目录 | 来源 | 说明 |
 | --- | --- | --- |
 | [labkey/](./labkey/) | LabKey Documentation | 五类科学图表官方文档整理 |
+| [benchling/](./benchling/) | Benchling Help Center | Analysis 数据分析与图表文档整理 |
 
 ## 使用约定
 
