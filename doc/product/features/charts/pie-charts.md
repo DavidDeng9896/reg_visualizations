@@ -1,6 +1,6 @@
 # Pie Charts 功能点（细化版）
 
-> 来源：`doc/piechart.md` + LabKey 官方截图  
+> 来源：`doc/reference/labkey/piechart.md` + LabKey 官方截图  
 > 范围：仅细化已勾选功能点  
 > 状态：已细化
 

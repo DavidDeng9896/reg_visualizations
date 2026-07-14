@@ -3,7 +3,7 @@
 > 文档性质：独立功能需求文档（第二步）  
 > 定位：在 **database 数据表能力** 之上叠加已调研确认的图表能力  
 > 表格实现：以 **vxe-table** 作为数据表组件底座  
-> 图表能力依据：`doc/features/` 已细化功能点  
+> 图表能力依据：`doc/product/features/charts/` 已细化功能点  
 > 状态：需求思考稿，供评审后进入方案/实现
 
 ---
@@ -24,7 +24,7 @@
 构建「**一张表 + 多种图**」的一体化能力：
 
 1. 用 vxe-table 承载 database 查询结果的浏览、筛选、排序、列管理等表能力；
-2. 在表的工具入口上提供五类图表创建与配置（对齐 `doc/features`）；
+2. 在表的工具入口上提供五类图表创建与配置（对齐 `doc/product/features/charts`）；
 3. 图表消费「当前表视图数据」（含字段元数据 + 行数据），而非脱离表的独立数据集；
 4. 保持图表配置能力完整（Chart Type / Chart Layout / 导出等已确认项）。
 
@@ -126,7 +126,7 @@
 
 ## 4. 图表能力在「表之上」的落位
 
-以下均以 `doc/features/*.md` 已确认细化项为准，只讨论**与表结合时的增量需求**。
+以下均以 `doc/product/features/charts/*.md` 已确认细化项为准，只讨论**与表结合时的增量需求**。
 
 ### 4.1 统一：从表启动图表
 
@@ -270,15 +270,15 @@ interface ChartDataInput {
 
 | 图表功能域 | 文档 | 表侧前置 | 一体化增量 |
 | --- | --- | --- | --- |
-| Bar 映射与聚合 | bar-charts.md | 分类/数值列元数据 | 视图行上聚合 |
+| Bar 映射与聚合 | [bar-charts.md](../features/charts/bar-charts.md) | 分类/数值列元数据 | 视图行上聚合 |
 | Bar Layout / 误差棒 / 导出 | 同上 | — | 配置存于图实例 |
-| Box 映射与点编码 | box-plots.md | Y 数值 + 分类 | 分布统计基于视图行 |
+| Box 映射与点编码 | [box-plots.md](../features/charts/box-plots.md) | Y 数值 + 分类 | 分布统计基于视图行 |
 | Box Hover / 渲染规则 / 导出 | 同上 | 可选行定位 | Tooltip 字段来自表 |
-| Line 映射/双Y/Trendline | line-plots.md | 时间/数值/系列列 | 筛选控 Series 密度 |
+| Line 映射/双Y/Trendline | [line-plots.md](../features/charts/line-plots.md) | 时间/数值/系列列 | 筛选控 Series 密度 |
 | Line Layout/误差棒/导出 | 同上 | — | — |
-| Pie Categories + Layout | pie-charts.md | 分类列 | Count 基于视图行 |
-| Pie 非 Count 扩展 | pie-charts.md | 数值列 | Chart Type 增 Measure |
-| Scatter 映射/双Y/密度布局 | scatter-plots.md | 双数值列 | 大行数触发密度 |
+| Pie Categories + Layout | [pie-charts.md](../features/charts/pie-charts.md) | 分类列 | Count 基于视图行 |
+| Pie 非 Count 扩展 | 同上 | 数值列 | Chart Type 增 Measure |
+| Scatter 映射/双Y/密度布局 | [scatter-plots.md](../features/charts/scatter-plots.md) | 双数值列 | 大行数触发密度 |
 
 ---
 
@@ -322,7 +322,7 @@ interface ChartDataInput {
 1. 用户打开一库表/查询结果，可在 vxe-table 中完成筛选排序浏览。  
 2. 从工具栏创建五类图之一，字段池与表列一致，拖拽校验符合类型规则。  
 3. 修改表筛选后，图表统计/图形随当前视图更新（在约定取数策略内）。  
-4. 各图已确认的 Type/Layout/导出能力可按 `doc/features` 逐项勾验。  
+4. 各图已确认的 Type/Layout/导出能力可按 `doc/product/features/charts` 逐项勾验。  
 5. Pie 在默认 Count 之外，可按确认扩展绑定度量字段。  
 
 ---
@@ -331,9 +331,10 @@ interface ChartDataInput {
 
 | 文档 | 作用 |
 | --- | --- |
-| [../features/README.md](../features/README.md) | 图表功能点细化入口 |
-| [../features/bar-charts.md](../features/bar-charts.md) 等五份 | 图表配置细则与源截图 |
-| [../README.md](../README.md) | 调研资料索引 |
+| [../features/charts/README.md](../features/charts/README.md) | 图表功能点细化入口 |
+| [../features/charts/](../features/charts/) 五份细则 | 图表配置细则与源截图 |
+| [../../reference/labkey/](../../reference/labkey/) | 调研参考资料 |
+| [../../README.md](../../README.md) | 文档中心索引 |
 
 ---
 

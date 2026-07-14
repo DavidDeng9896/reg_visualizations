@@ -1,6 +1,6 @@
 # Bar Charts 功能点（细化版）
 
-> 来源：`doc/barchart.md` + LabKey 官方截图  
+> 来源：`doc/reference/labkey/barchart.md` + LabKey 官方截图  
 > 范围：仅细化已勾选功能点  
 > 状态：已细化
 

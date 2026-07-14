@@ -1,6 +1,6 @@
 # Scatter Plots 功能点（细化版）
 
-> 来源：`doc/scatterplot.md` + LabKey 官方截图  
+> 来源：`doc/reference/labkey/scatterplot.md` + LabKey 官方截图  
 > 范围：仅细化已勾选功能点  
 > 状态：已细化  
 > 说明：Heat Map 不作为独立重点能力；密度相关项按 **Layout 配置项**细化。Developer 不纳入。
