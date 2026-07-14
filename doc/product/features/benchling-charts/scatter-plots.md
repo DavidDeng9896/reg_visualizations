@@ -1,41 +1,44 @@
 # Benchling · Scatter Plots 功能点初稿（待确认）
 
-> 参考：Benchling Analysis → View Type = Scatter plot；Regression 编辑侧栏也基于散点  
+> 关键截图：`configure-chart.png`（Scatter + Error bars）  
 > 状态：初稿，请勾选后再细化
 
 ---
 
-## 1. 数据 / 属性设置
+## 1. 数据 / 属性设置（CONFIGURE · 截图核对）
 
 - [ ] **View Type = Scatter plot**
-- [ ] **X axis** 列映射
-- [ ] **Y axis** 列映射
-- [ ] **Series** 列映射（点分组着色）
-- [ ] **X/Y Custom label**
+- [ ] **X-axis**（示例：Sample ID，Aa）+ settings 齿轮
+- [ ] **Y-axis**（示例：Average of Calculated Concentration，#）+ settings 齿轮
+- [ ] **Series**（示例：None；可按列分组着色）
+- [ ] **Error bars**（示例：Standard error of Calculated Concentration；图上为竖直误差棒）
+- [ ] **Color palette**（示例：Benchling (30)）
+- [ ] **Custom label**（正文）
+- [ ] **Save / Cancel**
 
 ---
 
-## 2. 布局 / 外观设置（继承共性 Style）
+## 2. 布局 / 外观设置（STYLE）
 
-- [ ] **Series Color**
-- [ ] **Point Shape**
+- [ ] **Series Color** 逐系列取色
+- [ ] **Point Shape**（截图点为方块等）
 - [ ] **Point Opacity**
-- [ ] **Legend** 显示 / 方位 / 自定义标题
+- [ ] **Legend** 显隐 / Left·Right·Top·Bottom / Custom label
 
 ---
 
 ## 3. 其他设置
 
-- [ ] Apply
-- [ ] View Type 切换
-- [ ] 与 **Regression** View 的关系（回归图基于散点 + 拟合线，见 [regressions.md](./regressions.md)）
-- [ ] 上游 Filters/Transforms
+- [ ] **+ FILTERS & TRANSFORMS**
+- [ ] Hover Tooltip（回归 GIF 同类：显示 X/Y/系列字段值）
+- [ ] 网格线（截图有浅色网格）
+- [ ] 与 Regression View 的关系（回归基于散点 + 拟合线）
 
 ---
 
-## 源文缺口（是否扩展请确认）
+## 源文缺口
 
-- [ ] 点大小映射（第三度量）
-- [ ] 抖动 Jitter
-- [ ] 密度/分箱热力（或使用独立 Heatmap）
-- [ ] 双 Y 轴
+- [ ] 水平误差棒
+- [ ] 点大小映射第三度量
+- [ ] Jitter / 密度分箱（或改用 Heatmap）
+- [ ] 双 Y（标准 Scatter；多 Y 见 Custom code）

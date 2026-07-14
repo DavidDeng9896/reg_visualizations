@@ -1,39 +1,38 @@
 # Benchling · Box Plots 功能点初稿（待确认）
 
-> 参考：Benchling Analysis → View Type = Box plot + 共性 Configure/Style  
+> 正文将 Box plot 列为 View Type；**change-view-type 截图下拉未出现 Box**（可能滚动未展示）。  
 > 状态：初稿，请勾选后再细化
 
 ---
 
 ## 1. 数据 / 属性设置
 
-- [ ] **View Type = Box plot**
-- [ ] **X axis** 列映射（分类分组）
-- [ ] **Y axis** 列映射（数值分布）
-- [ ] **Series** 列映射（若用于分组/着色）
-- [ ] **X/Y Custom label**
+- [ ] **View Type = Box plot**（正文）
+- [ ] **X-axis**（分类分组）
+- [ ] **Y-axis**（数值分布）
+- [ ] **Series**
+- [ ] **Error bars**（是否适用请确认）
+- [ ] **Color palette** / Custom label / 轴齿轮
 
 ---
 
-## 2. 布局 / 外观设置（继承共性 Style）
+## 2. 布局 / 外观设置（STYLE）
 
-- [ ] **Series Color**
-- [ ] **Point Shape / Opacity**（离群点或显示点时）
-- [ ] **Legend** 显示 / 方位 / 自定义标题
+- [ ] Series Color
+- [ ] Point Shape / Opacity（离群点）
+- [ ] Legend
 
 ---
 
 ## 3. 其他设置
 
-- [ ] Apply
-- [ ] View Type 切换
-- [ ] 上游 Filters/Transforms
+- [ ] Save；Filters & Transforms；Hover
 
 ---
 
-## 源文缺口（是否扩展请确认）
+## 源文/截图缺口
 
-- [ ] Show Points（全部 / 仅离群 / 隐藏）
+- [ ] Show Points 模式
 - [ ] Jitter
-- [ ] 箱线统计规则展示（Q1/Q2/Q3/须）
-- [ ] Hover 明细
+- [ ] 箱线统计规则 UI
+- [ ] 请确认产品是否纳入 Box（截图证据弱于正文）
