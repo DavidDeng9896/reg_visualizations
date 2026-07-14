@@ -265,6 +265,14 @@ interface ChartDataInput {
     // selectedRowKeys?: string[]  // 若启用「仅选中行」
   }
 }
+
+/** 表+图工作区布局（相对 database 表的图表方位） */
+type ChartPosition = 'top' | 'bottom' | 'left' | 'right'
+
+interface WorkspaceLayoutState {
+  chartPosition: ChartPosition  // 默认建议 'bottom'
+  // splitRatio?: number         // 表/图占比 0~1，P1 可记
+}
 ```
 
 ### 5.2 图表取数策略（必须拍板）
