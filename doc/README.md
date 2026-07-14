@@ -18,6 +18,12 @@
 
 - [features/README.md](./features/README.md)
 
+## 功能需求（第二步）
+
+在数据表（vxe-table）能力之上叠加图表能力的一体化需求思考：
+
+- [requirements/table-chart-integration.md](./requirements/table-chart-integration.md)
+
 ## 说明
 
 - 文档正文完整保留官方说明、操作步骤、布局选项与相关主题。
