@@ -12,13 +12,11 @@
 | [Pie Charts](./piechart.md) | 饼图：展示各类别占整体的比例 | 6 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=piechart) |
 | [Scatter Plots](./scatterplot.md) | 散点图：展示两个数值变量之间的关系 | 9 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=scatterplot) |
 
-## 功能点提取（待确认）
+## 功能点文档（已细化）
 
-基于上述调研原文，已提取五类图表的属性/布局/其他设置功能点初稿，见：
+基于调研原文与官方截图，已对确认后的功能点完成细化，见：
 
 - [features/README.md](./features/README.md)
-
-请先确认需要保留的功能点，再进行细节点完善。
 
 ## 说明
 
