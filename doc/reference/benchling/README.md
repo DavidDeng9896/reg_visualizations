@@ -1,8 +1,11 @@
-# Benchling Analysis 参考资料
+# Benchling 参考资料
 
-| 文档 | 说明 | 原文 |
-| --- | --- | --- |
-| [analyze-data-with-benchling-analysis.md](./analyze-data-with-benchling-analysis.md) | Analyze data with Benchling Analysis 全文整理 | [Help Center](https://help.benchling.com/hc/en-us/articles/36096516002317-Analyze-data-with-Benchling-Analysis) |
-| [visual-review-notes.md](./visual-review-notes.md) | 文档内 GIF/截图拆帧核对笔记 | — |
+来源调研材料，**不是**开发依据。确认功能后写入 `doc/product/features/`。
 
-对应产品功能点初稿（待确认）：[`../../product/features/benchling-charts/`](../../product/features/benchling-charts/)
+| 文件 | 说明 |
+|------|------|
+| [analyze-data-with-benchling-analysis.md](./analyze-data-with-benchling-analysis.md) | 《Analyze Data with Benchling Analysis》**中文译本**（含原文全部图片链接） |
+| [analyze-data-with-benchling-analysis.en.md](./analyze-data-with-benchling-analysis.en.md) | 英文原文备份 |
+| [visual-review-notes.md](./visual-review-notes.md) | 基于 GIF/截图的视觉核对笔记（提取功能点用） |
+
+产品侧初稿见：[doc/product/features/benchling-charts/](../../product/features/benchling-charts/)
