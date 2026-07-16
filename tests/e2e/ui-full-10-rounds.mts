@@ -183,11 +183,16 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   await step('Edit图表-改拟合-Save', async () => {
     await switchViewType(page, 'scatter')
     await page.getByRole('button', { name: /Edit 图表/ }).click()
-    await page.waitForSelector('text=图表配置')
-    const fitItem = page.locator('.el-drawer .el-form-item').filter({ hasText: '拟合' })
+    const drawer = page.locator('.el-drawer').filter({ hasText: '图表配置' })
+    await drawer.waitFor({ state: 'visible', timeout: 15000 })
+    const fitItem = drawer.locator('.el-form-item').filter({ hasText: '拟合' })
+    await fitItem.scrollIntoViewIfNeeded()
     await fitItem.locator('.el-select').click()
     await page.getByRole('option', { name: 'Linear' }).click()
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await drawer.getByRole('button', { name: 'Save', exact: true }).click()
+    await drawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(async () => {
+      await page.keyboard.press('Escape')
+    })
     await page.waitForTimeout(1000)
     const ink = await canvasInk(page)
     if (!ink.hasCanvas || ink.nonWhite < 20) throw new Error(`scatter after edit blank: ${JSON.stringify(ink)}`)
@@ -195,6 +200,8 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   })
 
   await step('导出PNG按钮可点', async () => {
+    // Ensure Edit drawer is not covering the chart toolbar.
+    await page.locator('.el-drawer').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => undefined)
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 5000 }).catch(() => null),
       page.getByRole('button', { name: '导出 PNG' }).click(),
@@ -206,7 +213,8 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
 
   await step('过滤转换对话框', async () => {
     await page.getByRole('button', { name: /过滤 \/ 转换/ }).click()
-    await page.waitForSelector('text=过滤与转换')
+    const dlg = page.getByText('过滤与转换')
+    await dlg.waitFor({ state: 'visible', timeout: 10000 })
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await page.waitForTimeout(400)
   })

@@ -107,9 +107,8 @@
       </div>
     </div>
 
-    <TransformDialog v-if="showTransforms" v-model="showTransforms" />
+    <TransformDialog v-model="showTransforms" />
     <ChartEditDrawer
-      v-if="showChartEdit"
       v-model="showChartEdit"
       :config="chartConfig"
       :columns="store.workspaceResult.columns"
@@ -238,6 +237,9 @@ function onViewport() {
 onMounted(() => {
   window.addEventListener('resize', onViewport, { passive: true })
   onViewport()
+  // Warm Edit/Transform async chunks after paint so first open is reliable.
+  void import('@/modules/chart/ChartEditDrawer.vue')
+  void import('@/modules/transform/TransformDialog.vue')
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
