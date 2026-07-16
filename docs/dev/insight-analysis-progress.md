@@ -1,45 +1,41 @@
 # Insight Analysis 开发记忆（实时）
 
 > 规格：[`../specs/2026-07-16-insight-analysis-framework-design.md`](../specs/2026-07-16-insight-analysis-framework-design.md)  
-> 自测报告：[`./selftest-10-rounds-report.md`](./selftest-10-rounds-report.md)
+> 自测报告：[`./selftest-10-rounds-report.md`](./selftest-10-rounds-report.md)  
+> 全按钮 UI×10：[`./ui-full-10-rounds-report.md`](./ui-full-10-rounds-report.md)
 
 ## 1. 当前状态
 
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/insight-analysis-app-9a40` |
-| 阶段 | **10 轮 E2E 自测全绿后加固完成** |
-| 上次更新 | 2026-07-16 10:20 |
+| 阶段 | **图表自动映射修复 + 全按钮浏览器自测进行中** |
+| 上次更新 | 2026-07-16 11:02 |
 | 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ |
-| E2E | **10 PASS / 0 FAIL**（`npm run test:e2e`） |
+| 单元 | `guessMapping` 6/6 PASS |
+| 图表取证 | bar→line/pie/box/heatmap/scatter 均有 canvas 墨迹 |
 
-## 2. 10 轮自测（systematic-debugging）
+## 2. 图表无法使用 — 根因与修复
 
-### 第一轮结果（修复前）：5 PASS / 5 FAIL
+### 根因（浏览器点击取证）
 
-| Round | 失败现象 | 根因（证据） |
-| --- | --- | --- |
-| 5 | From CSV strict mode | 测试选择器命中 Header+侧栏两个菜单（测试问题） |
-| 6/7/8 | Demo 后无 Edit/树节点超时 | **`scheduleSave` 防抖未落盘**，`openAnalysis` 用空 DB 覆盖内存；且总选中第一张**表**而非 scatter 视图 |
-| 10 | 找不到「确定」 | MessageBox 未设中文按钮文案（默认 OK） |
+1. 新建 bar/pie 等视图时 **CONFIGURE 字段为空** → 画出无意义图形或空白  
+2. 从 bar **切换到 line/scatter** 时仍保留分类字段作 X，而 line/scatter 用 `Number(x)` 过滤 → **全部点被丢弃，图空白**  
+3. E2E 曾误点工具栏第二个下拉（图位置）而非图表类型
 
 ### 修复
 
-1. 新增 `flushSave()`；Demo 导航前强制落盘  
-2. `openAnalysis` 优先选中首个视图；支持 `selectNodeId`；工作区挂载保留内存选中  
-3. MessageBox 明确 `confirmButtonText: '确定'`  
-4. 侧栏 `⋯` 可点性增强；只读提示按视图类型区分  
-5. 此前已修：`structuredClone` → `cloneDeep`（Vue Proxy）
-
-### 第二轮结果（修复后）：**10 PASS / 0 FAIL**
+- `src/modules/chart/guessMapping.ts`：按图类型做兼容字段推断；切换类型时丢弃不兼容字段；line/scatter 保证 X≠Y  
+- `addView` / `onViewType` 调用 `guessConfigure`  
+- `ChartPanel`：缺字段时提示「请配置…」；MODEL TABLES 折叠以腾出画布
 
 ## 3. 验证命令
 
 ```bash
 npm test
-npm run test:e2e
+npx tsx tests/e2e/chart-switch-forensic.mts
+npx tsx tests/e2e/ui-full-10-rounds.mts
 npm run build
-npm run dev
 ```
 
 ## 4. 残余风险

@@ -1,22 +1,25 @@
 <template>
   <div class="chart">
     <div class="toolbar">
+      <span v-if="missing.length" class="need">请配置：{{ missing.join('、') }}（点 Edit 图表）</span>
       <span v-if="built.sampled" class="sample">已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）</span>
       <el-button size="small" @click="downloadFull">下载完整数据 CSV</el-button>
       <el-button size="small" @click="exportPng">导出 PNG</el-button>
       <el-button size="small" @click="exportPdf">导出 PDF</el-button>
     </div>
     <div ref="elRef" class="canvas" />
-    <div v-if="built.modelTables?.variables?.length" class="models">
-      <h4>MODEL VARIABLES</h4>
-      <el-table :data="built.modelTables.variables" size="small" max-height="120">
-        <el-table-column v-for="k in varKeys" :key="k" :prop="k" :label="k" />
-      </el-table>
-      <h4>MODEL OUTPUT</h4>
-      <el-table :data="built.modelTables.output.slice(0, 50)" size="small" max-height="140">
-        <el-table-column v-for="k in outKeys" :key="k" :prop="k" :label="k" />
-      </el-table>
-    </div>
+    <el-collapse v-if="built.modelTables?.variables?.length" class="models">
+      <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
+        <h4>MODEL VARIABLES</h4>
+        <el-table :data="built.modelTables.variables" size="small" max-height="120">
+          <el-table-column v-for="k in varKeys" :key="k" :prop="k" :label="k" />
+        </el-table>
+        <h4>MODEL OUTPUT</h4>
+        <el-table :data="built.modelTables.output.slice(0, 50)" size="small" max-height="140">
+          <el-table-column v-for="k in outKeys" :key="k" :prop="k" :label="k" />
+        </el-table>
+      </el-collapse-item>
+    </el-collapse>
   </div>
 </template>
 
@@ -26,6 +29,7 @@ import * as echarts from 'echarts'
 import { jsPDF } from 'jspdf'
 import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import { buildChartOption, SAMPLE_LIMIT } from '@/modules/chart/runtime'
+import { missingRequiredFields } from '@/modules/chart/guessMapping'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { cloneDeep } from '@/shared/utils/clone'
 
@@ -40,6 +44,8 @@ const store = useAnalysisStore()
 
 const elRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
+
+const missing = computed(() => missingRequiredFields(props.viewType, props.config.configure))
 
 const built = computed(() =>
   buildChartOption({
@@ -61,11 +67,11 @@ function render() {
   if (!elRef.value) return
   if (!chart) chart = echarts.init(elRef.value)
   chart.setOption(built.value.option, true)
+  chart.resize()
   chart.off('brushselected')
   chart.on('brushselected', (params: unknown) => {
     const p = params as { batch?: { selected?: { dataIndex?: number[] }[] }[] }
     const indexes = p.batch?.[0]?.selected?.[0]?.dataIndex || []
-    // Map first series data indexes to row ids when possible
     const series = (built.value.option.series || []) as { data?: { id?: string }[] }[]
     const data = series[0]?.data || []
     const ids = indexes.map((i) => data[i]?.id).filter(Boolean) as string[]
@@ -87,6 +93,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', resize)
   chart?.dispose()
+  chart = null
 })
 watch(built, () => render(), { deep: true })
 
@@ -128,26 +135,31 @@ async function exportPdf() {
   display: flex;
   flex-direction: column;
   padding: 8px;
+  min-height: 0;
 }
 .toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 .sample {
   color: #e6a23c;
   font-size: 12px;
+}
+.need {
+  color: #c45656;
+  font-size: 12px;
+  font-weight: 600;
 }
 .canvas {
   flex: 1;
   min-height: 280px;
 }
 .models {
-  max-height: 220px;
-  overflow: auto;
   border-top: 1px solid var(--ia-border);
-  padding-top: 6px;
+  margin-top: 4px;
 }
 h4 {
   margin: 6px 0;

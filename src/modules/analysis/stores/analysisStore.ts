@@ -14,6 +14,7 @@ import { analysisRepository } from '@/shared/db/repository'
 import { nowIso, uid } from '@/shared/utils/id'
 import { isIdentityOrSortOnly, runPipeline } from '@/modules/transform/pipeline'
 import { findView, flattenViews, walkViews } from '@/modules/analysis/viewTree'
+import { guessConfigure } from '@/modules/chart/guessMapping'
 
 function defaultChartConfig(): ChartConfig {
   return {
@@ -202,6 +203,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     if (!current.value) return
     const table = current.value.tables.find((t) => t.id === tableId)
     if (!table) return
+    const chartConfig = defaultChartConfig()
+    if (viewType !== 'table') {
+      chartConfig.configure = guessConfigure(viewType, table.columns, chartConfig.configure)
+    }
     const view: ViewNode = {
       id: uid('vw'),
       parentId: parentId ?? tableId,
@@ -210,7 +215,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       viewType,
       viewFilters: [],
       transforms: [],
-      chartConfig: defaultChartConfig(),
+      chartConfig,
       children: [],
     }
     if (!parentId || parentId === tableId) {

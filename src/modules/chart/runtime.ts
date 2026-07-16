@@ -1,6 +1,7 @@
 import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import type { EChartsOption } from 'echarts'
 import { fitSeries } from './fitEngine'
+import { missingRequiredFields } from './guessMapping'
 
 const SAMPLE_LIMIT = 10000
 
@@ -74,6 +75,21 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
   const { viewType, config } = input
   if (viewType === 'table') {
     return { option: {}, sampled: false, totalRows: input.rows.length }
+  }
+  const miss = missingRequiredFields(viewType, config.configure)
+  if (miss.length) {
+    return {
+      option: {
+        title: {
+          text: '请先配置图表字段',
+          subtext: `缺少：${miss.join('、')}（点击 Edit 图表）`,
+          left: 'center',
+          top: 'middle',
+        },
+      },
+      sampled: false,
+      totalRows: input.rows.length,
+    }
   }
   const { rows, sampled } = sampleRows(input.rows)
   const cfg = config.configure

@@ -63,6 +63,7 @@ import ChartPanel from '@/modules/chart/ChartPanel.vue'
 import TransformDialog from '@/modules/transform/TransformDialog.vue'
 import ChartEditDrawer from '@/modules/chart/ChartEditDrawer.vue'
 import { cloneDeep } from '@/shared/utils/clone'
+import { guessConfigure } from '@/modules/chart/guessMapping'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
@@ -101,7 +102,14 @@ const gridReadOnlyHint = computed(() => {
 
 function onViewType(t: ViewType) {
   if (!store.selectedView) return
-  store.updateView(store.selectedView.view.id, { viewType: t })
+  const cols = store.workspaceResult?.columns || store.selectedView.table.columns
+  const next = {
+    ...chartConfig.value,
+    configure: guessConfigure(t, cols, chartConfig.value.configure),
+  }
+  chartConfig.value = next
+  viewType.value = t
+  store.updateView(store.selectedView.view.id, { viewType: t, chartConfig: next })
 }
 
 function onPos(p: ChartPosition) {
