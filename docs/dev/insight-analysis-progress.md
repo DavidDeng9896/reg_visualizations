@@ -9,14 +9,14 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-57d2d766-1d1d-4c3f-a1d8-eded89cbf027-e446`（含 Round 1+2） |
-| 阶段 | **优化 Round 2 完成**（累计 2/3，Round 3 后合并） |
-| 上次更新 | 2026-07-16 15:11 |
-| 单元 | **18/18 PASS**（layout / debounce / sidebarPrefs） |
+| 分支 | `cursor/bc-1950e261-8e50-49b1-80ee-69b630aad28b-32cf`（Round 1–3） |
+| 阶段 | **优化 Round 3 完成；本轮为合并点 → main** |
+| 上次更新 | 2026-07-16 16:25 |
+| 单元 | **24/24 PASS**（含 fit 边界） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 1–2 对齐摘要
+## 2. Round 1–3 对齐摘要
 
 对照 `docs/requirements/table-chart-integration.md`：
 
@@ -30,7 +30,9 @@
 | CONFIGURE 空态一键 Edit | ✅ Round 2 |
 | 侧栏宽度拖拽记忆 | ✅ Round 2（localStorage） |
 | 流程图空态 / 选中高亮 | ✅ Round 2 |
-| 只读表 hint | ✅ Round 2 增强对比 |
+| Element/Vxe 瘦身 | ✅ Round 3（CSS gzip 显著下降；Vxe JS ≈半） |
+| 4PL 边界/失败提示 | ✅ Round 3 |
+| 分隔条 a11y（aria-value + Home/End） | ✅ Round 3 |
 
 ## 3. 验证命令
 
@@ -40,11 +42,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 3 计划（下一 cron，完成后合并）
+## 4. Round 4 计划（下一 cron）
 
 | ID | 描述 |
 | --- | --- |
-| R4 | Element Plus / Vxe CSS 按需或拆分评估落地（产物仍偏大） |
-| R3 | 4PL 拟合稳健性：边界值 / 空数据提示 |
-| A11y | 工具栏分组与侧栏分隔条的 aria / 键盘巡检补强 |
-| Merge | Round 3 结束后开 PR 合并进 `main`，记忆标记 `lastMergedRound=3` |
+| Perf | Element Plus JS 仍 ~298KB gzip：评估路由级异步组件或进一步按图标/消息拆分 |
+| Fit | 4PL 约束 min/max（docs line-charts）；MODEL TABLES 失败态空表说明 |
+| UX | 图表位置切换后焦点回到分隔条；窄屏降级提示可关闭记忆 |
+| A11y | 工具栏分组 landmark / skip link |

@@ -14,8 +14,8 @@ export interface FilterCondition {
   id: string
   field: string
   op: FilterOp
-  value?: unknown
-  valueTo?: unknown
+  value?: string
+  valueTo?: string
 }
 
 export type TransformKind = 'select' | 'rename' | 'derived' | 'dedupe' | 'sort'
@@ -24,7 +24,14 @@ export interface TransformStep {
   id: string
   kind: TransformKind
   /** kind-specific payload */
-  config: Record<string, unknown>
+  config: {
+    fields?: string[]
+    from?: string
+    to?: string
+    field?: string
+    expr?: string
+    sorts?: { field: string; order: 'asc' | 'desc' }[]
+  }
 }
 
 export type ViewType = 'table' | 'bar' | 'box' | 'line' | 'pie' | 'scatter' | 'heatmap'
