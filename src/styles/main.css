@@ -1,0 +1,24 @@
+:root {
+  --ia-bg: #f5f6f8;
+  --ia-sidebar: #ffffff;
+  --ia-border: #e4e7ed;
+  --ia-accent: #2f6fed;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #1f2329;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: var(--ia-bg);
+}
+
+button {
+  font: inherit;
+}
