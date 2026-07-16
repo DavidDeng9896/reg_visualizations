@@ -9,23 +9,24 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-8aa12a6b-d37c-4788-8a21-1eefeeb00009-b715`（Round 7） |
-| 阶段 | **优化 Round 7 完成**（新 3 轮周期 1/3；`lastMergedRound=6`） |
-| 上次更新 | 2026-07-16 20:17 |
-| 单元 | **43/43 PASS**（含 axisScale） |
+| 分支 | `cursor/bc-2d33cfc7-a662-4258-98d1-165d07330ffe-c9aa`（Round 8） |
+| 阶段 | **优化 Round 8 完成**（周期 2/3；`lastMergedRound=6`） |
+| 上次更新 | 2026-07-16 21:35 |
+| 单元 | **53/53 PASS**（含 swapAxes / chartLayout） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 7 对齐摘要
+## 2. Round 8 对齐摘要
 
-对照 `docs/requirements/table-chart-integration.md` + `docs/features/charts/common.md`：
+对照 `docs/features/charts/common.md` STYLE / CONFIGURE：
 
 | 需求 | 状态 |
 | --- | --- |
-| 入口延后 Vxe / 去掉 jspdf 误 preload | ✅ Round 7 |
-| 轴 Scale Linear/Log + 非正值回退提示 | ✅ Round 7 |
-| CONFIGURE 按图种必填槽位提示 + Save 拦截 | ✅ Round 7 |
-| 工作区 Tab：主区优先、侧栏视觉仍在左 | ✅ Round 7 |
+| STYLE Width / Height / Margins 四边 | ✅ Round 8 |
+| Legend Custom label + 方位映射 | ✅ Round 8 |
+| 一键交换 X/Y（映射 + Scale + Range） | ✅ Round 8 |
+| MODEL TABLES 原生表瘦身 EP；CSV/Combine `v-if` | ✅ Round 8 |
+| Edit/Transform idle preload + E2E 抽屉等待加固 | ✅ Round 8 |
 
 ## 3. 验证命令
 
@@ -35,11 +36,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 8 计划（下一 cron · 周期 2/3）
+## 4. Round 9 计划（下一 cron · 周期 3/3 · **合并点**）
 
 | ID | 描述 |
 | --- | --- |
-| UX | STYLE 边距/尺寸控件；图例 Label；交换 X/Y（common.md） |
-| Perf | 工作区首屏：echarts 已动态；评估 EP 大 chunk 按需拆分 |
-| A11y | Edit drawer 必填字段与 Scale 控件朗读抽检 |
-| Merge | Round 9 为下一合并点 |
+| UX | STYLE 系列取色 picker；Title 刷新恢复默认；点 Opacity 图种适用提示 |
+| Perf | 工作区 EP 共享 chunk（~305KB gzip）再评估：Collapse 按需 / 按钮路由拆分 |
+| A11y | 交换 X/Y 与 Margins 控件键盘/朗读抽检；抽屉关闭后焦点恢复 |
+| Merge | **合并 Round 7–9 到 main**（本周期 3/3） |
