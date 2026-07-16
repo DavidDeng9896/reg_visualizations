@@ -57,8 +57,8 @@
       </div>
     </div>
 
-    <CsvImportDialog v-model="showCsv" />
-    <CombineTablesDialog v-model="showCombine" />
+    <CsvImportDialog v-if="showCsv" v-model="showCsv" />
+    <CombineTablesDialog v-if="showCombine" v-model="showCombine" />
   </div>
   <div v-else class="loading">加载中…</div>
 </template>

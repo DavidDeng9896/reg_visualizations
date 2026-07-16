@@ -29,18 +29,45 @@
       <p>图表字段未配置完整，无法绘制有意义图形。</p>
       <el-button type="primary" @click="emit('open-edit')">Edit 图表字段</el-button>
     </div>
-    <div ref="elRef" class="canvas" :class="{ dimmed: missing.length }" />
+    <div
+      ref="elRef"
+      class="canvas"
+      :class="{ dimmed: missing.length }"
+      :style="canvasStyle"
+    />
     <el-collapse v-if="showModelTables" v-model="modelCollapse" class="models">
       <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
         <template v-if="hasModelRows">
           <h4>MODEL VARIABLES</h4>
-          <el-table :data="built.modelTables!.variables" size="small" max-height="120">
-            <el-table-column v-for="k in varKeys" :key="k" :prop="k" :label="k" />
-          </el-table>
+          <div class="model-table-wrap" role="region" aria-label="MODEL VARIABLES">
+            <table class="model-table">
+              <thead>
+                <tr>
+                  <th v-for="k in varKeys" :key="k" scope="col">{{ k }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in built.modelTables!.variables" :key="ri">
+                  <td v-for="k in varKeys" :key="k">{{ formatCell(row[k]) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <h4>MODEL OUTPUT</h4>
-          <el-table :data="built.modelTables!.output.slice(0, 50)" size="small" max-height="140">
-            <el-table-column v-for="k in outKeys" :key="k" :prop="k" :label="k" />
-          </el-table>
+          <div class="model-table-wrap" role="region" aria-label="MODEL OUTPUT">
+            <table class="model-table">
+              <thead>
+                <tr>
+                  <th v-for="k in outKeys" :key="k" scope="col">{{ k }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in built.modelTables!.output.slice(0, 50)" :key="ri">
+                  <td v-for="k in outKeys" :key="k">{{ formatCell(row[k]) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </template>
         <p v-else class="model-empty" role="status">
           拟合未成功，暂无 MODEL VARIABLES / OUTPUT。请查看上方拟合提示，调整数据或 4PL 约束后重试。
@@ -82,6 +109,17 @@ let renderQueued = false
 
 const missing = computed(() => missingRequiredFields(props.viewType, props.config.configure))
 
+const canvasStyle = computed(() => {
+  const s = props.config.style
+  const style: Record<string, string> = {}
+  if (s.width && Number.isFinite(s.width)) style.width = `${s.width}px`
+  if (s.height && Number.isFinite(s.height)) {
+    style.height = `${s.height}px`
+    style.minHeight = `${s.height}px`
+  }
+  return style
+})
+
 const built = computed(() =>
   buildChartOption({
     columns: props.columns,
@@ -113,6 +151,12 @@ const varKeys = computed(() =>
 const outKeys = computed(() =>
   built.value.modelTables?.output[0] ? Object.keys(built.value.modelTables.output[0]) : [],
 )
+
+function formatCell(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v * 1e6) / 1e6) : String(v)
+  return String(v)
+}
 
 async function ensureEngine() {
   if (echartsApi) return echartsApi
@@ -319,5 +363,32 @@ async function exportPdf() {
 h4 {
   margin: 6px 0;
   font-size: 13px;
+}
+.model-table-wrap {
+  max-height: 140px;
+  overflow: auto;
+  border: 1px solid var(--ia-border);
+  border-radius: 4px;
+}
+.model-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.model-table th,
+.model-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--ia-border);
+  text-align: left;
+  white-space: nowrap;
+}
+.model-table th {
+  position: sticky;
+  top: 0;
+  background: #f5f6f7;
+  font-weight: 600;
+}
+.model-table tbody tr:last-child td {
+  border-bottom: none;
 }
 </style>

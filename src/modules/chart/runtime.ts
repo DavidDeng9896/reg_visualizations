@@ -8,6 +8,7 @@ import {
   logScaleDataWarning,
   type AxisScale,
 } from './axisScale'
+import { buildGridOption, buildLegendOption } from './chartLayout'
 
 const SAMPLE_LIMIT = 10000
 
@@ -119,7 +120,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     subtext: style.subtitle || '',
     left: 'center',
   }
-  const legendShow = style.legendShow !== false
+  const legend = buildLegendOption(style)
   const xExtent = axisExtent({ mode: style.xRangeMode, min: style.xMin, max: style.xMax })
   const yExtent = axisExtent({ mode: style.yRangeMode, min: style.yMin, max: style.yMax })
 
@@ -230,14 +231,9 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     option = {
       title,
       color: colors,
-      legend: { show: legendShow, right: style.legendPosition === 'right' ? 10 : undefined },
+      legend,
       tooltip: { trigger: 'axis' },
-      grid: {
-        top: style.marginTop ?? 60,
-        right: style.marginRight ?? 40,
-        bottom: style.marginBottom ?? 50,
-        left: style.marginLeft ?? 60,
-      },
+      grid: buildGridOption(style),
       xAxis: {
         type: isH ? valueAxisType : 'category',
         data: isH ? undefined : cats,
@@ -354,14 +350,9 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
       title,
       color: colors,
       brush: { toolbox: ['rect', 'polygon', 'clear'], xAxisIndex: 0 },
-      legend: { show: legendShow, orient: 'vertical', right: 10 },
+      legend,
       tooltip: { trigger: 'item' },
-      grid: {
-        top: style.marginTop ?? 60,
-        right: style.marginRight ?? 80,
-        bottom: style.marginBottom ?? 50,
-        left: style.marginLeft ?? 60,
-      },
+      grid: buildGridOption(style, { right: 80 }),
       xAxis: {
         type: xAxisType,
         name: cfg.xLabel || x,
@@ -398,7 +389,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     option = {
       title,
       tooltip: { trigger: 'item' },
-      legend: { show: legendShow, orient: 'vertical', left: style.legendPosition === 'left' ? 0 : undefined, right: style.legendPosition === 'right' ? 0 : undefined },
+      legend,
       series: [
         {
           type: 'pie',
@@ -438,6 +429,8 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     option = {
       title,
       tooltip: { trigger: 'item' },
+      legend,
+      grid: buildGridOption(style),
       xAxis: { type: 'category', data: cats, name: cfg.xLabel || x },
       yAxis: { type: yAxisType, name: cfg.yLabel || y, scale: true, ...yExtent },
       series: [{ type: 'boxplot', data: boxData }],
@@ -461,7 +454,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     option = {
       title,
       tooltip: { position: 'top' },
-      grid: { top: 60, bottom: 80, left: 80, right: 60 },
+      grid: buildGridOption(style, { top: 60, bottom: 80, left: 80, right: 60 }),
       xAxis: { type: 'category', data: colKeys, name: cfg.xLabel || cf, splitArea: { show: true } },
       yAxis: { type: 'category', data: rowKeys, name: cfg.yLabel || rf, splitArea: { show: true } },
       visualMap: {

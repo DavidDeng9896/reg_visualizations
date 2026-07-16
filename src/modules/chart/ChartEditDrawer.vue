@@ -154,10 +154,20 @@
               <el-switch v-model="draft.configure.excludeFlagged" />
             </el-form-item>
             <el-form-item label="Custom X label">
-              <el-input v-model="draft.configure.xLabel" />
+              <el-input v-model="draft.configure.xLabel" aria-label="X 轴自定义标签" />
             </el-form-item>
             <el-form-item label="Custom Y label">
-              <el-input v-model="draft.configure.yLabel" />
+              <el-input v-model="draft.configure.yLabel" aria-label="Y 轴自定义标签" />
+            </el-form-item>
+            <el-form-item v-if="showXY" label="交换 X/Y">
+              <el-button
+                size="small"
+                aria-label="交换 X 与 Y 轴映射及轴级设置"
+                @click="onSwapAxes"
+              >
+                交换 X ↔ Y
+              </el-button>
+              <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。</p>
             </el-form-item>
             <el-form-item label="色板">
               <el-select v-model="draft.configure.colorPalette" style="width: 100%">
@@ -170,24 +180,106 @@
         </el-tab-pane>
         <el-tab-pane label="STYLE" name="style">
           <el-form label-width="110px" size="small">
-            <el-form-item label="Title"><el-input v-model="draft.style.title" /></el-form-item>
-            <el-form-item label="Subtitle"><el-input v-model="draft.style.subtitle" /></el-form-item>
+            <el-form-item label="Title">
+              <el-input v-model="draft.style.title" aria-label="图表标题" />
+            </el-form-item>
+            <el-form-item label="Subtitle">
+              <el-input v-model="draft.style.subtitle" aria-label="图表副标题" />
+            </el-form-item>
+            <el-form-item label="Width (px)">
+              <el-input-number
+                v-model="chartWidth"
+                :min="120"
+                :max="4000"
+                :controls="true"
+                style="width: 100%"
+                aria-label="图表宽度像素"
+                placeholder="自适应"
+              />
+            </el-form-item>
+            <el-form-item label="Height (px)">
+              <el-input-number
+                v-model="chartHeight"
+                :min="120"
+                :max="4000"
+                :controls="true"
+                style="width: 100%"
+                aria-label="图表高度像素"
+                placeholder="自适应"
+              />
+            </el-form-item>
+            <el-form-item label="Margins">
+              <div class="margins" role="group" aria-label="图表四边边距像素">
+                <label>
+                  <span>Top</span>
+                  <el-input-number
+                    v-model="marginTop"
+                    :min="0"
+                    :max="400"
+                    :controls="false"
+                    aria-label="上边距"
+                  />
+                </label>
+                <label>
+                  <span>Right</span>
+                  <el-input-number
+                    v-model="marginRight"
+                    :min="0"
+                    :max="400"
+                    :controls="false"
+                    aria-label="右边距"
+                  />
+                </label>
+                <label>
+                  <span>Bottom</span>
+                  <el-input-number
+                    v-model="marginBottom"
+                    :min="0"
+                    :max="400"
+                    :controls="false"
+                    aria-label="下边距"
+                  />
+                </label>
+                <label>
+                  <span>Left</span>
+                  <el-input-number
+                    v-model="marginLeft"
+                    :min="0"
+                    :max="400"
+                    :controls="false"
+                    aria-label="左边距"
+                  />
+                </label>
+              </div>
+            </el-form-item>
             <el-form-item label="Opacity">
-              <el-slider v-model="opacity" :min="0.1" :max="1" :step="0.05" />
+              <el-slider v-model="opacity" :min="0.1" :max="1" :step="0.05" aria-label="透明度" />
             </el-form-item>
             <el-form-item label="图例">
-              <el-switch v-model="draft.style.legendShow" />
+              <el-switch v-model="draft.style.legendShow" aria-label="显示图例" />
             </el-form-item>
             <el-form-item label="图例位置">
-              <el-select v-model="draft.style.legendPosition" style="width: 100%">
+              <el-select
+                v-model="draft.style.legendPosition"
+                style="width: 100%"
+                aria-label="图例位置"
+              >
                 <el-option label="Left" value="left" />
                 <el-option label="Right" value="right" />
                 <el-option label="Top" value="top" />
                 <el-option label="Bottom" value="bottom" />
               </el-select>
             </el-form-item>
+            <el-form-item label="图例 Label">
+              <el-input
+                v-model="draft.style.legendLabel"
+                clearable
+                placeholder="可选自定义前缀"
+                aria-label="图例自定义标签"
+              />
+            </el-form-item>
             <el-form-item label="点形状">
-              <el-select v-model="draft.style.pointShape" style="width: 100%">
+              <el-select v-model="draft.style.pointShape" style="width: 100%" aria-label="点形状">
                 <el-option label="circle" value="circle" />
                 <el-option label="rect" value="rect" />
                 <el-option label="triangle" value="triangle" />
@@ -284,6 +376,7 @@ import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis
 import { cloneDeep } from '@/shared/utils/clone'
 import { isManualRangeInvalid } from '@/modules/chart/axisRange'
 import { supportsAxisScale } from '@/modules/chart/axisScale'
+import { swapAxesConfigure, swapAxesStyle } from '@/modules/chart/swapAxes'
 import { missingRequiredFields } from '@/modules/chart/guessMapping'
 import { toast } from '@/shared/ui/feedback'
 
@@ -349,6 +442,40 @@ const opacity = computed({
     draft.value.style.opacity = v
   },
 })
+
+function marginProp(key: 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft', fallback: number) {
+  return computed({
+    get: () => draft.value.style[key] ?? fallback,
+    set: (v: number | undefined | null) => {
+      draft.value.style[key] = v == null || !Number.isFinite(v) ? undefined : v
+    },
+  })
+}
+
+const marginTop = marginProp('marginTop', 60)
+const marginRight = marginProp('marginRight', 40)
+const marginBottom = marginProp('marginBottom', 50)
+const marginLeft = marginProp('marginLeft', 60)
+
+const chartWidth = computed({
+  get: () => draft.value.style.width,
+  set: (v: number | undefined | null) => {
+    draft.value.style.width = v == null || !Number.isFinite(v) ? undefined : v
+  },
+})
+
+const chartHeight = computed({
+  get: () => draft.value.style.height,
+  set: (v: number | undefined | null) => {
+    draft.value.style.height = v == null || !Number.isFinite(v) ? undefined : v
+  },
+})
+
+function onSwapAxes() {
+  draft.value.configure = swapAxesConfigure(draft.value.configure)
+  draft.value.style = swapAxesStyle(draft.value.style)
+  toast('success', '已交换 X/Y 映射与轴级设置')
+}
 
 const fitMin = computed({
   get: () => draft.value.configure.fitConstraints?.min ?? undefined,
@@ -531,5 +658,21 @@ function save() {
   font-size: 12px;
   line-height: 1.4;
   color: #c45656;
+}
+.margins {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+.margins label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #646a73;
+}
+.margins :deep(.el-input-number) {
+  width: 100%;
 }
 </style>
