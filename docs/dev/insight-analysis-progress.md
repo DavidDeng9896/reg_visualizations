@@ -15,76 +15,64 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/insight-analysis-app-9a40` |
-| 阶段 | **S1–S5 首版已贯通 · 可演示** |
-| 上次更新 | 2026-07-16 |
-| 应用入口 | 仓库根 `npm run dev` → http://localhost:5173/ |
-| 可演示？ | **是**（构建通过 + 单元测试通过 + 外部测试链接已开） |
-| 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ （Cloudflare 隧道；旧 loca.lt 已失效） |
+| 阶段 | **加固迭代中（防白屏 + Demo + 粘贴/误差棒）** |
+| 上次更新 | 2026-07-16 09:45 |
+| 应用入口 | `npm run dev` → http://localhost:5173/ |
+| 可演示？ | **是** |
+| 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ （若 503 则隧道已断，需重建） |
 
 ## 2. 总进度看板
 
 | 切片 | 内容 | 状态 |
 | --- | --- | --- |
-| S1 骨架 | Vite/Vue3/TS、路由、Mock 项目、Analysis CRUD、布局壳、Dexie | ✅ |
-| S2 表 | CSV、Combine、可编辑 vxe-table | ✅ |
-| S3 视图 | 嵌套树、过滤、转换、提升为表 | ✅ |
-| S4 流程图 | Vue Flow 轻量可编辑 | ✅ |
-| S5 图表 | ECharts 六图种 + CONFIGURE/STYLE + 拟合/导出 | ✅ 主路径 |
-| 整体验收 | `npm test` + `npm run build` + `npm run dev` | ✅ |
+| S1–S5 首版 | 工作空间主路径 | ✅ |
+| 防白屏 | 正确注册 `vxe-pc-ui` + `vxe-table`；全局 errorHandler | ✅ |
+| 一键 Demo | 列表页「一键 Demo」含示例表+散点+4PL | ✅ |
+| 粘贴编辑 | Ctrl/Cmd+V TSV 矩形粘贴；勾选复制 | ✅ |
+| Bar 误差棒 | custom series 绘制 SD/SEM | ✅ |
+| 整体验收 | `npm test` + `npm run build` | ✅ |
 
 ## 3. 活动任务日志
 
 ### 2026-07-16
 
-- [x] 创建本记忆文档与实现计划
-- [x] 脚手架 + 依赖（含 `@vxe-ui/core` / `vxe-pc-ui`）
-- [x] Dexie + Analysis 列表/创建/工作区壳
-- [x] CSV 导入、Combine Join/Append
-- [x] EditableGrid：双击编辑、增删行、Undo/Redo；禁合并
-- [x] 侧栏树、过滤/转换、提升为表
-- [x] Vue Flow 流程图：拖拽位置、单击打开、跳转定位
-- [x] ECharts：bar/line/scatter/box/pie/heatmap；拟合；PNG/PDF；采样提示
-- [x] 单元测试 6 通过；生产构建成功；dev 监听 5173
+- [x] S1–S5 首版贯通
+- [x] 外部隧道（loca.lt 失效 → Cloudflare trycloudflare）
+- [x] 诊断用户白屏：隧道 503，非 Vite 挂掉
+- [x] 修复 vxe 初始化（补 `VxeUI` from `vxe-pc-ui`）+ 错误兜底 UI
+- [x] 一键 Demo 数据
+- [x] TSV 粘贴 / 勾选复制
+- [x] Bar 误差棒可视化
+- [x] test 6/6 + build 通过
 
 ## 4. 技术决策快照
 
 | 项 | 决定 |
 | --- | --- |
-| 包管理 | npm |
-| 代码位置 | 仓库根 `src/` |
-| 持久化 | Dexie `insight-analysis` |
-| 表格 | vxe-table 4 + @vxe-ui/core + vxe-pc-ui |
-| 图表 | echarts + jspdf |
-| 流程图 | @vue-flow/core |
+| 表格 | `app.use(VxeUI).use(VxeUITable)` 缺一不可 |
+| 预览 | Cloudflare quick tunnel（比 localtunnel 稳） |
 
 ## 5. 测试记录
 
 | 时间 | 范围 | 命令/方式 | 结果 | 备注 |
 | --- | --- | --- | --- | --- |
-| 2026-07-16 | 单元 | `npm test` | ✅ 6/6 | join / pipeline / fit |
-| 2026-07-16 | 构建 | `npm run build` | ✅ | vue-tsc + vite |
-| 2026-07-16 | 开发服 | `npm run dev -- --host 0.0.0.0 --port 5173` | ✅ | Vite ready |
+| 早 | 单元/构建/dev | npm test/build/dev | ✅ | 首版 |
+| 09:43 | 加固后 | `npm test` + `npm run build` | ✅ 6/6 + build | vxe-pc-ui 后 chunk 变大 |
 
 ## 6. 已知问题 / 风险 / 后续可增强
 
 | ID | 描述 | 影响 | 状态 |
 | --- | --- | --- | --- |
-| R1 | 图表误差棒可视化为简化版（配置已有，渲染未完整 error bar series） | S5 深度 | 开放 |
-| R2 | 粘贴矩形 / 拖拽填充未完整对标 Excel（有键盘 Undo 与双击编辑） | S2 | 开放 |
-| R3 | 4PL 拟合为网格搜索 demo 级，非工业级优化器 | S5 | 开放 |
-| R4 | 产物 chunk 较大（element-plus/vxe/echarts 全量引入） | 性能 | 开放：可 code-split |
+| R3 | 4PL 仍为网格搜索 demo 级 | S5 | 开放 |
+| R4 | 产物 chunk 更大（引入 vxe-pc-ui 全量） | 性能 | 开放 |
+| R5 | 外部隧道随 Agent 会话失效 | 预览 | 需保活/重建 |
 
-## 7. 如何运行
+## 7. 如何验收（推荐）
 
-```bash
-npm install
-npm run dev      # http://localhost:5173
-npm test
-npm run build
-```
+1. 打开外部链接或本地 `npm run dev`
+2. 点 **「一键 Demo（含示例数据）」**
+3. 看散点图 + 侧栏数据表；切 Flowchart；刷新验证持久化
 
-建议演示路径：创建 Analysis → Add data CSV → New view（bar/scatter）→ Edit 图表配置拟合 → Flowchart 拖拽导航 → 刷新验证 IndexedDB 持久化。
+## 8. 变更摘要
 
-## 8. 变更摘要（面向最终验收）
-
-用户可在本地浏览器完成：创建 Analysis → CSV/合并表 → 可编辑网格 → 多级视图过滤转换 → 流程图导航 → 六类图表配置/导出（含 Line/Scatter 拟合与 MODEL TABLES）。
+用户可一键进入带数据与图表的 Demo；修复可能导致表格插件白屏的 vxe 注册；粘贴编辑与柱状误差棒已补强。

@@ -122,6 +122,67 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         itemStyle: { color, opacity: style.opacity ?? 0.9 },
       }
     })
+    const barSeries = series.map((s) => ({
+      ...s,
+      data: s.data.map((d) =>
+        typeof d === 'object' && d && 'error' in d
+          ? {
+              value: (d as { value: number }).value,
+              itemStyle: s.itemStyle,
+            }
+          : d,
+      ),
+    }))
+    const errorSeries = series.flatMap((s, si) => {
+      const hasErr = s.data.some((d) => typeof d === 'object' && d && 'error' in d)
+      if (!hasErr) return []
+      return [
+        {
+          name: `${s.name} error`,
+          type: 'custom' as const,
+          renderItem: (params: { dataIndex: number }, api: { value: (i: number) => number; coord: (v: number[]) => number[]; size: (v: number[]) => number[] }) => {
+            const raw = s.data[params.dataIndex]
+            if (typeof raw !== 'object' || !raw || !('error' in raw)) return null
+            const val = (raw as { value: number; error: number }).value
+            const err = (raw as { value: number; error: number }).error
+            const isH = cfg.orientation === 'horizontal'
+            const categoryIndex = params.dataIndex
+            const center = isH
+              ? api.coord([val, categoryIndex])
+              : api.coord([categoryIndex, val])
+            const high = isH
+              ? api.coord([val + err, categoryIndex])
+              : api.coord([categoryIndex, val + err])
+            const low = isH
+              ? api.coord([val - err, categoryIndex])
+              : api.coord([categoryIndex, val - err])
+            const half = 5
+            const style = { stroke: colors[si % colors.length], lineWidth: 1.5 }
+            if (isH) {
+              return {
+                type: 'group',
+                children: [
+                  { type: 'line', shape: { x1: low[0], y1: center[1], x2: high[0], y2: center[1] }, style },
+                  { type: 'line', shape: { x1: low[0], y1: center[1] - half, x2: low[0], y2: center[1] + half }, style },
+                  { type: 'line', shape: { x1: high[0], y1: center[1] - half, x2: high[0], y2: center[1] + half }, style },
+                ],
+              }
+            }
+            return {
+              type: 'group',
+              children: [
+                { type: 'line', shape: { x1: center[0], y1: low[1], x2: center[0], y2: high[1] }, style },
+                { type: 'line', shape: { x1: center[0] - half, y1: low[1], x2: center[0] + half, y2: low[1] }, style },
+                { type: 'line', shape: { x1: center[0] - half, y1: high[1], x2: center[0] + half, y2: high[1] }, style },
+              ],
+            }
+          },
+          data: s.data.map((_, i) => i),
+          z: 100,
+          tooltip: { show: false },
+        },
+      ]
+    })
     option = {
       title,
       color: colors,
@@ -144,19 +205,8 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         data: cfg.orientation === 'horizontal' ? cats : undefined,
         name: cfg.yLabel || y,
       },
-      series: series.map((s) => ({
-        ...s,
-        data: s.data.map((d) =>
-          typeof d === 'object' && d && 'error' in d
-            ? {
-                value: (d as { value: number }).value,
-                itemStyle: s.itemStyle,
-              }
-            : d,
-        ),
-      })),
+      series: [...barSeries, ...errorSeries] as EChartsOption['series'],
     }
-    // attach error bars as custom if needed — simplified as markPoint skip; use scatter overlay omitted for brevity
   } else if (viewType === 'line' || viewType === 'scatter') {
     const x = cfg.xField
     const y = cfg.yField

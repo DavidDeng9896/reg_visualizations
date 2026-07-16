@@ -1,12 +1,12 @@
 <template>
-  <div class="grid-wrap" @keydown="onKey">
+  <div class="grid-wrap" tabindex="0" @keydown="onKey" @paste="onPaste">
     <div class="bar">
       <el-button size="small" :disabled="!editable" @click="insertRow">插入行</el-button>
       <el-button size="small" :disabled="!editable" @click="removeRows">删除选中行</el-button>
       <el-button size="small" :disabled="!editable" @click="undo">Undo</el-button>
       <el-button size="small" :disabled="!editable" @click="redo">Redo</el-button>
       <span v-if="!editable" class="hint">当前视图含过滤/转换，表格只读；可提升为表后编辑</span>
-      <span class="hint">双击编辑 · Ctrl/Cmd+C/V 复制粘贴 · 不支持合并单元格</span>
+      <span class="hint">双击编辑 · Ctrl/Cmd+C/V 复制粘贴（TSV）· 不支持合并单元格</span>
     </div>
     <vxe-table
       ref="tableRef"
@@ -19,6 +19,7 @@
       :keyboard-config="{ isClip: true, isEdit: editable }"
       keep-source
       @edit-closed="onEditClosed"
+      @cell-selected="onCellSelected"
     >
       <vxe-column v-if="editable" type="checkbox" width="48" />
       <vxe-column
@@ -46,10 +47,14 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [Record<string, unknown>[]] }>()
 
-const tableRef = ref<{ getCheckboxRecords: () => Record<string, unknown>[] } | null>(null)
+const tableRef = ref<{
+  getCheckboxRecords: () => Record<string, unknown>[]
+  getSelectedCell?: () => { row: Record<string, unknown>; column: { field: string } } | null
+} | null>(null)
 const rows = ref<Record<string, unknown>[]>([])
 const undoStack = ref<string[]>([])
 const redoStack = ref<string[]>([])
+const anchor = ref<{ rowIndex: number; field: string } | null>(null)
 
 watch(
   () => props.modelValue,
@@ -66,7 +71,10 @@ function pushUndo() {
 }
 
 function commit() {
-  emit('update:modelValue', rows.value.map((r) => ({ ...r })))
+  emit(
+    'update:modelValue',
+    rows.value.map((r) => ({ ...r })),
+  )
 }
 
 function onEditClosed({ row, column }: { row: Record<string, unknown>; column: { field: string } }) {
@@ -80,6 +88,11 @@ function onEditClosed({ row, column }: { row: Record<string, unknown>; column: {
   pushUndo()
   row[column.field] = next
   commit()
+}
+
+function onCellSelected(params: { row: Record<string, unknown>; column: { field: string } }) {
+  const idx = rows.value.findIndex((r) => r.__rowId === params.row.__rowId)
+  if (idx >= 0) anchor.value = { rowIndex: idx, field: params.column.field }
 }
 
 function insertRow() {
@@ -118,6 +131,42 @@ function redo() {
   commit()
 }
 
+function onPaste(e: ClipboardEvent) {
+  if (!props.editable) return
+  const text = e.clipboardData?.getData('text/plain')
+  if (!text || !text.includes('\t') && !text.includes('\n')) return
+  e.preventDefault()
+  const matrix = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .filter((line) => line.length)
+    .map((line) => line.split('\t'))
+  if (!matrix.length) return
+
+  const startRow = anchor.value?.rowIndex ?? 0
+  const startField = anchor.value?.field || props.columns[0]?.field
+  const startCol = Math.max(
+    0,
+    props.columns.findIndex((c) => c.field === startField),
+  )
+
+  pushUndo()
+  for (let r = 0; r < matrix.length; r++) {
+    const rowIndex = startRow + r
+    while (rowIndex >= rows.value.length) {
+      rows.value.push({ __rowId: crypto.randomUUID() })
+    }
+    for (let c = 0; c < matrix[r].length; c++) {
+      const col = props.columns[startCol + c]
+      if (!col) break
+      rows.value[rowIndex][col.field] = coerceValue(matrix[r][c], col.dataType)
+    }
+  }
+  commit()
+  ElMessage.success(`已粘贴 ${matrix.length}×${matrix[0].length} 区域`)
+}
+
 function onKey(e: KeyboardEvent) {
   if (!props.editable) return
   const mod = e.metaKey || e.ctrlKey
@@ -127,6 +176,19 @@ function onKey(e: KeyboardEvent) {
   } else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
     e.preventDefault()
     redo()
+  } else if (mod && e.key.toLowerCase() === 'c') {
+    // allow native copy; also provide TSV of checkbox selection
+    const selected = tableRef.value?.getCheckboxRecords?.() || []
+    if (selected.length) {
+      e.preventDefault()
+      const fields = props.columns.map((c) => c.field)
+      const tsv = [
+        fields.join('\t'),
+        ...selected.map((row) => fields.map((f) => String(row[f] ?? '')).join('\t')),
+      ].join('\n')
+      navigator.clipboard.writeText(tsv)
+      ElMessage.success(`已复制 ${selected.length} 行`)
+    }
   }
 }
 </script>
@@ -137,6 +199,7 @@ function onKey(e: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   background: #fff;
+  outline: none;
 }
 .bar {
   display: flex;

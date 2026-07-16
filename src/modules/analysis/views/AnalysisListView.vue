@@ -5,7 +5,10 @@
         <h1>Insight Analysis</h1>
         <p class="sub">本地数据工作空间 · 导入 · 转换 · 可视化</p>
       </div>
-      <el-button type="primary" @click="showCreate = true">+ 创建 Analysis</el-button>
+      <div class="top-actions">
+        <el-button @click="createDemo">一键 Demo（含示例数据）</el-button>
+        <el-button type="primary" @click="showCreate = true">+ 创建 Analysis</el-button>
+      </div>
     </header>
 
     <div class="toolbar">
@@ -54,6 +57,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
+import { createDemoTable } from '@/shared/mock/demoData'
 
 const store = useAnalysisStore()
 const router = useRouter()
@@ -79,6 +83,34 @@ async function create() {
   router.push(`/analyses/${a.id}`)
 }
 
+async function createDemo() {
+  const a = await store.createAnalysis('Demo Dose Response', MOCK_PROJECTS[0].id)
+  await store.openAnalysis(a.id)
+  const table = createDemoTable()
+  store.addTable(table)
+  store.addView(table.id, table.id, 'Scatter Dose-Response', 'scatter')
+  const sv = store.selectedView
+  if (sv) {
+    store.setChartConfig(sv.view.id, {
+      ...sv.view.chartConfig,
+      configure: {
+        ...sv.view.chartConfig.configure,
+        xField: 'dose',
+        yField: 'response',
+        seriesField: 'compound',
+        fitModel: '4pl',
+      },
+      style: {
+        ...sv.view.chartConfig.style,
+        title: 'Dose Response',
+        subtitle: 'Demo dataset',
+      },
+    })
+  }
+  ElMessage.success('已创建 Demo Analysis')
+  router.push(`/analyses/${a.id}`)
+}
+
 function open(row: { id: string }) {
   router.push(`/analyses/${row.id}`)
 }
@@ -101,6 +133,10 @@ async function onRemove(id: string) {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
+}
+.top-actions {
+  display: flex;
+  gap: 8px;
 }
 h1 {
   margin: 0 0 6px;
