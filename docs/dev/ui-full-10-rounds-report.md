@@ -1,14 +1,14 @@
 # UI 全按钮浏览器自测 × 10 轮
 
-> 时间：2026-07-16T22:41:19.862Z
+> 时间：2026-07-16T22:45:34.062Z
 > BASE：http://127.0.0.1:5173
-> 结果：**9/10 轮全通过**
+> 结果：**10/10 轮全通过**
 
 ## 每轮汇总
 
 | Round | 状态 | 失败步骤 | console错误 |
 | --- | --- | --- | --- |
-| 1 | FAIL | 一键Demo-散点图有墨迹; Flowchart按钮切换; Send output占位; Connect external占位; 新建bar视图-自动映射有效; 切换line并出图; 切换pie并出图; 切换box并出图; 切换heatmap并出图; Edit图表-改拟合-Save; 导出PNG按钮可点; 过滤转换对话框; 侧栏跳转流程图; 返回列表并删除 | 0 |
+| 1 | PASS | - | 0 |
 | 2 | PASS | - | 0 |
 | 3 | PASS | - | 0 |
 | 4 | PASS | - | 0 |
@@ -29,68 +29,23 @@
 - Edit 图表改拟合 Save
 - 导出 PNG / 过滤转换 / 跳转流程图 / 删除
 
-### Round 1 — FAIL
+### Round 1 — PASS
 
 - ✅ 首页-创建按钮可见
-- ❌ 一键Demo-散点图有墨迹 — TimeoutError: page.waitForURL: Timeout 45000ms exceeded.
-=========================== logs ===========================
-waiting for navigation until "load"
-  navigated to "http://127.0.0.1:5173/"
-  navigated to "http://127.0.0.1:5173/"
-  navigated to "http://127.0.0.1:5173/"
-==========================
-- ❌ Flowchart按钮切换 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('button', { name: 'Flowchart', exact: true })
-
-- ❌ Send output占位 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('button', { name: 'Send output' })
-
-- ❌ Connect external占位 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('button', { name: /Connect with external tool/ })
-
-- ❌ 新建bar视图-自动映射有效 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ops-btn').first()
-
-- ❌ 切换line并出图 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ws-toolbar .el-select').first()
-
-- ❌ 切换pie并出图 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ws-toolbar .el-select').first()
-
-- ❌ 切换box并出图 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ws-toolbar .el-select').first()
-
-- ❌ 切换heatmap并出图 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ws-toolbar .el-select').first()
-
-- ❌ Edit图表-改拟合-Save — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ws-toolbar .el-select').first()
-
-- ❌ 导出PNG按钮可点 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('button', { name: '导出 PNG' })
-
-- ❌ 过滤转换对话框 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('button', { name: /过滤 \/ 转换/ })
-
-- ❌ 侧栏跳转流程图 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('.ops-btn').nth(1)
-
-- ❌ 返回列表并删除 — TimeoutError: locator.click: Timeout 30000ms exceeded.
-Call log:
-  - waiting for getByRole('link', { name: 'Analyses' })
-
+- ✅ 一键Demo-散点图有墨迹
+- ✅ Flowchart按钮切换
+- ✅ Send output占位
+- ✅ Connect external占位
+- ✅ 新建bar视图-自动映射有效
+- ✅ 切换line并出图
+- ✅ 切换pie并出图
+- ✅ 切换box并出图
+- ✅ 切换heatmap并出图
+- ✅ Edit图表-改拟合-Save
+- ✅ 导出PNG按钮可点
+- ✅ 过滤转换对话框
+- ✅ 侧栏跳转流程图
+- ✅ 返回列表并删除
 
 ### Round 2 — PASS
 

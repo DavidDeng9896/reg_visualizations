@@ -9,24 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-2d33cfc7-a662-4258-98d1-165d07330ffe-c9aa`（Round 8） |
-| 阶段 | **优化 Round 8 完成**（周期 2/3；`lastMergedRound=6`） |
-| 上次更新 | 2026-07-16 21:35 |
-| 单元 | **53/53 PASS**（含 swapAxes / chartLayout） |
+| 分支 | `cursor/bc-7aef9e09-29d6-48ea-bcec-9ec54962f841-2474`（Round 7–9） |
+| 阶段 | **优化 Round 9 完成（合并点）→ PR 合并 main** |
+| 上次更新 | 2026-07-16 22:45 |
+| 单元 | **66/66 PASS**（含 seriesStyle） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 8 对齐摘要
+## 2. Round 9 对齐摘要
 
-对照 `docs/features/charts/common.md` STYLE / CONFIGURE：
+对照 `docs/features/charts/common.md` STYLE：
 
 | 需求 | 状态 |
 | --- | --- |
-| STYLE Width / Height / Margins 四边 | ✅ Round 8 |
-| Legend Custom label + 方位映射 | ✅ Round 8 |
-| 一键交换 X/Y（映射 + Scale + Range） | ✅ Round 8 |
-| MODEL TABLES 原生表瘦身 EP；CSV/Combine `v-if` | ✅ Round 8 |
-| Edit/Transform idle preload + E2E 抽屉等待加固 | ✅ Round 8 |
+| STYLE 系列取色 picker（覆盖色板） | ✅ Round 9 |
+| Title 刷新恢复默认（视图/表名） | ✅ Round 9 |
+| Opacity 图种适用提示 | ✅ Round 9 |
+| MODEL TABLES 原生 `<details>`（去 el-collapse） | ✅ Round 9 |
+| 抽屉关闭焦点恢复加固；Demo 冷启动竞态 | ✅ Round 9 |
+| 交换 X/Y / Margins a11y | ✅ Round 9 |
 
 ## 3. 验证命令
 
@@ -36,11 +37,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 9 计划（下一 cron · 周期 3/3 · **合并点**）
+## 4. Round 10 计划（下一 cron · 新周期 1/3）
 
 | ID | 描述 |
 | --- | --- |
-| UX | STYLE 系列取色 picker；Title 刷新恢复默认；点 Opacity 图种适用提示 |
-| Perf | 工作区 EP 共享 chunk（~305KB gzip）再评估：Collapse 按需 / 按钮路由拆分 |
-| A11y | 交换 X/Y 与 Margins 控件键盘/朗读抽检；抽屉关闭后焦点恢复 |
-| Merge | **合并 Round 7–9 到 main**（本周期 3/3） |
+| Perf | EP 共享 `index-*` ~305KB gzip 仍在：评估 Select/Dropdown 按路由异步，忌 `manualChunks('element-plus')` |
+| UX | Point Shape 图种适用；色板预览色块（common.md §2.5） |
+| A11y | 系列取色原生 color input 键盘抽检；STYLE 长表单分区标题 |
+| Merge | Round 10 起新 3 轮周期；`lastMergedRound` 应为 9 |
