@@ -12,6 +12,10 @@
         <strong>拟合提示：</strong>
         <span v-for="(w, i) in built.fitWarnings" :key="i">{{ w }}</span>
       </div>
+      <div v-if="built.axisWarnings?.length" class="fit-warn" role="status">
+        <strong>轴 Scale：</strong>
+        <span v-for="(w, i) in built.axisWarnings" :key="i">{{ w }}</span>
+      </div>
       <el-button size="small" :loading="engineLoading" @click="downloadFull">下载完整数据 CSV</el-button>
       <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPng">
         导出 PNG

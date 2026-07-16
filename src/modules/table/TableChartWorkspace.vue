@@ -1,7 +1,7 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
-    <a class="skip-link" href="#ws-main">跳到表图工作区</a>
-    <div class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏">
+    <a class="skip-link" href="#ws-toolbar">跳到工具栏</a>
+    <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1">
       <template v-if="store.selectedView">
         <div class="tb-group" role="group" aria-label="视图">
           <span class="tb-label">视图</span>
@@ -112,6 +112,7 @@
       v-model="showChartEdit"
       :config="chartConfig"
       :columns="store.workspaceResult.columns"
+      :view-type="viewType"
       @save="onChartSave"
     />
   </div>

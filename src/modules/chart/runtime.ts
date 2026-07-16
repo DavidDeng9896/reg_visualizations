@@ -3,6 +3,11 @@ import type { EChartsOption } from 'echarts'
 import { fitSeries } from './fitEngine'
 import { missingRequiredFields } from './guessMapping'
 import { axisExtent } from './axisRange'
+import {
+  echartsValueAxisType,
+  logScaleDataWarning,
+  type AxisScale,
+} from './axisScale'
 
 const SAMPLE_LIMIT = 10000
 
@@ -20,6 +25,8 @@ export interface ChartBuildResult {
   modelTables?: { variables: Record<string, unknown>[]; output: Record<string, unknown>[] }
   /** 拟合边界/失败提示（按系列去重后展示） */
   fitWarnings?: string[]
+  /** 轴 Scale（如 Log）回退提示 */
+  axisWarnings?: string[]
 }
 
 function sampleRows(rows: Record<string, unknown>[]) {
@@ -33,6 +40,15 @@ function sampleRows(rows: Record<string, unknown>[]) {
 function num(v: unknown): number | null {
   const n = Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+function resolveAxisType(scale: AxisScale | undefined, values: number[], warnings: string[]): 'value' | 'log' {
+  const warn = logScaleDataWarning(scale, values)
+  if (warn) {
+    if (!warnings.includes(warn)) warnings.push(warn)
+    return 'value'
+  }
+  return echartsValueAxisType(scale)
 }
 
 function palette(name?: string): string[] {
@@ -110,6 +126,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
   let option: EChartsOption = {}
   let modelTables: ChartBuildResult['modelTables']
   let fitWarnings: string[] | undefined
+  const axisWarnings: string[] = []
 
   if (viewType === 'bar') {
     const x = cfg.xField
@@ -205,6 +222,11 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         },
       ]
     })
+    const measureVals = series.flatMap((s) =>
+      s.data.map((d) => (typeof d === 'object' && d && 'value' in d ? (d as { value: number }).value : (d as number))),
+    )
+    const isH = cfg.orientation === 'horizontal'
+    const valueAxisType = resolveAxisType(isH ? cfg.xScale : cfg.yScale, measureVals, axisWarnings)
     option = {
       title,
       color: colors,
@@ -217,17 +239,17 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         left: style.marginLeft ?? 60,
       },
       xAxis: {
-        type: cfg.orientation === 'horizontal' ? 'value' : 'category',
-        data: cfg.orientation === 'horizontal' ? undefined : cats,
+        type: isH ? valueAxisType : 'category',
+        data: isH ? undefined : cats,
         name: cfg.xLabel || x,
         scale: true,
-        ...(cfg.orientation === 'horizontal' ? yExtent : undefined),
+        ...(isH ? yExtent : undefined),
       },
       yAxis: {
-        type: cfg.orientation === 'horizontal' ? 'category' : 'value',
-        data: cfg.orientation === 'horizontal' ? cats : undefined,
+        type: isH ? 'category' : valueAxisType,
+        data: isH ? cats : undefined,
         name: cfg.yLabel || y,
-        ...(cfg.orientation === 'horizontal' ? undefined : yExtent),
+        ...(isH ? undefined : yExtent),
       },
       series: [...barSeries, ...errorSeries] as EChartsOption['series'],
     }
@@ -305,6 +327,29 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
 
     modelTables = { variables, output: outputs }
     if (warnings.length) fitWarnings = warnings
+    const xVals = series.flatMap((s) =>
+      Array.isArray((s as { data?: { value?: number[] }[] }).data)
+        ? ((s as { data: { value?: number[] }[] }).data || [])
+            .map((d) => d.value?.[0])
+            .filter((v): v is number => v != null)
+        : [],
+    )
+    const yVals = series.flatMap((s) =>
+      Array.isArray((s as { data?: { value?: number[] }[] }).data)
+        ? ((s as { data: { value?: number[] }[] }).data || [])
+            .map((d) => d.value?.[1])
+            .filter((v): v is number => v != null)
+        : [],
+    )
+    // Prefer raw numeric points for scale validation (fit curves may include extrapolated values)
+    const rawX = rows
+      .map((r) => num(r[x || '']))
+      .filter((v): v is number => v != null)
+    const rawY = rows
+      .map((r) => num(r[y || '']))
+      .filter((v): v is number => v != null)
+    const xAxisType = resolveAxisType(cfg.xScale, rawX.length ? rawX : xVals, axisWarnings)
+    const yAxisType = resolveAxisType(cfg.yScale, rawY.length ? rawY : yVals, axisWarnings)
     option = {
       title,
       color: colors,
@@ -318,14 +363,14 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         left: style.marginLeft ?? 60,
       },
       xAxis: {
-        type: 'value',
+        type: xAxisType,
         name: cfg.xLabel || x,
         scale: true,
         ...xExtent,
       },
       yAxis: [
         {
-          type: 'value',
+          type: yAxisType,
           name: cfg.yLabel || y,
           scale: true,
           ...yExtent,
@@ -388,11 +433,13 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
       const high = Math.min(vals[vals.length - 1], q3 + 1.5 * iqr)
       return [low, q1, q2, q3, high]
     })
+    const yVals = boxData.flat()
+    const yAxisType = resolveAxisType(cfg.yScale, yVals, axisWarnings)
     option = {
       title,
       tooltip: { trigger: 'item' },
       xAxis: { type: 'category', data: cats, name: cfg.xLabel || x },
-      yAxis: { type: 'value', name: cfg.yLabel || y, scale: true, ...yExtent },
+      yAxis: { type: yAxisType, name: cfg.yLabel || y, scale: true, ...yExtent },
       series: [{ type: 'boxplot', data: boxData }],
     }
   } else if (viewType === 'heatmap') {
@@ -428,7 +475,14 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     }
   }
 
-  return { option, sampled, totalRows: input.rows.length, modelTables, fitWarnings }
+  return {
+    option,
+    sampled,
+    totalRows: input.rows.length,
+    modelTables,
+    fitWarnings,
+    axisWarnings: axisWarnings.length ? axisWarnings : undefined,
+  }
 }
 
 export { SAMPLE_LIMIT }

@@ -11,44 +11,83 @@
     <div ref="panelRef" class="drawer-panel" @keydown="onTrapKeydown">
       <el-tabs v-model="tab">
         <el-tab-pane label="CONFIGURE" name="configure">
+          <p v-if="configureMiss.length" class="cfg-miss" role="alert">
+            必填槽位未完成：{{ configureMiss.join('、') }}。请按当前图种补齐后再保存。
+          </p>
           <el-form label-width="110px" size="small">
-            <el-form-item label="X / Categories">
-              <el-select v-model="draft.configure.xField" clearable style="width: 100%">
+            <el-form-item v-if="showXY" :required="true" label="X / Categories">
+              <el-select
+                v-model="draft.configure.xField"
+                clearable
+                style="width: 100%"
+                aria-label="X 或 Categories 字段"
+                :aria-invalid="!draft.configure.xField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="`${c.title} (${c.dataType})`" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Y / Measure">
-              <el-select v-model="draft.configure.yField" clearable style="width: 100%">
+            <el-form-item v-if="showXY" :required="true" label="Y / Measure">
+              <el-select
+                v-model="draft.configure.yField"
+                clearable
+                style="width: 100%"
+                aria-label="Y 或 Measure 字段"
+                :aria-invalid="!draft.configure.yField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="`${c.title} (${c.dataType})`" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Series / Color">
+            <el-form-item v-if="showXY" label="Series / Color">
               <el-select v-model="draft.configure.seriesField" clearable style="width: 100%">
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Categories(Pie)">
-              <el-select v-model="draft.configure.categoriesField" clearable style="width: 100%">
+            <el-form-item v-if="showPie" :required="true" label="Categories(Pie)">
+              <el-select
+                v-model="draft.configure.categoriesField"
+                clearable
+                style="width: 100%"
+                aria-label="Pie Categories 字段"
+                :aria-invalid="!draft.configure.categoriesField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Measure(Pie)">
+            <el-form-item v-if="showPie" label="Measure(Pie)">
               <el-select v-model="draft.configure.measureField" clearable style="width: 100%">
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Heatmap Row">
-              <el-select v-model="draft.configure.heatmapRowField" clearable style="width: 100%">
+            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Row">
+              <el-select
+                v-model="draft.configure.heatmapRowField"
+                clearable
+                style="width: 100%"
+                aria-label="Heatmap 行字段"
+                :aria-invalid="!draft.configure.heatmapRowField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Heatmap Col">
-              <el-select v-model="draft.configure.heatmapColField" clearable style="width: 100%">
+            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Col">
+              <el-select
+                v-model="draft.configure.heatmapColField"
+                clearable
+                style="width: 100%"
+                aria-label="Heatmap 列字段"
+                :aria-invalid="!draft.configure.heatmapColField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
-            <el-form-item label="Heatmap Value">
-              <el-select v-model="draft.configure.heatmapValueField" clearable style="width: 100%">
+            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Value">
+              <el-select
+                v-model="draft.configure.heatmapValueField"
+                clearable
+                style="width: 100%"
+                aria-label="Heatmap 值字段"
+                :aria-invalid="!draft.configure.heatmapValueField || undefined"
+              >
                 <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
               </el-select>
             </el-form-item>
@@ -213,6 +252,21 @@
                 Y 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
               </p>
             </template>
+            <template v-if="showScale">
+              <el-form-item v-if="showXScale" label="X Scale">
+                <el-select v-model="xScale" style="width: 100%" aria-label="X 轴 Scale">
+                  <el-option label="Linear" value="linear" />
+                  <el-option label="Log" value="log" />
+                </el-select>
+              </el-form-item>
+              <el-form-item v-if="showYScale" label="Y Scale">
+                <el-select v-model="yScale" style="width: 100%" aria-label="Y 轴 Scale">
+                  <el-option label="Linear" value="linear" />
+                  <el-option label="Log" value="log" />
+                </el-select>
+              </el-form-item>
+              <p class="fit-hint" role="note">对数轴（Log）要求数据全部为正值；否则运行时回退 Linear 并提示。</p>
+            </template>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -226,12 +280,19 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { ChartConfig, TableColumn } from '@/shared/types/analysis'
+import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import { cloneDeep } from '@/shared/utils/clone'
 import { isManualRangeInvalid } from '@/modules/chart/axisRange'
+import { supportsAxisScale } from '@/modules/chart/axisScale'
+import { missingRequiredFields } from '@/modules/chart/guessMapping'
 import { toast } from '@/shared/ui/feedback'
 
-const props = defineProps<{ modelValue: boolean; config: ChartConfig; columns: TableColumn[] }>()
+const props = defineProps<{
+  modelValue: boolean
+  config: ChartConfig
+  columns: TableColumn[]
+  viewType: ViewType
+}>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }>()
 
 const tab = ref('configure')
@@ -248,6 +309,31 @@ watch(
   (c) => {
     draft.value = cloneDeep(c)
   },
+)
+
+const showXY = computed(
+  () =>
+    props.viewType === 'bar' ||
+    props.viewType === 'box' ||
+    props.viewType === 'line' ||
+    props.viewType === 'scatter',
+)
+const showPie = computed(() => props.viewType === 'pie')
+const showHeatmap = computed(() => props.viewType === 'heatmap')
+const configureMiss = computed(() => missingRequiredFields(props.viewType, draft.value.configure))
+const showScale = computed(() => supportsAxisScale(props.viewType))
+const showXScale = computed(
+  () =>
+    props.viewType === 'line' ||
+    props.viewType === 'scatter' ||
+    (props.viewType === 'bar' && draft.value.configure.orientation === 'horizontal'),
+)
+const showYScale = computed(
+  () =>
+    props.viewType === 'line' ||
+    props.viewType === 'scatter' ||
+    props.viewType === 'box' ||
+    (props.viewType === 'bar' && draft.value.configure.orientation !== 'horizontal'),
 )
 
 const horiz = computed({
@@ -297,6 +383,20 @@ const yRangeMode = computed({
   get: () => draft.value.style.yRangeMode || 'auto',
   set: (v: 'auto' | 'manual') => {
     draft.value.style.yRangeMode = v
+  },
+})
+
+const xScale = computed({
+  get: () => draft.value.configure.xScale || 'linear',
+  set: (v: 'linear' | 'log') => {
+    draft.value.configure.xScale = v
+  },
+})
+
+const yScale = computed({
+  get: () => draft.value.configure.yScale || 'linear',
+  set: (v: 'linear' | 'log') => {
+    draft.value.configure.yScale = v
   },
 })
 
@@ -385,6 +485,11 @@ function onTrapKeydown(e: KeyboardEvent) {
 }
 
 function save() {
+  if (configureMiss.value.length) {
+    toast('warning', `请先完成必填槽位：${configureMiss.value.join('、')}`)
+    tab.value = 'configure'
+    return
+  }
   if (xRangeInvalid.value || yRangeInvalid.value) {
     toast('warning', '轴 Manual 范围无效：最小值须小于最大值')
     tab.value = 'style'
@@ -411,6 +516,15 @@ function save() {
   font-size: 12px;
   line-height: 1.4;
   color: #8f959e;
+}
+.cfg-miss {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c45656;
+  background: #fef0f0;
+  border-radius: 4px;
 }
 .range-error {
   margin: 0 0 12px 110px;

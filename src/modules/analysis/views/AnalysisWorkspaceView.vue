@@ -29,8 +29,15 @@
       </div>
     </header>
 
+    <!--
+      DOM 顺序：主区 → 分隔条 → 侧栏；CSS order 保持侧栏在左。
+      键盘 Tab 优先进入工具栏/表图，再回侧栏导航（a11y）。
+    -->
     <div class="body">
-      <AnalysisSidebar :width="sidebarWidth" @add-data="onAddData" @jump-flowchart="onJump" />
+      <main id="workspace-main" class="main" tabindex="-1">
+        <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
+        <TableChartWorkspace v-else />
+      </main>
       <div
         class="sidebar-splitter"
         role="separator"
@@ -44,10 +51,9 @@
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
       />
-      <main id="workspace-main" class="main" tabindex="-1">
-        <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
-        <TableChartWorkspace v-else />
-      </main>
+      <div class="sidebar-slot" :style="{ width: `${sidebarWidth}px` }">
+        <AnalysisSidebar :width="sidebarWidth" @add-data="onAddData" @jump-flowchart="onJump" />
+      </div>
     </div>
 
     <CsvImportDialog v-model="showCsv" />
@@ -57,12 +63,13 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
+import { defineAsyncComponent, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
+import { setupVxe } from '@/modules/plugins/vxe'
 import { toast } from '@/shared/ui/feedback'
 import {
   clampSidebarWidth,
@@ -71,6 +78,9 @@ import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
+
+const app = getCurrentInstance()?.appContext.app
+if (app) setupVxe(app)
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
@@ -203,8 +213,18 @@ function onSidebarKey(e: KeyboardEvent) {
   display: flex;
   min-height: 0;
 }
+.sidebar-slot {
+  order: 0;
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+}
+.sidebar-slot :deep(.sidebar) {
+  width: 100% !important;
+}
 .sidebar-splitter {
   flex: 0 0 5px;
+  order: 1;
   cursor: col-resize;
   background: var(--ia-border);
   transition: background 0.15s ease;
@@ -217,6 +237,7 @@ function onSidebarKey(e: KeyboardEvent) {
 }
 .main {
   flex: 1;
+  order: 2;
   min-width: 0;
   background: #f0f2f5;
 }

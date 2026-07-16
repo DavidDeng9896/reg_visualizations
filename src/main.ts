@@ -2,7 +2,6 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { router } from './app/router'
-import { setupVxe } from './modules/plugins/vxe'
 import './styles/main.css'
 
 const app = createApp(App)
@@ -22,5 +21,5 @@ app.config.errorHandler = (err, _instance, info) => {
 
 app.use(createPinia())
 app.use(router)
-setupVxe(app)
+// Vxe 仅工作区表网格需要，延后到 AnalysisWorkspaceView 注册，避免列表页入口 preload
 app.mount('#app')

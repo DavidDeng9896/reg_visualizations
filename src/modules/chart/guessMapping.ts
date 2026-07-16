@@ -38,6 +38,9 @@ export function guessConfigure(viewType: ViewType, columns: TableColumn[], prev?
     orientation: prev?.orientation || 'vertical',
     stacked: prev?.stacked || false,
     excludeFlagged: prev?.excludeFlagged || false,
+    xScale: prev?.xScale || 'linear',
+    yScale: prev?.yScale || 'linear',
+    fitThroughOrigin: prev?.fitThroughOrigin,
   }
 
   if (viewType === 'table') return base
