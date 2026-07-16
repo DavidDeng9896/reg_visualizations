@@ -9,33 +9,28 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-cf322311-cbb6-4e7e-bd54-dc0c4c90a0ad-0b53`（Round 5，含 Round 4 FF） |
-| 阶段 | **优化 Round 5 完成**；本合并周期 2/3（Round 6 再合 main） |
-| 上次更新 | 2026-07-16 18:10 |
-| 单元 | **34/34 PASS**（含过原点、axisRange） |
+| 分支 | `cursor/bc-43dc1686-29a9-4851-b14b-80ec531cdc69-0dd6`（Round 4–6） |
+| 阶段 | **优化 Round 6 完成；本轮为合并点 → main** |
+| 上次更新 | 2026-07-16 19:20 |
+| 单元 | **36/36 PASS**（含 axisRange invalid） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 1–5 对齐摘要
+## 2. Round 4–6 对齐摘要
 
-对照 `docs/requirements/table-chart-integration.md` / `docs/features/charts/`：
+对照 `docs/requirements/table-chart-integration.md` + `docs/features/charts/`：
 
 | 需求 | 状态 |
 | --- | --- |
-| L-04 表/图分隔条 + 记住占比 | ✅ Round 1 |
-| L-05 窄屏左右→上下 | ✅ Round 1；可关闭提示记忆 ✅ Round 4 |
-| T-11 虚拟滚动 | ✅ Round 1 |
-| §5.3 表变更→图防抖 | ✅ Round 2（160ms） |
-| 工具栏分组（视图/布局/数据） | ✅ Round 2；landmark/skip ✅ Round 4 |
-| CONFIGURE 空态一键 Edit | ✅ Round 2 |
-| 侧栏宽度拖拽记忆 | ✅ Round 2（localStorage） |
-| 流程图空态 / 选中高亮 | ✅ Round 2；键盘可达 ✅ Round 5 |
-| Element/Vxe 瘦身 | ✅ Round 3–5（EP 强制 chunk 取消；vue-vendor 收窄） |
-| 4PL 边界/失败提示 | ✅ Round 3–4；MODEL 失败自动展开 ✅ Round 5 |
-| 分隔条 a11y | ✅ Round 3–4 |
-| STYLE 轴 Range Manual | ✅ Round 5 |
+| 4PL min/max 约束 | ✅ Round 4 |
+| MODEL 空态 / 窄屏提示记忆 / 分隔条焦点 | ✅ Round 4 |
+| STYLE 轴 Range Automatic/Manual | ✅ Round 5 |
 | Linear/Quadratic 过原点 | ✅ Round 5 |
-| Edit 焦点陷阱 | ✅ Round 5 |
+| Edit 焦点陷阱 / 流程图键盘选择 | ✅ Round 5 |
+| Manual range 表单即时校验 + Save 拦截 | ✅ Round 6 |
+| 列表页 EP 瘦身（原生表 + 异步创建对话框） | ✅ Round 6 |
+| 流程图 :focus-visible 焦点环 | ✅ Round 6 |
+| E2E IDB clear 竞态修复 | ✅ Round 6 |
 
 ## 3. 验证命令
 
@@ -45,12 +40,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 6 计划（下一 cron · 合并点）
+## 4. Round 7 计划（下一 cron · 新周期 1/3）
 
 | ID | 描述 |
 | --- | --- |
-| Merge | 合并 Round 4–6 到 `main`（开 PR 并合入） |
-| Perf | 评估关键路径 EP 同步组件是否可再拆（`projects` chunk ~344KB gzip 含 EP） |
-| UX | 轴 Manual min≥max 时 Edit 内即时校验提示；流程图焦点环可见性 |
-| Verify | 全量 unit + e2e:ui + build 回归后合 main |
-| Memory | 标记 `lastMergedRound=6` |
+| Perf | 入口仍 modulepreload `vxe` + `export`：评估列表路由是否可延后 Vxe/jspdf |
+| UX | CONFIGURE 必填槽位提示；轴 Scale Linear/Log（docs common.md） |
+| A11y | 工作区工具栏与侧栏键盘顺序抽检 |
+| Merge | Round 7 起新 3 轮周期；`lastMergedRound` 应为 6 |
