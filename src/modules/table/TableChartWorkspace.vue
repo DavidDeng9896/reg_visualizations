@@ -83,6 +83,10 @@
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
         aria-label="拖拽调整表图占比"
+        :aria-valuenow="Math.round(splitRatio * 100)"
+        :aria-valuemin="20"
+        :aria-valuemax="80"
+        :aria-valuetext="`图表区占比 ${Math.round(splitRatio * 100)}%`"
         tabindex="0"
         @pointerdown="onSplitterDown"
         @keydown="onSplitterKey"
@@ -271,6 +275,16 @@ function onSplitterUp() {
 function onSplitterKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 0.08 : 0.03
   let next = splitRatio.value
+  if (e.key === 'Home') {
+    e.preventDefault()
+    persistSplitRatio(0.2)
+    return
+  }
+  if (e.key === 'End') {
+    e.preventDefault()
+    persistSplitRatio(0.8)
+    return
+  }
   if (splitterOrientation.value === 'horizontal') {
     if (e.key === 'ArrowUp') next += effectivePos.value === 'top' ? -step : step
     else if (e.key === 'ArrowDown') next += effectivePos.value === 'top' ? step : -step

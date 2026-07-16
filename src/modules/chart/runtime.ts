@@ -17,6 +17,8 @@ export interface ChartBuildResult {
   sampled: boolean
   totalRows: number
   modelTables?: { variables: Record<string, unknown>[]; output: Record<string, unknown>[] }
+  /** 拟合边界/失败提示（按系列去重后展示） */
+  fitWarnings?: string[]
 }
 
 function sampleRows(rows: Record<string, unknown>[]) {
@@ -104,6 +106,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
 
   let option: EChartsOption = {}
   let modelTables: ChartBuildResult['modelTables']
+  let fitWarnings: string[] | undefined
 
   if (viewType === 'bar') {
     const x = cfg.xField
@@ -234,6 +237,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     const series: EChartsOption['series'] = []
     const variables: Record<string, unknown>[] = []
     const outputs: Record<string, unknown>[] = []
+    const warnings: string[] = []
 
     for (let gi = 0; gi < groups.length; gi++) {
       const g = groups[gi]
@@ -265,24 +269,30 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         symbolSize: viewType === 'scatter' && cfg.sizeField ? 10 : 8,
       })
 
-      if (cfg.fitModel && cfg.fitModel !== 'none' && pts.length >= 2) {
+      if (cfg.fitModel && cfg.fitModel !== 'none') {
         const fit = fitSeries(
           pts.map((p) => [p.x, p.y]),
           cfg.fitModel,
         )
-        series.push({
-          name: `${g} fit`,
-          type: 'line',
-          showSymbol: false,
-          data: fit.curve,
-          lineStyle: { type: 'dashed', color },
-        })
-        variables.push({ series: g, ...fit.variables })
-        outputs.push(...fit.output.map((o) => ({ series: g, ...o })))
+        if (!fit.ok) {
+          const label = g === 'all' ? fit.warning! : `系列「${g}」：${fit.warning}`
+          if (!warnings.includes(label)) warnings.push(label)
+        } else {
+          series.push({
+            name: `${g} fit`,
+            type: 'line',
+            showSymbol: false,
+            data: fit.curve,
+            lineStyle: { type: 'dashed', color },
+          })
+          variables.push({ series: g, ...fit.variables })
+          outputs.push(...fit.output.map((o) => ({ series: g, ...o })))
+        }
       }
     }
 
     modelTables = { variables, output: outputs }
+    if (warnings.length) fitWarnings = warnings
     option = {
       title,
       color: colors,
@@ -404,7 +414,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     }
   }
 
-  return { option, sampled, totalRows: input.rows.length, modelTables }
+  return { option, sampled, totalRows: input.rows.length, modelTables, fitWarnings }
 }
 
 export { SAMPLE_LIMIT }

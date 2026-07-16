@@ -8,6 +8,10 @@
       <span v-if="built.sampled" class="sample">
         已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）
       </span>
+      <div v-if="built.fitWarnings?.length" class="fit-warn" role="status">
+        <strong>拟合提示：</strong>
+        <span v-for="(w, i) in built.fitWarnings" :key="i">{{ w }}</span>
+      </div>
       <el-button size="small" :loading="engineLoading" @click="downloadFull">下载完整数据 CSV</el-button>
       <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPng">
         导出 PNG
@@ -212,6 +216,22 @@ async function exportPdf() {
 .sample {
   color: #e6a23c;
   font-size: 12px;
+}
+.fit-warn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  color: #b88230;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  max-width: 100%;
+}
+.fit-warn strong {
+  color: #a06c1f;
 }
 .need-block {
   display: flex;

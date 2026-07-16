@@ -35,6 +35,10 @@
         role="separator"
         aria-orientation="vertical"
         aria-label="拖拽调整侧栏宽度"
+        :aria-valuenow="sidebarWidth"
+        :aria-valuemin="MIN_SIDEBAR_WIDTH"
+        :aria-valuemax="MAX_SIDEBAR_WIDTH"
+        :aria-valuetext="`侧栏宽度 ${sidebarWidth} 像素`"
         tabindex="0"
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
@@ -65,6 +69,8 @@ import {
   clampSidebarWidth,
   loadSidebarWidth,
   saveSidebarWidth,
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
 
 const props = defineProps<{ analysisId: string }>()
@@ -136,6 +142,12 @@ function onSidebarKey(e: KeyboardEvent) {
   } else if (e.key === 'ArrowRight') {
     e.preventDefault()
     persistSidebar(sidebarWidth.value + step)
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    persistSidebar(MIN_SIDEBAR_WIDTH)
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    persistSidebar(MAX_SIDEBAR_WIDTH)
   }
 }
 </script>
