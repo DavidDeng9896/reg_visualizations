@@ -6,6 +6,8 @@ export interface FitConstraints {
   min?: number
   /** 上渐近线；缺省用数据 Y 最大值 */
   max?: number
+  /** Linear / Quadratic：强制过原点 */
+  throughOrigin?: boolean
 }
 
 export interface FitResult {
@@ -37,7 +39,17 @@ function emptyFail(warning: string): FitResult {
   return { curve: [], variables: {}, output: [], ok: false, warning }
 }
 
-function linReg(xs: number[], ys: number[]) {
+function linReg(xs: number[], ys: number[], throughOrigin = false) {
+  if (throughOrigin) {
+    let num = 0
+    let den = 0
+    for (let i = 0; i < xs.length; i++) {
+      num += xs[i] * ys[i]
+      den += xs[i] * xs[i]
+    }
+    const slope = den === 0 ? 0 : num / den
+    return { slope, intercept: 0, den }
+  }
   const n = xs.length
   const mx = xs.reduce((a, b) => a + b, 0) / n
   const my = ys.reduce((a, b) => a + b, 0) / n
@@ -50,6 +62,31 @@ function linReg(xs: number[], ys: number[]) {
   const slope = den === 0 ? 0 : num / den
   const intercept = my - slope * mx
   return { slope, intercept, den }
+}
+
+/** Quadratic through origin: y = a x² + b x */
+function quadThroughOrigin(xs: number[], ys: number[]): [number, number] | null {
+  let sx4 = 0
+  let sx3 = 0
+  let sx2 = 0
+  let sx2y = 0
+  let sxy = 0
+  for (let i = 0; i < xs.length; i++) {
+    const x = xs[i]
+    const y = ys[i]
+    const x2 = x * x
+    sx4 += x2 * x2
+    sx3 += x2 * x
+    sx2 += x2
+    sx2y += x2 * y
+    sxy += x * y
+  }
+  const det = sx4 * sx2 - sx3 * sx3
+  if (Math.abs(det) < 1e-12) return null
+  const a = (sx2y * sx2 - sx3 * sxy) / det
+  const b = (sx4 * sxy - sx3 * sx2y) / det
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
+  return [a, b]
 }
 
 /** Simple 4PL via grid search on hill + inflection (demo-quality) */
@@ -125,9 +162,14 @@ export function fitSeries(
       for (const p of sorted) curve.push([p[0], p[1]])
       variables = {}
     } else if (model === 'linear') {
-      const { slope, intercept, den } = linReg(xs, ys)
+      const throughOrigin = !!constraints?.throughOrigin
+      const { slope, intercept, den } = linReg(xs, ys, throughOrigin)
       if (den === 0) {
-        return emptyFail('线性拟合失败：X 值无变化，无法估计斜率')
+        return emptyFail(
+          throughOrigin
+            ? '线性过原点拟合失败：X 全为 0，无法估计斜率'
+            : '线性拟合失败：X 值无变化，无法估计斜率',
+        )
       }
       variables = { slope, intercept }
       for (let i = 0; i <= 50; i++) {
@@ -140,26 +182,39 @@ export function fitSeries(
         output.push({ x: xs[i], y: ys[i], predicted: pred, residual: ys[i] - pred })
       }
     } else if (model === 'quadratic') {
-      // fit y = a x^2 + b x + c via normal equations (3x3)
-      const sx = xs.reduce((a, b) => a + b, 0)
-      const sx2 = xs.reduce((a, b) => a + b * b, 0)
-      const sx3 = xs.reduce((a, b) => a + b ** 3, 0)
-      const sx4 = xs.reduce((a, b) => a + b ** 4, 0)
-      const sy = ys.reduce((a, b) => a + b, 0)
-      const sxy = xs.reduce((a, b, i) => a + b * ys[i], 0)
-      const sx2y = xs.reduce((a, b, i) => a + b * b * ys[i], 0)
-      const n = xs.length
-      const A = [
-        [sx4, sx3, sx2],
-        [sx3, sx2, sx],
-        [sx2, sx, n],
-      ]
-      const B = [sx2y, sxy, sy]
-      const coeff = solve3(A, B)
-      if (coeff.some((c) => !Number.isFinite(c))) {
-        return emptyFail('二次拟合数值不稳定，请检查数据点是否共线或过少')
+      const throughOrigin = !!constraints?.throughOrigin
+      let a: number
+      let b: number
+      let c: number
+      if (throughOrigin) {
+        const coeff = quadThroughOrigin(xs, ys)
+        if (!coeff) {
+          return emptyFail('二次过原点拟合数值不稳定，请检查数据')
+        }
+        ;[a, b] = coeff
+        c = 0
+      } else {
+        // fit y = a x^2 + b x + c via normal equations (3x3)
+        const sx = xs.reduce((sum, v) => sum + v, 0)
+        const sx2 = xs.reduce((sum, v) => sum + v * v, 0)
+        const sx3 = xs.reduce((sum, v) => sum + v ** 3, 0)
+        const sx4 = xs.reduce((sum, v) => sum + v ** 4, 0)
+        const sy = ys.reduce((sum, v) => sum + v, 0)
+        const sxy = xs.reduce((sum, v, i) => sum + v * ys[i], 0)
+        const sx2y = xs.reduce((sum, v, i) => sum + v * v * ys[i], 0)
+        const n = xs.length
+        const A = [
+          [sx4, sx3, sx2],
+          [sx3, sx2, sx],
+          [sx2, sx, n],
+        ]
+        const B = [sx2y, sxy, sy]
+        const coeff = solve3(A, B)
+        if (coeff.some((v) => !Number.isFinite(v))) {
+          return emptyFail('二次拟合数值不稳定，请检查数据点是否共线或过少')
+        }
+        ;[a, b, c] = coeff
       }
-      const [a, b, c] = coeff
       variables = { a, b, c }
       for (let i = 0; i <= 50; i++) {
         const x = xMin + ((xMax - xMin) * i) / 50

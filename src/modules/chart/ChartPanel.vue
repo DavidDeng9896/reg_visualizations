@@ -26,7 +26,7 @@
       <el-button type="primary" @click="emit('open-edit')">Edit 图表字段</el-button>
     </div>
     <div ref="elRef" class="canvas" :class="{ dimmed: missing.length }" />
-    <el-collapse v-if="showModelTables" class="models">
+    <el-collapse v-if="showModelTables" v-model="modelCollapse" class="models">
       <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
         <template v-if="hasModelRows">
           <h4>MODEL VARIABLES</h4>
@@ -94,6 +94,15 @@ const showModelTables = computed(() => {
   if (!fitting) return false
   return hasModelRows.value || (built.value.fitWarnings?.length ?? 0) > 0
 })
+/** 拟合失败时自动展开 MODEL TABLES，成功时保持用户折叠偏好 */
+const modelCollapse = ref<string[]>([])
+watch(
+  () => built.value.fitWarnings,
+  (warnings) => {
+    if (warnings?.length) modelCollapse.value = ['models']
+  },
+  { immediate: true },
+)
 const varKeys = computed(() =>
   built.value.modelTables?.variables[0] ? Object.keys(built.value.modelTables.variables[0]) : [],
 )

@@ -35,9 +35,8 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('echarts')) return 'echarts'
           if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify')) return 'export'
-          // Keep Element Plus as one vendor chunk; Message/MessageBox still load via
-          // dynamic import in shared/ui/feedback.ts (async entry, not circular manualChunks).
-          if (id.includes('element-plus')) return 'element-plus'
+          // Do NOT force all of element-plus into one chunk — let Rollup split by
+          // sync route usage vs dynamic import('element-plus') in feedback + async dialogs.
           if (id.includes('vxe-table') || id.includes('vxe-pc-ui') || id.includes('@vxe-ui')) return 'vxe'
           if (id.includes('@vue-flow')) return 'vue-flow'
           if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vue-vendor'
