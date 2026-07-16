@@ -88,25 +88,26 @@ async function createDemo() {
   await store.openAnalysis(a.id)
   const table = createDemoTable()
   store.addTable(table)
-  store.addView(table.id, table.id, 'Scatter Dose-Response', 'scatter')
-  const sv = store.selectedView
-  if (sv) {
-    store.setChartConfig(sv.view.id, {
-      ...sv.view.chartConfig,
+  const view = store.addView(table.id, table.id, 'Scatter Dose-Response', 'scatter')
+  if (view) {
+    store.setChartConfig(view.id, {
+      ...store.defaultChartConfig(),
       configure: {
-        ...sv.view.chartConfig.configure,
+        ...store.defaultChartConfig().configure,
         xField: 'dose',
         yField: 'response',
         seriesField: 'compound',
         fitModel: '4pl',
       },
       style: {
-        ...sv.view.chartConfig.style,
+        ...store.defaultChartConfig().style,
         title: 'Dose Response',
         subtitle: 'Demo dataset',
       },
     })
+    store.selectNode(view.id, 'workspace')
   }
+  await store.flushSave()
   ElMessage.success('已创建 Demo Analysis')
   router.push(`/analyses/${a.id}`)
 }
@@ -116,7 +117,11 @@ function open(row: { id: string }) {
 }
 
 async function onRemove(id: string) {
-  await ElMessageBox.confirm('确定删除该 Analysis？', '确认')
+  await ElMessageBox.confirm('确定删除该 Analysis？', '确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
   await store.removeAnalysis(id)
   ElMessage.success('已删除')
 }

@@ -30,7 +30,7 @@
           <span class="label">{{ data.label }}</span>
           <span class="ops" @click.stop>
             <el-dropdown trigger="click" @command="(c: string) => onMenu(c, data)">
-              <el-button size="small" text>⋯</el-button>
+              <el-button size="small" text type="primary" class="ops-btn">⋯</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="new-view">New view</el-dropdown-item>
@@ -141,7 +141,11 @@ function onMenu(cmd: string, data: TreeNode) {
     store.promoteViewToTable(data.id)
     ElMessage.success('已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    ElMessageBox.confirm('确定删除？子视图将一并删除。', '确认').then(() => {
+    ElMessageBox.confirm('确定删除？子视图将一并删除。', '确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }).then(() => {
       const r = store.deleteNode(data.id)
       if (!r.ok) ElMessage.error(r.reason || '删除失败')
       else ElMessage.success('已删除')
@@ -193,6 +197,12 @@ function createView() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+.ops-btn {
+  min-width: 28px;
+  font-size: 16px;
+  font-weight: 700;
 }
 .footer {
   margin-top: auto;

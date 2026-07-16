@@ -42,6 +42,7 @@
           :columns="store.workspaceResult.columns"
           :model-value="store.workspaceResult.rows"
           :editable="store.canEditGrid"
+          :read-only-hint="gridReadOnlyHint"
           @update:model-value="onRows"
         />
       </div>
@@ -89,6 +90,13 @@ const showChartPane = computed(() => store.selectedView && viewType.value !== 't
 const layoutClass = computed(() => {
   if (!showChartPane.value) return 'only-table'
   return `pos-${chartPos.value}`
+})
+const gridReadOnlyHint = computed(() => {
+  if (store.canEditGrid) return ''
+  if (store.selectedView && store.selectedView.view.viewType !== 'table') {
+    return '图表视图中的数据表为只读预览；切到源表或提升为表后可编辑'
+  }
+  return '当前视图含过滤/转换，表格只读；可提升为表后编辑'
 })
 
 function onViewType(t: ViewType) {

@@ -5,7 +5,7 @@
       <el-button size="small" :disabled="!editable" @click="removeRows">删除选中行</el-button>
       <el-button size="small" :disabled="!editable" @click="undo">Undo</el-button>
       <el-button size="small" :disabled="!editable" @click="redo">Redo</el-button>
-      <span v-if="!editable" class="hint">当前视图含过滤/转换，表格只读；可提升为表后编辑</span>
+      <span v-if="!editable" class="hint">{{ readOnlyHint }}</span>
       <span class="hint">双击编辑 · Ctrl/Cmd+C/V 复制粘贴（TSV）· 不支持合并单元格</span>
     </div>
     <vxe-table
@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { TableColumn } from '@/shared/types/analysis'
 import { coerceValue } from '@/shared/utils/schema'
@@ -44,8 +44,13 @@ const props = defineProps<{
   columns: TableColumn[]
   modelValue: Record<string, unknown>[]
   editable: boolean
+  readOnlyHint?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [Record<string, unknown>[]] }>()
+
+const readOnlyHint = computed(
+  () => props.readOnlyHint || '当前表格只读；源表可编辑，或将视图提升为表',
+)
 
 const tableRef = ref<{
   getCheckboxRecords: () => Record<string, unknown>[]

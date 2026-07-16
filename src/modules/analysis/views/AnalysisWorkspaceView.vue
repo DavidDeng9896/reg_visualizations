@@ -60,7 +60,9 @@ const showCombine = ref(false)
 const focusId = ref<string | null>(null)
 
 onMounted(async () => {
-  await store.openAnalysis(props.analysisId)
+  // Preserve in-memory selection when navigating right after local mutations
+  const preferred = store.current?.id === props.analysisId ? store.selectedNodeId : null
+  await store.openAnalysis(props.analysisId, { selectNodeId: preferred })
   if (!store.current) ElMessage.error('Analysis 不存在')
 })
 

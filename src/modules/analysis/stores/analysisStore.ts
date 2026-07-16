@@ -107,11 +107,20 @@ export const useAnalysisStore = defineStore('analysis', () => {
     list.value = await analysisRepository.list()
   }
 
-  async function openAnalysis(id: string) {
+  async function openAnalysis(id: string, opts?: { selectNodeId?: string | null }) {
     const a = await analysisRepository.get(id)
     current.value = a ?? null
-    selectedNodeId.value = a?.tables[0]?.id ?? null
-    mainMode.value = a?.tables.length ? 'flowchart' : 'flowchart'
+    const preferred = opts?.selectNodeId
+    if (preferred && a) {
+      const tableHit = a.tables.some((t) => t.id === preferred)
+      const viewHit = a.tables.some((t) => !!findView(t.views, preferred))
+      selectedNodeId.value = tableHit || viewHit ? preferred : a.tables[0]?.id ?? null
+    } else {
+      // Prefer first non-table view if present (better demo UX), else first table
+      const firstView = a?.tables.map((t) => t.views[0]).find(Boolean)
+      selectedNodeId.value = firstView?.id ?? a?.tables[0]?.id ?? null
+    }
+    mainMode.value = 'workspace'
   }
 
   async function createAnalysis(name: string, projectId: string) {
@@ -135,18 +144,27 @@ export const useAnalysisStore = defineStore('analysis', () => {
     await loadList()
   }
 
+  async function flushSave() {
+    if (!current.value) return
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    current.value.updatedAt = nowIso()
+    saving.value = true
+    try {
+      await analysisRepository.save(JSON.parse(JSON.stringify(current.value)))
+    } finally {
+      saving.value = false
+    }
+  }
+
   function scheduleSave() {
     if (!current.value) return
     current.value.updatedAt = nowIso()
     if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(async () => {
-      if (!current.value) return
-      saving.value = true
-      try {
-        await analysisRepository.save(JSON.parse(JSON.stringify(current.value)))
-      } finally {
-        saving.value = false
-      }
+    saveTimer = setTimeout(() => {
+      void flushSave()
     }, 400)
   }
 
@@ -357,6 +375,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     promoteViewToTable,
     setFlowchartPosition,
     defaultChartConfig,
+    flushSave,
   }
 })
 
