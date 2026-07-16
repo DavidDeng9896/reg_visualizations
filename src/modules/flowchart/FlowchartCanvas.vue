@@ -194,4 +194,19 @@ function onCanvasKeydown(ev: KeyboardEvent) {
   font-size: 14px;
   line-height: 1.5;
 }
+/* Keyboard focus ring — stronger than selected shadow for a11y contrast */
+:deep(.vue-flow__node:focus),
+:deep(.vue-flow__node:focus-visible) {
+  outline: 3px solid var(--ia-accent, #2f6fed) !important;
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 6px rgba(47, 111, 237, 0.45) !important;
+  z-index: 2;
+}
+:deep(.vue-flow__node.selected:not(:focus):not(:focus-visible)) {
+  /* keep selection visible without competing with keyboard focus */
+  outline: 2px solid var(--ia-accent, #2f6fed);
+  outline-offset: 1px;
+}
 </style>

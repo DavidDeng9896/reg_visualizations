@@ -6,74 +6,71 @@
         <p class="sub">本地数据工作空间 · 导入 · 转换 · 可视化</p>
       </div>
       <div class="top-actions">
-        <el-button @click="createDemo">一键 Demo（含示例数据）</el-button>
-        <el-button type="primary" @click="showCreate = true">+ 创建 Analysis</el-button>
+        <button type="button" class="btn" @click="createDemo">一键 Demo（含示例数据）</button>
+        <button type="button" class="btn btn-primary" @click="showCreate = true">+ 创建 Analysis</button>
       </div>
     </header>
 
     <div class="toolbar">
-      <el-select v-model="projectFilter" clearable placeholder="按项目筛选" style="width: 220px">
-        <el-option v-for="p in MOCK_PROJECTS" :key="p.id" :label="p.name" :value="p.id" />
-      </el-select>
+      <label class="filter">
+        <span class="sr-only">按项目筛选</span>
+        <select v-model="projectFilter" aria-label="按项目筛选">
+          <option value="">全部项目</option>
+          <option v-for="p in MOCK_PROJECTS" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+      </label>
     </div>
 
-    <el-table
-      v-if="filtered.length"
-      :data="filtered"
-      stripe
-      style="width: 100%"
-      empty-text="暂无 Analysis"
-      @row-click="open"
-    >
-      <el-table-column prop="name" label="名称" />
-      <el-table-column label="项目">
-        <template #default="{ row }">{{ getProjectName(row.projectId) }}</template>
-      </el-table-column>
-      <el-table-column prop="updatedAt" label="更新时间" width="200">
-        <template #default="{ row }">{{ formatTime(row.updatedAt) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="120">
-        <template #default="{ row }">
-          <el-button link type="danger" @click.stop="onRemove(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <table v-if="filtered.length" class="analysis-table" aria-label="Analysis 列表">
+      <thead>
+        <tr>
+          <th scope="col">名称</th>
+          <th scope="col">项目</th>
+          <th scope="col">更新时间</th>
+          <th scope="col">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="row in filtered"
+          :key="row.id"
+          tabindex="0"
+          @click="open(row)"
+          @keydown.enter="open(row)"
+        >
+          <td>{{ row.name }}</td>
+          <td>{{ getProjectName(row.projectId) }}</td>
+          <td>{{ formatTime(row.updatedAt) }}</td>
+          <td>
+            <button type="button" class="link-danger" @click.stop="onRemove(row.id)">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <div v-else class="empty-list">
       <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
     </div>
 
-    <el-dialog v-model="showCreate" title="创建 Analysis" width="420px">
-      <el-form label-width="80px">
-        <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="例如 Dose Response" />
-        </el-form-item>
-        <el-form-item label="项目" required>
-          <el-select v-model="form.projectId" style="width: 100%">
-            <el-option v-for="p in MOCK_PROJECTS" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" :disabled="!form.name || !form.projectId" @click="create">创建</el-button>
-      </template>
-    </el-dialog>
+    <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirm, toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 
+const CreateAnalysisDialog = defineAsyncComponent(
+  () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
+)
+
 const store = useAnalysisStore()
 const router = useRouter()
 const showCreate = ref(false)
-const projectFilter = ref<string>()
-const form = reactive({ name: '', projectId: MOCK_PROJECTS[0].id })
+const projectFilter = ref('')
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
@@ -85,10 +82,9 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleString()
 }
 
-async function create() {
-  const a = await store.createAnalysis(form.name.trim(), form.projectId)
+async function onCreate(payload: { name: string; projectId: string }) {
+  const a = await store.createAnalysis(payload.name, payload.projectId)
   showCreate.value = false
-  form.name = ''
   toast('success', '已创建')
   router.push(`/analyses/${a.id}`)
 }
@@ -144,10 +140,12 @@ async function onRemove(id: string) {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
+  gap: 16px;
 }
 .top-actions {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 h1 {
   margin: 0 0 6px;
@@ -160,6 +158,93 @@ h1 {
 .toolbar {
   margin-bottom: 12px;
 }
+.filter select {
+  width: 220px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
+}
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.analysis-table th,
+.analysis-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--ia-border);
+  font-size: 14px;
+}
+.analysis-table th {
+  background: #f7f8fa;
+  font-weight: 600;
+  color: #646a73;
+}
+.analysis-table tbody tr {
+  cursor: pointer;
+}
+.analysis-table tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+.analysis-table tbody tr:hover {
+  background: var(--ia-accent-soft);
+}
+.analysis-table tbody tr:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: -2px;
+}
+.link-danger {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #c45656;
+  cursor: pointer;
+  font: inherit;
+}
+.link-danger:hover {
+  text-decoration: underline;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .empty-list {
   margin-top: 48px;
   text-align: center;
@@ -171,5 +256,14 @@ h1 {
 }
 .empty-list p {
   margin: 0;
+}
+@media (max-width: 640px) {
+  .top {
+    flex-direction: column;
+  }
+  .top-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 </style>

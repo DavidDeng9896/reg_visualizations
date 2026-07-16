@@ -168,6 +168,7 @@
                   :controls="false"
                   style="width: 100%"
                   aria-label="X 轴最小值"
+                  :aria-invalid="xRangeInvalid || undefined"
                 />
               </el-form-item>
               <el-form-item label="X Max">
@@ -176,8 +177,12 @@
                   :controls="false"
                   style="width: 100%"
                   aria-label="X 轴最大值"
+                  :aria-invalid="xRangeInvalid || undefined"
                 />
               </el-form-item>
+              <p v-if="xRangeInvalid" class="range-error" role="alert">
+                X 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
+              </p>
             </template>
             <el-form-item label="Y Range">
               <el-select v-model="yRangeMode" style="width: 100%" aria-label="Y 轴 Range 模式">
@@ -192,6 +197,7 @@
                   :controls="false"
                   style="width: 100%"
                   aria-label="Y 轴最小值"
+                  :aria-invalid="yRangeInvalid || undefined"
                 />
               </el-form-item>
               <el-form-item label="Y Max">
@@ -200,8 +206,12 @@
                   :controls="false"
                   style="width: 100%"
                   aria-label="Y 轴最大值"
+                  :aria-invalid="yRangeInvalid || undefined"
                 />
               </el-form-item>
+              <p v-if="yRangeInvalid" class="range-error" role="alert">
+                Y 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
+              </p>
             </template>
           </el-form>
         </el-tab-pane>
@@ -218,6 +228,8 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { ChartConfig, TableColumn } from '@/shared/types/analysis'
 import { cloneDeep } from '@/shared/utils/clone'
+import { isManualRangeInvalid } from '@/modules/chart/axisRange'
+import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{ modelValue: boolean; config: ChartConfig; columns: TableColumn[] }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }>()
@@ -316,6 +328,22 @@ const yMax = computed({
   },
 })
 
+const xRangeInvalid = computed(() =>
+  isManualRangeInvalid({
+    mode: draft.value.style.xRangeMode,
+    min: draft.value.style.xMin,
+    max: draft.value.style.xMax,
+  }),
+)
+
+const yRangeInvalid = computed(() =>
+  isManualRangeInvalid({
+    mode: draft.value.style.yRangeMode,
+    min: draft.value.style.yMin,
+    max: draft.value.style.yMax,
+  }),
+)
+
 function focusables(): HTMLElement[] {
   const root = panelRef.value?.closest('.el-drawer') || panelRef.value
   if (!root) return []
@@ -357,6 +385,11 @@ function onTrapKeydown(e: KeyboardEvent) {
 }
 
 function save() {
+  if (xRangeInvalid.value || yRangeInvalid.value) {
+    toast('warning', '轴 Manual 范围无效：最小值须小于最大值')
+    tab.value = 'style'
+    return
+  }
   emit('save', cloneDeep(draft.value))
 }
 </script>
@@ -378,5 +411,11 @@ function save() {
   font-size: 12px;
   line-height: 1.4;
   color: #8f959e;
+}
+.range-error {
+  margin: 0 0 12px 110px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c45656;
 }
 </style>
