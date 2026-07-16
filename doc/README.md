@@ -20,7 +20,7 @@ doc/
 
 | 路径 | 说明 |
 | --- | --- |
-| [reference/labkey/](./reference/labkey/) | LabKey 五类图表官方文档摘录 |
+| [reference/labkey/](./reference/labkey/) | LabKey 五类图表官方文档摘录（含原图链接） |
 | [reference/benchling/](./reference/benchling/) | Benchling Analysis 官方文档整理 |
 
 > 参考资料**不应直接当作本产品需求规格**。
