@@ -19,7 +19,7 @@
 | 上次更新 | 2026-07-16 |
 | 应用入口 | 仓库根 `npm run dev` → http://localhost:5173/ |
 | 可演示？ | **是**（构建通过 + 单元测试通过 + 外部测试链接已开） |
-| 外部测试链接 | https://eager-banks-build.loca.lt/ （隧道，Agent 运行期间有效） |
+| 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ （Cloudflare 隧道；旧 loca.lt 已失效） |
 
 ## 2. 总进度看板
 
