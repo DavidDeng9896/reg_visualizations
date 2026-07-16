@@ -4,5 +4,6 @@
 
 | 子目录 | 说明 |
 | --- | --- |
-| [charts/](./charts/) | LabKey 调研后已确认细化的图表功能点（产品依据） |
-| [benchling-charts/](./benchling-charts/) | Benchling Analysis 图表功能点**已确认细化**（产品依据；Regression 不纳入） |
+| [unified-charts/](./unified-charts/) | **当前产品依据（合并中）** — 先勾 [conflicts.md](./unified-charts/conflicts.md) |
+| [charts/](./charts/) | LabKey 细化原文（已合并，仅溯源） |
+| [benchling-charts/](./benchling-charts/) | Benchling 细化原文（已合并，仅溯源） |

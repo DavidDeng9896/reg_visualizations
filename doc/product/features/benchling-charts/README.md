@@ -1,6 +1,9 @@
-# Benchling 图表功能点（产品依据）
+# Benchling 图表功能点（已合并，仅溯源）
 
-基于 Benchling Analysis 参考原文与截图/GIF 拆帧，对**已确认**功能点完成细化，作为本产品图表能力的开发依据之一。
+> **不再作为当前产品开发依据。**  
+> 统一依据见：[`../unified-charts/`](../unified-charts/)（请先完成 [conflicts.md](../unified-charts/conflicts.md)）
+
+基于 Benchling Analysis 参考原文与截图/GIF 拆帧，对**已确认**功能点完成细化（合并前原文）。
 
 > 原则：紧扣源正文与截图 UI；**未勾选能力不展开**。  
 > 参考原文：[`../../reference/benchling/`](../../reference/benchling/)  
