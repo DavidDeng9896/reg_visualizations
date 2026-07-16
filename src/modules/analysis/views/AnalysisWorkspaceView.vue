@@ -68,6 +68,8 @@ import { defineAsyncComponent, getCurrentInstance, onMounted, onUnmounted, ref, 
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
+import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
+import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
 import { toast } from '@/shared/ui/feedback'
 import {
   clampSidebarWidth,
@@ -77,9 +79,6 @@ import {
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
 
-/** 动态加载 Vxe + 工作区重模块，避免列表共享图误拉 vxe chunk */
-const FlowchartCanvas = defineAsyncComponent(() => import('@/modules/flowchart/FlowchartCanvas.vue'))
-const TableChartWorkspace = defineAsyncComponent(() => import('@/modules/table/TableChartWorkspace.vue'))
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
 
@@ -95,6 +94,7 @@ const sidebarWidth = ref(loadSidebarWidth())
 const draggingSidebar = ref(false)
 
 onMounted(async () => {
+  // Vxe 仅动态导入，避免列表路由共享图误拉；表网格需等注册完成再挂载
   const [{ setupVxe }] = await Promise.all([
     import('@/modules/plugins/vxe'),
     (async () => {

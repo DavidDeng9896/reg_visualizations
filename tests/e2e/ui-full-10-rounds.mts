@@ -71,9 +71,11 @@ async function createDemo(page: Page) {
   await page.goto(BASE, { waitUntil: 'networkidle' })
   const demoBtn = page.getByRole('button', { name: /一键 Demo/ }).first()
   await demoBtn.waitFor({ state: 'visible' })
-  await demoBtn.click()
-  await page.waitForURL(/\/analyses\//, { timeout: 45000 })
-  await page.waitForTimeout(1200)
+  await Promise.all([page.waitForURL(/\/analyses\//, { timeout: 45000 }), demoBtn.click()])
+  // Wait for Vxe registration + toolbar (not just route change)
+  await page.locator('#ws-toolbar').waitFor({ state: 'visible', timeout: 45000 })
+  await page.getByRole('button', { name: /Edit 图表/ }).waitFor({ state: 'visible', timeout: 30000 })
+  await page.waitForTimeout(600)
 }
 
 async function newViewOfType(page: Page, type: string) {
