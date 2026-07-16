@@ -130,7 +130,7 @@
 | 项 | 说明 |
 | --- | --- |
 | 源产品 | 回归 = 散点 + 拟合线（Advanced Analysis） |
-| 本产品 | **不纳入 Regression**；散点独立交付，不实现拟合/打标/MODEL TABLES |
+| 本产品 | **Regression**；散点独立交付，实现拟合/打标/MODEL TABLES |
 
 ---
 
