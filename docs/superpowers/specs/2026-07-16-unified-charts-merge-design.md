@@ -1,7 +1,7 @@
 # 统一图表功能依据合并设计
 
 > 日期：2026-07-16  
-> 状态：已与用户对齐方案，**待 `conflicts.md` 勾选后**再写各图细则  
+> 状态：冲突已决议，`unified-charts/` 细则已定稿；表+图需求已同步引用  
 > 相关目录：`doc/product/features/unified-charts/`
 
 ## 1. 目标
@@ -72,4 +72,4 @@ doc/product/features/unified-charts/
 - [x] 无「另议」占位作为成功路径  
 - [x] Regression 范围与「非独立图种但含 4PL/打标/MODEL TABLES」一致  
 - [x] Custom code 明确排除  
-- [ ] 冲突勾选完成前不宣称统一细则已定稿  
+- [x] 冲突勾选完成；统一细则已定稿  

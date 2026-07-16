@@ -3,7 +3,7 @@
 > 文档性质：独立功能需求文档（第二步）  
 > 定位：在 **database 数据表能力** 之上叠加已调研确认的图表能力  
 > 表格实现：以 **vxe-table** 作为数据表组件底座  
-> 图表能力依据：`doc/product/features/charts/` 已细化功能点  
+> 图表能力依据：`doc/product/features/unified-charts/`（LabKey + Benchling 合并定稿）  
 > 状态：需求思考稿，供评审后进入方案/实现
 
 ---
@@ -12,7 +12,7 @@
 
 ### 1.1 背景
 
-前期已完成 LabKey 五类图表调研与功能点细化（Bar / Box / Line / Pie / Scatter）。  
+已完成 LabKey / Benchling 图表调研，并合并为统一功能依据（Bar / Box / Line / Pie / Scatter / **Heatmap**；Line/Scatter 含拟合与 MODEL TABLES）。  
 第二步需要从产品形态上回答：
 
 > **图表不是独立画板，而是挂在「数据表」之上的可视化能力。**
@@ -24,16 +24,18 @@
 构建「**一张表 + 多种图**」的一体化能力：
 
 1. 用 vxe-table 承载 database 查询结果的浏览、筛选、排序、列管理等表能力；
-2. 在表的工具入口上提供五类图表创建与配置（对齐 `doc/product/features/charts`）；
+2. 在表的工具入口上提供六类图表创建与配置（对齐 `doc/product/features/unified-charts`）；
 3. 图表消费「当前表视图数据」（含字段元数据 + 行数据），而非脱离表的独立数据集；
-4. 保持图表配置能力完整（Chart Type / Chart Layout / 导出等已确认项）；
-5. **图表相对数据表的显示位置可由用户设置**：上 / 下 / 左 / 右。
+4. 保持图表配置能力完整（**CONFIGURE / STYLE**、导出、拟合等已确认项）；
+5. **图表相对数据表的显示位置可由用户设置**：上 / 下 / 左 / 右；
+6. 图表 Save 写入本工作区配置（与统一图表决议 10C 一致）。
 
 ### 1.3 非目标（本阶段不展开）
 
-- 图表配置持久化/分享权限体系（前期图表侧未勾选「保存」）；
+- 分享/权限体系级的跨用户配置治理（工作区内 Save 需要）；
 - 图表内嵌 Developer JS 点击回调；
-- Scatter「Heat Map」作为独立图表类型重点；
+- Custom code / Plotly 可编程图；
+- 独立 Regression 图种（拟合挂在 Line/Scatter）；
 - 复杂 BI 多数据集关联、跨表 Join 可视化；
 - 替代完整数据库管理平台（DDL/权限/调度等）。
 
@@ -58,22 +60,22 @@
 │  · position=left/right → 横向：图在左/右，表占剩余宽度         │
 │                                                         │
 │  表区：vxe-table（浏览/筛选/排序/分页）                       │
-│  图区：Chart 渲染 + Type/Layout 配置入口                     │
+│  图区：Chart 渲染 + CONFIGURE/STYLE 配置入口                  │
 └─────────────────────────────────────────────────────────┘
          │ 当前视图数据（schema + rows）
          ▼
-   Chart Runtime（按类型渲染）
+   Chart Runtime（按类型渲染；Line/Scatter 可含拟合与 MODEL TABLES）
 ```
 
-### 2.2 核心交互原则（对齐 LabKey 心智，落地到本产品）
+### 2.2 核心交互原则（对齐统一图表依据）
 
 | 原则 | 说明 |
 | --- | --- |
 | 表是真相源 | 字段列表、行集合来自当前表视图 |
 | 图是表的投影 | 图表绑定列必须来自当前表列；数据取自当前过滤/排序后的可见数据集（或明确约定的数据范围） |
-| 配置分两层 | **Chart Type**（数据映射）与 **Chart Layout**（外观布局）分离，与已细化功能点一致 |
+| 配置分两层 | **CONFIGURE**（数据映射/拟合）与 **STYLE**（外观布局）分离，与 `unified-charts` 一致 |
 | 表能力用 vxe | 筛选、排序、列显隐、虚拟滚动等优先用 vxe-table 原生能力，不在图表内重复造「表筛选器」 |
-| 图位可配 | **图表显示位置相对 database 表可设为上 / 下 / 左 / 右**，由用户切换，不写死单一布局 |
+| 图位可配 | **图表显示位置相对 database 表可设为上 / 下 / 左 / 右**（取代源产品 SPLIT 单独概念） |
 
 ### 2.3 图表显示位置（已确认）
 
@@ -95,7 +97,7 @@
 | L-03 | 无图时行为 | 尚未创建/显示图表时，表可占满工作区；创建图后按当前方位排布 |
 | L-04 | 分隔与尺寸 | 表/图之间支持分隔条拖拽调整占比；可选记住上次比例（P1） |
 | L-05 | 响应式兜底 | 窄屏下左右布局可自动降级为上下（需提示），避免表/图不可用 |
-| L-06 | 与 Chart Layout 区分 | 「图表位置」是**相对数据表的工作区布局**；Chart Layout 仍是图内部标题/边距/色板等，二者独立 |
+| L-06 | 与 STYLE 区分 | 「图表位置」是**相对数据表的工作区布局**；STYLE 仍是图内部标题/边距/色板等，二者独立 |
 
 示意：
 
@@ -137,7 +139,7 @@
 | T-04 | 列筛选 | vxe 列筛选（等于/包含/空值等） | 改变图表输入行集 |
 | T-05 | 列排序 | 单列/多列排序 | 影响表展示；图通常按绑定逻辑聚合，不直接依赖行序（除 Line 原始序列场景需明确） |
 | T-06 | 列显隐与顺序 | 自定义列 | **建议：隐藏列仍可绑定图表**或「仅可见列可绑定」二选一（待决） |
-| T-07 | 工具栏入口 | 「创建图表」按钮 + 图表类型菜单 | 打开 Chart Type 对话框 |
+| T-07 | 工具栏入口 | 「创建图表」按钮 + 图表类型菜单 | 打开 CONFIGURE 侧栏 / 创建对话框 |
 | T-08 | 空态/加载/错误 | 无数据、加载中、查询失败 | 图同步禁用或提示 |
 
 #### P1（增强体验）
@@ -160,92 +162,82 @@
 | date / datetime | Line X Axis、部分排序轴 |
 | 其他 / 未知 | 默认仅作分类候选或禁止拖入数值槽位 |
 
-需在表 schema 层提供稳定 `dataType`，否则 Chart Type 拖拽校验无法落地。
+需在表 schema 层提供稳定 `dataType`，否则 CONFIGURE 字段校验无法落地。
 
 ---
 
 ## 4. 图表能力在「表之上」的落位
 
-以下均以 `doc/product/features/charts/*.md` 已确认细化项为准，只讨论**与表结合时的增量需求**。
+以下均以 `doc/product/features/unified-charts/*.md` 已确认项为准，只讨论**与表结合时的增量需求**。
 
-### 4.1 统一：从表启动图表
+### 4.1 图表创建与配置（表上下文）
 
 | ID | 需求 | 说明 |
 | --- | --- | --- |
-| C-01 | 创建入口 | 表工具栏：创建图表 → Bar/Box/Line/Pie/Scatter |
-| C-02 | 字段池 | 对话框右侧 Columns = 当前表字段列表（title 展示，field 绑定） |
-| C-03 | 数据输入 | 默认 = 当前表视图行集（筛选后）；大数据策略见 §5 |
-| C-04 | 配置分层 | Chart Type / Chart Layout 两套面板，与细化文档一致 |
-| C-05 | 导出 | 图：PDF/PNG；与表导出入口分离，避免混淆 |
-| C-06 | 图表显示位置 | **用户可设置图相对表为上/下/左/右**（详见 §2.3）；切换不丢表状态与图配置 |
+| C-01 | 类型菜单 | Bar / Box / Line / Pie / Scatter / **Heatmap** |
+| C-02 | 字段池来源 | CONFIGURE 可选列 = 当前表字段（遵守显隐策略） |
+| C-03 | 数据输入 | 默认 = 当前表视图行集；大数据策略见 §5 |
+| C-04 | 配置分层 | **CONFIGURE / STYLE**，与 `unified-charts` 一致 |
+| C-05 | Save | 图配置写入工作区（决议 10C） |
+| C-06 | 导出 | 图：PDF/PNG；与表导出入口分离 |
+| C-07 | 图表显示位置 | 上/下/左/右（§2.3）；切换不丢表状态与图配置 |
+| C-08 | 拟合 | Line/Scatter：Point-to-Point / Linear / Quadratic / 4PL + 套索打标 + MODEL TABLES |
 
 ### 4.2 Bar Charts × 数据表
 
 | 表侧依赖 | 图表已确认能力 | 结合点 |
 | --- | --- | --- |
-| 分类列 | X Axis *、Group By | 表 string/enum 列进入 X / Group By |
-| 数值列 | Y + Aggregate | number 列进入 Y；聚合 Count/Sum/Min/Max/Mean/Median |
-| 筛选后的行 | 柱高重算 | 表筛选变化 → 图按新行集重聚合 |
-| — | Layout：色板/边距/误差棒等 | 不依赖表 UI，纯图配置 |
-
-**额外产品点：**
-- 未绑 Y 时柱高 = 分类 Count（与源一致），Count 基于**当前表视图行**。
-- Mean 时启用 Error Bars，统计也基于当前视图行。
+| 分类列 | X、Series | string/enum → X / Series |
+| 数值列 | Y + 聚合 | number → Y；Count/Sum/Min/Max/Mean/Median |
+| 筛选后的行 | 柱高重算 | 表筛选 → 重聚合 |
+| — | 水平/堆叠、色板、统计误差棒 | STYLE / CONFIGURE |
 
 ### 4.3 Box Plots × 数据表
 
 | 表侧依赖 | 图表已确认能力 | 结合点 |
 | --- | --- | --- |
-| 数值列 | Y Axis * | 必选度量来自 number 列 |
+| 数值列 | Y | number |
 | 分类列 | X / Color / Shape | 分组与点编码 |
-| 行数据 | Q1/Q2/Q3/须/离群点 | 在当前行集上计算分布 |
-| — | Show Points / Jitter / Hover | 纯图交互 |
+| 行数据 | 箱线统计 | 当前行集上计算 |
+| — | Show Points / Hover；**无 Jitter** | 纯图交互 |
 
-**额外产品点：**
-- Hover 明细可回指表字段值；可选「从点定位到表行」（P1）。
-
-### 4.4 Line Plots × 数据表
+### 4.4 Line Charts × 数据表
 
 | 表侧依赖 | 图表已确认能力 | 结合点 |
 | --- | --- | --- |
-| 时间/数值 X | X Axis * | date/number 列优先 |
-| 数值 Y | Y / 第二 Y / Side | 多度量来自多 number 列 |
-| 系列列 | Series | 如 Participant ID |
-| — | Trendline 全套、Hide Points、聚合/误差棒 | 配置层 |
-
-**额外产品点：**
-- Series 取值很多时，表筛选是控制可读性的主手段（替代图表内过滤）。
-- Trendline 非线性（assay）若本产品无 assay schema，需在需求中界定：仅开放 Point-to-Point / Linear / Polynomial，或模拟「数值 X + 专用数据域」条件。
+| 时间/数值 X | X | date/number |
+| 数值 Y | Y / 双 Y | 多 number 列 |
+| 系列列 | Series | 多折线 |
+| — | 对数轴、点形/透明度；拟合四模型 + 打标 + MODEL TABLES | **无** Hide Points / 线宽 / 误差棒 |
 
 ### 4.5 Pie Charts × 数据表
 
 | 表侧依赖 | 图表已确认能力 | 结合点 |
 | --- | --- | --- |
-| 分类列 | Categories * | 唯一值 Count → 扇区 |
-| 表筛选 | 扇区重算 | Blank 是否保留随筛选变化 |
-| — | 色板/半径/百分比/渐变 | 纯图 |
-
-**已确认扩展（超出 LabKey 源）：**
-- 支持「度量字段非 Count」（如按某 number 列 Sum/Mean 决定扇区大小）。  
-- 落位建议：Chart Type 增加可选 **Measure + Aggregate**（默认 Count），字段来自表 number 列。
+| 分类列 | Categories | Count 或度量聚合 → 扇区 |
+| 数值列 | Measure + 聚合 | 非 Count |
+| — | 内径、百分比、色板；**无渐变** | STYLE |
 
 ### 4.6 Scatter Plots × 数据表
 
 | 表侧依赖 | 图表已确认能力 | 结合点 |
 | --- | --- | --- |
-| 两数值列 | X* / Y* | number×number |
-| 多 Y | 第二 Y + Side | 多度量 |
-| 分类列 | Color / Shape | 编码 |
-| 大量点 | Group by Density 等 Layout | 表行数大时自动/Always 分箱 |
-| — | 分面 One Per Measure | 多 Y 时 |
+| 两数值列 | X / Y | number×number |
+| 多 Y | 双 Y + 分面 | 多度量 |
+| 分类/数值 | Color / Shape / Size | 编码 |
+| — | Jitter、统计误差棒、拟合套件；**无密度 Layout** | 过密改用 Heatmap |
 
-**额外产品点：**
-- 密度告警文案可保留为运行时提示；不作为独立 Heat Map 产品入口。
+### 4.7 Heatmaps × 数据表
+
+| 表侧依赖 | 图表已确认能力 | 结合点 |
+| --- | --- | --- |
+| 行列坐标列 | X / Y | 分类或整数坐标 |
+| 数值列 | 色阶值 | 连续色映射 |
+| — | 色阶类型、格内标注、排序/聚类、Hover | STYLE |
 
 ---
 
 ## 5. 关键数据契约：表视图 → 图表输入
-
 ### 5.1 建议的数据对象
 
 ```ts
@@ -285,7 +277,8 @@ interface WorkspaceLayoutState {
 | D. 选中行 | 仅选中行 | 灵活 | 非默认心智，作增强 |
 
 **推荐默认：B**，并设 **安全上限 N**（达到则转 C 并提示）。  
-与 Scatter「超过 10000 点密度分组」可共用阈值语义。
+**推荐默认：B**，并设 **安全上限 N**（达到则转 C 并提示）。  
+与统一图表「抽样提示」及 Heatmap 大数据场景共用阈值语义。
 
 ### 5.3 表变更 → 图刷新策略
 
@@ -304,30 +297,29 @@ interface WorkspaceLayoutState {
 | --- | --- | --- |
 | DataTableView | vxe-table 展示、筛选排序、工具栏 | vxe-table |
 | FieldMetaService | schema → TableFieldMeta | 后端/查询 API |
-| WorkspaceLayout | 表+图组合排布；消费 `chartPosition`（top/bottom/left/right）；分隔条 | — |
-| ChartEntry | 「创建图表」菜单、**图表位置设置**、已打开图列表 | WorkspaceLayout |
-| ChartTypeDialog | 五类图的数据映射配置（拖拽） | features 细化项 |
-| ChartLayoutPanel | 外观/轴/误差棒等（图内部布局，≠ 工作区方位） | features 细化项 |
-| ChartRenderer | 实际绘图引擎（待选型） | ChartDataInput + 配置模型 |
+| WorkspaceLayout | 表+图组合排布；消费 `chartPosition`；分隔条 | — |
+| ChartEntry | 「创建图表」菜单、图表位置、已打开图列表 | WorkspaceLayout |
+| ChartConfigurePanel | CONFIGURE：映射/聚合/拟合/误差棒 | `unified-charts` |
+| ChartStylePanel | STYLE：标题/色板/图例/点样式 | `unified-charts` |
+| ChartRenderer | 绘图引擎（待选型） | ChartDataInput + 配置模型 |
+| ModelTablesPanel | Line/Scatter：MODEL VARIABLES / OUTPUT | 拟合运行时 |
 | ExportService | 表导出 vs 图 PDF/PNG | — |
 
-> 绘图引擎（ECharts / G2 / 自研等）本文件不锁定，只要求能覆盖已确认功能点。
+> 绘图引擎本文件不锁定，需覆盖 `unified-charts` 已确认功能点。
 
 ---
 
-## 7. 与已确认图表功能点的追溯矩阵
+## 7. 与统一图表功能点的追溯矩阵
 
 | 图表功能域 | 文档 | 表侧前置 | 一体化增量 |
 | --- | --- | --- | --- |
-| Bar 映射与聚合 | [bar-charts.md](../features/charts/bar-charts.md) | 分类/数值列元数据 | 视图行上聚合 |
-| Bar Layout / 误差棒 / 导出 | 同上 | — | 配置存于图实例 |
-| Box 映射与点编码 | [box-plots.md](../features/charts/box-plots.md) | Y 数值 + 分类 | 分布统计基于视图行 |
-| Box Hover / 渲染规则 / 导出 | 同上 | 可选行定位 | Tooltip 字段来自表 |
-| Line 映射/双Y/Trendline | [line-plots.md](../features/charts/line-plots.md) | 时间/数值/系列列 | 筛选控 Series 密度 |
-| Line Layout/误差棒/导出 | 同上 | — | — |
-| Pie Categories + Layout | [pie-charts.md](../features/charts/pie-charts.md) | 分类列 | Count 基于视图行 |
-| Pie 非 Count 扩展 | 同上 | 数值列 | Chart Type 增 Measure |
-| Scatter 映射/双Y/密度布局 | [scatter-plots.md](../features/charts/scatter-plots.md) | 双数值列 | 大行数触发密度 |
+| 共性 CONFIGURE/STYLE | [common.md](../features/unified-charts/common.md) | 字段元数据 | 工作区 Save、chartPosition |
+| Bar | [bar-charts.md](../features/unified-charts/bar-charts.md) | 分类/数值 | 视图行聚合、水平/堆叠 |
+| Box | [box-plots.md](../features/unified-charts/box-plots.md) | Y + Color/Shape | 分布统计；无 Jitter |
+| Line + 拟合 | [line-charts.md](../features/unified-charts/line-charts.md) | X/Y/Series | 拟合/打标/MODEL TABLES |
+| Pie | [pie-charts.md](../features/unified-charts/pie-charts.md) | Categories + Measure | 非 Count；无渐变 |
+| Scatter + 拟合 | [scatter-plots.md](../features/unified-charts/scatter-plots.md) | X/Y/Color/Shape/Size | 无密度；过密→Heatmap |
+| Heatmap | [heatmaps.md](../features/unified-charts/heatmaps.md) | 行列坐标+色值 | 色阶与 Hover |
 
 ---
 
@@ -335,49 +327,49 @@ interface WorkspaceLayoutState {
 
 ### Phase 1 — 表可用 + 一图打通
 - vxe-table：T-01～T-08
-- 图表：Bar（Type + 基础 Layout + PNG 导出）
-- **工作区方位：L-01～L-03（至少支持上下；左右可同 Phase 或紧随）**
+- 图表：Bar（CONFIGURE + 基础 STYLE + PNG）
+- 工作区方位：L-01～L-03
 - 数据契约：方案 B + 上限提示
 
-### Phase 2 — 五图 Type 齐备 + 四向布局齐备
-- Box / Line / Pie / Scatter 的 Chart Type 全量已确认项
-- Pie 非 Count 扩展
-- 图 PDF/PNG
-- **图表位置上/下/左/右全量（L-01～L-06）**
+### Phase 2 — 六图 CONFIGURE 齐备 + 四向布局
+- Box / Line / Pie / Scatter / Heatmap 的 CONFIGURE 主路径
+- Pie 非 Count；Scatter Size；Heatmap 色阶
+- PDF/PNG；chartPosition 全量（L-01～L-06）
 
-### Phase 3 — Layout 深化
-- 各图 Layout 全量（色板、边距、误差棒、双轴、Trendline、密度等）
-- 表 P1：虚拟滚动、格式化、选中行绘图（可选）
-- 分隔条比例记忆（L-04 P1）
+### Phase 3 — STYLE 与拟合深化
+- 各图 STYLE 全量（色板、边距、误差棒、双轴、对数轴等）
+- Line/Scatter：拟合四模型、套索打标、MODEL TABLES
+- 表 P1：虚拟滚动、选中行绘图（可选）
 
 ### Phase 4 — 体验与治理（可选）
-- 图表配置草稿本地缓存
 - 点→表行联动
-- 查询下推聚合（服务端）以支持更大数据
+- 查询下推聚合
+- 多图实例并存策略（见 §9）
 
 ---
 
 ## 9. 待决问题（需产品确认）
 
-1. **隐藏列能否用于图表绑定？**（可见列 only vs 全部字段）
-2. **图表取数默认 B + 上限 N，N 取多少？**（如 2万/5万）
+1. **隐藏列能否用于图表绑定？**
+2. **图表取数默认 B + 上限 N，N 取多少？**
 3. **是否提供「仅选中行绘图」？**
-4. **Line Trendline 非线性**在本产品数据域如何界定可用条件？
-5. ~~**表/图布局**~~ → **已确认**：用户可设置图表相对表为 **上 / 下 / 左 / 右**（§2.3）；默认建议 `bottom`
-6. **是否需要多图表实例并存**（同一表多个已创建图）？多图时方位是「共享一个图区」还是「每图独立方位」？
-7. **绘图库选型约束**（性能、导出 PDF/PNG、双 Y、箱线、趋势线拟合）？
-8. **左右布局的默认宽度比例**、窄屏降级阈值（L-05）具体数值？
+4. ~~Line 非线性范围~~ → **已确认**：Point-to-Point / Linear / Quadratic / 4PL（见 unified-charts）
+5. ~~表/图布局~~ → **已确认**：上/下/左/右（§2.3）
+6. **是否需要多图表实例并存？** 多图时方位共享还是每图独立？
+7. **绘图库选型约束**（导出、双 Y、箱线、4PL、套索）？
+8. **左右布局默认宽度比例**、窄屏降级阈值？
 
 ---
 
 ## 10. 成功标准（验收思路）
 
 1. 用户打开一库表/查询结果，可在 vxe-table 中完成筛选排序浏览。  
-2. 从工具栏创建五类图之一，字段池与表列一致，拖拽校验符合类型规则。  
-3. 修改表筛选后，图表统计/图形随当前视图更新（在约定取数策略内）。  
-4. 各图已确认的 Type/Layout/导出能力可按 `doc/product/features/charts` 逐项勾验。  
-5. Pie 在默认 Count 之外，可按确认扩展绑定度量字段。  
-6. **用户可将图表显示位置切换为相对数据表的上/下/左/右，切换后表状态与图配置保持，工作区正确重排。**
+2. 从工具栏创建六类图之一，字段池与表列一致，类型校验符合统一细则。  
+3. 修改表筛选后，图表随当前视图更新（在约定取数策略内）。  
+4. 各图已确认的 CONFIGURE/STYLE/导出/拟合能力可按 `doc/product/features/unified-charts` 逐项勾验。  
+5. Pie 可绑定非 Count 度量；Heatmap 可独立创建。  
+6. Line/Scatter 可完成拟合、套索打标与 MODEL TABLES 查看。  
+7. **用户可将图表位置切换为上/下/左/右，表状态与图配置保持。**
 
 ---
 
@@ -385,17 +377,17 @@ interface WorkspaceLayoutState {
 
 | 文档 | 作用 |
 | --- | --- |
-| [../features/charts/README.md](../features/charts/README.md) | 图表功能点细化入口 |
-| [../features/charts/](../features/charts/) 五份细则 | 图表配置细则与源截图 |
-| [../../reference/labkey/](../../reference/labkey/) | 调研参考资料 |
+| [../features/unified-charts/README.md](../features/unified-charts/README.md) | **当前**图表功能点入口 |
+| [../features/charts/](../features/charts/) | LabKey 溯源 |
+| [../features/benchling-charts/](../features/benchling-charts/) | Benchling 溯源 |
+| [../../reference/labkey/](../../reference/labkey/) | LabKey 参考资料 |
+| [../../reference/benchling/](../../reference/benchling/) | Benchling 参考资料 |
 | [../../README.md](../../README.md) | 文档中心索引 |
 
 ---
 
 ## 12. 小结
 
-本阶段需求的核心不是「再列一遍图表控件」，而是：
+> **以 vxe-table 为唯一业务数据入口，把 `unified-charts` 已确认的六类图表（含 Line/Scatter 拟合套件）挂到表工具链上，用字段元数据 + 当前视图行集驱动 CONFIGURE/STYLE/导出；图表相对表位置支持上/下/左/右。**
 
-> **以 vxe-table 数据表为唯一业务数据入口，把已确认的五类图表能力挂到表工具链上，用统一的字段元数据 + 当前视图行集驱动 Chart Type/Layout/导出；图表相对表的显示位置支持用户设置为上/下/左/右。**
-
-确认 §9 剩余待决问题后，可进入技术方案（表状态管理、工作区布局、图表配置模型、渲染引擎选型）与实现计划。
+确认 §9 剩余待决后，可进入技术方案与实现计划。

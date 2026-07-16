@@ -6,49 +6,46 @@
 doc/
 ├── README.md                          ← 本索引
 ├── reference/                         ← 参考资料（只读调研，不作为开发依据）
-│   ├── labkey/                        ← LabKey 官方图表文档整理
-│   └── benchling/                     ← Benchling Analysis 文档整理
-└── product/                           ← 产品开发依据（后续实现以此为准）
+│   ├── labkey/
+│   └── benchling/
+└── product/                           ← 产品开发依据
     ├── features/
-    │   ├── charts/                    ← LabKey 来源：已确认图表功能点细则
-    │   └── benchling-charts/          ← Benchling 来源：功能点初稿（待确认）
+    │   ├── unified-charts/            ← 【当前】合并后的图表功能点（定稿）
+    │   ├── charts/                    ← LabKey 细化原文（仅溯源）
+    │   └── benchling-charts/          ← Benchling 细化原文（仅溯源）
     └── requirements/                  ← 功能需求文档
 ```
 
 ## 1. 参考资料 `reference/`
 
-从外部产品/官网整理的调研原文，用于理解能力来源与 UI 形态。
-
 | 路径 | 说明 |
 | --- | --- |
-| [reference/labkey/](./reference/labkey/) | LabKey 五类图表官方文档摘录（含原图链接） |
+| [reference/labkey/](./reference/labkey/) | LabKey 五类图表官方文档摘录 |
 | [reference/benchling/](./reference/benchling/) | Benchling Analysis 官方文档整理 |
 
-> 参考资料可修订、可增补，但**不应直接当作本产品需求规格**。产品范围以 `product/` 勾选与确认结果为准。
+> 参考资料**不应直接当作本产品需求规格**。
 
 ## 2. 产品开发依据 `product/`
 
-经确认后的功能点与需求思考，作为后续产品设计/开发的依据。
-
 | 路径 | 说明 |
 | --- | --- |
-| [product/features/charts/](./product/features/charts/) | LabKey 来源：已确认并细化的图表功能点 |
-| [product/features/benchling-charts/](./product/features/benchling-charts/) | Benchling 来源：图表功能点初稿（**请先勾选确认**） |
-| [product/requirements/](./product/requirements/) | 表（vxe-table）+ 图表一体化等需求文档 |
+| [product/features/unified-charts/](./product/features/unified-charts/) | **当前图表功能点（LabKey+Benchling 合并定稿）** |
+| [product/features/charts/](./product/features/charts/) | LabKey 细化原文（已合并，仅溯源） |
+| [product/features/benchling-charts/](./product/features/benchling-charts/) | Benchling 细化原文（已合并，仅溯源） |
+| [product/requirements/](./product/requirements/) | 表（vxe-table）+ 图表一体化等需求 |
 
 建议阅读顺序：
 
-1. `product/features/charts/` — LabKey 侧已确认图表能力  
-2. `product/features/benchling-charts/` — Benchling 侧初稿，确认后再细化  
-3. `product/requirements/table-chart-integration.md` — 表 + 图一体化  
+1. `product/features/unified-charts/` — 图表能力唯一依据  
+2. `product/requirements/table-chart-integration.md` — 表 + 图一体化  
 
 ## 文档关系
 
 ```text
-reference/labkey/*      ──►  product/features/charts/*          （已细化）
-reference/benchling/*   ──►  product/features/benchling-charts/* （待确认）
-                                      │
-                                      ▼
-                           product/requirements/*
-                              （表 + 图一体化）
+reference/labkey/*      ──►  product/features/charts/*           （溯源）
+reference/benchling/*   ──►  product/features/benchling-charts/* （溯源）
+                └──────────────► product/features/unified-charts/*  （定稿）
+                                          │
+                                          ▼
+                               product/requirements/*
 ```
