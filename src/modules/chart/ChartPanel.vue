@@ -2,11 +2,18 @@
   <div class="chart">
     <div class="toolbar">
       <span v-if="missing.length" class="need">请配置：{{ missing.join('、') }}（点 Edit 图表）</span>
-      <span v-if="built.sampled" class="sample">已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）</span>
-      <el-button size="small" @click="downloadFull">下载完整数据 CSV</el-button>
-      <el-button size="small" @click="exportPng">导出 PNG</el-button>
-      <el-button size="small" @click="exportPdf">导出 PDF</el-button>
+      <span v-if="built.sampled" class="sample">
+        已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）
+      </span>
+      <el-button size="small" :loading="engineLoading" @click="downloadFull">下载完整数据 CSV</el-button>
+      <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPng">
+        导出 PNG
+      </el-button>
+      <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPdf">
+        导出 PDF
+      </el-button>
     </div>
+    <div v-if="engineError" class="engine-error" role="alert">{{ engineError }}</div>
     <div ref="elRef" class="canvas" />
     <el-collapse v-if="built.modelTables?.variables?.length" class="models">
       <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
@@ -25,8 +32,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import * as echarts from 'echarts'
-import { jsPDF } from 'jspdf'
 import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import { buildChartOption, SAMPLE_LIMIT } from '@/modules/chart/runtime'
 import { missingRequiredFields } from '@/modules/chart/guessMapping'
@@ -43,7 +48,13 @@ const emit = defineEmits<{ 'update:config': [ChartConfig] }>()
 const store = useAnalysisStore()
 
 const elRef = ref<HTMLDivElement>()
-let chart: echarts.ECharts | null = null
+const engineLoading = ref(true)
+const engineError = ref('')
+const chartReady = ref(false)
+let chart: import('echarts').ECharts | null = null
+let echartsApi: typeof import('echarts') | null = null
+let resizeObserver: ResizeObserver | null = null
+let renderQueued = false
 
 const missing = computed(() => missingRequiredFields(props.viewType, props.config.configure))
 
@@ -63,52 +74,88 @@ const outKeys = computed(() =>
   built.value.modelTables?.output[0] ? Object.keys(built.value.modelTables.output[0]) : [],
 )
 
-function render() {
-  if (!elRef.value) return
-  if (!chart) chart = echarts.init(elRef.value)
-  chart.setOption(built.value.option, true)
-  chart.resize()
-  chart.off('brushselected')
-  chart.on('brushselected', (params: unknown) => {
-    const p = params as { batch?: { selected?: { dataIndex?: number[] }[] }[] }
-    const indexes = p.batch?.[0]?.selected?.[0]?.dataIndex || []
-    const series = (built.value.option.series || []) as { data?: { id?: string }[] }[]
-    const data = series[0]?.data || []
-    const ids = indexes.map((i) => data[i]?.id).filter(Boolean) as string[]
-    if (!ids.length || !store.selectedView) return
-    const cfg = cloneDeep(props.config)
-    cfg.flags = cfg.flags || { pointIds: [], comments: {} }
-    for (const id of ids) {
-      if (!cfg.flags.pointIds.includes(id)) cfg.flags.pointIds.push(id)
-      cfg.flags.comments[id] = cfg.flags.comments[id] || 'flagged'
-    }
-    emit('update:config', cfg)
-  })
+async function ensureEngine() {
+  if (echartsApi) return echartsApi
+  engineLoading.value = true
+  engineError.value = ''
+  try {
+    echartsApi = await import('echarts')
+    return echartsApi
+  } catch (err) {
+    engineError.value = `图表引擎加载失败：${String(err)}`
+    throw err
+  } finally {
+    engineLoading.value = false
+  }
 }
 
-onMounted(() => {
-  render()
-  window.addEventListener('resize', resize)
-})
-onUnmounted(() => {
-  window.removeEventListener('resize', resize)
-  chart?.dispose()
-  chart = null
-})
-watch(built, () => render(), { deep: true })
+async function render() {
+  if (!elRef.value) return
+  if (renderQueued) return
+  renderQueued = true
+  try {
+    const echarts = await ensureEngine()
+    if (!elRef.value) return
+    if (!chart) chart = echarts.init(elRef.value)
+    chart.setOption(built.value.option, true)
+    chart.resize()
+    chartReady.value = true
+    chart.off('brushselected')
+    chart.on('brushselected', (params: unknown) => {
+      const p = params as { batch?: { selected?: { dataIndex?: number[] }[] }[] }
+      const indexes = p.batch?.[0]?.selected?.[0]?.dataIndex || []
+      const series = (built.value.option.series || []) as { data?: { id?: string }[] }[]
+      const data = series[0]?.data || []
+      const ids = indexes.map((i) => data[i]?.id).filter(Boolean) as string[]
+      if (!ids.length || !store.selectedView) return
+      const cfg = cloneDeep(props.config)
+      cfg.flags = cfg.flags || { pointIds: [], comments: {} }
+      for (const id of ids) {
+        if (!cfg.flags.pointIds.includes(id)) cfg.flags.pointIds.push(id)
+        cfg.flags.comments[id] = cfg.flags.comments[id] || 'flagged'
+      }
+      emit('update:config', cfg)
+    })
+  } finally {
+    renderQueued = false
+  }
+}
 
 function resize() {
   chart?.resize()
 }
 
+onMounted(() => {
+  void render()
+  if (elRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => resize())
+    resizeObserver.observe(elRef.value)
+  }
+  window.addEventListener('resize', resize, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resize)
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  chart?.dispose()
+  chart = null
+})
+
+watch(built, () => {
+  void render()
+})
+
 function downloadFull() {
   const header = props.columns.map((c) => c.field).join(',')
   const lines = props.rows.map((r) => props.columns.map((c) => JSON.stringify(r[c.field] ?? '')).join(','))
   const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
+  a.href = url
   a.download = 'full-data.csv'
   a.click()
+  URL.revokeObjectURL(url)
 }
 
 function exportPng() {
@@ -123,6 +170,7 @@ function exportPng() {
 async function exportPdf() {
   if (!chart) return
   const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' })
+  const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'landscape' })
   pdf.addImage(url, 'PNG', 10, 10, 280, 150)
   pdf.save('chart.pdf')
@@ -153,9 +201,14 @@ async function exportPdf() {
   font-size: 12px;
   font-weight: 600;
 }
+.engine-error {
+  color: #c45656;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
 .canvas {
   flex: 1;
-  min-height: 280px;
+  min-height: 200px;
 }
 .models {
   border-top: 1px solid var(--ia-border);

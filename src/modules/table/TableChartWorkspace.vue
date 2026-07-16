@@ -6,29 +6,55 @@
           v-model="viewName"
           size="small"
           style="width: 200px"
+          aria-label="视图名称"
           @change="store.renameNode(store.selectedView.view.id, viewName)"
         />
-        <el-select v-model="viewType" size="small" style="width: 140px" @change="onViewType">
-          <el-option v-for="t in viewTypes" :key="t" :label="t" :value="t" />
+        <el-select
+          v-model="viewType"
+          size="small"
+          style="width: 150px"
+          aria-label="视图类型"
+          @change="onViewType"
+        >
+          <el-option v-for="t in viewTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
         </el-select>
-        <el-select v-model="chartPos" size="small" style="width: 140px" @change="onPos">
+        <el-select
+          v-model="chartPos"
+          size="small"
+          style="width: 140px"
+          aria-label="图表位置"
+          :disabled="viewType === 'table'"
+          @change="onPos"
+        >
           <el-option label="图在下" value="bottom" />
           <el-option label="图在上" value="top" />
           <el-option label="图在左" value="left" />
           <el-option label="图在右" value="right" />
         </el-select>
         <el-button size="small" @click="showTransforms = true">过滤 / 转换</el-button>
-        <el-button size="small" @click="showChartEdit = true" :disabled="viewType === 'table'">Edit 图表</el-button>
+        <el-button size="small" @click="showChartEdit = true" :disabled="viewType === 'table'">
+          Edit 图表
+        </el-button>
       </template>
       <template v-else-if="store.selectedTable">
         <strong>{{ store.selectedTable.name }}</strong>
-        <el-button size="small" @click="quickView">New view</el-button>
+        <el-button size="small" type="primary" plain @click="quickView">New view</el-button>
       </template>
+      <el-tag size="small" type="info" class="row-count">{{ rowCountLabel }}</el-tag>
       <el-button size="small" @click="exportCsv">导出 CSV</el-button>
     </div>
 
-    <div class="ws-body" :class="layoutClass">
-      <div v-if="showChartPane" class="chart-pane">
+    <div v-if="layoutDegraded" class="layout-hint" role="status">
+      窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。
+    </div>
+
+    <div
+      ref="bodyRef"
+      class="ws-body"
+      :class="layoutClass"
+      :style="splitStyle"
+    >
+      <div v-if="showChartPane" class="chart-pane" :style="chartPaneStyle">
         <ChartPanel
           :view-type="viewType"
           :columns="store.workspaceResult.columns"
@@ -37,7 +63,18 @@
           @update:config="onChartSave"
         />
       </div>
-      <div class="table-pane">
+      <div
+        v-if="showChartPane"
+        class="splitter"
+        :class="splitterOrientation"
+        role="separator"
+        :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
+        aria-label="拖拽调整表图占比"
+        tabindex="0"
+        @pointerdown="onSplitterDown"
+        @keydown="onSplitterKey"
+      />
+      <div class="table-pane" :style="tablePaneStyle">
         <EditableGrid
           :columns="store.workspaceResult.columns"
           :model-value="store.workspaceResult.rows"
@@ -49,13 +86,21 @@
     </div>
 
     <TransformDialog v-model="showTransforms" />
-    <ChartEditDrawer v-model="showChartEdit" :config="chartConfig" :columns="store.workspaceResult.columns" @save="onChartSave" />
+    <ChartEditDrawer
+      v-model="showChartEdit"
+      :config="chartConfig"
+      :columns="store.workspaceResult.columns"
+      @save="onChartSave"
+    />
   </div>
-  <div v-else class="empty">从侧栏选择表或视图，或使用 + Add data 导入 CSV</div>
+  <div v-else class="empty">
+    <h3>开始分析</h3>
+    <p>从侧栏选择表或视图，或使用「+ Add data」导入 CSV / 合并表。</p>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ChartConfig, ChartPosition, ViewType } from '@/shared/types/analysis'
 import EditableGrid from './EditableGrid.vue'
@@ -64,11 +109,29 @@ import TransformDialog from '@/modules/transform/TransformDialog.vue'
 import ChartEditDrawer from '@/modules/chart/ChartEditDrawer.vue'
 import { cloneDeep } from '@/shared/utils/clone'
 import { guessConfigure } from '@/modules/chart/guessMapping'
+import {
+  clampSplitRatio,
+  DEFAULT_SPLIT_RATIO,
+  effectiveChartPosition,
+} from './layout'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
-const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
+const bodyRef = ref<HTMLElement | null>(null)
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const splitRatio = ref(DEFAULT_SPLIT_RATIO)
+const dragging = ref(false)
+
+const viewTypeOptions: { value: ViewType; label: string }[] = [
+  { value: 'table', label: '表格 table' },
+  { value: 'bar', label: '柱状 bar' },
+  { value: 'line', label: '折线 line' },
+  { value: 'scatter', label: '散点 scatter' },
+  { value: 'box', label: '箱线 box' },
+  { value: 'pie', label: '饼图 pie' },
+  { value: 'heatmap', label: '热力 heatmap' },
+]
 
 const viewName = ref('')
 const viewType = ref<ViewType>('table')
@@ -83,15 +146,54 @@ watch(
     viewType.value = sv.view.viewType
     chartPos.value = sv.view.chartConfig.chartPosition
     chartConfig.value = cloneDeep(sv.view.chartConfig)
+    splitRatio.value = clampSplitRatio(sv.view.chartConfig.splitRatio)
   },
   { immediate: true },
 )
 
 const showChartPane = computed(() => store.selectedView && viewType.value !== 'table')
+
+const layoutInfo = computed(() =>
+  effectiveChartPosition(chartPos.value, viewportWidth.value),
+)
+const layoutDegraded = computed(() => showChartPane.value && layoutInfo.value.degraded)
+const effectivePos = computed(() => layoutInfo.value.position)
+
 const layoutClass = computed(() => {
   if (!showChartPane.value) return 'only-table'
-  return `pos-${chartPos.value}`
+  return `pos-${effectivePos.value}`
 })
+
+const splitterOrientation = computed(() =>
+  effectivePos.value === 'left' || effectivePos.value === 'right' ? 'vertical' : 'horizontal',
+)
+
+const chartPaneStyle = computed(() => {
+  if (!showChartPane.value) return {}
+  const r = splitRatio.value
+  if (splitterOrientation.value === 'horizontal') {
+    return { flex: `${r} 1 0`, minHeight: '160px' }
+  }
+  return { flex: `${r} 1 0`, minWidth: '240px' }
+})
+
+const tablePaneStyle = computed(() => {
+  if (!showChartPane.value) return { flex: '1 1 auto' }
+  const r = 1 - splitRatio.value
+  if (splitterOrientation.value === 'horizontal') {
+    return { flex: `${r} 1 0`, minHeight: '140px' }
+  }
+  return { flex: `${r} 1 0`, minWidth: '240px' }
+})
+
+const splitStyle = computed(() => (dragging.value ? { userSelect: 'none' as const } : {}))
+
+const rowCountLabel = computed(() => {
+  const n = store.workspaceResult?.rows.length ?? 0
+  const cols = store.workspaceResult?.columns.length ?? 0
+  return `${n.toLocaleString()} 行 · ${cols} 列`
+})
+
 const gridReadOnlyHint = computed(() => {
   if (store.canEditGrid) return ''
   if (store.selectedView && store.selectedView.view.viewType !== 'table') {
@@ -100,12 +202,82 @@ const gridReadOnlyHint = computed(() => {
   return '当前视图含过滤/转换，表格只读；可提升为表后编辑'
 })
 
+function onViewport() {
+  viewportWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('resize', onViewport, { passive: true })
+  onViewport()
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', onViewport)
+  window.removeEventListener('pointermove', onSplitterMove)
+  window.removeEventListener('pointerup', onSplitterUp)
+})
+
+function persistSplitRatio(ratio: number) {
+  splitRatio.value = clampSplitRatio(ratio)
+  if (!store.selectedView) return
+  const next = { ...chartConfig.value, splitRatio: splitRatio.value }
+  chartConfig.value = next
+  store.setChartConfig(store.selectedView.view.id, next)
+}
+
+function onSplitterDown(e: PointerEvent) {
+  e.preventDefault()
+  dragging.value = true
+  ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  window.addEventListener('pointermove', onSplitterMove)
+  window.addEventListener('pointerup', onSplitterUp)
+}
+
+function onSplitterMove(e: PointerEvent) {
+  if (!dragging.value || !bodyRef.value) return
+  const rect = bodyRef.value.getBoundingClientRect()
+  let ratio: number
+  if (splitterOrientation.value === 'horizontal') {
+    const y = e.clientY - rect.top
+    ratio = effectivePos.value === 'top' ? y / rect.height : 1 - y / rect.height
+  } else {
+    const x = e.clientX - rect.left
+    ratio = effectivePos.value === 'left' ? x / rect.width : 1 - x / rect.width
+  }
+  // live preview without save spam
+  splitRatio.value = clampSplitRatio(ratio)
+}
+
+function onSplitterUp() {
+  if (!dragging.value) return
+  dragging.value = false
+  window.removeEventListener('pointermove', onSplitterMove)
+  window.removeEventListener('pointerup', onSplitterUp)
+  persistSplitRatio(splitRatio.value)
+}
+
+function onSplitterKey(e: KeyboardEvent) {
+  const step = e.shiftKey ? 0.08 : 0.03
+  let next = splitRatio.value
+  if (splitterOrientation.value === 'horizontal') {
+    if (e.key === 'ArrowUp') next += effectivePos.value === 'top' ? -step : step
+    else if (e.key === 'ArrowDown') next += effectivePos.value === 'top' ? step : -step
+    else return
+  } else {
+    if (e.key === 'ArrowLeft') next += effectivePos.value === 'left' ? -step : step
+    else if (e.key === 'ArrowRight') next += effectivePos.value === 'left' ? step : -step
+    else return
+  }
+  e.preventDefault()
+  persistSplitRatio(next)
+}
+
 function onViewType(t: ViewType) {
   if (!store.selectedView) return
   const cols = store.workspaceResult?.columns || store.selectedView.table.columns
   const next = {
     ...chartConfig.value,
     configure: guessConfigure(t, cols, chartConfig.value.configure),
+    splitRatio: splitRatio.value,
   }
   chartConfig.value = next
   viewType.value = t
@@ -118,9 +290,10 @@ function onPos(p: ChartPosition) {
 }
 
 function onChartSave(cfg: ChartConfig) {
-  chartConfig.value = cfg
+  const next = { ...cfg, splitRatio: splitRatio.value, chartPosition: chartPos.value }
+  chartConfig.value = next
   if (!store.selectedView) return
-  store.setChartConfig(store.selectedView.view.id, cfg)
+  store.setChartConfig(store.selectedView.view.id, next)
   showChartEdit.value = false
 }
 
@@ -145,10 +318,12 @@ function exportCsv() {
     res.columns.map((c) => JSON.stringify(r[c.field] ?? '')).join(','),
   )
   const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
+  a.href = url
   a.download = 'export.csv'
   a.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
@@ -167,6 +342,16 @@ function exportCsv() {
   border-bottom: 1px solid var(--ia-border);
   flex-wrap: wrap;
 }
+.row-count {
+  margin-left: auto;
+}
+.layout-hint {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #8a6d3b;
+  background: #fff8e6;
+  border-bottom: 1px solid #f0e0b2;
+}
 .ws-body {
   flex: 1;
   min-height: 0;
@@ -179,34 +364,91 @@ function exportCsv() {
   flex-direction: column;
 }
 .ws-body.pos-top {
-  flex-direction: column-reverse;
+  flex-direction: column;
+}
+.ws-body.pos-top .chart-pane {
+  order: 0;
+}
+.ws-body.pos-top .splitter {
+  order: 1;
+}
+.ws-body.pos-top .table-pane {
+  order: 2;
+}
+.ws-body.pos-bottom .chart-pane {
+  order: 2;
+}
+.ws-body.pos-bottom .splitter {
+  order: 1;
+}
+.ws-body.pos-bottom .table-pane {
+  order: 0;
 }
 .ws-body.pos-right {
   flex-direction: row;
 }
 .ws-body.pos-left {
-  flex-direction: row-reverse;
+  flex-direction: row;
+}
+.ws-body.pos-left .chart-pane {
+  order: 0;
+}
+.ws-body.pos-left .splitter {
+  order: 1;
+}
+.ws-body.pos-left .table-pane {
+  order: 2;
+}
+.ws-body.pos-right .chart-pane {
+  order: 2;
+}
+.ws-body.pos-right .splitter {
+  order: 1;
+}
+.ws-body.pos-right .table-pane {
+  order: 0;
 }
 .chart-pane {
-  flex: 1;
-  min-height: 280px;
-  min-width: 320px;
+  min-height: 160px;
+  min-width: 240px;
   background: #fff;
-  border-bottom: 1px solid var(--ia-border);
-}
-.pos-left .chart-pane,
-.pos-right .chart-pane {
-  border-bottom: none;
-  border-left: 1px solid var(--ia-border);
+  overflow: hidden;
 }
 .table-pane {
-  flex: 1;
-  min-height: 200px;
-  min-width: 280px;
+  min-height: 140px;
+  min-width: 240px;
+  overflow: hidden;
+}
+.splitter {
+  flex: 0 0 6px;
+  background: var(--ia-border);
+  position: relative;
+  z-index: 2;
+  transition: background 0.15s ease;
+}
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--ia-accent);
+  outline: none;
+}
+.splitter.horizontal {
+  cursor: row-resize;
+}
+.splitter.vertical {
+  cursor: col-resize;
 }
 .empty {
-  padding: 40px;
-  color: #909399;
+  padding: 48px 24px;
+  color: #646a73;
   text-align: center;
+}
+.empty h3 {
+  margin: 0 0 8px;
+  color: #1f2329;
+  font-size: 18px;
+}
+.empty p {
+  margin: 0;
+  font-size: 14px;
 }
 </style>

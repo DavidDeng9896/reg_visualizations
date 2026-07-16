@@ -13,11 +13,13 @@
       border
       height="100%"
       :data="rows"
+      :scroll-y="{ enabled: true, gt: 40 }"
       :edit-config="editable ? { trigger: 'dblclick', mode: 'cell', showStatus: true } : undefined"
       :checkbox-config="{ highlight: true }"
       :mouse-config="{ selected: true }"
       :keyboard-config="{ isClip: true, isEdit: editable }"
       keep-source
+      show-overflow
       @edit-closed="onEditClosed"
       @cell-selected="onCellSelected"
     >

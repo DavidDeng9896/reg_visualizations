@@ -2,47 +2,47 @@
 
 > 规格：[`../specs/2026-07-16-insight-analysis-framework-design.md`](../specs/2026-07-16-insight-analysis-framework-design.md)  
 > 自测报告：[`./selftest-10-rounds-report.md`](./selftest-10-rounds-report.md)  
-> 全按钮 UI×10：[`./ui-full-10-rounds-report.md`](./ui-full-10-rounds-report.md)
+> 全按钮 UI×10：[`./ui-full-10-rounds-report.md`](./ui-full-10-rounds-report.md)  
+> 优化轮次：见自动化记忆 `optimization-rounds.md`（每 3 轮合并一次）
 
 ## 1. 当前状态
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/insight-analysis-app-9a40` |
-| 阶段 | **图表修复完成；全按钮浏览器自测 10/10 PASS** |
-| 上次更新 | 2026-07-16 11:06 |
-| 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ |
-| 单元 | **12/12 PASS** |
-| UI E2E | **10/10 轮全通过**（Playwright 真实点击） |
-| Build | PASS |
+| 分支 | `cursor/bc-dca1013b-4dcc-4b20-87c4-996dff1da607-c9ca` |
+| 阶段 | **优化 Round 1**：布局分隔条 / 窄屏降级 / 分包与虚拟滚动 |
+| 上次更新 | 2026-07-16 14:06 |
+| 单元 | **14/14 PASS**（含 layout helpers） |
+| Build | PASS（echarts / vxe / element-plus 已拆 chunk） |
 
-## 2. 图表无法使用 — 根因与修复
+## 2. Round 1 对齐与改动
 
-### 根因（浏览器点击取证）
+对照 `docs/requirements/table-chart-integration.md`：
 
-1. 新建 bar/pie 等视图时 **CONFIGURE 字段为空** → 画出无意义图形或空白  
-2. 从 bar **切换到 line/scatter** 时仍保留分类字段作 X，而 line/scatter 用 `Number(x)` 过滤 → **全部点被丢弃，图空白**  
-3. E2E 曾误点工具栏第二个下拉（图位置）而非图表类型
+| 需求 | 状态 |
+| --- | --- |
+| L-04 表/图分隔条拖拽 + 记住占比 | ✅ `splitRatio` + splitter（键盘可调） |
+| L-05 窄屏左右→上下降级提示 | ✅ `<900px` 降级 + banner |
+| T-11 虚拟滚动 | ✅ vxe `scroll-y` |
+| R4 产物体积 | 🟡 主包已拆；echarts/vxe 仍大但按需加载 |
 
-### 修复
-
-- `src/modules/chart/guessMapping.ts`：按图类型做兼容字段推断；切换类型时丢弃不兼容字段；line/scatter 保证 X≠Y  
-- `addView` / `onViewType` 调用 `guessConfigure`  
-- `ChartPanel`：缺字段时提示「请配置…」；MODEL TABLES 折叠以腾出画布
+交互：视图类型中英标签、行列计数、列表空态 CTA、`:focus-visible`、CSV `revokeObjectURL`、图表 `ResizeObserver`。
 
 ## 3. 验证命令
 
 ```bash
 npm test
-npx tsx tests/e2e/chart-switch-forensic.mts
-npx tsx tests/e2e/ui-full-10-rounds.mts   # 或 npm run test:e2e:ui
 npm run build
+npx tsx tests/e2e/ui-full-10-rounds.mts   # 或 npm run test:e2e:ui
 ```
 
-## 4. 残余风险
+## 4. 残余风险 / 下一轮候选
 
-| ID | 描述 | 状态 |
+| ID | 描述 | 计划轮次 |
 | --- | --- | --- |
-| R3 | 4PL 拟合为 demo 级 | 开放 |
-| R4 | 产物体积大 | 开放 |
-| R5 | 外部隧道会随会话失效 | 开放 |
+| R3 | 4PL 拟合为 demo 级 | Round 3+ |
+| R4 | CSS/JS 大包继续瘦身（按需 Element/Vxe） | Round 2 |
+| UX-2 | CONFIGURE 字段空态引导更强、工具栏分组 | Round 2 |
+| UX-3 | 侧栏拖拽宽度、流程图空态 | Round 2 |
+| L-02 表筛选后图防抖重绘 | Round 2 |
+| Merge | 每满 3 轮合并到 main | Round 3 |

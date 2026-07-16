@@ -99,6 +99,8 @@ export interface ChartConfig {
   style: ChartStyle
   flags?: ChartFlags
   chartPosition: ChartPosition
+  /** 图表区相对表+图总空间的占比 0.2–0.8；缺省 0.45（需求 L-04） */
+  splitRatio?: number
 }
 
 export interface ViewNode {
