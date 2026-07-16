@@ -39,7 +39,13 @@ export default defineConfig({
           // sync route usage vs dynamic import('element-plus') in feedback + async dialogs.
           if (id.includes('vxe-table') || id.includes('vxe-pc-ui') || id.includes('@vxe-ui')) return 'vxe'
           if (id.includes('@vue-flow')) return 'vue-flow'
-          if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vue-vendor'
+          // Narrow match: avoid catching @vueuse / element-plus via substring "vue"
+          if (
+            /node_modules\/(?:vue|pinia|vue-router)\//.test(id) ||
+            /node_modules\/@vue\//.test(id)
+          ) {
+            return 'vue-vendor'
+          }
         },
       },
     },

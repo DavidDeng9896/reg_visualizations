@@ -1,5 +1,5 @@
 <template>
-  <div class="flow" role="region" aria-label="分析流程图">
+  <div class="flow" role="region" aria-label="分析流程图" @keydown.capture="onCanvasKeydown">
     <p class="sr-only">
       使用 Tab 聚焦节点，Enter 或 Space 选择并跳转到工作区；画布仅支持拖拽布局。
     </p>
@@ -18,7 +18,6 @@
       :nodes-focusable="true"
       @node-click="onNodeClick"
       @node-drag-stop="onDragStop"
-      @keydown="onCanvasKeydown"
     >
       <Background pattern-color="#c5cad3" :gap="18" />
       <Controls />

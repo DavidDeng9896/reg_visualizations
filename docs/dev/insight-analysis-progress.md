@@ -9,16 +9,16 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-cab31f91-376b-452a-b039-282af91c3cba-5b3b`（Round 4） |
-| 阶段 | **优化 Round 4 完成**；本合并周期 1/3（Round 6 再合 main） |
-| 上次更新 | 2026-07-16 17:10 |
-| 单元 | **28/28 PASS**（含 4PL 约束、layoutPrefs） |
+| 分支 | `cursor/bc-cf322311-cbb6-4e7e-bd54-dc0c4c90a0ad-0b53`（Round 5，含 Round 4 FF） |
+| 阶段 | **优化 Round 5 完成**；本合并周期 2/3（Round 6 再合 main） |
+| 上次更新 | 2026-07-16 18:10 |
+| 单元 | **34/34 PASS**（含过原点、axisRange） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 1–4 对齐摘要
+## 2. Round 1–5 对齐摘要
 
-对照 `docs/requirements/table-chart-integration.md`：
+对照 `docs/requirements/table-chart-integration.md` / `docs/features/charts/`：
 
 | 需求 | 状态 |
 | --- | --- |
@@ -29,10 +29,13 @@
 | 工具栏分组（视图/布局/数据） | ✅ Round 2；landmark/skip ✅ Round 4 |
 | CONFIGURE 空态一键 Edit | ✅ Round 2 |
 | 侧栏宽度拖拽记忆 | ✅ Round 2（localStorage） |
-| 流程图空态 / 选中高亮 | ✅ Round 2 |
-| Element/Vxe 瘦身 | ✅ Round 3；反馈 API 异步 + 对话框懒加载 ✅ Round 4 |
-| 4PL 边界/失败提示 | ✅ Round 3；min/max 约束 + MODEL 空态 ✅ Round 4 |
-| 分隔条 a11y（aria-value + Home/End） | ✅ Round 3；位置切换后焦点回分隔条 ✅ Round 4 |
+| 流程图空态 / 选中高亮 | ✅ Round 2；键盘可达 ✅ Round 5 |
+| Element/Vxe 瘦身 | ✅ Round 3–5（EP 强制 chunk 取消；vue-vendor 收窄） |
+| 4PL 边界/失败提示 | ✅ Round 3–4；MODEL 失败自动展开 ✅ Round 5 |
+| 分隔条 a11y | ✅ Round 3–4 |
+| STYLE 轴 Range Manual | ✅ Round 5 |
+| Linear/Quadratic 过原点 | ✅ Round 5 |
+| Edit 焦点陷阱 | ✅ Round 5 |
 
 ## 3. 验证命令
 
@@ -42,12 +45,12 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 5 计划（下一 cron）
+## 4. Round 6 计划（下一 cron · 合并点）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | Element Plus JS 仍 ~305KB gzip：评估去掉强制 manualChunks、按路由拆 EP，或换轻量反馈 |
-| UX | Edit 抽屉打开时焦点陷阱；拟合失败时自动展开 MODEL TABLES |
-| Fit | Linear/Quadratic 可选强制过原点；轴 Range Manual(min/max) STYLE |
-| A11y | 流程图节点键盘可达；侧栏树 aria |
-| 合并 | Round 6 为本周期合并点 |
+| Merge | 合并 Round 4–6 到 `main`（开 PR 并合入） |
+| Perf | 评估关键路径 EP 同步组件是否可再拆（`projects` chunk ~344KB gzip 含 EP） |
+| UX | 轴 Manual min≥max 时 Edit 内即时校验提示；流程图焦点环可见性 |
+| Verify | 全量 unit + e2e:ui + build 回归后合 main |
+| Memory | 标记 `lastMergedRound=6` |
