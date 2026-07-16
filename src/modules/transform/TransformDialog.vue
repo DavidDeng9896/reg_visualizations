@@ -74,6 +74,7 @@ import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { FilterCondition, TransformStep } from '@/shared/types/analysis'
 import { uid } from '@/shared/utils/id'
 import { runPipeline } from '@/modules/transform/pipeline'
+import { cloneDeep } from '@/shared/utils/clone'
 
 defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
@@ -90,8 +91,8 @@ watch(
   () => store.selectedView?.view,
   (v) => {
     if (!v) return
-    filters.value = structuredClone(v.viewFilters)
-    transforms.value = structuredClone(v.transforms)
+    filters.value = cloneDeep(v.viewFilters)
+    transforms.value = cloneDeep(v.transforms)
   },
   { immediate: true },
 )

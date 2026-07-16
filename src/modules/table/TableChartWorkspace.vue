@@ -61,6 +61,7 @@ import EditableGrid from './EditableGrid.vue'
 import ChartPanel from '@/modules/chart/ChartPanel.vue'
 import TransformDialog from '@/modules/transform/TransformDialog.vue'
 import ChartEditDrawer from '@/modules/chart/ChartEditDrawer.vue'
+import { cloneDeep } from '@/shared/utils/clone'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
@@ -79,7 +80,7 @@ watch(
     viewName.value = sv.view.name
     viewType.value = sv.view.viewType
     chartPos.value = sv.view.chartConfig.chartPosition
-    chartConfig.value = structuredClone(sv.view.chartConfig)
+    chartConfig.value = cloneDeep(sv.view.chartConfig)
   },
   { immediate: true },
 )

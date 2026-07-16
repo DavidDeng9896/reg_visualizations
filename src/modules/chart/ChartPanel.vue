@@ -27,6 +27,7 @@ import { jsPDF } from 'jspdf'
 import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import { buildChartOption, SAMPLE_LIMIT } from '@/modules/chart/runtime'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
+import { cloneDeep } from '@/shared/utils/clone'
 
 const props = defineProps<{
   viewType: ViewType
@@ -69,7 +70,7 @@ function render() {
     const data = series[0]?.data || []
     const ids = indexes.map((i) => data[i]?.id).filter(Boolean) as string[]
     if (!ids.length || !store.selectedView) return
-    const cfg = structuredClone(props.config)
+    const cfg = cloneDeep(props.config)
     cfg.flags = cfg.flags || { pointIds: [], comments: {} }
     for (const id of ids) {
       if (!cfg.flags.pointIds.includes(id)) cfg.flags.pointIds.push(id)

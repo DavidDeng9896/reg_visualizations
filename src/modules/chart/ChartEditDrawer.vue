@@ -127,18 +127,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ChartConfig, TableColumn } from '@/shared/types/analysis'
+import { cloneDeep } from '@/shared/utils/clone'
 
 const props = defineProps<{ modelValue: boolean; config: ChartConfig; columns: TableColumn[] }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }>()
 
 const tab = ref('configure')
-const draft = ref<ChartConfig>(structuredClone(props.config))
+const draft = ref<ChartConfig>(cloneDeep(props.config))
 const aggs = ['count', 'sum', 'min', 'max', 'mean', 'median'] as const
 
 watch(
   () => props.config,
   (c) => {
-    draft.value = structuredClone(c)
+    draft.value = cloneDeep(c)
   },
 )
 
@@ -157,7 +158,7 @@ const opacity = computed({
 })
 
 function save() {
-  emit('save', structuredClone(draft.value))
+  emit('save', cloneDeep(draft.value))
 }
 </script>
 
