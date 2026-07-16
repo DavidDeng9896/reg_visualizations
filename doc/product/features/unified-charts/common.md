@@ -1,54 +1,62 @@
 # 统一图表 · 共性配置（CONFIGURE / STYLE）
 
-> **产品依据（定稿）**  
+> **产品依据（定稿 · 细则补强）**  
 > 决议：[conflicts.md](./conflicts.md)  
-> 溯源：[`../charts/`](../charts/) · [`../benchling-charts/`](../benchling-charts/)
+> 溯源细节：[`../charts/`](../charts/)（LabKey 控件级）· [`../benchling-charts/`](../benchling-charts/)（Benchling 侧栏）
+
+LabKey 源截图仍可对照各图种专章中的图片链接（entityId 与文件名与 `../charts/` 一致）。
 
 ---
 
 ## 已确认范围
 
 ### CONFIGURE
-- [x] View Type 切换（全部已纳入图种）
-- [x] X / Y 列映射 + 类型图标（Aa / #）
-- [x] 轴 settings（Custom label、范围、线性/对数等按图种）
+- [x] View Type 切换（全部已纳入图种，11A）
+- [x] X / Y 列映射 + 类型图标（Aa / #）+ 字段胶囊增删/换位
+- [x] 轴 settings（Label/Custom label、Range、Scale；按图种）
 - [x] X/Y 交换
-- [x] 分组：Line/Bar 用 **Series**；Scatter/Box 用 **Color** + **Shape** 列（决议 2B）
-- [x] 统计型 Error bars（决议 1A；适用范围见各图种）
-- [x] Color palette
-- [x] Save / Cancel → 写入表+图工作区配置（决议 10C）
+- [x] 分组：Line/Bar = **Series**；Scatter/Box = **Color** + **Shape**（2B）
+- [x] 统计型 Error bars（1A；图种范围见下）
+- [x] Color palette（含 Light/Dark/Alternate 等预设 + 预览）
+- [x] Save / Cancel → 表+图工作区配置（10C）
 
 ### STYLE
-- [x] Title / Subtitle / Width / Height / Margins（决议 9A）
-- [x] 按系列/分组取色（color picker）
-- [x] Point Shape / Opacity（适用图种）
+- [x] Title / Subtitle（+ 刷新恢复默认）/ Width / Height / Margins 四边
+- [x] 按系列/分组取色（色块 + picker，覆盖色板）
+- [x] Point Shape / Opacity（及图种专属点/线控件，见各专章）
 - [x] Legend：显隐 / Left·Right·Top·Bottom / Custom label
-- [x] 导出 PDF / PNG
+- [x] 导出 PDF / PNG（悬停图右上角）
 - [x] 大数据抽样提示
 
 ### 工作区
-- [x] 图表相对表位置：上/下/左/右（`chartPosition`，决议 9D-1；不单列 SPLIT）
+- [x] `chartPosition`：上/下/左/右（9D-1）
 - [x] Hover Tooltip
-- [x] 从当前表创建图表；Edit 打开侧栏
+- [x] 从表创建图表；Edit 打开侧栏
 
 ### 排除
-- Custom code / Plotly
-- 独立 Regression 图种（拟合挂 Line/Scatter）
+- Custom code / Plotly；独立 Regression 图种
 - 列映射误差棒 / 水平误差列
-- Notebook 嵌入锁定
+- Notebook 嵌入；Developer JS
 
 ---
 
 ## 1. 配置面板结构
 
-右侧侧栏：
-
 | 结构 | 说明 |
 | --- | --- |
 | **View type** | Bar / Box / Line / Pie / Scatter / Heatmap |
-| Tab **CONFIGURE** | 数据映射、聚合、误差棒、色板、拟合（Line/Scatter） |
-| Tab **STYLE** | 标题尺寸、系列色、点样式、图例 |
-| 底部 | Cancel / Save（保存到表+图工作区配置，见需求文档） |
+| Tab **CONFIGURE** | 映射、聚合、误差棒、色板、拟合（Line/Scatter） |
+| Tab **STYLE** | 可含子区：General / X-Axis / Y-Axis（及 Left/Right） |
+| 底部 | Cancel / Save |
+
+字段交互（对齐 LabKey）：
+
+| 能力 | 说明 |
+| --- | --- |
+| 绑定 | 从当前表列选择/拖入槽位 |
+| 删除 | 悬停胶囊点 X |
+| 换位 | 槽位间拖拽互换（X / Y / Series 或 Color/Shape） |
+| 必填标记 | 槽位 `*`；底部可提示 Required fields |
 
 ---
 
@@ -56,73 +64,92 @@
 
 ### 2.1 View Type 切换（11A）
 
-切换后尽量保留可对齐的列映射；无法对齐的槽位清空。Heatmap 与其他类型之间同样尝试复用 X/Y。
+切换后尽量保留可对齐映射；无法对齐则清空。适用性 “when practical”。
 
-### 2.2 轴与交换
+### 2.2 轴
 
 | 项 | 说明 |
 | --- | --- |
-| X / Y | 下拉绑表列；Aa=分类，#=数值 |
-| settings | Custom label；范围 min/max；Scale 线性/对数（图种开放时） |
+| 类型图标 | Aa=分类/文本；#=数值 |
+| Label / Custom label | 只改显示名，不改数据列；刷新图标恢复「基于字段/聚合」的默认标签 |
+| Scale | Linear / Log（图种开放时；对数要求正值） |
+| Range | **Automatic**（Min/Max 灰显）或 **Manual(min/max)**；源文另有 Across charts / Within chart 语义，产品以 Automatic/Manual 为主并允许后续扩展 |
 | 交换 | 一键交换 X/Y 映射及轴级设置 |
 
-### 2.3 分组命名（2B）
+### 2.3 分组（2B）
 
-| 图种 | 槽位 |
-| --- | --- |
-| Line / Bar | **Series**（分组着色；语义同 LabKey Group By / Color） |
-| Scatter / Box | **Color** 列 + **Shape** 列（按列值映射） |
-| Pie | Categories（分类）+ Measure（度量） |
-| Heatmap | 行列坐标 + 色阶数值列 |
+| 图种 | 槽位 | 说明 |
+| --- | --- | --- |
+| Bar / Line | **Series** | 等同 LabKey Group By / Series；多系列着色 |
+| Scatter / Box | **Color**、**Shape** | 按列值映射颜色与形状（Shape 约 5 种系统映射） |
+| Pie | Categories + Measure | 见 pie 专章 |
+| Heatmap | 行列坐标 + 色值列 | 见 heatmap 专章 |
 
 ### 2.4 Error bars（1A）
 
 | 项 | 说明 |
 | --- | --- |
-| 类型 | **仅统计型**：None / Standard Deviation / Standard Error of the Mean |
-| 条件 | 度量聚合为 **Mean**（或等价均值）时可选；其他聚合禁用 |
-| 方向 | 沿度量轴（竖直柱/散点为竖直棒） |
-| 范围 | **Bar、Scatter、Box**；**Line 不提供** |
+| 选项 | None / **Standard Deviation** / **Standard Error of the Mean** |
+| 条件 | 度量聚合为 **Mean** 时可用；其他聚合禁用或不展示 |
+| 图种 | **Bar、Scatter、Box**；**Line 不提供** |
 | 不做 | 误差列映射、水平误差列 |
 
 ### 2.5 Color palette
 
-预设色板（如科学默认色板）；可被 STYLE 逐系列取色覆盖。
+| 项 | 说明 |
+| --- | --- |
+| 预设 | 至少 **Light (default) / Dark / Alternate**（LabKey）；可增科学色板 |
+| 预览 | 下拉下方色板小方块 |
+| 覆盖 | STYLE 逐系列/分组 color picker 可覆盖默认分配 |
 
 ### 2.6 Save（10C）
 
-Save 将当前图配置写入**表+图工作区**（与 `table-chart-integration` 中图表实例配置一致）；Cancel 放弃未保存修改。
+写入表+图工作区图表实例配置；Cancel 丢弃未保存修改。
 
 ---
 
-## 3. STYLE 细则
+## 3. STYLE 共性控件
+
+| 控件 | 类型 | 行为 |
+| --- | --- | --- |
+| Title | 文本 + 刷新 | 默认可为数据集/表名；刷新恢复默认 |
+| Subtitle | 文本 | 可选 |
+| Width / Height (px) | 数字步进 | 图幅像素 |
+| Margins (px) | Top / Right / Bottom / Left | 缓解轴标签重叠（例：长日期 bottom=85） |
+| Opacity | 滑杆 | 点/柱透明度（图种适用） |
+| Legend | 开关 + Position + Custom label | Left / Right / Top / Bottom |
+| 系列取色 | 色块 + picker | 覆盖色板 |
+
+### 导出
 
 | 项 | 说明 |
 | --- | --- |
-| Title / Subtitle | 可选 |
-| Width / Height / Margins | 图区域尺寸与边距 |
-| Series/Color 取色 | 色块 + picker |
-| Point Shape / Opacity | 有点几何的图种 |
-| Legend | Show/Hide；Position；Custom legend label |
-| 导出 | **PDF**、**PNG** |
-| 抽样提示 | 大数据随机抽样作图时展示提示 + 完整数据下载入口 |
+| 触发 | 鼠标悬停图表右上角出现导出按钮 |
+| PDF / PNG | 导出对应格式 |
+| 不做 | Script 导出（LabKey 有、未纳入） |
+
+### 抽样提示
+
+大数据随机抽样作图时展示提示（文案形态对齐 Benchling）+ 完整数据下载入口。
 
 ---
 
-## 4. 拟合与打标（Line / Scatter 共用）
+## 4. 拟合与打标（Line / Scatter）
 
-> 非独立图种；入口在 CONFIGURE 的 **Fit / Trend** 区。
+入口：CONFIGURE · **Fit / Trend**。
 
 | 项 | 说明 |
 | --- | --- |
-| 模型 | **Point-to-Point**（连接，非回归）、**Linear**、**Quadratic**、**4PL** |
-| 套索打标 | Flag / Clear；需 comment；打标点显示为 × |
-| Exclude flagged | 勾选后打标点不参与拟合，仍显示在图上 |
-| MODEL VARIABLES | 参数表（Linear：slope/intercept；4PL：Min/Max/Hill/Inflection 等） |
-| MODEL OUTPUT | 预测、残差等输出表 |
-| 作用范围 | 有 Color/Series 时按组分别拟合 |
+| 模型 | **Point-to-Point**、**Linear**、**Quadratic**、**4PL**（6B；不含 3PL/5PL/Polynomial 泛型） |
+| 4PL 附加 | 可选渐近线/约束 min·max（对齐 LabKey 非线性附加参数心智） |
+| 套索打标 | Flag / Clear；comment 必填；点显示 × |
+| Exclude flagged | 不参与拟合，仍显示 ×（6F-1） |
+| MODEL VARIABLES | Linear：slope、intercept；4PL：Min、Max、Hill Slope、Inflection（+CI 若有） |
+| MODEL OUTPUT | 预测、残差等 |
+| 作用范围 | 有 Series/Color 时**每组分别**拟合 |
+| 悬停拟合线 | 显示统计量与拟合参数（LabKey 趋势线交互） |
 
-细节见 [line-charts.md](./line-charts.md)、[scatter-plots.md](./scatter-plots.md)。
+细节：[line-charts.md](./line-charts.md)、[scatter-plots.md](./scatter-plots.md)。
 
 ---
 
@@ -130,9 +157,10 @@ Save 将当前图配置写入**表+图工作区**（与 `table-chart-integration
 
 | 统一用语 | LabKey | Benchling |
 | --- | --- | --- |
-| CONFIGURE | Chart Type | CONFIGURE |
-| STYLE | Chart Layout | STYLE |
+| CONFIGURE | Chart Type / Create a plot | CONFIGURE |
+| STYLE | Chart Layout / Customize look and feel | STYLE |
 | Series | Group By / Series | Series |
-| Color / Shape | Color / Shape | （Series + Point Shape） |
+| Color / Shape | Color / Shape | Series + Point Shape |
+| Label | Axis Label | Custom label |
 | Save | Apply / Save | Save |
-| chartPosition | — | SPLIT WORKSPACE（本产品不单列） |
+| chartPosition | — | SPLIT WORKSPACE（不单列） |
