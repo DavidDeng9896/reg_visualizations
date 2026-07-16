@@ -39,11 +39,7 @@
       </el-table-column>
     </el-table>
     <div v-else class="empty-list">
-      <p>还没有 Analysis。可「一键 Demo」快速体验，或创建空白分析后导入 CSV。</p>
-      <div class="empty-actions">
-        <el-button @click="createDemo">一键 Demo</el-button>
-        <el-button type="primary" @click="showCreate = true">+ 创建 Analysis</el-button>
-      </div>
+      <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
     </div>
 
     <el-dialog v-model="showCreate" title="创建 Analysis" width="420px">
@@ -178,11 +174,6 @@ h1 {
   border-radius: 8px;
 }
 .empty-list p {
-  margin: 0 0 16px;
-}
-.empty-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
+  margin: 0;
 }
 </style>

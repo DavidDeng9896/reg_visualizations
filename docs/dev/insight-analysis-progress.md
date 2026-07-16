@@ -13,6 +13,7 @@
 | 阶段 | **优化 Round 1**：布局分隔条 / 窄屏降级 / 分包与虚拟滚动 |
 | 上次更新 | 2026-07-16 14:06 |
 | 单元 | **14/14 PASS**（含 layout helpers） |
+| UI E2E | **10/10 PASS**（修复空态重复按钮后） |
 | Build | PASS（echarts / vxe / element-plus 已拆 chunk） |
 
 ## 2. Round 1 对齐与改动

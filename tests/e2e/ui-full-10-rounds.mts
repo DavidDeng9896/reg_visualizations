@@ -44,17 +44,14 @@ async function canvasInk(page: Page) {
 async function switchViewType(page: Page, type: string) {
   const sel = page.locator('.ws-toolbar .el-select').first()
   await sel.click()
-  await page.getByRole('option', { name: type, exact: true }).click()
+  // Labels may be "line" or "折线 line" — match by value token
+  await page.getByRole('option', { name: new RegExp(`\\b${type}\\b`, 'i') }).click()
   await page.waitForTimeout(1200)
-  const tb = await page.locator('.ws-toolbar').innerText()
-  if (!new RegExp(type, 'i').test(tb) && type !== 'table') {
-    // Element Plus may show selected label in input; assert via option text presence or canvas
-  }
 }
 
 async function createDemo(page: Page) {
   await page.goto(BASE, { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /一键 Demo/ }).click()
+  await page.getByRole('button', { name: /一键 Demo/ }).first().click()
   await page.waitForURL(/\/analyses\//)
   await page.waitForTimeout(1200)
 }
@@ -64,7 +61,7 @@ async function newViewOfType(page: Page, type: string) {
   await page.getByRole('menuitem', { name: 'New view' }).click()
   await page.waitForSelector('text=新建视图')
   await page.locator('.el-dialog .el-select').last().click()
-  await page.getByRole('option', { name: type, exact: true }).click()
+  await page.getByRole('option', { name: new RegExp(`\\b${type}\\b`, 'i') }).click()
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await page.waitForTimeout(1200)
 }
@@ -95,8 +92,8 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
 
   await step('首页-创建按钮可见', async () => {
     await page.goto(BASE, { waitUntil: 'networkidle' })
-    await page.getByRole('button', { name: '+ 创建 Analysis' }).waitFor()
-    await page.getByRole('button', { name: /一键 Demo/ }).waitFor()
+    await page.getByRole('button', { name: '+ 创建 Analysis' }).first().waitFor()
+    await page.getByRole('button', { name: /一键 Demo/ }).first().waitFor()
   })
 
   await step('一键Demo-散点图有墨迹', async () => {
