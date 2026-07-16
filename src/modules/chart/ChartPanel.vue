@@ -35,8 +35,14 @@
       :class="{ dimmed: missing.length }"
       :style="canvasStyle"
     />
-    <el-collapse v-if="showModelTables" v-model="modelCollapse" class="models">
-      <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
+    <details
+      v-if="showModelTables"
+      class="models"
+      :open="modelOpen"
+      @toggle="onModelToggle"
+    >
+      <summary class="models-summary">MODEL TABLES（拟合结果）</summary>
+      <div class="models-body">
         <template v-if="hasModelRows">
           <h4>MODEL VARIABLES</h4>
           <div class="model-table-wrap" role="region" aria-label="MODEL VARIABLES">
@@ -72,8 +78,8 @@
         <p v-else class="model-empty" role="status">
           拟合未成功，暂无 MODEL VARIABLES / OUTPUT。请查看上方拟合提示，调整数据或 4PL 约束后重试。
         </p>
-      </el-collapse-item>
-    </el-collapse>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -137,14 +143,19 @@ const showModelTables = computed(() => {
   return hasModelRows.value || (built.value.fitWarnings?.length ?? 0) > 0
 })
 /** 拟合失败时自动展开 MODEL TABLES，成功时保持用户折叠偏好 */
-const modelCollapse = ref<string[]>([])
+const modelOpen = ref(false)
 watch(
   () => built.value.fitWarnings,
   (warnings) => {
-    if (warnings?.length) modelCollapse.value = ['models']
+    if (warnings?.length) modelOpen.value = true
   },
   { immediate: true },
 )
+
+function onModelToggle(e: Event) {
+  const el = e.target as HTMLDetailsElement
+  modelOpen.value = el.open
+}
 const varKeys = computed(() =>
   built.value.modelTables?.variables[0] ? Object.keys(built.value.modelTables.variables[0]) : [],
 )
@@ -349,6 +360,33 @@ async function exportPdf() {
 .models {
   border-top: 1px solid var(--ia-border);
   margin-top: 4px;
+}
+.models-summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 4px;
+  list-style: none;
+  outline: none;
+}
+.models-summary:focus-visible {
+  box-shadow: inset 0 0 0 2px #3370ff;
+  border-radius: 4px;
+}
+.models-summary::-webkit-details-marker {
+  display: none;
+}
+.models-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s ease;
+}
+.models[open] > .models-summary::before {
+  transform: rotate(90deg);
+}
+.models-body {
+  padding: 0 4px 8px;
 }
 .model-empty {
   margin: 8px 0 4px;

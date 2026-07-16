@@ -162,12 +162,15 @@
             <el-form-item v-if="showXY" label="交换 X/Y">
               <el-button
                 size="small"
+                type="primary"
+                plain
                 aria-label="交换 X 与 Y 轴映射及轴级设置"
+                title="交换字段、标签、Scale 与轴 Range"
                 @click="onSwapAxes"
               >
                 交换 X ↔ Y
               </el-button>
-              <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。</p>
+              <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。</p>
             </el-form-item>
             <el-form-item label="色板">
               <el-select v-model="draft.configure.colorPalette" style="width: 100%">
@@ -181,7 +184,17 @@
         <el-tab-pane label="STYLE" name="style">
           <el-form label-width="110px" size="small">
             <el-form-item label="Title">
-              <el-input v-model="draft.style.title" aria-label="图表标题" />
+              <div class="title-row">
+                <el-input v-model="draft.style.title" aria-label="图表标题" />
+                <el-button
+                  size="small"
+                  aria-label="刷新标题为默认（视图或表名）"
+                  title="刷新恢复默认标题"
+                  @click="resetTitle"
+                >
+                  刷新
+                </el-button>
+              </div>
             </el-form-item>
             <el-form-item label="Subtitle">
               <el-input v-model="draft.style.subtitle" aria-label="图表副标题" />
@@ -252,8 +265,35 @@
                 </label>
               </div>
             </el-form-item>
-            <el-form-item label="Opacity">
+            <el-form-item v-if="opacityEnabled" label="Opacity">
               <el-slider v-model="opacity" :min="0.1" :max="1" :step="0.05" aria-label="透明度" />
+              <p class="fit-hint" role="note">{{ opacityHintText }}</p>
+            </el-form-item>
+            <el-form-item v-else label="Opacity">
+              <p class="fit-hint" role="note">{{ opacityHintText }}</p>
+            </el-form-item>
+            <el-form-item v-if="seriesKeys.length" label="系列取色">
+              <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
+                <label v-for="(key, i) in seriesKeys" :key="key" class="series-color-row">
+                  <span class="series-name">{{ key }}</span>
+                  <input
+                    type="color"
+                    class="series-color-input"
+                    :value="seriesColorValue(key, i)"
+                    :aria-label="`系列 ${key} 颜色`"
+                    @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
+                  />
+                  <el-button
+                    size="small"
+                    text
+                    :aria-label="`重置系列 ${key} 颜色为色板默认`"
+                    @click="clearSeriesColor(key)"
+                  >
+                    重置
+                  </el-button>
+                </label>
+              </div>
+              <p class="fit-hint" role="note">覆盖色板默认分配；重置后恢复当前色板槽位色。</p>
             </el-form-item>
             <el-form-item label="图例">
               <el-switch v-model="draft.style.legendShow" aria-label="显示图例" />
@@ -378,6 +418,14 @@ import { isManualRangeInvalid } from '@/modules/chart/axisRange'
 import { supportsAxisScale } from '@/modules/chart/axisScale'
 import { swapAxesConfigure, swapAxesStyle } from '@/modules/chart/swapAxes'
 import { missingRequiredFields } from '@/modules/chart/guessMapping'
+import {
+  defaultChartTitle,
+  listSeriesKeys,
+  opacityAppliesTo,
+  opacityHint,
+  paletteColors,
+  resolveSeriesColor,
+} from '@/modules/chart/seriesStyle'
 import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{
@@ -385,6 +433,10 @@ const props = defineProps<{
   config: ChartConfig
   columns: TableColumn[]
   viewType: ViewType
+  /** 视图/表名，用于 Title 刷新默认 */
+  defaultTitle?: string
+  /** 当前表行，用于列出系列取色键 */
+  rows?: Record<string, unknown>[]
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }>()
 
@@ -442,6 +494,36 @@ const opacity = computed({
     draft.value.style.opacity = v
   },
 })
+
+const opacityEnabled = computed(() => opacityAppliesTo(props.viewType))
+const opacityHintText = computed(() => opacityHint(props.viewType))
+
+const seriesKeys = computed(() =>
+  listSeriesKeys(props.viewType, props.rows || [], draft.value.configure),
+)
+
+const palette = computed(() => paletteColors(draft.value.configure.colorPalette))
+
+function seriesColorValue(key: string, index: number): string {
+  return resolveSeriesColor(draft.value.style.seriesColors, key, palette.value, index)
+}
+
+function onSeriesColorInput(key: string, value: string) {
+  const next = { ...(draft.value.style.seriesColors || {}) }
+  next[key] = value
+  draft.value.style.seriesColors = next
+}
+
+function clearSeriesColor(key: string) {
+  const next = { ...(draft.value.style.seriesColors || {}) }
+  delete next[key]
+  draft.value.style.seriesColors = Object.keys(next).length ? next : undefined
+}
+
+function resetTitle() {
+  draft.value.style.title = defaultChartTitle(props.defaultTitle)
+  toast('success', '已恢复默认标题')
+}
 
 function marginProp(key: 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft', fallback: number) {
   return computed({
@@ -589,7 +671,12 @@ function onOpened() {
 }
 
 function onClosed() {
-  restoreFocus?.focus?.()
+  // Prefer previously focused Edit trigger; fall back to workspace toolbar.
+  const target =
+    restoreFocus && document.contains(restoreFocus)
+      ? restoreFocus
+      : (document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null)
+  target?.focus?.()
   restoreFocus = null
 }
 
@@ -674,5 +761,43 @@ function save() {
 }
 .margins :deep(.el-input-number) {
   width: 100%;
+}
+.title-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+.title-row .el-input {
+  flex: 1;
+}
+.series-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.series-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.series-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #646a73;
+}
+.series-color-input {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d0d3d6;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
 }
 </style>

@@ -112,7 +112,9 @@
       v-model="showChartEdit"
       :config="chartConfig"
       :columns="store.workspaceResult.columns"
+      :rows="store.workspaceResult.rows"
       :view-type="viewType"
+      :default-title="viewName || store.selectedTable?.name"
       @save="onChartSave"
     />
   </div>

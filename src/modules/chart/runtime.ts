@@ -9,6 +9,7 @@ import {
   type AxisScale,
 } from './axisScale'
 import { buildGridOption, buildLegendOption } from './chartLayout'
+import { paletteColors, resolveSeriesColor } from './seriesStyle'
 
 const SAMPLE_LIMIT = 10000
 
@@ -50,12 +51,6 @@ function resolveAxisType(scale: AxisScale | undefined, values: number[], warning
     return 'value'
   }
   return echartsValueAxisType(scale)
-}
-
-function palette(name?: string): string[] {
-  if (name === 'dark') return ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272']
-  if (name === 'alternate') return ['#fc8452', '#9a60b4', '#ea7ccc', '#5470c6', '#91cc75', '#fac858']
-  return ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
 }
 
 function aggregate(
@@ -114,7 +109,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
   const { rows, sampled } = sampleRows(input.rows)
   const cfg = config.configure
   const style = config.style
-  const colors = palette(cfg.colorPalette)
+  const colors = paletteColors(cfg.colorPalette)
   const title = {
     text: style.title || '',
     subtext: style.subtitle || '',
@@ -153,7 +148,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         }
         return err != null ? { value: v, error: err } : v
       })
-      const color = style.seriesColors?.[sk] || colors[i % colors.length]
+      const color = resolveSeriesColor(style.seriesColors, sk, colors, i)
       return {
         name: sk,
         type: 'bar' as const,
@@ -279,7 +274,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
 
       if (cfg.excludeFlagged) pts = pts.filter((p) => !p.flagged)
 
-      const color = style.seriesColors?.[g] || colors[gi % colors.length]
+      const color = resolveSeriesColor(style.seriesColors, g, colors, gi)
       series.push({
         name: g,
         type: viewType === 'line' ? 'line' : 'scatter',
@@ -384,7 +379,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     const data = [...groups.entries()].map(([name, subset], i) => ({
       name,
       value: aggregate(subset, measure, cfg.aggregation || 'count'),
-      itemStyle: { color: style.seriesColors?.[name] || colors[i % colors.length] },
+      itemStyle: { color: resolveSeriesColor(style.seriesColors, name, colors, i) },
     }))
     option = {
       title,
