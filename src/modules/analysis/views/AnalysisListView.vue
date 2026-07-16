@@ -90,32 +90,37 @@ async function onCreate(payload: { name: string; projectId: string }) {
 }
 
 async function createDemo() {
-  const a = await store.createAnalysis('Demo Dose Response', MOCK_PROJECTS[0].id)
-  await store.openAnalysis(a.id)
-  const table = createDemoTable()
-  store.addTable(table)
-  const view = store.addView(table.id, table.id, 'Scatter Dose-Response', 'scatter')
-  if (view) {
-    store.setChartConfig(view.id, {
-      ...store.defaultChartConfig(),
-      configure: {
-        ...store.defaultChartConfig().configure,
-        xField: 'dose',
-        yField: 'response',
-        seriesField: 'compound',
-        fitModel: '4pl',
-      },
-      style: {
-        ...store.defaultChartConfig().style,
-        title: 'Dose Response',
-        subtitle: 'Demo dataset',
-      },
-    })
-    store.selectNode(view.id, 'workspace')
+  try {
+    const a = await store.createAnalysis('Demo Dose Response', MOCK_PROJECTS[0].id)
+    await store.openAnalysis(a.id)
+    const table = createDemoTable()
+    store.addTable(table)
+    const view = store.addView(table.id, table.id, 'Scatter Dose-Response', 'scatter')
+    if (view) {
+      store.setChartConfig(view.id, {
+        ...store.defaultChartConfig(),
+        configure: {
+          ...store.defaultChartConfig().configure,
+          xField: 'dose',
+          yField: 'response',
+          seriesField: 'compound',
+          fitModel: '4pl',
+        },
+        style: {
+          ...store.defaultChartConfig().style,
+          title: 'Dose Response',
+          subtitle: 'Demo dataset',
+        },
+      })
+      store.selectNode(view.id, 'workspace')
+    }
+    await store.flushSave()
+    toast('success', '已创建 Demo Analysis')
+    await router.push(`/analyses/${a.id}`)
+  } catch (err) {
+    console.error('[createDemo]', err)
+    toast('error', 'Demo 创建失败，请刷新后重试')
   }
-  await store.flushSave()
-  toast('success', '已创建 Demo Analysis')
-  router.push(`/analyses/${a.id}`)
 }
 
 function open(row: { id: string }) {
