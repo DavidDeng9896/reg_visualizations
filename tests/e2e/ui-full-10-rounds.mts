@@ -70,8 +70,21 @@ async function switchViewType(page: Page, type: string) {
 async function createDemo(page: Page) {
   await page.goto(BASE, { waitUntil: 'networkidle' })
   const demoBtn = page.getByRole('button', { name: /一键 Demo/ }).first()
-  await demoBtn.waitFor({ state: 'visible' })
-  await Promise.all([page.waitForURL(/\/analyses\//, { timeout: 45000 }), demoBtn.click()])
+  await demoBtn.waitFor({ state: 'visible', timeout: 30000 })
+  // First cold load after IDB wipe can race Dexie open; retry navigation once.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await Promise.all([
+      page.waitForURL(/\/analyses\//, { timeout: 45000 }).catch(() => null),
+      demoBtn.click(),
+    ])
+    if (/\/analyses\//.test(page.url())) break
+    await page.waitForTimeout(800)
+    await page.goto(BASE, { waitUntil: 'networkidle' })
+    await demoBtn.waitFor({ state: 'visible', timeout: 30000 })
+  }
+  if (!/\/analyses\//.test(page.url())) {
+    throw new Error(`Demo did not navigate to workspace: ${page.url()}`)
+  }
   // Wait for Vxe registration + toolbar (not just route change)
   await page.locator('#ws-toolbar').waitFor({ state: 'visible', timeout: 45000 })
   await page.getByRole('button', { name: /Edit 图表/ }).waitFor({ state: 'visible', timeout: 30000 })
@@ -111,6 +124,8 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   }
 
   await clearSite(page)
+  // Let Dexie finish reopening after wipe before interacting.
+  await page.waitForTimeout(400)
 
   await step('首页-创建按钮可见', async () => {
     await page.goto(BASE, { waitUntil: 'networkidle' })

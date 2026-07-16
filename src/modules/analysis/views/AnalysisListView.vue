@@ -6,7 +6,9 @@
         <p class="sub">本地数据工作空间 · 导入 · 转换 · 可视化</p>
       </div>
       <div class="top-actions">
-        <button type="button" class="btn" @click="createDemo">一键 Demo（含示例数据）</button>
+        <button type="button" class="btn" :disabled="demoBusy" @click="createDemo">
+          {{ demoBusy ? '创建中…' : '一键 Demo（含示例数据）' }}
+        </button>
         <button type="button" class="btn btn-primary" @click="showCreate = true">+ 创建 Analysis</button>
       </div>
     </header>
@@ -71,6 +73,7 @@ const store = useAnalysisStore()
 const router = useRouter()
 const showCreate = ref(false)
 const projectFilter = ref('')
+const demoBusy = ref(false)
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
@@ -90,6 +93,8 @@ async function onCreate(payload: { name: string; projectId: string }) {
 }
 
 async function createDemo() {
+  if (demoBusy.value) return
+  demoBusy.value = true
   try {
     const a = await store.createAnalysis('Demo Dose Response', MOCK_PROJECTS[0].id)
     await store.openAnalysis(a.id)
@@ -120,6 +125,8 @@ async function createDemo() {
   } catch (err) {
     console.error('[createDemo]', err)
     toast('error', 'Demo 创建失败，请刷新后重试')
+  } finally {
+    demoBusy.value = false
   }
 }
 
