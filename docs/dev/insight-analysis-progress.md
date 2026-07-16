@@ -9,28 +9,23 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-43dc1686-29a9-4851-b14b-80ec531cdc69-0dd6`（Round 4–6） |
-| 阶段 | **优化 Round 6 完成；本轮为合并点 → main** |
-| 上次更新 | 2026-07-16 19:20 |
-| 单元 | **36/36 PASS**（含 axisRange invalid） |
+| 分支 | `cursor/bc-8aa12a6b-d37c-4788-8a21-1eefeeb00009-b715`（Round 7） |
+| 阶段 | **优化 Round 7 完成**（新 3 轮周期 1/3；`lastMergedRound=6`） |
+| 上次更新 | 2026-07-16 20:17 |
+| 单元 | **43/43 PASS**（含 axisScale） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 4–6 对齐摘要
+## 2. Round 7 对齐摘要
 
-对照 `docs/requirements/table-chart-integration.md` + `docs/features/charts/`：
+对照 `docs/requirements/table-chart-integration.md` + `docs/features/charts/common.md`：
 
 | 需求 | 状态 |
 | --- | --- |
-| 4PL min/max 约束 | ✅ Round 4 |
-| MODEL 空态 / 窄屏提示记忆 / 分隔条焦点 | ✅ Round 4 |
-| STYLE 轴 Range Automatic/Manual | ✅ Round 5 |
-| Linear/Quadratic 过原点 | ✅ Round 5 |
-| Edit 焦点陷阱 / 流程图键盘选择 | ✅ Round 5 |
-| Manual range 表单即时校验 + Save 拦截 | ✅ Round 6 |
-| 列表页 EP 瘦身（原生表 + 异步创建对话框） | ✅ Round 6 |
-| 流程图 :focus-visible 焦点环 | ✅ Round 6 |
-| E2E IDB clear 竞态修复 | ✅ Round 6 |
+| 入口延后 Vxe / 去掉 jspdf 误 preload | ✅ Round 7 |
+| 轴 Scale Linear/Log + 非正值回退提示 | ✅ Round 7 |
+| CONFIGURE 按图种必填槽位提示 + Save 拦截 | ✅ Round 7 |
+| 工作区 Tab：主区优先、侧栏视觉仍在左 | ✅ Round 7 |
 
 ## 3. 验证命令
 
@@ -40,11 +35,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 7 计划（下一 cron · 新周期 1/3）
+## 4. Round 8 计划（下一 cron · 周期 2/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | 入口仍 modulepreload `vxe` + `export`：评估列表路由是否可延后 Vxe/jspdf |
-| UX | CONFIGURE 必填槽位提示；轴 Scale Linear/Log（docs common.md） |
-| A11y | 工作区工具栏与侧栏键盘顺序抽检 |
-| Merge | Round 7 起新 3 轮周期；`lastMergedRound` 应为 6 |
+| UX | STYLE 边距/尺寸控件；图例 Label；交换 X/Y（common.md） |
+| Perf | 工作区首屏：echarts 已动态；评估 EP 大 chunk 按需拆分 |
+| A11y | Edit drawer 必填字段与 Scale 控件朗读抽检 |
+| Merge | Round 9 为下一合并点 |
