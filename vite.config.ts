@@ -9,6 +9,12 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    host: true,
+    port: 5173,
+    // allow localtunnel / cloudflare quick tunnels for external preview
+    allowedHosts: true,
+  },
   test: {
     environment: 'jsdom',
     globals: true,
