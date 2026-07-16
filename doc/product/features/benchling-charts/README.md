@@ -1,46 +1,62 @@
-# Benchling 图表功能点初稿（待确认）
+# Benchling 图表功能点（产品依据）
 
-> 来源参考：[`../../reference/benchling/analyze-data-with-benchling-analysis.md`](../../reference/benchling/analyze-data-with-benchling-analysis.md)  
-> **本轮已对文档内 GIF/PNG 拆帧核对**，配置项比纯正文更完整  
-> 状态：**初稿**，请勾选需保留项后再细化
+基于 Benchling Analysis 参考原文与截图/GIF 拆帧，对**已确认**功能点完成细化，作为本产品图表能力的开发依据之一。
 
-## 说明
-
-Benchling Analysis 图表配置侧栏（截图）：
-
-- Tab **CONFIGURE**：View type、X/Y（含类型图标与齿轮）、Series、**Error bars**、**Color palette**、Filters & Transforms  
-- Tab **STYLE**：系列取色、Point Shape/Opacity、Legend（显隐/方位/自定义标题）  
-- 底部：**Cancel / Save**；工作区有 **SPLIT WORKSPACE**
-
-GIF 额外可见：Heatmap 行列坐标+色阶+Hover；Regression 套索打标/对数轴/4PL；Custom code 多 Y 折线等。
+> 原则：紧扣源正文与截图 UI；**未勾选能力不展开**。  
+> 参考原文：[`../../reference/benchling/`](../../reference/benchling/)  
+> 共性细则：[common.md](./common.md)
 
 ## 文档列表
 
-| 文档 | 内容 | 视觉证据强度 |
+| 文档 | 状态 | 说明 |
 | --- | --- | --- |
-| [common.md](./common.md) | 共性 CONFIGURE / STYLE / 工作区 | 强（configure 截图） |
-| [bar-charts.md](./bar-charts.md) | Bar | 中（View type 列表） |
-| [line-charts.md](./line-charts.md) | Line + Custom code 折线 | 中–强 |
-| [scatter-plots.md](./scatter-plots.md) | Scatter + Error bars | **强** |
-| [box-plots.md](./box-plots.md) | Box | 弱（正文有、截图下拉未见） |
-| [pie-charts.md](./pie-charts.md) | Pie | 中（View type 列表） |
-| [heatmaps.md](./heatmaps.md) | Heatmap | **强**（GIF 实图） |
-| [regressions.md](./regressions.md) | Regression + Visual flagging | **强**（多图/GIF） |
+| [common.md](./common.md) | **已细化** | CONFIGURE / STYLE / 工作区共性（含 Error bars） |
+| [bar-charts.md](./bar-charts.md) | **已细化** | Bar：聚合、方向、堆叠/并排、误差棒 |
+| [line-charts.md](./line-charts.md) | **已细化** | 标准 Line + **Custom code / Plotly 多 Y** |
+| [scatter-plots.md](./scatter-plots.md) | **已细化** | Scatter：误差棒（含水平）、Size、Jitter、双 Y |
+| [box-plots.md](./box-plots.md) | **已细化** | Box：**已纳入**；Show Points、统计规则；无 Jitter |
+| [pie-charts.md](./pie-charts.md) | **已细化** | Pie：环形、百分比、非 Count 聚合 |
+| [heatmaps.md](./heatmaps.md) | **已细化** | Heatmap：行列坐标、连续色阶、聚类/标注 |
+| [regressions.md](./regressions.md) | **不纳入** | 确认时全部未勾选 |
 
-## 请你确认
+## 组织方式（与 LabKey `../charts/` 对齐）
 
-在各文件将需要纳入产品的项改为 `- [x]`。尤其请拍板：
+1. **已确认范围**（勾选清单 + 排除）  
+2. **数据/属性设置（CONFIGURE）**  
+3. **布局/外观设置（STYLE）**  
+4. **其他设置**  
+5. **源命名对照**
 
-1. **Error bars**（列映射）是否作为标准图共性？  
-2. **Heatmap / Regression** 是否纳入本产品范围？  
-3. **Box plot** 是否保留（截图证据弱）？  
-4. **Custom code / Plotly 多 Y** 是否作为高级能力单列？  
+## 确认拍板摘要
 
-确认后进入细节点完善。
+| 议题 | 结论 |
+| --- | --- |
+| Error bars 列映射 | **纳入**共性（Bar/Line/Scatter/Box 均开放） |
+| Heatmap | **纳入** |
+| Regression | **不纳入** |
+| Box plot | **纳入**（尽管截图证据弱于正文） |
+| Custom code / Plotly 多 Y | **纳入**（挂在 Line 专章高级能力） |
 
-## 与 LabKey 产品功能点
+## 纳入 / 排除摘要
+
+| 类别 | 纳入 | 排除（未勾选） |
+| --- | :---: | --- |
+| 共性 | View Type、X/Y/齿轮/交换、Series、Error bars、色板、Custom label、STYLE、Hover、分屏、抽样提示、SOURCE TABLE | Notebook/Outputs 嵌入锁定 |
+| Bar | 聚合、方向、堆叠/并排、轴范围、误差棒、STYLE | （Save/Hover 走 common） |
+| Line | 误差棒、对数轴、STYLE；Custom code 多 Trace/多 Y/峰值 | 标准线宽线型、隐藏点 |
+| Scatter | 竖直+水平误差棒、Size、Jitter/分箱、双 Y、Point Shape/Opacity、网格 | 本专章 Series Color、Legend |
+| Box | Show Points、统计规则 UI、误差棒、STYLE | Jitter |
+| Pie | 三槽映射、环形、百分比、非 Count、Color/Legend | — |
+| Heatmap | 行列坐标、连续色阶、色阶类型、格内标注、聚类排序、Hover | 独立「颜色度量」专名；Flowchart I/O |
+| Regression | — | **全部** |
+
+## 与 LabKey 功能点
 
 | 路径 | 角色 |
 | --- | --- |
-| [`../charts/`](../charts/) | LabKey **已确认细化** |
-| `benchling-charts/` | Benchling **待确认初稿**（含视觉核对） |
+| [`../charts/`](../charts/) | LabKey 已确认细化 |
+| `benchling-charts/` | Benchling **已确认细化**（本文） |
+
+## 相关需求
+
+表（vxe-table）+ 图表一体化：[`../../requirements/table-chart-integration.md`](../../requirements/table-chart-integration.md)
