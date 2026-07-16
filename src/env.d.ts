@@ -5,3 +5,5 @@ declare module '*.vue' {
   const component: DefineComponent<object, object, unknown>
   export default component
 }
+
+declare module 'element-plus/es/components/*/style/css'

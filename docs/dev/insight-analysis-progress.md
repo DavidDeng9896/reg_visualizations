@@ -9,30 +9,30 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-1950e261-8e50-49b1-80ee-69b630aad28b-32cf`（Round 1–3） |
-| 阶段 | **优化 Round 3 完成；本轮为合并点 → main** |
-| 上次更新 | 2026-07-16 16:25 |
-| 单元 | **24/24 PASS**（含 fit 边界） |
+| 分支 | `cursor/bc-cab31f91-376b-452a-b039-282af91c3cba-5b3b`（Round 4） |
+| 阶段 | **优化 Round 4 完成**；本合并周期 1/3（Round 6 再合 main） |
+| 上次更新 | 2026-07-16 17:10 |
+| 单元 | **28/28 PASS**（含 4PL 约束、layoutPrefs） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 1–3 对齐摘要
+## 2. Round 1–4 对齐摘要
 
 对照 `docs/requirements/table-chart-integration.md`：
 
 | 需求 | 状态 |
 | --- | --- |
 | L-04 表/图分隔条 + 记住占比 | ✅ Round 1 |
-| L-05 窄屏左右→上下 | ✅ Round 1 |
+| L-05 窄屏左右→上下 | ✅ Round 1；可关闭提示记忆 ✅ Round 4 |
 | T-11 虚拟滚动 | ✅ Round 1 |
 | §5.3 表变更→图防抖 | ✅ Round 2（160ms） |
-| 工具栏分组（视图/布局/数据） | ✅ Round 2 |
+| 工具栏分组（视图/布局/数据） | ✅ Round 2；landmark/skip ✅ Round 4 |
 | CONFIGURE 空态一键 Edit | ✅ Round 2 |
 | 侧栏宽度拖拽记忆 | ✅ Round 2（localStorage） |
 | 流程图空态 / 选中高亮 | ✅ Round 2 |
-| Element/Vxe 瘦身 | ✅ Round 3（CSS gzip 显著下降；Vxe JS ≈半） |
-| 4PL 边界/失败提示 | ✅ Round 3 |
-| 分隔条 a11y（aria-value + Home/End） | ✅ Round 3 |
+| Element/Vxe 瘦身 | ✅ Round 3；反馈 API 异步 + 对话框懒加载 ✅ Round 4 |
+| 4PL 边界/失败提示 | ✅ Round 3；min/max 约束 + MODEL 空态 ✅ Round 4 |
+| 分隔条 a11y（aria-value + Home/End） | ✅ Round 3；位置切换后焦点回分隔条 ✅ Round 4 |
 
 ## 3. 验证命令
 
@@ -42,11 +42,12 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 4 计划（下一 cron）
+## 4. Round 5 计划（下一 cron）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | Element Plus JS 仍 ~298KB gzip：评估路由级异步组件或进一步按图标/消息拆分 |
-| Fit | 4PL 约束 min/max（docs line-charts）；MODEL TABLES 失败态空表说明 |
-| UX | 图表位置切换后焦点回到分隔条；窄屏降级提示可关闭记忆 |
-| A11y | 工具栏分组 landmark / skip link |
+| Perf | Element Plus JS 仍 ~305KB gzip：评估去掉强制 manualChunks、按路由拆 EP，或换轻量反馈 |
+| UX | Edit 抽屉打开时焦点陷阱；拟合失败时自动展开 MODEL TABLES |
+| Fit | Linear/Quadratic 可选强制过原点；轴 Range Manual(min/max) STYLE |
+| A11y | 流程图节点键盘可达；侧栏树 aria |
+| 合并 | Round 6 为本周期合并点 |

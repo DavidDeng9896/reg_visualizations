@@ -35,15 +35,8 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('echarts')) return 'echarts'
           if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify')) return 'export'
-          if (
-            id.includes('element-plus') &&
-            (id.includes('/message') ||
-              id.includes('/message-box') ||
-              id.includes('/notification') ||
-              id.includes('/loading'))
-          ) {
-            return 'element-feedback'
-          }
+          // Keep Element Plus as one vendor chunk; Message/MessageBox still load via
+          // dynamic import in shared/ui/feedback.ts (async entry, not circular manualChunks).
           if (id.includes('element-plus')) return 'element-plus'
           if (id.includes('vxe-table') || id.includes('vxe-pc-ui') || id.includes('@vxe-ui')) return 'vxe'
           if (id.includes('@vue-flow')) return 'vue-flow'
