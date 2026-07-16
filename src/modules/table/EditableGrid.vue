@@ -19,7 +19,7 @@
       :mouse-config="{ selected: true }"
       :keyboard-config="{ isClip: true, isEdit: editable }"
       keep-source
-      show-overflow
+      :show-overflow="'title'"
       @edit-closed="onEditClosed"
       @cell-selected="onCellSelected"
     >
