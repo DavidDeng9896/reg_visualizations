@@ -1,5 +1,6 @@
 <template>
   <div v-if="store.current" class="workspace">
+    <a class="skip-link" href="#workspace-main">跳到主内容</a>
     <header class="header">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
@@ -43,7 +44,7 @@
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
       />
-      <main class="main">
+      <main id="workspace-main" class="main" tabindex="-1">
         <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
         <TableChartWorkspace v-else />
       </main>
@@ -56,15 +57,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
-import CsvImportDialog from '@/modules/table/CsvImportDialog.vue'
-import CombineTablesDialog from '@/modules/table/CombineTablesDialog.vue'
+import { toast } from '@/shared/ui/feedback'
 import {
   clampSidebarWidth,
   loadSidebarWidth,
@@ -72,6 +71,9 @@ import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
+
+const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
+const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
 
 const props = defineProps<{ analysisId: string }>()
 const store = useAnalysisStore()
@@ -85,7 +87,7 @@ onMounted(async () => {
   // Preserve in-memory selection when navigating right after local mutations
   const preferred = store.current?.id === props.analysisId ? store.selectedNodeId : null
   await store.openAnalysis(props.analysisId, { selectNodeId: preferred })
-  if (!store.current) ElMessage.error('Analysis 不存在')
+  if (!store.current) toast('error', 'Analysis 不存在')
 })
 
 onUnmounted(() => {
@@ -94,7 +96,7 @@ onUnmounted(() => {
 })
 
 function stub(name: string) {
-  ElMessage.info(`${name}：后续版本`)
+  toast('info', `${name}：后续版本`)
 }
 
 function onAddData(cmd: string) {
@@ -157,6 +159,22 @@ function onSidebarKey(e: KeyboardEvent) {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 30;
+  padding: 8px 12px;
+  background: var(--ia-accent);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
 }
 .header {
   display: flex;

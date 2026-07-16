@@ -273,6 +273,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         const fit = fitSeries(
           pts.map((p) => [p.x, p.y]),
           cfg.fitModel,
+          cfg.fitModel === '4pl' ? cfg.fitConstraints : undefined,
         )
         if (!fit.ok) {
           const label = g === 'all' ? fit.warning! : `系列「${g}」：${fit.warning}`

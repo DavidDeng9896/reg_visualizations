@@ -64,7 +64,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirm, toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
@@ -89,7 +89,7 @@ async function create() {
   const a = await store.createAnalysis(form.name.trim(), form.projectId)
   showCreate.value = false
   form.name = ''
-  ElMessage.success('已创建')
+  toast('success', '已创建')
   router.push(`/analyses/${a.id}`)
 }
 
@@ -118,7 +118,7 @@ async function createDemo() {
     store.selectNode(view.id, 'workspace')
   }
   await store.flushSave()
-  ElMessage.success('已创建 Demo Analysis')
+  toast('success', '已创建 Demo Analysis')
   router.push(`/analyses/${a.id}`)
 }
 
@@ -127,13 +127,9 @@ function open(row: { id: string }) {
 }
 
 async function onRemove(id: string) {
-  await ElMessageBox.confirm('确定删除该 Analysis？', '确认', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning',
-  })
+  await confirm('确定删除该 Analysis？', '确认')
   await store.removeAnalysis(id)
-  ElMessage.success('已删除')
+  toast('success', '已删除')
 }
 </script>
 

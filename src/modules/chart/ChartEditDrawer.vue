@@ -70,9 +70,29 @@
               <el-option label="4PL" value="4pl" />
             </el-select>
             <p v-if="draft.configure.fitModel === '4pl'" class="fit-hint" role="note">
-              4PL 至少需要 4 个有效点，且 X/Y 均需有变化；点数不足或边界异常时画布会显示拟合提示。
+              4PL 至少需要 4 个有效点，且 X/Y 均需有变化；可选手动约束上下渐近线（min / max）。
             </p>
           </el-form-item>
+          <template v-if="draft.configure.fitModel === '4pl'">
+            <el-form-item label="4PL min">
+              <el-input-number
+                v-model="fitMin"
+                :controls="false"
+                placeholder="自动"
+                style="width: 100%"
+                aria-label="4PL 下渐近线约束"
+              />
+            </el-form-item>
+            <el-form-item label="4PL max">
+              <el-input-number
+                v-model="fitMax"
+                :controls="false"
+                placeholder="自动"
+                style="width: 100%"
+                aria-label="4PL 上渐近线约束"
+              />
+            </el-form-item>
+          </template>
           <el-form-item label="Exclude flagged">
             <el-switch v-model="draft.configure.excludeFlagged" />
           </el-form-item>
@@ -157,6 +177,28 @@ const opacity = computed({
   get: () => draft.value.style.opacity ?? 0.85,
   set: (v: number) => {
     draft.value.style.opacity = v
+  },
+})
+
+const fitMin = computed({
+  get: () => draft.value.configure.fitConstraints?.min ?? undefined,
+  set: (v: number | undefined | null) => {
+    const next = { ...(draft.value.configure.fitConstraints || {}) }
+    if (v == null || !Number.isFinite(v)) delete next.min
+    else next.min = v
+    draft.value.configure.fitConstraints =
+      next.min != null || next.max != null ? next : undefined
+  },
+})
+
+const fitMax = computed({
+  get: () => draft.value.configure.fitConstraints?.max ?? undefined,
+  set: (v: number | undefined | null) => {
+    const next = { ...(draft.value.configure.fitConstraints || {}) }
+    if (v == null || !Number.isFinite(v)) delete next.max
+    else next.max = v
+    draft.value.configure.fitConstraints =
+      next.min != null || next.max != null ? next : undefined
   },
 })
 

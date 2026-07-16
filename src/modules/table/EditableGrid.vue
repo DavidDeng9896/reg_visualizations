@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/shared/ui/feedback'
 import type { TableColumn } from '@/shared/types/analysis'
 import { coerceValue } from '@/shared/utils/schema'
 
@@ -89,7 +89,7 @@ function onEditClosed({ row, column }: { row: Record<string, unknown>; column: {
   if (!col) return
   const next = coerceValue(row[column.field], col.dataType)
   if (col.dataType === 'number' && next !== '' && next != null && Number.isNaN(Number(next))) {
-    ElMessage.warning('数值类型无效，已还原')
+    toast('warning', '数值类型无效，已还原')
     return
   }
   pushUndo()
@@ -113,7 +113,7 @@ function removeRows() {
   if (!$table) return
   const selected = $table.getCheckboxRecords() as Record<string, unknown>[]
   if (!selected.length) {
-    ElMessage.info('请先勾选行')
+    toast('info', '请先勾选行')
     return
   }
   pushUndo()
@@ -171,7 +171,7 @@ function onPaste(e: ClipboardEvent) {
     }
   }
   commit()
-  ElMessage.success(`已粘贴 ${matrix.length}×${matrix[0].length} 区域`)
+  toast('success', `已粘贴 ${matrix.length}×${matrix[0].length} 区域`)
 }
 
 function onKey(e: KeyboardEvent) {
@@ -194,7 +194,7 @@ function onKey(e: KeyboardEvent) {
         ...selected.map((row) => fields.map((f) => String(row[f] ?? '')).join('\t')),
       ].join('\n')
       navigator.clipboard.writeText(tsv)
-      ElMessage.success(`已复制 ${selected.length} 行`)
+      toast('success', `已复制 ${selected.length} 行`)
     }
   }
 }

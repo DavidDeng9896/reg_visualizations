@@ -26,16 +26,21 @@
       <el-button type="primary" @click="emit('open-edit')">Edit 图表字段</el-button>
     </div>
     <div ref="elRef" class="canvas" :class="{ dimmed: missing.length }" />
-    <el-collapse v-if="built.modelTables?.variables?.length" class="models">
+    <el-collapse v-if="showModelTables" class="models">
       <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
-        <h4>MODEL VARIABLES</h4>
-        <el-table :data="built.modelTables.variables" size="small" max-height="120">
-          <el-table-column v-for="k in varKeys" :key="k" :prop="k" :label="k" />
-        </el-table>
-        <h4>MODEL OUTPUT</h4>
-        <el-table :data="built.modelTables.output.slice(0, 50)" size="small" max-height="140">
-          <el-table-column v-for="k in outKeys" :key="k" :prop="k" :label="k" />
-        </el-table>
+        <template v-if="hasModelRows">
+          <h4>MODEL VARIABLES</h4>
+          <el-table :data="built.modelTables!.variables" size="small" max-height="120">
+            <el-table-column v-for="k in varKeys" :key="k" :prop="k" :label="k" />
+          </el-table>
+          <h4>MODEL OUTPUT</h4>
+          <el-table :data="built.modelTables!.output.slice(0, 50)" size="small" max-height="140">
+            <el-table-column v-for="k in outKeys" :key="k" :prop="k" :label="k" />
+          </el-table>
+        </template>
+        <p v-else class="model-empty" role="status">
+          拟合未成功，暂无 MODEL VARIABLES / OUTPUT。请查看上方拟合提示，调整数据或 4PL 约束后重试。
+        </p>
       </el-collapse-item>
     </el-collapse>
   </div>
@@ -82,6 +87,13 @@ const built = computed(() =>
   }),
 )
 
+const hasModelRows = computed(() => (built.value.modelTables?.variables?.length ?? 0) > 0)
+const showModelTables = computed(() => {
+  const cfg = props.config.configure
+  const fitting = !!cfg.fitModel && cfg.fitModel !== 'none'
+  if (!fitting) return false
+  return hasModelRows.value || (built.value.fitWarnings?.length ?? 0) > 0
+})
 const varKeys = computed(() =>
   built.value.modelTables?.variables[0] ? Object.keys(built.value.modelTables.variables[0]) : [],
 )
@@ -280,6 +292,16 @@ async function exportPdf() {
 .models {
   border-top: 1px solid var(--ia-border);
   margin-top: 4px;
+}
+.model-empty {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8a6d3b;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+  padding: 8px 10px;
 }
 h4 {
   margin: 6px 0;

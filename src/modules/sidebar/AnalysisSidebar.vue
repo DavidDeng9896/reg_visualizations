@@ -47,7 +47,7 @@
     </el-tree>
 
     <div class="footer">
-      <el-button class="ext" @click="ElMessage.info('Connect with external tool：后续版本')">
+      <el-button class="ext" @click="toast('info', 'Connect with external tool：后续版本')">
         Connect with external tool
       </el-button>
     </div>
@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirm, prompt, toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
 
@@ -135,24 +135,20 @@ function onMenu(cmd: string, data: TreeNode) {
     newViewType.value = 'table'
     showNewView.value = true
   } else if (cmd === 'rename') {
-    ElMessageBox.prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') }).then(({ value }) => {
-      store.renameNode(data.id, value)
+    void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') }).then(({ value }) => {
+      if (value) store.renameNode(data.id, value)
     })
   } else if (cmd === 'jump') {
     emit('jump-flowchart', data.id)
   } else if (cmd === 'promote') {
     store.selectNode(data.id, 'workspace')
     store.promoteViewToTable(data.id)
-    ElMessage.success('已提升为 Analysis 表')
+    toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    ElMessageBox.confirm('确定删除？子视图将一并删除。', '确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }).then(() => {
+    void confirm('确定删除？子视图将一并删除。', '确认').then(() => {
       const r = store.deleteNode(data.id)
-      if (!r.ok) ElMessage.error(r.reason || '删除失败')
-      else ElMessage.success('已删除')
+      if (!r.ok) toast('error', r.reason || '删除失败')
+      else toast('success', '已删除')
     })
   }
 }

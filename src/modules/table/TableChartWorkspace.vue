@@ -1,8 +1,9 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
-    <div class="ws-toolbar">
+    <a class="skip-link" href="#ws-main">跳到表图工作区</a>
+    <div class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏">
       <template v-if="store.selectedView">
-        <div class="tb-group" aria-label="视图">
+        <div class="tb-group" role="group" aria-label="视图">
           <span class="tb-label">视图</span>
           <el-input
             v-model="viewName"
@@ -21,7 +22,7 @@
             <el-option v-for="t in viewTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
         </div>
-        <div class="tb-group" aria-label="布局">
+        <div class="tb-group" role="group" aria-label="布局">
           <span class="tb-label">布局</span>
           <el-select
             v-model="chartPos"
@@ -40,14 +41,14 @@
             Edit 图表
           </el-button>
         </div>
-        <div class="tb-group" aria-label="数据">
+        <div class="tb-group" role="group" aria-label="数据">
           <span class="tb-label">数据</span>
           <el-button size="small" @click="showTransforms = true">过滤 / 转换</el-button>
           <el-button size="small" @click="exportCsv">导出 CSV</el-button>
         </div>
       </template>
       <template v-else-if="store.selectedTable">
-        <div class="tb-group">
+        <div class="tb-group" role="group" aria-label="表操作">
           <strong>{{ store.selectedTable.name }}</strong>
           <el-button size="small" type="primary" plain @click="quickView">New view</el-button>
           <el-button size="small" @click="exportCsv">导出 CSV</el-button>
@@ -56,15 +57,18 @@
       <el-tag size="small" type="info" class="row-count">{{ rowCountLabel }}</el-tag>
     </div>
 
-    <div v-if="layoutDegraded" class="layout-hint" role="status">
-      窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。
+    <div v-if="showLayoutHint" class="layout-hint" role="status">
+      <span>窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。</span>
+      <button type="button" class="hint-dismiss" @click="onDismissLayoutHint">不再提示</button>
     </div>
 
     <div
+      id="ws-main"
       ref="bodyRef"
       class="ws-body"
       :class="layoutClass"
       :style="splitStyle"
+      tabindex="-1"
     >
       <div v-if="showChartPane" class="chart-pane" :style="chartPaneStyle">
         <ChartPanel
@@ -78,6 +82,7 @@
       </div>
       <div
         v-if="showChartPane"
+        ref="splitterRef"
         class="splitter"
         :class="splitterOrientation"
         role="separator"
@@ -117,13 +122,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ChartConfig, ChartPosition, ViewType } from '@/shared/types/analysis'
 import EditableGrid from './EditableGrid.vue'
 import ChartPanel from '@/modules/chart/ChartPanel.vue'
-import TransformDialog from '@/modules/transform/TransformDialog.vue'
-import ChartEditDrawer from '@/modules/chart/ChartEditDrawer.vue'
+
+const TransformDialog = defineAsyncComponent(() => import('@/modules/transform/TransformDialog.vue'))
+const ChartEditDrawer = defineAsyncComponent(() => import('@/modules/chart/ChartEditDrawer.vue'))
 import { cloneDeep } from '@/shared/utils/clone'
 import { guessConfigure } from '@/modules/chart/guessMapping'
 import {
@@ -131,14 +137,17 @@ import {
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
 } from './layout'
+import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
 const bodyRef = ref<HTMLElement | null>(null)
+const splitterRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const splitRatio = ref(DEFAULT_SPLIT_RATIO)
 const dragging = ref(false)
+const layoutHintDismissed = ref(isLayoutHintDismissed())
 
 const viewTypeOptions: { value: ViewType; label: string }[] = [
   { value: 'table', label: '表格 table' },
@@ -174,6 +183,7 @@ const layoutInfo = computed(() =>
   effectiveChartPosition(chartPos.value, viewportWidth.value),
 )
 const layoutDegraded = computed(() => showChartPane.value && layoutInfo.value.degraded)
+const showLayoutHint = computed(() => layoutDegraded.value && !layoutHintDismissed.value)
 const effectivePos = computed(() => layoutInfo.value.position)
 
 const layoutClass = computed(() => {
@@ -233,6 +243,17 @@ onUnmounted(() => {
   window.removeEventListener('pointerup', onSplitterUp)
 })
 
+function onDismissLayoutHint() {
+  dismissLayoutHint()
+  layoutHintDismissed.value = true
+}
+
+function focusSplitter() {
+  void nextTick(() => {
+    splitterRef.value?.focus()
+  })
+}
+
 function persistSplitRatio(ratio: number) {
   splitRatio.value = clampSplitRatio(ratio)
   if (!store.selectedView) return
@@ -260,7 +281,6 @@ function onSplitterMove(e: PointerEvent) {
     const x = e.clientX - rect.left
     ratio = effectivePos.value === 'left' ? x / rect.width : 1 - x / rect.width
   }
-  // live preview without save spam
   splitRatio.value = clampSplitRatio(ratio)
 }
 
@@ -309,11 +329,13 @@ function onViewType(t: ViewType) {
   chartConfig.value = next
   viewType.value = t
   store.updateView(store.selectedView.view.id, { viewType: t, chartConfig: next })
+  if (t !== 'table') focusSplitter()
 }
 
 function onPos(p: ChartPosition) {
   if (!store.selectedView) return
   store.setChartPosition(store.selectedView.view.id, p)
+  focusSplitter()
 }
 
 function onChartSave(cfg: ChartConfig) {
@@ -359,6 +381,22 @@ function exportCsv() {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 20;
+  padding: 8px 12px;
+  background: var(--ia-accent);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
 }
 .ws-toolbar {
   display: flex;
@@ -392,11 +430,28 @@ function exportCsv() {
   margin-left: auto;
 }
 .layout-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 6px 12px;
   font-size: 12px;
   color: #8a6d3b;
   background: #fff8e6;
   border-bottom: 1px solid #f0e0b2;
+}
+.hint-dismiss {
+  flex-shrink: 0;
+  border: 1px solid #e0c98a;
+  background: #fff;
+  color: #8a6d3b;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hint-dismiss:hover {
+  background: #fff3d1;
 }
 .ws-body {
   flex: 1;

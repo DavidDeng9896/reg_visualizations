@@ -1,5 +1,13 @@
 export type FitModel = 'ptp' | 'linear' | 'quadratic' | '4pl'
 
+/** 4PL 可选渐近线约束（docs line-charts：约束 min·max） */
+export interface FitConstraints {
+  /** 下渐近线；缺省用数据 Y 最小值 */
+  min?: number
+  /** 上渐近线；缺省用数据 Y 最大值 */
+  max?: number
+}
+
 export interface FitResult {
   curve: [number, number][]
   variables: Record<string, number>
@@ -45,9 +53,11 @@ function linReg(xs: number[], ys: number[]) {
 }
 
 /** Simple 4PL via grid search on hill + inflection (demo-quality) */
-function fit4pl(xs: number[], ys: number[]) {
-  const min = Math.min(...ys)
-  const max = Math.max(...ys)
+function fit4pl(xs: number[], ys: number[], constraints?: FitConstraints) {
+  const dataMin = Math.min(...ys)
+  const dataMax = Math.max(...ys)
+  const min = constraints?.min != null && Number.isFinite(constraints.min) ? constraints.min : dataMin
+  const max = constraints?.max != null && Number.isFinite(constraints.max) ? constraints.max : dataMax
   let best = { hill: 1, inf: xs.reduce((a, b) => a + b, 0) / xs.length, err: Infinity }
   for (const hill of [0.5, 1, 1.5, 2, 3]) {
     for (let k = 0; k < 20; k++) {
@@ -63,7 +73,11 @@ function fit4pl(xs: number[], ys: number[]) {
   return { min, max, hill: best.hill, inflection: best.inf, err: best.err }
 }
 
-function validatePoints(points: [number, number][], model: FitModel): string | null {
+function validatePoints(
+  points: [number, number][],
+  model: FitModel,
+  constraints?: FitConstraints,
+): string | null {
   if (!points.length) return '没有可用于拟合的数据点'
   const need = MIN_FIT_POINTS[model]
   if (points.length < need) {
@@ -77,13 +91,24 @@ function validatePoints(points: [number, number][], model: FitModel): string | n
     const yMin = Math.min(...ys)
     const yMax = Math.max(...ys)
     if (xMin === xMax) return '4PL 需要 X 值有跨度；当前全部相同，无法估计拐点'
-    if (yMin === yMax) return '4PL 需要 Y 值有变化以估计上下渐近线；当前全部相同'
+    if (yMin === yMax && constraints?.min == null && constraints?.max == null) {
+      return '4PL 需要 Y 值有变化以估计上下渐近线；当前全部相同'
+    }
+    const cMin = constraints?.min
+    const cMax = constraints?.max
+    if (cMin != null && cMax != null && Number.isFinite(cMin) && Number.isFinite(cMax) && cMin >= cMax) {
+      return '4PL 渐近约束无效：min 必须小于 max'
+    }
   }
   return null
 }
 
-export function fitSeries(points: [number, number][], model: FitModel): FitResult {
-  const gate = validatePoints(points, model)
+export function fitSeries(
+  points: [number, number][],
+  model: FitModel,
+  constraints?: FitConstraints,
+): FitResult {
+  const gate = validatePoints(points, model, constraints)
   if (gate) return emptyFail(gate)
 
   const sorted = [...points].sort((a, b) => a[0] - b[0])
@@ -145,9 +170,12 @@ export function fitSeries(points: [number, number][], model: FitModel): FitResul
         output.push({ x: xs[i], y: ys[i], predicted: pred, residual: ys[i] - pred })
       }
     } else {
-      const p = fit4pl(xs, ys)
+      const p = fit4pl(xs, ys, constraints)
       if (!Number.isFinite(p.inflection) || !Number.isFinite(p.hill)) {
         return emptyFail('4PL 拟合失败：未能收敛到有效参数，请检查剂量-响应数据')
+      }
+      if (!(p.max > p.min)) {
+        return emptyFail('4PL 渐近约束无效：min 必须小于 max')
       }
       variables = { min: p.min, max: p.max, hillSlope: p.hill, inflection: p.inflection }
       for (let i = 0; i <= 50; i++) {

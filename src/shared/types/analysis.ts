@@ -71,6 +71,8 @@ export interface ChartConfigure {
   xScale?: 'linear' | 'log'
   yScale?: 'linear' | 'log'
   fitModel?: 'none' | 'ptp' | 'linear' | 'quadratic' | '4pl'
+  /** 4PL 渐近线约束（可选）；对齐 line-charts 约束 min·max */
+  fitConstraints?: { min?: number; max?: number }
   excludeFlagged?: boolean
   colorPalette?: 'light' | 'dark' | 'alternate'
   showPoints?: boolean

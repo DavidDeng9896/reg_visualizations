@@ -92,4 +92,30 @@ describe('fitEngine', () => {
     expect(r.ok).toBe(false)
     expect(r.warning).toMatch(/X/)
   })
+
+  it('applies 4PL min/max asymptote constraints', () => {
+    const pts: [number, number][] = [
+      [0.1, 1],
+      [1, 2],
+      [10, 8],
+      [100, 9],
+      [1000, 9.5],
+    ]
+    const r = fitSeries(pts, '4pl', { min: 0, max: 10 })
+    expect(r.ok).toBe(true)
+    expect(r.variables.min).toBe(0)
+    expect(r.variables.max).toBe(10)
+  })
+
+  it('rejects 4PL when constrained min >= max', () => {
+    const pts: [number, number][] = [
+      [0.1, 1],
+      [1, 2],
+      [10, 8],
+      [100, 9],
+    ]
+    const r = fitSeries(pts, '4pl', { min: 5, max: 5 })
+    expect(r.ok).toBe(false)
+    expect(r.warning).toMatch(/min.*max|渐近/i)
+  })
 })

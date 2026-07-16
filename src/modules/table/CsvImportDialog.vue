@@ -29,7 +29,7 @@
 import { ref } from 'vue'
 import Papa from 'papaparse'
 import type { UploadFile } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { buildColumnsFromRows, withRowIds } from '@/shared/utils/schema'
 import { uid } from '@/shared/utils/id'
@@ -59,7 +59,7 @@ function onFile(file: UploadFile) {
     skipEmptyLines: true,
     complete: (res) => {
       if (res.errors?.length) {
-        ElMessage.error('CSV 解析失败：' + res.errors[0].message)
+        toast('error', 'CSV 解析失败：' + res.errors[0].message)
         rows.value = []
         return
       }
@@ -68,7 +68,7 @@ function onFile(file: UploadFile) {
       columns.value = buildColumnsFromRows(data)
       previewRows.value = data.slice(0, 20)
     },
-    error: () => ElMessage.error('CSV 解析失败'),
+    error: () => toast('error', 'CSV 解析失败'),
   })
 }
 
@@ -82,7 +82,7 @@ function add() {
     tableFilters: [],
     views: [],
   })
-  ElMessage.success('已添加表')
+  toast('success', '已添加表')
   close()
 }
 </script>

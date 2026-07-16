@@ -33,6 +33,7 @@ export function guessConfigure(viewType: ViewType, columns: TableColumn[], prev?
     aggregation: prev?.aggregation || 'mean',
     errorBars: prev?.errorBars || 'none',
     fitModel: prev?.fitModel || 'none',
+    fitConstraints: prev?.fitConstraints,
     colorPalette: prev?.colorPalette || 'light',
     orientation: prev?.orientation || 'vertical',
     stacked: prev?.stacked || false,

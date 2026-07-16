@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { combineTables } from '@/modules/table/join'
 import type { JoinType, TableColumn } from '@/shared/types/analysis'
@@ -138,7 +138,7 @@ function add() {
     tableFilters: [],
     views: [],
   })
-  ElMessage.success('已添加合并表')
+  toast('success', '已添加合并表')
   close()
 }
 </script>
