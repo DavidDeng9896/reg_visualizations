@@ -2,6 +2,7 @@ import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis
 import type { EChartsOption } from 'echarts'
 import { fitSeries } from './fitEngine'
 import { missingRequiredFields } from './guessMapping'
+import { axisExtent } from './axisRange'
 
 const SAMPLE_LIMIT = 10000
 
@@ -103,6 +104,8 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     left: 'center',
   }
   const legendShow = style.legendShow !== false
+  const xExtent = axisExtent({ mode: style.xRangeMode, min: style.xMin, max: style.xMax })
+  const yExtent = axisExtent({ mode: style.yRangeMode, min: style.yMin, max: style.yMax })
 
   let option: EChartsOption = {}
   let modelTables: ChartBuildResult['modelTables']
@@ -218,11 +221,13 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         data: cfg.orientation === 'horizontal' ? undefined : cats,
         name: cfg.xLabel || x,
         scale: true,
+        ...(cfg.orientation === 'horizontal' ? yExtent : undefined),
       },
       yAxis: {
         type: cfg.orientation === 'horizontal' ? 'category' : 'value',
         data: cfg.orientation === 'horizontal' ? cats : undefined,
         name: cfg.yLabel || y,
+        ...(cfg.orientation === 'horizontal' ? undefined : yExtent),
       },
       series: [...barSeries, ...errorSeries] as EChartsOption['series'],
     }
@@ -270,9 +275,16 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
       })
 
       if (cfg.fitModel && cfg.fitModel !== 'none') {
+        const fitConstraints =
+          cfg.fitModel === '4pl'
+            ? cfg.fitConstraints
+            : cfg.fitModel === 'linear' || cfg.fitModel === 'quadratic'
+              ? { throughOrigin: !!cfg.fitThroughOrigin }
+              : undefined
         const fit = fitSeries(
           pts.map((p) => [p.x, p.y]),
           cfg.fitModel,
+          fitConstraints,
         )
         if (!fit.ok) {
           const label = g === 'all' ? fit.warning! : `系列「${g}」：${fit.warning}`
@@ -309,12 +321,14 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
         type: 'value',
         name: cfg.xLabel || x,
         scale: true,
+        ...xExtent,
       },
       yAxis: [
         {
           type: 'value',
           name: cfg.yLabel || y,
           scale: true,
+          ...yExtent,
         },
         cfg.yFieldRight
           ? { type: 'value', name: cfg.yLabelRight || cfg.yFieldRight, scale: true }
@@ -378,7 +392,7 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
       title,
       tooltip: { trigger: 'item' },
       xAxis: { type: 'category', data: cats, name: cfg.xLabel || x },
-      yAxis: { type: 'value', name: cfg.yLabel || y, scale: true },
+      yAxis: { type: 'value', name: cfg.yLabel || y, scale: true, ...yExtent },
       series: [{ type: 'boxplot', data: boxData }],
     }
   } else if (viewType === 'heatmap') {

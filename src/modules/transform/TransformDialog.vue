@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { FilterCondition, TransformStep } from '@/shared/types/analysis'
 import { uid } from '@/shared/utils/id'
@@ -130,12 +130,12 @@ function save() {
     })
   } catch (e) {
     error.value = String(e)
-    ElMessage.error('转换无效，已阻断 Save')
+    toast('error', '转换无效，已阻断 Save')
     return
   }
   store.setViewFilters(sv.view.id, filters.value)
   store.setTransforms(sv.view.id, transforms.value)
-  ElMessage.success('已保存')
+  toast('success', '已保存')
   emit('update:modelValue', false)
 }
 </script>

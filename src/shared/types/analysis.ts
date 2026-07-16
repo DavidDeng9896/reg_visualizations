@@ -71,6 +71,10 @@ export interface ChartConfigure {
   xScale?: 'linear' | 'log'
   yScale?: 'linear' | 'log'
   fitModel?: 'none' | 'ptp' | 'linear' | 'quadratic' | '4pl'
+  /** 4PL 渐近线约束（可选）；对齐 line-charts 约束 min·max */
+  fitConstraints?: { min?: number; max?: number }
+  /** Linear / Quadratic 强制过原点（intercept / 常数项为 0） */
+  fitThroughOrigin?: boolean
   excludeFlagged?: boolean
   colorPalette?: 'light' | 'dark' | 'alternate'
   showPoints?: boolean
@@ -94,6 +98,13 @@ export interface ChartStyle {
   legendPosition?: 'left' | 'right' | 'top' | 'bottom'
   legendLabel?: string
   seriesColors?: Record<string, string>
+  /** 轴 Range：Automatic 或 Manual(min/max)，对齐 charts/common.md */
+  xRangeMode?: 'auto' | 'manual'
+  xMin?: number
+  xMax?: number
+  yRangeMode?: 'auto' | 'manual'
+  yMin?: number
+  yMax?: number
 }
 
 export interface ChartFlags {

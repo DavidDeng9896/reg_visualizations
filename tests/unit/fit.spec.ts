@@ -92,4 +92,57 @@ describe('fitEngine', () => {
     expect(r.ok).toBe(false)
     expect(r.warning).toMatch(/X/)
   })
+
+  it('applies 4PL min/max asymptote constraints', () => {
+    const pts: [number, number][] = [
+      [0.1, 1],
+      [1, 2],
+      [10, 8],
+      [100, 9],
+      [1000, 9.5],
+    ]
+    const r = fitSeries(pts, '4pl', { min: 0, max: 10 })
+    expect(r.ok).toBe(true)
+    expect(r.variables.min).toBe(0)
+    expect(r.variables.max).toBe(10)
+  })
+
+  it('rejects 4PL when constrained min >= max', () => {
+    const pts: [number, number][] = [
+      [0.1, 1],
+      [1, 2],
+      [10, 8],
+      [100, 9],
+    ]
+    const r = fitSeries(pts, '4pl', { min: 5, max: 5 })
+    expect(r.ok).toBe(false)
+    expect(r.warning).toMatch(/min.*max|渐近/i)
+  })
+
+  it('fits linear through origin', () => {
+    const pts: [number, number][] = [
+      [1, 2],
+      [2, 4],
+      [3, 6.1],
+    ]
+    const free = fitSeries(pts, 'linear')
+    const forced = fitSeries(pts, 'linear', { throughOrigin: true })
+    expect(forced.ok).toBe(true)
+    expect(forced.variables.intercept).toBe(0)
+    expect(forced.variables.slope).toBeCloseTo(28.3 / 14, 5)
+    expect(free.variables.intercept).not.toBe(0)
+  })
+
+  it('fits quadratic through origin with c = 0', () => {
+    const pts: [number, number][] = [
+      [1, 3],
+      [2, 10],
+      [3, 21],
+    ]
+    const r = fitSeries(pts, 'quadratic', { throughOrigin: true })
+    expect(r.ok).toBe(true)
+    expect(r.variables.c).toBe(0)
+    expect(r.variables.a).toBeCloseTo(2, 5)
+    expect(r.variables.b).toBeCloseTo(1, 5)
+  })
 })

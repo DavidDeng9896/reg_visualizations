@@ -1,10 +1,17 @@
 <template>
-  <aside class="sidebar" :style="{ width: `${width}px` }">
-    <el-input v-model="q" placeholder="搜索表 / 视图" clearable size="small" class="search" />
+  <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
+    <el-input
+      v-model="q"
+      placeholder="搜索表 / 视图"
+      clearable
+      size="small"
+      class="search"
+      aria-label="搜索表或视图"
+    />
     <div class="section-head">
-      <span>ANALYSIS DATA</span>
+      <span id="analysis-data-heading">ANALYSIS DATA</span>
       <el-dropdown trigger="click" @command="(c: string) => emit('add-data', c)">
-        <el-button size="small" text>+</el-button>
+        <el-button size="small" text aria-label="添加数据">+</el-button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="csv">From CSV</el-dropdown-item>
@@ -16,38 +23,49 @@
       </el-dropdown>
     </div>
 
-    <el-tree
-      :data="treeData"
-      node-key="id"
-      default-expand-all
-      highlight-current
-      :expand-on-click-node="false"
-      :current-node-key="store.selectedNodeId || undefined"
-      @node-click="onClick"
-    >
-      <template #default="{ data }">
-        <div class="node">
-          <span class="label">{{ data.label }}</span>
-          <span class="ops" @click.stop>
-            <el-dropdown trigger="click" @command="(c: string) => onMenu(c, data)">
-              <el-button size="small" text type="primary" class="ops-btn">⋯</el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="new-view">New view</el-dropdown-item>
-                  <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                  <el-dropdown-item command="jump">跳转到流程图</el-dropdown-item>
-                  <el-dropdown-item v-if="data.kind === 'view'" command="promote">提升为表</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </span>
-        </div>
-      </template>
-    </el-tree>
+    <nav class="tree-nav" aria-labelledby="analysis-data-heading">
+      <el-tree
+        :data="treeData"
+        node-key="id"
+        default-expand-all
+        highlight-current
+        :expand-on-click-node="false"
+        :current-node-key="store.selectedNodeId || undefined"
+        aria-label="表与视图树"
+        @node-click="onClick"
+      >
+        <template #default="{ data }">
+          <div class="node" :aria-label="`${data.kind === 'table' ? '表' : '视图'} ${data.label}`">
+            <span class="label">{{ data.label }}</span>
+            <span class="ops" @click.stop>
+              <el-dropdown trigger="click" @command="(c: string) => onMenu(c, data)">
+                <el-button
+                  size="small"
+                  text
+                  type="primary"
+                  class="ops-btn"
+                  :aria-label="`${data.label} 更多操作`"
+                >
+                  ⋯
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="new-view">New view</el-dropdown-item>
+                    <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                    <el-dropdown-item command="jump">跳转到流程图</el-dropdown-item>
+                    <el-dropdown-item v-if="data.kind === 'view'" command="promote">提升为表</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </span>
+          </div>
+        </template>
+      </el-tree>
+    </nav>
 
     <div class="footer">
-      <el-button class="ext" @click="ElMessage.info('Connect with external tool：后续版本')">
+      <el-button class="ext" @click="toast('info', 'Connect with external tool：后续版本')">
         Connect with external tool
       </el-button>
     </div>
@@ -73,7 +91,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirm, prompt, toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
 
@@ -135,24 +153,20 @@ function onMenu(cmd: string, data: TreeNode) {
     newViewType.value = 'table'
     showNewView.value = true
   } else if (cmd === 'rename') {
-    ElMessageBox.prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') }).then(({ value }) => {
-      store.renameNode(data.id, value)
+    void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') }).then(({ value }) => {
+      if (value) store.renameNode(data.id, value)
     })
   } else if (cmd === 'jump') {
     emit('jump-flowchart', data.id)
   } else if (cmd === 'promote') {
     store.selectNode(data.id, 'workspace')
     store.promoteViewToTable(data.id)
-    ElMessage.success('已提升为 Analysis 表')
+    toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    ElMessageBox.confirm('确定删除？子视图将一并删除。', '确认', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }).then(() => {
+    void confirm('确定删除？子视图将一并删除。', '确认').then(() => {
       const r = store.deleteNode(data.id)
-      if (!r.ok) ElMessage.error(r.reason || '删除失败')
-      else ElMessage.success('已删除')
+      if (!r.ok) toast('error', r.reason || '删除失败')
+      else toast('success', '已删除')
     })
   }
 }
@@ -182,6 +196,11 @@ function createView() {
 }
 .search {
   margin-bottom: 8px;
+}
+.tree-nav {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .section-head {
   display: flex;

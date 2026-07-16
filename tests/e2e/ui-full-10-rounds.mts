@@ -21,8 +21,26 @@ async function clearSite(page: Page) {
   await page.evaluate(async () => {
     localStorage.clear()
     sessionStorage.clear()
-    for (const d of (await indexedDB.databases?.()) || []) if (d.name) indexedDB.deleteDatabase(d.name)
+    const dbs = (await indexedDB.databases?.()) || []
+    await Promise.all(
+      dbs.map(
+        (d) =>
+          new Promise<void>((resolve, reject) => {
+            if (!d.name) {
+              resolve()
+              return
+            }
+            const req = indexedDB.deleteDatabase(d.name)
+            req.onsuccess = () => resolve()
+            req.onerror = () => reject(req.error ?? new Error('deleteDatabase failed'))
+            // If a connection blocks deletion, resolve so the next cold load can retry.
+            req.onblocked = () => resolve()
+          }),
+      ),
+    )
   })
+  // Cold reload after IDB delete fully settles — avoids Dexie open vs delete race.
+  await page.goto(BASE, { waitUntil: 'networkidle' })
 }
 
 async function canvasInk(page: Page) {
@@ -51,8 +69,10 @@ async function switchViewType(page: Page, type: string) {
 
 async function createDemo(page: Page) {
   await page.goto(BASE, { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /一键 Demo/ }).first().click()
-  await page.waitForURL(/\/analyses\//)
+  const demoBtn = page.getByRole('button', { name: /一键 Demo/ }).first()
+  await demoBtn.waitFor({ state: 'visible' })
+  await demoBtn.click()
+  await page.waitForURL(/\/analyses\//, { timeout: 45000 })
   await page.waitForTimeout(1200)
 }
 
