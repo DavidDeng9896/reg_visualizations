@@ -34,12 +34,10 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return
           if (id.includes('echarts')) return 'echarts'
-          if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify')) return 'export'
-          // Do NOT force all of element-plus into one chunk — let Rollup split by
-          // sync route usage vs dynamic import('element-plus') in feedback + async dialogs.
-          if (id.includes('vxe-table') || id.includes('vxe-pc-ui') || id.includes('@vxe-ui')) return 'vxe'
+          // Keep jspdf/html2canvas/vxe as automatic async chunks — forcing named
+          // manual chunks can steal shared helpers (e.g. __vitePreload) or pull
+          // vxe into the list-route shared graph via cross-chunk re-exports.
           if (id.includes('@vue-flow')) return 'vue-flow'
-          // Narrow match: avoid catching @vueuse / element-plus via substring "vue"
           if (
             /node_modules\/(?:vue|pinia|vue-router)\//.test(id) ||
             /node_modules\/@vue\//.test(id)

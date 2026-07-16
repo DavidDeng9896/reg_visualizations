@@ -36,7 +36,8 @@
     <div class="body">
       <main id="workspace-main" class="main" tabindex="-1">
         <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
-        <TableChartWorkspace v-else />
+        <TableChartWorkspace v-else-if="vxeReady" />
+        <div v-else class="loading">加载表格引擎…</div>
       </main>
       <div
         class="sidebar-splitter"
@@ -63,13 +64,10 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
+import { defineAsyncComponent, getCurrentInstance, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
-import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
-import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
-import { setupVxe } from '@/modules/plugins/vxe'
 import { toast } from '@/shared/ui/feedback'
 import {
   clampSidebarWidth,
@@ -79,11 +77,14 @@ import {
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
 
-const app = getCurrentInstance()?.appContext.app
-if (app) setupVxe(app)
-
+/** 动态加载 Vxe + 工作区重模块，避免列表共享图误拉 vxe chunk */
+const FlowchartCanvas = defineAsyncComponent(() => import('@/modules/flowchart/FlowchartCanvas.vue'))
+const TableChartWorkspace = defineAsyncComponent(() => import('@/modules/table/TableChartWorkspace.vue'))
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
+
+const vxeReady = shallowRef(false)
+const instance = getCurrentInstance()
 
 const props = defineProps<{ analysisId: string }>()
 const store = useAnalysisStore()
@@ -94,10 +95,17 @@ const sidebarWidth = ref(loadSidebarWidth())
 const draggingSidebar = ref(false)
 
 onMounted(async () => {
-  // Preserve in-memory selection when navigating right after local mutations
-  const preferred = store.current?.id === props.analysisId ? store.selectedNodeId : null
-  await store.openAnalysis(props.analysisId, { selectNodeId: preferred })
-  if (!store.current) toast('error', 'Analysis 不存在')
+  const [{ setupVxe }] = await Promise.all([
+    import('@/modules/plugins/vxe'),
+    (async () => {
+      const preferred = store.current?.id === props.analysisId ? store.selectedNodeId : null
+      await store.openAnalysis(props.analysisId, { selectNodeId: preferred })
+      if (!store.current) toast('error', 'Analysis 不存在')
+    })(),
+  ])
+  const app = instance?.appContext.app
+  if (app) setupVxe(app)
+  vxeReady.value = true
 })
 
 onUnmounted(() => {
