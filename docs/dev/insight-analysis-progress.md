@@ -10,7 +10,7 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/bc-7aef9e09-29d6-48ea-bcec-9ec54962f841-2474`（Round 7–9） |
-| 阶段 | **优化 Round 9 完成（合并点）→ PR 合并 main** |
+| 阶段 | **优化 Round 9 完成并已 FF 合入 main**（`lastMergedRound=9`） |
 | 上次更新 | 2026-07-16 22:45 |
 | 单元 | **66/66 PASS**（含 seriesStyle） |
 | UI E2E | **10/10 PASS** |
