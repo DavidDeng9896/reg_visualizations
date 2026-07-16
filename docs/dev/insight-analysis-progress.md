@@ -9,11 +9,12 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/insight-analysis-app-9a40` |
-| 阶段 | **图表自动映射修复 + 全按钮浏览器自测进行中** |
-| 上次更新 | 2026-07-16 11:02 |
+| 阶段 | **图表修复完成；全按钮浏览器自测 10/10 PASS** |
+| 上次更新 | 2026-07-16 11:06 |
 | 外部测试链接 | https://things-occasional-learn-quiz.trycloudflare.com/ |
-| 单元 | `guessMapping` 6/6 PASS |
-| 图表取证 | bar→line/pie/box/heatmap/scatter 均有 canvas 墨迹 |
+| 单元 | **12/12 PASS** |
+| UI E2E | **10/10 轮全通过**（Playwright 真实点击） |
+| Build | PASS |
 
 ## 2. 图表无法使用 — 根因与修复
 
@@ -34,7 +35,7 @@
 ```bash
 npm test
 npx tsx tests/e2e/chart-switch-forensic.mts
-npx tsx tests/e2e/ui-full-10-rounds.mts
+npx tsx tests/e2e/ui-full-10-rounds.mts   # 或 npm run test:e2e:ui
 npm run build
 ```
 
