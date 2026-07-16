@@ -5,7 +5,7 @@
       <el-button size="small" :disabled="!editable" @click="removeRows">删除选中行</el-button>
       <el-button size="small" :disabled="!editable" @click="undo">Undo</el-button>
       <el-button size="small" :disabled="!editable" @click="redo">Redo</el-button>
-      <span v-if="!editable" class="hint">{{ readOnlyHint }}</span>
+      <span v-if="!editable" class="hint hint-readonly" role="status">{{ readOnlyHint }}</span>
       <span class="hint">双击编辑 · Ctrl/Cmd+C/V 复制粘贴（TSV）· 不支持合并单元格</span>
     </div>
     <vxe-table
@@ -219,5 +219,13 @@ function onKey(e: KeyboardEvent) {
 .hint {
   font-size: 12px;
   color: #909399;
+}
+.hint-readonly {
+  color: #ad6800;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 600;
 }
 </style>

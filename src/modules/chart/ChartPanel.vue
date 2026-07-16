@@ -1,7 +1,10 @@
 <template>
   <div class="chart">
     <div class="toolbar">
-      <span v-if="missing.length" class="need">请配置：{{ missing.join('、') }}（点 Edit 图表）</span>
+      <div v-if="missing.length" class="need-block" role="status">
+        <span class="need">缺少字段：{{ missing.join('、') }}</span>
+        <el-button size="small" type="primary" @click="emit('open-edit')">打开 Edit 配置</el-button>
+      </div>
       <span v-if="built.sampled" class="sample">
         已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）
       </span>
@@ -14,7 +17,11 @@
       </el-button>
     </div>
     <div v-if="engineError" class="engine-error" role="alert">{{ engineError }}</div>
-    <div ref="elRef" class="canvas" />
+    <div v-if="missing.length" class="config-empty" role="status">
+      <p>图表字段未配置完整，无法绘制有意义图形。</p>
+      <el-button type="primary" @click="emit('open-edit')">Edit 图表字段</el-button>
+    </div>
+    <div ref="elRef" class="canvas" :class="{ dimmed: missing.length }" />
     <el-collapse v-if="built.modelTables?.variables?.length" class="models">
       <el-collapse-item title="MODEL TABLES（拟合结果）" name="models">
         <h4>MODEL VARIABLES</h4>
@@ -37,6 +44,10 @@ import { buildChartOption, SAMPLE_LIMIT } from '@/modules/chart/runtime'
 import { missingRequiredFields } from '@/modules/chart/guessMapping'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { cloneDeep } from '@/shared/utils/clone'
+import { debounce } from '@/shared/utils/debounce'
+
+/** 表筛选/编辑后重绘防抖（需求 §5.3） */
+const CHART_REFRESH_DEBOUNCE_MS = 160
 
 const props = defineProps<{
   viewType: ViewType
@@ -44,7 +55,7 @@ const props = defineProps<{
   rows: Record<string, unknown>[]
   config: ChartConfig
 }>()
-const emit = defineEmits<{ 'update:config': [ChartConfig] }>()
+const emit = defineEmits<{ 'update:config': [ChartConfig]; 'open-edit': [] }>()
 const store = useAnalysisStore()
 
 const elRef = ref<HTMLDivElement>()
@@ -125,6 +136,10 @@ function resize() {
   chart?.resize()
 }
 
+const scheduleRender = debounce(() => {
+  void render()
+}, CHART_REFRESH_DEBOUNCE_MS)
+
 onMounted(() => {
   void render()
   if (elRef.value && typeof ResizeObserver !== 'undefined') {
@@ -135,6 +150,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  scheduleRender.cancel()
   window.removeEventListener('resize', resize)
   resizeObserver?.disconnect()
   resizeObserver = null
@@ -143,7 +159,7 @@ onUnmounted(() => {
 })
 
 watch(built, () => {
-  void render()
+  scheduleRender()
 })
 
 function downloadFull() {
@@ -179,6 +195,7 @@ async function exportPdf() {
 
 <style scoped>
 .chart {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -196,10 +213,36 @@ async function exportPdf() {
   color: #e6a23c;
   font-size: 12px;
 }
+.need-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
 .need {
   color: #c45656;
   font-size: 12px;
   font-weight: 600;
+}
+.config-empty {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(31, 35, 41, 0.08);
+  max-width: 320px;
+}
+.config-empty p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #646a73;
 }
 .engine-error {
   color: #c45656;
@@ -209,6 +252,10 @@ async function exportPdf() {
 .canvas {
   flex: 1;
   min-height: 200px;
+}
+.canvas.dimmed {
+  opacity: 0.35;
+  pointer-events: none;
 }
 .models {
   border-top: 1px solid var(--ia-border);

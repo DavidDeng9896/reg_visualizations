@@ -2,46 +2,58 @@
   <div v-if="store.workspaceResult" class="ws">
     <div class="ws-toolbar">
       <template v-if="store.selectedView">
-        <el-input
-          v-model="viewName"
-          size="small"
-          style="width: 200px"
-          aria-label="视图名称"
-          @change="store.renameNode(store.selectedView.view.id, viewName)"
-        />
-        <el-select
-          v-model="viewType"
-          size="small"
-          style="width: 150px"
-          aria-label="视图类型"
-          @change="onViewType"
-        >
-          <el-option v-for="t in viewTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
-        </el-select>
-        <el-select
-          v-model="chartPos"
-          size="small"
-          style="width: 140px"
-          aria-label="图表位置"
-          :disabled="viewType === 'table'"
-          @change="onPos"
-        >
-          <el-option label="图在下" value="bottom" />
-          <el-option label="图在上" value="top" />
-          <el-option label="图在左" value="left" />
-          <el-option label="图在右" value="right" />
-        </el-select>
-        <el-button size="small" @click="showTransforms = true">过滤 / 转换</el-button>
-        <el-button size="small" @click="showChartEdit = true" :disabled="viewType === 'table'">
-          Edit 图表
-        </el-button>
+        <div class="tb-group" aria-label="视图">
+          <span class="tb-label">视图</span>
+          <el-input
+            v-model="viewName"
+            size="small"
+            style="width: 180px"
+            aria-label="视图名称"
+            @change="store.renameNode(store.selectedView.view.id, viewName)"
+          />
+          <el-select
+            v-model="viewType"
+            size="small"
+            style="width: 150px"
+            aria-label="视图类型"
+            @change="onViewType"
+          >
+            <el-option v-for="t in viewTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
+        </div>
+        <div class="tb-group" aria-label="布局">
+          <span class="tb-label">布局</span>
+          <el-select
+            v-model="chartPos"
+            size="small"
+            style="width: 140px"
+            aria-label="图表位置"
+            :disabled="viewType === 'table'"
+            @change="onPos"
+          >
+            <el-option label="图在下" value="bottom" />
+            <el-option label="图在上" value="top" />
+            <el-option label="图在左" value="left" />
+            <el-option label="图在右" value="right" />
+          </el-select>
+          <el-button size="small" @click="showChartEdit = true" :disabled="viewType === 'table'">
+            Edit 图表
+          </el-button>
+        </div>
+        <div class="tb-group" aria-label="数据">
+          <span class="tb-label">数据</span>
+          <el-button size="small" @click="showTransforms = true">过滤 / 转换</el-button>
+          <el-button size="small" @click="exportCsv">导出 CSV</el-button>
+        </div>
       </template>
       <template v-else-if="store.selectedTable">
-        <strong>{{ store.selectedTable.name }}</strong>
-        <el-button size="small" type="primary" plain @click="quickView">New view</el-button>
+        <div class="tb-group">
+          <strong>{{ store.selectedTable.name }}</strong>
+          <el-button size="small" type="primary" plain @click="quickView">New view</el-button>
+          <el-button size="small" @click="exportCsv">导出 CSV</el-button>
+        </div>
       </template>
       <el-tag size="small" type="info" class="row-count">{{ rowCountLabel }}</el-tag>
-      <el-button size="small" @click="exportCsv">导出 CSV</el-button>
     </div>
 
     <div v-if="layoutDegraded" class="layout-hint" role="status">
@@ -61,6 +73,7 @@
           :rows="store.workspaceResult.rows"
           :config="chartConfig"
           @update:config="onChartSave"
+          @open-edit="showChartEdit = true"
         />
       </div>
       <div
@@ -335,12 +348,31 @@ function exportCsv() {
 }
 .ws-toolbar {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   padding: 8px 10px;
   background: #fff;
   border-bottom: 1px solid var(--ia-border);
   flex-wrap: wrap;
+}
+.tb-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 10px;
+  border-right: 1px solid var(--ia-border);
+}
+.tb-group:last-of-type {
+  border-right: none;
+  padding-right: 0;
+}
+.tb-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a9199;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .row-count {
   margin-left: auto;

@@ -1,6 +1,10 @@
 <template>
   <div class="flow">
     <div class="banner">修改分析结构请从侧栏进行；画布仅支持拖拽布局</div>
+    <div v-if="!graph.nodes.length" class="flow-empty" role="status">
+      <h3>流程图为空</h3>
+      <p>请先通过「+ Add data」导入 CSV 或合并表，侧栏会出现节点后此处同步展示。</p>
+    </div>
     <VueFlow
       v-model:nodes="nodes"
       v-model:edges="edges"
@@ -11,7 +15,7 @@
       @node-click="onNodeClick"
       @node-drag-stop="onDragStop"
     >
-      <Background />
+      <Background pattern-color="#c5cad3" :gap="18" />
       <Controls />
     </VueFlow>
   </div>
@@ -35,8 +39,29 @@ const { setCenter, findNode } = useVueFlow()
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 
+function nodeStyle(kind: 'table' | 'view', viewType: string | undefined, selected: boolean) {
+  const base =
+    kind === 'table'
+      ? { background: '#f0f7ff', border: '1.5px solid #5b8ff9', color: '#1f2329' }
+      : viewType === 'table'
+        ? { background: '#f3faf0', border: '1.5px solid #52c41a', color: '#1f2329' }
+        : { background: '#f7f2ff', border: '1.5px solid #9254de', color: '#1f2329' }
+  return {
+    ...base,
+    borderRadius: '8px',
+    padding: '8px 12px',
+    minWidth: '140px',
+    whiteSpace: 'pre-line' as const,
+    fontWeight: selected ? 700 : 500,
+    boxShadow: selected ? '0 0 0 3px rgba(47, 111, 237, 0.35)' : '0 1px 2px rgba(31,35,41,0.06)',
+    outline: selected ? '2px solid var(--ia-accent, #2f6fed)' : 'none',
+    outlineOffset: '1px',
+  }
+}
+
 const graph = computed(() => {
   const a = store.current
+  const selectedId = store.selectedNodeId
   if (!a) return { nodes: [] as Node[], edges: [] as Edge[] }
   const ns: Node[] = []
   const es: Edge[] = []
@@ -47,7 +72,7 @@ const graph = computed(() => {
       label: t.name,
       position: pos,
       data: { kind: 'table' },
-      style: { background: '#fff', border: '1px solid #91caff', borderRadius: '8px', padding: '8px 12px', minWidth: '140px' },
+      style: nodeStyle('table', undefined, selectedId === t.id),
     })
     if (t.source.type === 'combine') {
       es.push({ id: `${t.source.leftTableId}-${t.id}`, source: t.source.leftTableId, target: t.id })
@@ -60,14 +85,7 @@ const graph = computed(() => {
         label: `${v.name}\n(${v.viewType})`,
         position: vp,
         data: { kind: 'view', viewType: v.viewType },
-        style: {
-          background: v.viewType === 'table' ? '#f6ffed' : '#f9f0ff',
-          border: '1px solid #b7eb8f',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          whiteSpace: 'pre-line',
-          minWidth: '140px',
-        },
+        style: nodeStyle('view', v.viewType, selectedId === v.id),
       })
       const parent = v.parentId || t.id
       es.push({ id: `${parent}-${v.id}`, source: parent, target: v.id })
@@ -107,6 +125,7 @@ function onDragStop(ev: NodeDragEvent) {
 .flow {
   height: 100%;
   position: relative;
+  background: linear-gradient(180deg, #eef1f6 0%, #e4e8ef 100%);
 }
 .banner {
   position: absolute;
@@ -120,5 +139,29 @@ function onDragStop(ev: NodeDragEvent) {
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
+}
+.flow-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 24px;
+  color: #646a73;
+  background: rgba(238, 241, 246, 0.92);
+}
+.flow-empty h3 {
+  margin: 0 0 8px;
+  color: #1f2329;
+  font-size: 18px;
+}
+.flow-empty p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 </style>
