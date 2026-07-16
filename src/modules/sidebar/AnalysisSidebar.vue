@@ -1,5 +1,5 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :style="{ width: `${width}px` }">
     <el-input v-model="q" placeholder="搜索表 / 视图" clearable size="small" class="search" />
     <div class="section-head">
       <span>ANALYSIS DATA</span>
@@ -78,6 +78,10 @@ import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
+withDefaults(
+  defineProps<{ width?: number }>(),
+  { width: 280 },
+)
 const store = useAnalysisStore()
 const q = ref('')
 const showNewView = ref(false)
@@ -168,11 +172,13 @@ function createView() {
 <style scoped>
 .sidebar {
   width: 280px;
+  flex: 0 0 auto;
   background: var(--ia-sidebar);
-  border-right: 1px solid var(--ia-border);
+  border-right: none;
   display: flex;
   flex-direction: column;
   padding: 10px;
+  min-width: 0;
 }
 .search {
   margin-bottom: 8px;

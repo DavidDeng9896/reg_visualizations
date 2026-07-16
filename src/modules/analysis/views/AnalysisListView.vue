@@ -17,7 +17,14 @@
       </el-select>
     </div>
 
-    <el-table :data="filtered" stripe style="width: 100%" @row-click="open">
+    <el-table
+      v-if="filtered.length"
+      :data="filtered"
+      stripe
+      style="width: 100%"
+      empty-text="暂无 Analysis"
+      @row-click="open"
+    >
       <el-table-column prop="name" label="名称" />
       <el-table-column label="项目">
         <template #default="{ row }">{{ getProjectName(row.projectId) }}</template>
@@ -31,6 +38,9 @@
         </template>
       </el-table-column>
     </el-table>
+    <div v-else class="empty-list">
+      <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
+    </div>
 
     <el-dialog v-model="showCreate" title="创建 Analysis" width="420px">
       <el-form label-width="80px">
@@ -153,5 +163,17 @@ h1 {
 }
 .toolbar {
   margin-bottom: 12px;
+}
+.empty-list {
+  margin-top: 48px;
+  text-align: center;
+  color: #646a73;
+  padding: 32px 16px;
+  background: linear-gradient(180deg, #fff 0%, #f7f8fa 100%);
+  border: 1px dashed var(--ia-border);
+  border-radius: 8px;
+}
+.empty-list p {
+  margin: 0;
 }
 </style>

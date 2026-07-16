@@ -62,13 +62,16 @@
             <el-switch v-model="draft.configure.stacked" />
           </el-form-item>
           <el-form-item label="拟合">
-            <el-select v-model="draft.configure.fitModel" style="width: 100%">
+            <el-select v-model="draft.configure.fitModel" style="width: 100%" aria-label="拟合模型">
               <el-option label="None" value="none" />
               <el-option label="Point-to-Point" value="ptp" />
               <el-option label="Linear" value="linear" />
               <el-option label="Quadratic" value="quadratic" />
               <el-option label="4PL" value="4pl" />
             </el-select>
+            <p v-if="draft.configure.fitModel === '4pl'" class="fit-hint" role="note">
+              4PL 至少需要 4 个有效点，且 X/Y 均需有变化；点数不足或边界异常时画布会显示拟合提示。
+            </p>
           </el-form-item>
           <el-form-item label="Exclude flagged">
             <el-switch v-model="draft.configure.excludeFlagged" />
@@ -168,5 +171,11 @@ function save() {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+.fit-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8f959e;
 }
 </style>

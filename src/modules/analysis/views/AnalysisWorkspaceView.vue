@@ -29,7 +29,20 @@
     </header>
 
     <div class="body">
-      <AnalysisSidebar @add-data="onAddData" @jump-flowchart="onJump" />
+      <AnalysisSidebar :width="sidebarWidth" @add-data="onAddData" @jump-flowchart="onJump" />
+      <div
+        class="sidebar-splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖拽调整侧栏宽度"
+        :aria-valuenow="sidebarWidth"
+        :aria-valuemin="MIN_SIDEBAR_WIDTH"
+        :aria-valuemax="MAX_SIDEBAR_WIDTH"
+        :aria-valuetext="`侧栏宽度 ${sidebarWidth} 像素`"
+        tabindex="0"
+        @pointerdown="onSidebarDown"
+        @keydown="onSidebarKey"
+      />
       <main class="main">
         <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
         <TableChartWorkspace v-else />
@@ -43,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
@@ -52,18 +65,32 @@ import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
 import CsvImportDialog from '@/modules/table/CsvImportDialog.vue'
 import CombineTablesDialog from '@/modules/table/CombineTablesDialog.vue'
+import {
+  clampSidebarWidth,
+  loadSidebarWidth,
+  saveSidebarWidth,
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+} from '@/modules/sidebar/sidebarPrefs'
 
 const props = defineProps<{ analysisId: string }>()
 const store = useAnalysisStore()
 const showCsv = ref(false)
 const showCombine = ref(false)
 const focusId = ref<string | null>(null)
+const sidebarWidth = ref(loadSidebarWidth())
+const draggingSidebar = ref(false)
 
 onMounted(async () => {
   // Preserve in-memory selection when navigating right after local mutations
   const preferred = store.current?.id === props.analysisId ? store.selectedNodeId : null
   await store.openAnalysis(props.analysisId, { selectNodeId: preferred })
   if (!store.current) ElMessage.error('Analysis 不存在')
+})
+
+onUnmounted(() => {
+  window.removeEventListener('pointermove', onSidebarMove)
+  window.removeEventListener('pointerup', onSidebarUp)
 })
 
 function stub(name: string) {
@@ -79,6 +106,49 @@ function onAddData(cmd: string) {
 function onJump(id: string) {
   focusId.value = id
   store.mainMode = 'flowchart'
+}
+
+function persistSidebar(width: number) {
+  sidebarWidth.value = clampSidebarWidth(width)
+  saveSidebarWidth(sidebarWidth.value)
+}
+
+function onSidebarDown(e: PointerEvent) {
+  e.preventDefault()
+  draggingSidebar.value = true
+  ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  window.addEventListener('pointermove', onSidebarMove)
+  window.addEventListener('pointerup', onSidebarUp)
+}
+
+function onSidebarMove(e: PointerEvent) {
+  if (!draggingSidebar.value) return
+  sidebarWidth.value = clampSidebarWidth(e.clientX)
+}
+
+function onSidebarUp() {
+  if (!draggingSidebar.value) return
+  draggingSidebar.value = false
+  window.removeEventListener('pointermove', onSidebarMove)
+  window.removeEventListener('pointerup', onSidebarUp)
+  persistSidebar(sidebarWidth.value)
+}
+
+function onSidebarKey(e: KeyboardEvent) {
+  const step = e.shiftKey ? 24 : 12
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    persistSidebar(sidebarWidth.value - step)
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    persistSidebar(sidebarWidth.value + step)
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    persistSidebar(MIN_SIDEBAR_WIDTH)
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    persistSidebar(MAX_SIDEBAR_WIDTH)
+  }
 }
 </script>
 
@@ -114,6 +184,18 @@ function onJump(id: string) {
   flex: 1;
   display: flex;
   min-height: 0;
+}
+.sidebar-splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: var(--ia-border);
+  transition: background 0.15s ease;
+  z-index: 2;
+}
+.sidebar-splitter:hover,
+.sidebar-splitter:focus-visible {
+  background: var(--ia-accent);
+  outline: none;
 }
 .main {
   flex: 1;

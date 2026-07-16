@@ -17,7 +17,7 @@ describe('pipeline', () => {
         { a: 5, b: 1, name: 'y', __rowId: '2' },
       ],
       tableFilters: [],
-      viewFilters: [{ id: 'f1', field: 'a', op: 'gt', value: 2 }],
+      viewFilters: [{ id: 'f1', field: 'a', op: 'gt', value: '2' }],
       transforms: [{ id: 't1', kind: 'derived', config: { field: 'sum', expr: 'a + b' } }],
     })
     expect(out.rows).toHaveLength(1)

@@ -27,6 +27,7 @@ function defaultChartConfig(): ChartConfig {
     },
     flags: { pointIds: [], comments: {} },
     chartPosition: 'bottom',
+    splitRatio: 0.45,
   }
 }
 
