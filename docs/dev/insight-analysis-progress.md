@@ -44,6 +44,7 @@
 - [x] TSV 粘贴 / 勾选复制
 - [x] Bar 误差棒可视化
 - [x] test 6/6 + build 通过
+- [x] 修复 structuredClone 对 Pinia/Vue proxy 抛 DataCloneError（改用 cloneDeep）
 
 ## 4. 技术决策快照
 
