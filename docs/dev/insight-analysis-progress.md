@@ -9,41 +9,42 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-dca1013b-4dcc-4b20-87c4-996dff1da607-c9ca` |
-| 阶段 | **优化 Round 1**：布局分隔条 / 窄屏降级 / 分包与虚拟滚动 |
-| 上次更新 | 2026-07-16 14:06 |
-| 单元 | **14/14 PASS**（含 layout helpers） |
-| UI E2E | **10/10 PASS**（修复空态重复按钮后） |
-| Build | PASS（echarts / vxe / element-plus 已拆 chunk） |
+| 分支 | `cursor/bc-57d2d766-1d1d-4c3f-a1d8-eded89cbf027-e446`（含 Round 1+2） |
+| 阶段 | **优化 Round 2 完成**（累计 2/3，Round 3 后合并） |
+| 上次更新 | 2026-07-16 15:11 |
+| 单元 | **18/18 PASS**（layout / debounce / sidebarPrefs） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS |
 
-## 2. Round 1 对齐与改动
+## 2. Round 1–2 对齐摘要
 
 对照 `docs/requirements/table-chart-integration.md`：
 
 | 需求 | 状态 |
 | --- | --- |
-| L-04 表/图分隔条拖拽 + 记住占比 | ✅ `splitRatio` + splitter（键盘可调） |
-| L-05 窄屏左右→上下降级提示 | ✅ `<900px` 降级 + banner |
-| T-11 虚拟滚动 | ✅ vxe `scroll-y` |
-| R4 产物体积 | 🟡 主包已拆；echarts/vxe 仍大但按需加载 |
-
-交互：视图类型中英标签、行列计数、列表空态 CTA、`:focus-visible`、CSV `revokeObjectURL`、图表 `ResizeObserver`。
+| L-04 表/图分隔条 + 记住占比 | ✅ Round 1 |
+| L-05 窄屏左右→上下 | ✅ Round 1 |
+| T-11 虚拟滚动 | ✅ Round 1 |
+| §5.3 表变更→图防抖 | ✅ Round 2（160ms） |
+| 工具栏分组（视图/布局/数据） | ✅ Round 2 |
+| CONFIGURE 空态一键 Edit | ✅ Round 2 |
+| 侧栏宽度拖拽记忆 | ✅ Round 2（localStorage） |
+| 流程图空态 / 选中高亮 | ✅ Round 2 |
+| 只读表 hint | ✅ Round 2 增强对比 |
 
 ## 3. 验证命令
 
 ```bash
 npm test
 npm run build
-npx tsx tests/e2e/ui-full-10-rounds.mts   # 或 npm run test:e2e:ui
+npm run test:e2e:ui
 ```
 
-## 4. 残余风险 / 下一轮候选
+## 4. Round 3 计划（下一 cron，完成后合并）
 
-| ID | 描述 | 计划轮次 |
-| --- | --- | --- |
-| R3 | 4PL 拟合为 demo 级 | Round 3+ |
-| R4 | CSS/JS 大包继续瘦身（按需 Element/Vxe） | Round 2 |
-| UX-2 | CONFIGURE 字段空态引导更强、工具栏分组 | Round 2 |
-| UX-3 | 侧栏拖拽宽度、流程图空态 | Round 2 |
-| L-02 表筛选后图防抖重绘 | Round 2 |
-| Merge | 每满 3 轮合并到 main | Round 3 |
+| ID | 描述 |
+| --- | --- |
+| R4 | Element Plus / Vxe CSS 按需或拆分评估落地（产物仍偏大） |
+| R3 | 4PL 拟合稳健性：边界值 / 空数据提示 |
+| A11y | 工具栏分组与侧栏分隔条的 aria / 键盘巡检补强 |
+| Merge | Round 3 结束后开 PR 合并进 `main`，记忆标记 `lastMergedRound=3` |
