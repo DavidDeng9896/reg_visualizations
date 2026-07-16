@@ -1,20 +1,51 @@
-# LabKey 图表可视化调研文档
+# 文档中心
 
-本目录整理自 LabKey 官方文档中的图表（Visualizations）相关页面，保留原文结构与图片链接。
+本目录按用途分为两类，避免「调研原文」与「产品开发依据」混放。
 
-## 文档列表
+```text
+doc/
+├── README.md                          ← 本索引
+├── reference/                         ← 参考资料（只读调研，不作为开发依据）
+│   ├── labkey/
+│   └── benchling/
+└── product/                           ← 产品开发依据
+    ├── features/
+    │   ├── unified-charts/            ← 【当前】合并后的图表功能点（定稿）
+    │   ├── charts/                    ← LabKey 细化原文（仅溯源）
+    │   └── benchling-charts/          ← Benchling 细化原文（仅溯源）
+    └── requirements/                  ← 功能需求文档
+```
 
-| 文档 | 说明 | 图片数 | 原文链接 |
-| --- | --- | --- | --- |
-| [Line Plots](./lineplot.md) | 折线图：跟踪测量值在水平轴（通常为时间）上的变化趋势 | 14 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=lineplot) |
-| [Bar Charts](./barchart.md) | 柱状图：比较分类数据的数值大小 | 9 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=barchart) |
-| [Box Plots](./boxplot.md) | 箱线图：展示数据分布、中位数与异常值 | 6 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=boxplot) |
-| [Pie Charts](./piechart.md) | 饼图：展示各类别占整体的比例 | 6 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=piechart) |
-| [Scatter Plots](./scatterplot.md) | 散点图：展示两个数值变量之间的关系 | 9 | [原文](https://www.labkey.org/Documentation/wiki-page.view?name=scatterplot) |
+## 1. 参考资料 `reference/`
 
-## 说明
+| 路径 | 说明 |
+| --- | --- |
+| [reference/labkey/](./reference/labkey/) | LabKey 五类图表官方文档摘录（含原图链接） |
+| [reference/benchling/](./reference/benchling/) | Benchling Analysis 官方文档整理 |
 
-- 文档正文完整保留官方说明、操作步骤、布局选项与相关主题。
-- 图片使用 LabKey 官方原始链接（`wiki-download.view`），并保持在原文对应位置。
-- 文中的 UI 图标（如 Charts、Filter、Refresh 等）以文字标记替代，便于纯 Markdown 阅读。
-- 调研页面：Line Plot / Bar Chart / Box Plot / Pie Chart / Scatter Plot。
+> 参考资料**不应直接当作本产品需求规格**。
+
+## 2. 产品开发依据 `product/`
+
+| 路径 | 说明 |
+| --- | --- |
+| [product/features/unified-charts/](./product/features/unified-charts/) | **当前图表功能点（LabKey+Benchling 合并定稿）** |
+| [product/features/charts/](./product/features/charts/) | LabKey 细化原文（已合并，仅溯源） |
+| [product/features/benchling-charts/](./product/features/benchling-charts/) | Benchling 细化原文（已合并，仅溯源） |
+| [product/requirements/](./product/requirements/) | 表（vxe-table）+ 图表一体化等需求 |
+
+建议阅读顺序：
+
+1. `product/features/unified-charts/` — 图表能力唯一依据  
+2. `product/requirements/table-chart-integration.md` — 表 + 图一体化  
+
+## 文档关系
+
+```text
+reference/labkey/*      ──►  product/features/charts/*           （溯源）
+reference/benchling/*   ──►  product/features/benchling-charts/* （溯源）
+                └──────────────► product/features/unified-charts/*  （定稿）
+                                          │
+                                          ▼
+                               product/requirements/*
+```
