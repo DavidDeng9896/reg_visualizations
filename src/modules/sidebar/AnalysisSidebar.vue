@@ -176,6 +176,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { confirm, isFeedbackCancel, prompt, toast } from '@/shared/ui/feedback'
+import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
@@ -577,10 +578,11 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
     store.promoteViewToTable(data.id)
     toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    void confirm('确定删除？子视图将一并删除。此操作不可撤销。', '删除节点', {
-      danger: true,
-      confirmButtonText: '删除',
-    })
+    void confirm(
+      '确定删除？子视图将一并删除。此操作不可撤销。',
+      '删除节点',
+      dangerDeleteOptions('删除'),
+    )
       .then(() => {
         const r = store.deleteNode(data.id)
         if (!r.ok) toast('error', r.reason || '删除失败')

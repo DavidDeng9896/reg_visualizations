@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { focusAfterNavigation, resolveRouteFocusTarget } from '@/shared/ui/routeFocus'
+import {
+  focusAfterNavigation,
+  resolveRouteFocusTarget,
+  shouldSkipRouteFocus,
+} from '@/shared/ui/routeFocus'
 
 describe('routeFocus', () => {
   it('prefers #workspace-main, then main, then h1', () => {
@@ -22,6 +26,25 @@ describe('routeFocus', () => {
     const focused = focusAfterNavigation(document)
     expect(focused?.id).toBe('workspace-main')
     expect(document.activeElement).toBe(focused)
+    document.body.innerHTML = ''
+  })
+
+  it('does not steal focus from skip-link or an already-focused landmark', () => {
+    document.body.innerHTML = `
+      <a class="skip-link" data-ia-skip="1" href="#workspace-main">跳到主内容</a>
+      <main id="workspace-main" tabindex="-1">Workspace</main>
+    `
+    const skip = document.querySelector<HTMLAnchorElement>('.skip-link')!
+    skip.focus()
+    expect(shouldSkipRouteFocus(document)).toBe(true)
+    expect(focusAfterNavigation(document)).toBeNull()
+    expect(document.activeElement).toBe(skip)
+
+    const main = document.querySelector<HTMLElement>('#workspace-main')!
+    main.focus()
+    expect(shouldSkipRouteFocus(document)).toBe(true)
+    expect(focusAfterNavigation(document)).toBeNull()
+    expect(document.activeElement).toBe(main)
     document.body.innerHTML = ''
   })
 })

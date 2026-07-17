@@ -1,5 +1,6 @@
 <template>
   <div class="list-page">
+    <a class="skip-link" data-ia-skip="1" href="#analysis-list">跳到列表</a>
     <header class="top">
       <div>
         <h1 tabindex="-1">Insight Analysis</h1>
@@ -23,34 +24,47 @@
       </label>
     </div>
 
-    <table v-if="filtered.length" class="analysis-table" aria-label="Analysis 列表">
-      <thead>
-        <tr>
-          <th scope="col">名称</th>
-          <th scope="col">项目</th>
-          <th scope="col">更新时间</th>
-          <th scope="col">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="row in filtered"
-          :key="row.id"
-          tabindex="0"
-          @click="open(row)"
-          @keydown.enter="open(row)"
-        >
-          <td>{{ row.name }}</td>
-          <td>{{ getProjectName(row.projectId) }}</td>
-          <td>{{ formatTime(row.updatedAt) }}</td>
-          <td>
-            <button type="button" class="link-danger" @click.stop="onRemove(row.id)">删除</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-else class="empty-list">
-      <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
+    <div id="analysis-list" tabindex="-1">
+      <div
+        v-if="!listReady"
+        class="list-skel ia-skel"
+        v-bind="listSkeletonAttrs()"
+      >
+        <div class="list-skel__rows" aria-hidden="true">
+          <div v-for="n in 4" :key="n" class="ia-skel__pulse list-skel__row" />
+        </div>
+        <span class="sr-only">加载中…</span>
+      </div>
+      <table v-else-if="filtered.length" class="analysis-table" aria-label="Analysis 列表">
+        <thead>
+          <tr>
+            <th scope="col">名称</th>
+            <th scope="col">项目</th>
+            <th scope="col">更新时间</th>
+            <th scope="col">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in filtered"
+            :key="row.id"
+            tabindex="0"
+            @click="open(row)"
+            @keydown.enter="open(row)"
+          >
+            <td>{{ row.name }}</td>
+            <td>{{ getProjectName(row.projectId) }}</td>
+            <td>{{ formatTime(row.updatedAt) }}</td>
+            <td>
+              <button type="button" class="link-danger" @click.stop="onRemove(row.id)">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty-list" role="status">
+        <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
+        <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
+      </div>
     </div>
 
     <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
@@ -61,7 +75,9 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
+import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
+import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 
@@ -74,12 +90,19 @@ const router = useRouter()
 const showCreate = ref(false)
 const projectFilter = ref('')
 const demoBusy = ref(false)
+const listReady = ref(false)
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
 )
 
-onMounted(() => store.loadList())
+onMounted(async () => {
+  try {
+    await store.loadList()
+  } finally {
+    listReady.value = true
+  }
+})
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString()
@@ -136,10 +159,11 @@ function open(row: { id: string }) {
 
 async function onRemove(id: string) {
   try {
-    await confirm('确定删除该 Analysis？此操作不可撤销。', '删除 Analysis', {
-      danger: true,
-      confirmButtonText: '删除',
-    })
+    await confirm(
+      '确定删除该 Analysis？此操作不可撤销。',
+      '删除 Analysis',
+      dangerDeleteOptions('删除'),
+    )
   } catch (err) {
     if (isFeedbackCancel(err)) return
     throw err
@@ -151,9 +175,25 @@ async function onRemove(id: string) {
 
 <style scoped>
 .list-page {
+  position: relative;
   max-width: 960px;
   margin: 0 auto;
   padding: 32px 20px;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 30;
+  padding: 8px 12px;
+  background: var(--ia-accent);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
 }
 .top {
   display: flex;
@@ -265,17 +305,42 @@ h1 {
   white-space: nowrap;
   border: 0;
 }
+.list-skel {
+  margin-top: 8px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+}
+.list-skel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.list-skel__row {
+  width: 100%;
+  height: 14px;
+}
 .empty-list {
-  margin-top: 48px;
+  margin-top: 24px;
   text-align: center;
   color: #646a73;
-  padding: 32px 16px;
+  padding: 40px 16px 32px;
   background: linear-gradient(180deg, #fff 0%, #f7f8fa 100%);
   border: 1px dashed var(--ia-border);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.empty-list__pulse {
+  width: min(200px, 50%);
+  height: 10px;
 }
 .empty-list p {
   margin: 0;
+  max-width: 36em;
 }
 @media (max-width: 640px) {
   .top {

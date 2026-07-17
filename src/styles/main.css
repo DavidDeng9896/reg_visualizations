@@ -43,3 +43,32 @@ button {
   }
 }
 
+/* Shared loading skeleton pulse (list + workspace, Round 26) */
+.ia-skel__pulse,
+.ia-skel__block {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e4e7ed 0%, #f2f3f5 50%, #e4e7ed 100%);
+  background-size: 200% 100%;
+  animation: ia-skel-shimmer 1.2s ease-in-out infinite;
+}
+.ia-skel__pulse {
+  height: 12px;
+}
+.ia-skel__block {
+  border-radius: 0;
+}
+@keyframes ia-skel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ia-skel__pulse,
+  .ia-skel__block {
+    animation: none;
+  }
+}
+

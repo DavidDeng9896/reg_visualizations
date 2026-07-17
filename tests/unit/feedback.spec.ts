@@ -7,7 +7,7 @@ import {
   toastLivePoliteness,
   trapTabKey,
 } from '@/shared/ui/feedbackA11y'
-import { confirm, prompt, toast } from '@/shared/ui/feedback'
+import { confirm, prompt, toast, listToastCloseButtons } from '@/shared/ui/feedback'
 
 describe('feedbackA11y', () => {
   it('maps toast live politeness by severity', () => {
@@ -99,6 +99,16 @@ describe('native feedback', () => {
     close.focus()
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(document.querySelector('.ia-toast--warning')).toBeNull()
+  })
+
+  it('orders toast close buttons newest-first for Tab', () => {
+    toast('info', 'first')
+    toast('success', 'second')
+    toast('warning', 'third')
+    const closes = listToastCloseButtons()
+    expect(closes).toHaveLength(3)
+    const texts = closes.map((btn) => btn.parentElement?.querySelector('.ia-toast__text')?.textContent)
+    expect(texts).toEqual(['third', 'second', 'first'])
   })
 
   it('danger confirm focuses Cancel and styles primary as danger', async () => {

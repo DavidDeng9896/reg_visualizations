@@ -1,6 +1,6 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
-    <a class="skip-link" href="#ws-toolbar">跳到工具栏</a>
+    <a class="skip-link" data-ia-skip="1" href="#ws-toolbar">跳到工具栏</a>
     <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1" :class="{ 'is-compact': toolbarCompact }">
       <template v-if="store.selectedView">
         <div class="tb-group" role="group" aria-label="视图">

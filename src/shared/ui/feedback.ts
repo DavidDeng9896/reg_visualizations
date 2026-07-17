@@ -92,7 +92,15 @@ export function toast(type: MessageType, message: string) {
     if (!el.contains(e.relatedTarget as Node | null)) restartTtl()
   })
 
-  host.appendChild(el)
+  // Newest first in DOM → Tab reaches the latest close button before older ones (Round 26).
+  host.insertBefore(el, host.firstChild)
+}
+
+/** Close buttons in Tab order (newest toast first). */
+export function listToastCloseButtons(doc: Document = document): HTMLButtonElement[] {
+  const host = doc.querySelector('[data-ia-toast-host]')
+  if (!host) return []
+  return [...host.querySelectorAll<HTMLButtonElement>('button.ia-toast__close')]
 }
 
 type ConfirmOptions = {

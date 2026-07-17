@@ -1,6 +1,6 @@
 <template>
   <div v-if="store.current" class="workspace">
-    <a class="skip-link" href="#workspace-main">跳到主内容</a>
+    <a class="skip-link" data-ia-skip="1" href="#workspace-main">跳到主内容</a>
     <header class="header">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
@@ -65,8 +65,8 @@
       <main id="workspace-main" class="main" tabindex="-1">
         <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
         <TableChartWorkspace v-else-if="vxeReady" />
-        <div v-else class="workspace-skel workspace-skel--main" v-bind="workspaceSkeletonAttrs()">
-          <div class="workspace-skel__pulse" aria-hidden="true" />
+        <div v-else class="workspace-skel workspace-skel--main ia-skel" v-bind="workspaceSkeletonAttrs()">
+          <div class="ia-skel__pulse" aria-hidden="true" />
           <span class="sr-only">加载表格引擎…</span>
         </div>
       </main>
@@ -91,12 +91,12 @@
     <CsvImportDialog v-if="showCsv" v-model="showCsv" />
     <CombineTablesDialog v-if="showCombine" v-model="showCombine" />
   </div>
-  <div v-else class="workspace-skel" v-bind="workspaceSkeletonAttrs()">
-    <div class="workspace-skel__header" aria-hidden="true" />
+  <div v-else class="workspace-skel ia-skel" v-bind="workspaceSkeletonAttrs()">
+    <div class="workspace-skel__header ia-skel__block" aria-hidden="true" />
     <div class="workspace-skel__body" aria-hidden="true">
       <div class="workspace-skel__sidebar" />
       <div class="workspace-skel__main">
-        <div class="workspace-skel__pulse" />
+        <div class="ia-skel__pulse" />
       </div>
     </div>
     <span class="sr-only">加载中…</span>
@@ -134,14 +134,17 @@ import {
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
+/** Delay avoids skeleton flash when Flowchart chunk is already warm (Round 26). */
+const FLOWCHART_LOADING_DELAY_MS = 200
+
 const FlowchartCanvas = defineAsyncComponent({
   loader: () => import('@/modules/flowchart/FlowchartCanvas.vue'),
-  delay: 0,
+  delay: FLOWCHART_LOADING_DELAY_MS,
   loadingComponent: {
     setup() {
       return () =>
-        h('div', { class: 'workspace-skel workspace-skel--main', ...workspaceSkeletonAttrs() }, [
-          h('div', { class: 'workspace-skel__pulse', 'aria-hidden': 'true' }),
+        h('div', { class: 'workspace-skel workspace-skel--main ia-skel', ...workspaceSkeletonAttrs() }, [
+          h('div', { class: 'ia-skel__pulse', 'aria-hidden': 'true' }),
           h('span', { class: 'sr-only' }, '加载流程图…'),
         ])
     },
@@ -490,9 +493,6 @@ function onSidebarKey(e: KeyboardEvent) {
 .workspace-skel__header {
   height: 52px;
   margin: 0;
-  background: linear-gradient(90deg, #eef0f3 0%, #f7f8fa 50%, #eef0f3 100%);
-  background-size: 200% 100%;
-  animation: skel-shimmer 1.2s ease-in-out infinite;
   border-bottom: 1px solid var(--ia-border);
 }
 .workspace-skel__body {
@@ -512,13 +512,8 @@ function onSidebarKey(e: KeyboardEvent) {
   justify-content: center;
   padding: 24px;
 }
-.workspace-skel__pulse {
+.workspace-skel__main .ia-skel__pulse {
   width: min(320px, 70%);
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #e4e7ed 0%, #f2f3f5 50%, #e4e7ed 100%);
-  background-size: 200% 100%;
-  animation: skel-shimmer 1.2s ease-in-out infinite;
 }
 .sr-only {
   position: absolute;
@@ -530,19 +525,5 @@ function onSidebarKey(e: KeyboardEvent) {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-@keyframes skel-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .workspace-skel__header,
-  .workspace-skel__pulse {
-    animation: none;
-  }
 }
 </style>
