@@ -9,25 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-62543417-0c06-4f95-b90e-3e876af1f7e5-d4ee`（Round 30） |
-| 阶段 | **优化 Round 30 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=30`） |
-| 上次更新 | 2026-07-17 21:08 |
-| 单元 | **161/161 PASS**（+sidebarEmpty / newViewHandoff / projectsChunk / emptyCtaFocus / routeFocus empty / after-create focus） |
-| UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；projects ~116.8 仍 defer split） |
+| 分支 | `cursor/bc-345acef9-ae05-44e0-bbe9-c63c73d34994-2a2c`（Round 31；含 R25–30 基线） |
+| 阶段 | **优化 Round 31 完成**（周期 **1/3**） |
+| 上次更新 | 2026-07-17 22:10 |
+| 单元 | **168/168 PASS**（+listSkip/main landmark、search force/no-match、sidebar inert、workspaceViewChunk、skip 决策） |
+| UI E2E | **10/10 PASS**（创建后 treeitem 焦点断言） |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~66.1 / ~23.9；projects 仍 defer） |
 
-## 2. Round 30 对齐摘要
+## 2. Round 31 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 侧栏无匹配 / 无数据空态 CTA | ✅ Round 30 |
-| New view 引导 → 侧栏对话框焦点衔接 | ✅ 取消恢复 CTA；创建后聚焦新树节点 |
-| 空态 CTA 焦点环统一（main.css） | ✅ |
-| skip 空态 landmark ↔ routeFocus 不抢焦 | ✅ |
-| projects chunk 细分评估 | ✅ 仍 defer（Dexie/store shared-entry） |
-| 合并 Round 25–30 → main | **进行中（本轮开 PR）** |
+| 清除搜索 live：Esc 去重 / 空态 CTA force 宣告；无匹配 live | ✅ Round 31 |
+| New view 创建后聚焦新树节点（E2E 覆盖） | ✅ |
+| `#analysis-list` contains 收窄（空态专用；有数据 → `#analysis-list-main`） | ✅ |
+| `#sidebar-empty` **不**纳入 workspace skip（主内容语义） | ✅ 评估结论 |
+| New view 对话框打开时侧栏 chrome `inert` | ✅ |
+| AnalysisWorkspaceView sync-shell 再拆分 | ✅ 仍 defer（`workspaceViewChunk`） |
+| 合并 | **否**（周期 1/3；下一合并点 Round 33） |
 
 ## 3. 验证命令
 
@@ -37,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 31 计划（下一周期 1/3）
+## 4. Round 32 计划（下一周期 2/3）
 
-1. **UX**：侧栏搜索「无匹配」后清除搜索的 live 宣告与焦点环对齐；New view 创建成功后聚焦新树节点
-2. **Perf**：AnalysisWorkspaceView JS（~65.5k）侧栏空态/对话框体积再评估；FlowchartCanvas 保持 async
-3. **A11y**：`#sidebar-empty` 纳入 workspace skip 候选；dialog 打开时侧栏树 inert
+1. **UX**：侧栏搜索有匹配时的可选 count live；无匹配 → 清除后焦点环/搜索框可见性回归
+2. **Perf**：ChartEditDrawer / STYLE 再评估；评估 `TableChartWorkspace` 与 workspace 壳的边界
+3. **A11y**：dialog `inert` 扩展到 CSV/Combine/Transform；confirm 打开时侧栏 inert 对齐
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：否（周期 2/3）

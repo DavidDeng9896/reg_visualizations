@@ -65,7 +65,7 @@
         </tr>
       </tbody>
     </table>
-    <div v-else class="empty-list" role="status" v-bind="listEmptyRegionAttrs()">
+    <div v-else class="empty-list" v-bind="listEmptyRegionAttrs()">
       <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
       <p>还没有 Analysis。使用下方按钮快速体验，或创建后导入 CSV。</p>
       <div class="empty-list__cta">
