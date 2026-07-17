@@ -9,27 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-c8b29df9-45f2-42b2-826c-aa80b7cdaf26-cbf6`（Round 22） |
-| 阶段 | **优化 Round 22 完成**（周期 **1/3**；目标下一合并 `lastMergedRound=24`） |
-| 上次更新 | 2026-07-17 12:09 |
-| 单元 | **114/114 PASS**（+nativeNumber） |
+| 分支 | `cursor/bc-90880d8b-f453-4d94-8c94-eaad28f7685b-bb1b`（Round 23） |
+| 阶段 | **优化 Round 23 完成**（周期 **2/3**；目标下一合并 `lastMergedRound=24`） |
+| 上次更新 | 2026-07-17 13:05 |
+| 单元 | **120/120 PASS**（+feedback） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 22 对齐摘要
+## 2. Round 23 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEditDrawer `el-input` / `el-input-number` → 原生 | ✅ Round 22 |
-| Opacity `el-slider` → 原生 `input[type=range]` + live | ✅ |
-| `el-form` / `el-form-item` → 原生 field-row 布局 | ✅ |
-| 数值越界 / Opacity live 宣告 | ✅（`nativeNumber.ts`） |
-| ChartEditDrawer **零** EP 组件 | ✅ |
-| Drawer CSS | ~22.4/4.0 → **~7.6/1.7** |
-| EP `index-*` gzip | 仍 ~304.6（根因：`feedback.ts` `import('element-plus')` 全量） |
-| 合并 | 否（周期 1/3） |
+| `feedback.ts` 去掉 `import('element-plus')` | ✅ Round 23 |
+| 原生 toast 栈 + `aria-live` / alert | ✅ |
+| 原生 confirm/prompt（Esc、焦点陷阱、焦点恢复） | ✅ |
+| 删除 Analysis / 侧栏删除·重命名 取消静默 | ✅ |
+| 移除 `element-plus` 依赖与 unplugin resolver | ✅ |
+| EP `index-*` gzip | **已消失**（原 ~304.6） |
+| 合并 | 否（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -39,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 23 计划（下一周期 2/3）
+## 4. Round 24 计划（下一周期 3/3 · 合并）
 
-1. **Perf**：`feedback.ts` toast/confirm → 原生 live toast / dialog，去掉全量 `element-plus` 导入，冲击 EP `index-*` 桶
-2. **UX**：可选把 Confirm（删除 Analysis 等）做成原生确认壳；Message 替换为轻量 toast
-3. **A11y**：toast 焦点/aria-live；确认框 Esc/焦点陷阱对齐三对话框
-4. **验证**：unit + e2e:ui + build；对照 EP chunk 体积
-5. **合并**：否（周期 2/3）
+1. **UX 抛光**：toast 手动关闭 / 堆叠上限已有；可选减少-motion 回归与窄屏 toast 边距
+2. **Perf 复核**：确认 dist 无 EP；入口 CSS 含 feedback；workspace 冷启动体感
+3. **A11y**：confirm 危险操作默认焦点策略复核；prompt Enter 提交回归
+4. **验证**：unit + e2e:ui + build
+5. **合并**：**是** — 合并 Round 22–24 → main（开 PR / merge）
