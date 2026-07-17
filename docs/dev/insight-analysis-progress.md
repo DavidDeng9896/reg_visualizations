@@ -9,27 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-0b2f7a1e-4fdf-49c9-bad4-da75790da2bf-4c26`（Round 18） |
-| 阶段 | **优化 Round 18 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=18`） |
-| 上次更新 | 2026-07-17 08:09 |
-| 单元 | **97/97 PASS**（+cfgMissDescribedBy / selectedOptionValues / view-type width / search dedupe） |
+| 分支 | `cursor/bc-b7ddaca6-9cbb-4cb0-8333-ac6f15e41b05-611f`（Round 19） |
+| 阶段 | **优化 Round 19 完成**（周期 **1/3**；`lastMergedRound=18`；下一合并点 Round 21） |
+| 上次更新 | 2026-07-17 09:10 |
+| 单元 | **102/102 PASS**（+selectStatus / focusCfgMissAfterBlockedSave） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 18 对齐摘要
+## 2. Round 19 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform / Combine `el-select` → 原生（含 multi） | ✅ Round 18 |
-| CSV Dialog | 无 `el-select`（跳过） |
-| compact「更多」Esc / 方向键（menuNav） | ✅ Round 18 |
-| 窄屏视图类型 select 宽度 150→112 | ✅ Round 18 |
-| Drawer 必填 select `aria-describedby` → `#chart-cfg-miss` | ✅ Round 18 |
-| 搜索 live region 连续相同文案去重 | ✅ Round 18 |
-| EP `index-*` gzip | 仍 ~304.6（Dialog/Drawer/Form/Input/Table/Button 仍共享桶；`el-select` CSS 已消失） |
-| 合并 | **Round 16–18 → main** |
+| Transform/Combine/CSV 原生 Dialog 壳 + 焦点陷阱 | ✅ Round 19 |
+| Transform/Combine/CSV 原生按钮；CSV Name / Transform inputs 原生 | ✅ Round 19 |
+| Combine multi-select 选中计数 live region | ✅ Round 19 |
+| cfg-miss ↔ Save 焦点联动（`focusCfgMissAfterBlockedSave`） | ✅ Round 19 |
+| EP `index-*` gzip | 仍 ~304.6（Drawer/Form/Tabs/Table/Upload 仍共享桶；`el-dialog` 已从三对话框移除） |
+| 合并 | 否（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -39,8 +37,8 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 19 计划（下一周期 1/3）
+## 4. Round 20 计划（周期 2/3）
 
-1. **Perf**：原生 Dialog/Drawer 壳，或拆 EP 子桶（Tabs/Form vs Dialog），冲击 `index-*` gzip
-2. **UX**：Transform/Combine 原生按钮替换 `el-button`；CSV Name 原生 input
-3. **A11y**：Combine multi-select 选中计数 live region；cfg-miss 与 Save 焦点联动
+1. **Perf**：ChartEditDrawer 原生 Drawer 壳，或预览表改原生 `<table>`（冲击 CSV/Combine 的 `el-table` 桶）
+2. **UX**：CSV 上传区原生 file input（去 `el-upload`）；Transform 剩余 EP 清零验证
+3. **A11y**：原生 Dialog Esc/焦点恢复回归加固；Upload 区 `aria-describedby` 文件名宣告
