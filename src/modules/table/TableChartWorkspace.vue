@@ -267,7 +267,7 @@ import { tableNoViewsCtaAria, tableNoViewsHint } from './tableNoViewsHint'
 import { warmIdle } from '@/shared/ui/warmIdle'
 import { handleMenuKeydown } from '@/shared/ui/menuNav'
 
-const emit = defineEmits<{ 'add-data': [cmd: string] }>()
+const emit = defineEmits<{ 'add-data': [cmd: string]; 'request-new-view': [] }>()
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
@@ -606,7 +606,8 @@ function onRows(rows: Record<string, unknown>[]) {
 
 function quickView() {
   if (!store.selectedTable) return
-  store.addView(store.selectedTable.id, store.selectedTable.id, 'New view', 'table')
+  // Handoff to sidebar native New view dialog (Round 30) so naming/type + focus restore stay consistent.
+  emit('request-new-view')
 }
 
 function exportCsv() {
@@ -1007,10 +1008,6 @@ function exportCsv() {
   justify-content: center;
   gap: 10px;
   margin-top: 8px;
-}
-.empty-cta:focus-visible {
-  outline: 2px solid var(--ia-accent);
-  outline-offset: 2px;
 }
 .no-views-hint {
   display: flex;

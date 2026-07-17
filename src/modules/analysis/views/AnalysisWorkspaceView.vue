@@ -68,7 +68,11 @@
           :focus-id="focusId"
           @add-data="onAddData"
         />
-        <TableChartWorkspace v-else-if="vxeReady" @add-data="onAddData" />
+        <TableChartWorkspace
+          v-else-if="vxeReady"
+          @add-data="onAddData"
+          @request-new-view="onRequestNewView"
+        />
         <div v-else class="workspace-skel workspace-skel--main ia-skel" v-bind="workspaceSkeletonAttrs()">
           <div class="ia-skel__pulse" aria-hidden="true" />
           <span class="sr-only">加载表格引擎…</span>
@@ -88,7 +92,12 @@
         @keydown="onSidebarKey"
       />
       <div class="sidebar-slot" :style="{ width: `${sidebarWidth}px` }">
-        <AnalysisSidebar :width="sidebarWidth" @add-data="onAddData" @jump-flowchart="onJump" />
+        <AnalysisSidebar
+          ref="sidebarRef"
+          :width="sidebarWidth"
+          @add-data="onAddData"
+          @jump-flowchart="onJump"
+        />
       </div>
     </div>
 
@@ -177,6 +186,13 @@ const draggingSidebar = ref(false)
 const addDataOpen = ref(false)
 const addDataRoot = ref<HTMLElement | null>(null)
 const addDataActive = ref<number | null>(null)
+const sidebarRef = ref<{
+  openNewViewDialog: (opts: {
+    tableId: string
+    parentId: string
+    restoreFocus?: HTMLElement | null
+  }) => void
+} | null>(null)
 
 const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
 const workspaceEmpty = computed(() => !store.workspaceResult)
@@ -294,6 +310,19 @@ function onAddData(cmd: string) {
   if (cmd === 'csv') showCsv.value = true
   else if (cmd === 'combine') showCombine.value = true
   else if (cmd === 'registry' || cmd === 'plate') stub(cmd)
+}
+
+/** Workspace New view CTA → sidebar dialog (name/type + focus restore). */
+function onRequestNewView() {
+  const table = store.selectedTable
+  if (!table) return
+  const restore =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
+  sidebarRef.value?.openNewViewDialog({
+    tableId: table.id,
+    parentId: table.id,
+    restoreFocus: restore,
+  })
 }
 
 function onJump(id: string) {

@@ -241,8 +241,7 @@ function onCanvasKeydown(ev: KeyboardEvent) {
   border-color: var(--ia-accent, #2f6fed);
   color: var(--ia-accent, #2f6fed);
 }
-.btn:focus-visible,
-.empty-cta:focus-visible {
+.btn:focus-visible {
   outline: 2px solid var(--ia-accent, #2f6fed);
   outline-offset: 2px;
 }

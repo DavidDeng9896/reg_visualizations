@@ -121,7 +121,43 @@
           </div>
         </li>
       </ul>
-      <p v-if="!flatNodes.length" class="tree-empty">无匹配的表或视图</p>
+      <div
+        v-if="emptyKind"
+        class="tree-empty"
+        v-bind="sidebarEmptyRegionAttrs()"
+      >
+        <strong class="tree-empty__title">{{ emptyCopy.title }}</strong>
+        <p class="tree-empty__body">{{ emptyCopy.body }}</p>
+        <div class="tree-empty__cta">
+          <template v-if="emptyKind === 'no-data'">
+            <button
+              type="button"
+              class="btn btn-primary empty-cta"
+              :aria-label="sidebarEmptyCtaAria('csv')"
+              @click="emit('add-data', 'csv')"
+            >
+              导入 CSV
+            </button>
+            <button
+              type="button"
+              class="btn empty-cta"
+              :aria-label="sidebarEmptyCtaAria('combine')"
+              @click="emit('add-data', 'combine')"
+            >
+              合并表
+            </button>
+          </template>
+          <button
+            v-else
+            type="button"
+            class="btn empty-cta"
+            :aria-label="sidebarEmptyCtaAria('clear')"
+            @click="clearSearch"
+          >
+            清除搜索
+          </button>
+        </div>
+      </div>
     </nav>
 
     <div class="footer">
@@ -194,6 +230,16 @@ import {
   resolveTreeKeyAction,
   treeItemTabIndex,
 } from '@/modules/sidebar/treeNav'
+import {
+  sidebarEmptyCopy,
+  sidebarEmptyCtaAria,
+  sidebarEmptyKind,
+  sidebarEmptyRegionAttrs,
+} from '@/modules/sidebar/sidebarEmpty'
+import {
+  newViewDialogDefaults,
+  resolveNewViewRestoreFocus,
+} from '@/modules/sidebar/newViewHandoff'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -211,6 +257,7 @@ const newViewParent = ref<{ tableId: string; parentId: string } | null>(null)
 const newViewNameRef = ref<HTMLInputElement | null>(null)
 const newViewPanelRef = ref<HTMLElement | null>(null)
 let newViewRestoreFocus: HTMLElement | null = null
+let pendingRestoreFocus: HTMLElement | null = null
 const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
 
 const FOCUSABLE =
@@ -258,6 +305,16 @@ const rawTree = computed((): SidebarTreeNode[] => {
 const treeData = computed(() => filterSidebarTree(rawTree.value, q.value))
 const flatNodes = computed(() => flattenSidebarTree(treeData.value))
 const treeFocusIndex = ref<number | null>(null)
+const emptyKind = computed(() =>
+  sidebarEmptyKind({
+    tableCount: store.current?.tables.length ?? 0,
+    query: q.value,
+    visibleCount: flatNodes.value.length,
+  }),
+)
+const emptyCopy = computed(() =>
+  emptyKind.value ? sidebarEmptyCopy(emptyKind.value) : { title: '', body: '' },
+)
 
 watch(
   flatNodes,
@@ -286,7 +343,8 @@ onUnmounted(() => {
 
 watch(showNewView, (open) => {
   if (open) {
-    newViewRestoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    newViewRestoreFocus = resolveNewViewRestoreFocus(pendingRestoreFocus)
+    pendingRestoreFocus = null
     document.body.style.overflow = 'hidden'
     void nextTick(() => newViewNameRef.value?.focus())
   } else {
@@ -557,12 +615,33 @@ function onDocPointer(e: PointerEvent) {
   }
 }
 
+function clearSearch() {
+  q.value = ''
+  void nextTick(() => {
+    const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
+    if (next !== null) searchStatus.value = next
+    focusSearch()
+  })
+}
+
+function openNewViewDialog(opts: {
+  tableId: string
+  parentId: string
+  restoreFocus?: HTMLElement | null
+}) {
+  const defaults = newViewDialogDefaults({ tableId: opts.tableId, parentId: opts.parentId })
+  newViewParent.value = { tableId: defaults.tableId, parentId: defaults.parentId }
+  newViewName.value = defaults.name
+  newViewType.value = defaults.viewType
+  pendingRestoreFocus = opts.restoreFocus ?? null
+  showNewView.value = true
+}
+
+defineExpose({ openNewViewDialog })
+
 function onMenu(cmd: string, data: SidebarTreeNode) {
   if (cmd === 'new-view') {
-    newViewParent.value = { tableId: data.tableId, parentId: data.id }
-    newViewName.value = 'New view'
-    newViewType.value = 'table'
-    showNewView.value = true
+    openNewViewDialog({ tableId: data.tableId, parentId: data.id })
   } else if (cmd === 'rename') {
     void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') })
       .then(({ value }) => {
@@ -712,8 +791,55 @@ function createView() {
 }
 .tree-empty {
   margin: 8px 4px;
+  padding: 10px 8px;
   font-size: 12px;
   color: #8f959e;
+  border-radius: 6px;
+  background: #f7f8fa;
+}
+.tree-empty:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.tree-empty__title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2329;
+  margin-bottom: 4px;
+}
+.tree-empty__body {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.tree-empty__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tree-empty .btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.tree-empty .btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.tree-empty .btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.tree-empty .btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
 }
 .section-head {
   display: flex;

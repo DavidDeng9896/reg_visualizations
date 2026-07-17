@@ -47,4 +47,19 @@ describe('routeFocus', () => {
     expect(document.activeElement).toBe(main)
     document.body.innerHTML = ''
   })
+
+  it('does not steal focus from empty-state skip targets (ws/flow/sidebar/list)', () => {
+    for (const id of ['ws-empty', 'flow-empty', 'sidebar-empty', 'analysis-list']) {
+      document.body.innerHTML = `
+        <main id="workspace-main" tabindex="-1">Main</main>
+        <div id="${id}" tabindex="-1" role="region">Empty</div>
+      `
+      const empty = document.getElementById(id)!
+      empty.focus()
+      expect(shouldSkipRouteFocus(document)).toBe(true)
+      expect(focusAfterNavigation(document)).toBeNull()
+      expect(document.activeElement).toBe(empty)
+      document.body.innerHTML = ''
+    }
+  })
 })

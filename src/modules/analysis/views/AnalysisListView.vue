@@ -270,8 +270,7 @@ h1 {
   filter: brightness(1.05);
   color: #fff;
 }
-.btn:focus-visible,
-.empty-cta:focus-visible {
+.btn:focus-visible {
   outline: 2px solid var(--ia-accent);
   outline-offset: 2px;
 }
