@@ -9,24 +9,24 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-ff0c71ec-02a1-479f-9227-e91eae95420c-5071`（Round 10–11） |
-| 阶段 | **优化 Round 11 完成**（周期 **2/3**；`lastMergedRound=9`） |
-| 上次更新 | 2026-07-17 01:09 |
-| 单元 | **71/71 PASS**（含 errorBars） |
+| 分支 | `cursor/bc-96fd9508-d3c7-408b-9cd7-bf15d0820d84-739e`（Round 10–12） |
+| 阶段 | **优化 Round 12 完成并合并 main**（周期 **3/3**；`lastMergedRound=12`） |
+| 上次更新 | 2026-07-17 02:15 |
+| 单元 | **75/75 PASS**（含 menuNav） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 11 对齐摘要
+## 2. Round 12 对齐摘要
 
-对照 `docs/features/charts/common.md` CONFIGURE / STYLE / a11y：
+对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 工作区顶栏原生 Button / Add data 菜单 / 保存中 Tag | ✅ Round 11 |
-| 误差棒图种+Mean 适用提示（§2.4） | ✅ Round 11 |
-| 色板预览 ↔ STYLE 系列取色联动文案 | ✅ Round 11 |
-| 创建对话框 Tab 焦点陷阱 | ✅ Round 11 |
-| STYLE 分区 `aria-labelledby` | ✅ Round 11 |
+| 侧栏 `+` / 节点 ⋯ EP Dropdown → 原生菜单 | ✅ Round 12 |
+| 侧栏添加数据文案与顶栏一致 | ✅ Round 12 |
+| 顶栏 + 侧栏菜单 Arrow/Home/End/Enter/Escape | ✅ Round 12（`menuNav`） |
+| Demo / 图种切换 canvas 墨迹轮询加固 | ✅ Round 12 |
+| EP `index-*` gzip | 仍 ~305（Tree/Input/Dialog 仍同步；Dropdown 已去） |
 
 ## 3. 验证命令
 
@@ -36,11 +36,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 12 计划（下一 cron · 周期 3/3 → 合并）
+## 4. Round 13 计划（下一 cron · 新周期 1/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | 侧栏 `+` / 节点 ⋯ EP Dropdown → 原生菜单；评估 EP `index-*` 是否下降 |
-| UX | 侧栏「添加数据」与顶栏菜单一致；误差棒在非 Mean 时自动回退 None（已有）的可见反馈强化 |
-| A11y | 原生 Add data 菜单方向键导航；窄屏提示与顶栏按钮焦点环抽检 |
-| Merge | **Round 12 合并进 main**（本周期 3/3；`lastMergedRound` → 12） |
+| Perf | 侧栏 `el-tree` / 搜索 Input 延后或轻量替代；评估 EP `index-*` 再砍 |
+| UX | Connect external / 新建视图对话框去 EP Button 或延后 Dialog |
+| A11y | 节点菜单打开后焦点回到触发按钮；侧栏搜索 `aria-controls` |
+| Merge | Round 13 起新 3 轮周期；`lastMergedRound` 应为 12 |

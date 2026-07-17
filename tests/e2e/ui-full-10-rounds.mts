@@ -58,6 +58,18 @@ async function canvasInk(page: Page) {
   })
 }
 
+/** Poll until chart canvas has ink (cold Demo / type switch races). */
+async function waitForCanvasInk(page: Page, minNonWhite: number, timeoutMs = 20000) {
+  const started = Date.now()
+  let last = { hasCanvas: false, nonWhite: 0, w: 0, h: 0 }
+  while (Date.now() - started < timeoutMs) {
+    last = await canvasInk(page)
+    if (last.hasCanvas && last.nonWhite >= minNonWhite && last.w > 0 && last.h > 0) return last
+    await page.waitForTimeout(400)
+  }
+  throw new Error(`canvas ink timeout: ${JSON.stringify(last)}`)
+}
+
 /** Toolbar view-type select (first), not chart-position (second). */
 async function switchViewType(page: Page, type: string) {
   const sel = page.locator('.ws-toolbar .el-select').first()
@@ -88,7 +100,12 @@ async function createDemo(page: Page) {
   // Wait for Vxe registration + toolbar (not just route change)
   await page.locator('#ws-toolbar').waitFor({ state: 'visible', timeout: 45000 })
   await page.getByRole('button', { name: /Edit 图表/ }).waitFor({ state: 'visible', timeout: 30000 })
-  await page.waitForTimeout(600)
+  // Chart pane may still be mounting ECharts after toolbar appears (cold first round).
+  await page.locator('.chart-pane canvas, .chart canvas, canvas').first().waitFor({
+    state: 'attached',
+    timeout: 30000,
+  })
+  await page.waitForTimeout(400)
 }
 
 async function newViewOfType(page: Page, type: string) {
@@ -136,8 +153,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   await step('一键Demo-散点图有墨迹', async () => {
     await createDemo(page)
     await page.getByRole('button', { name: /Edit 图表/ }).waitFor({ timeout: 10000 })
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 30) throw new Error(`scatter canvas blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 30)
     await page.screenshot({ path: path.join(SHOT_DIR, `r${round}-demo-scatter.png`) })
   })
 
@@ -160,8 +176,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
 
   await step('新建bar视图-自动映射有效', async () => {
     await newViewOfType(page, 'bar')
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 20) throw new Error(`bar blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 20)
     // should not be a flat y=1 garbage only — toolbar should show bar
     const tb = await page.locator('.ws-toolbar').innerText()
     if (!/bar/.test(tb)) throw new Error('toolbar not bar: ' + tb)
@@ -170,28 +185,24 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
 
   await step('切换line并出图', async () => {
     await switchViewType(page, 'line')
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 15) throw new Error(`line blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 15)
     await page.screenshot({ path: path.join(SHOT_DIR, `r${round}-line.png`) })
   })
 
   await step('切换pie并出图', async () => {
     await switchViewType(page, 'pie')
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 15) throw new Error(`pie blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 15)
     await page.screenshot({ path: path.join(SHOT_DIR, `r${round}-pie.png`) })
   })
 
   await step('切换box并出图', async () => {
     await switchViewType(page, 'box')
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 10) throw new Error(`box blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 10)
   })
 
   await step('切换heatmap并出图', async () => {
     await switchViewType(page, 'heatmap')
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 10) throw new Error(`heatmap blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 10)
     await page.screenshot({ path: path.join(SHOT_DIR, `r${round}-heatmap.png`) })
   })
 
@@ -208,9 +219,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
     await drawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(async () => {
       await page.keyboard.press('Escape')
     })
-    await page.waitForTimeout(1000)
-    const ink = await canvasInk(page)
-    if (!ink.hasCanvas || ink.nonWhite < 20) throw new Error(`scatter after edit blank: ${JSON.stringify(ink)}`)
+    await waitForCanvasInk(page, 20)
     await page.screenshot({ path: path.join(SHOT_DIR, `r${round}-scatter-fit.png`) })
   })
 
