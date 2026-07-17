@@ -9,26 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-5e50a11c-a4d8-444e-981a-34dbf4fe0b60-3ccd`（含 Round 13–14） |
-| 阶段 | **优化 Round 14 完成**（周期 **2/3**；`lastMergedRound=12`；下一合并点 Round 15） |
-| 上次更新 | 2026-07-17 04:15 |
-| 单元 | **84/84 PASS**（含 treeNav） |
+| 分支 | `cursor/bc-a4eb9796-1a78-4a5f-b397-b928e8d7a83a-5691`（Round 13–15） |
+| 阶段 | **优化 Round 15 完成并合并 main**（周期 **3/3**；`lastMergedRound=15`） |
+| 上次更新 | 2026-07-17 05:30 |
+| 单元 | **85/85 PASS**（含 searchKeyAction） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 14 对齐摘要
+## 2. Round 15 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 工具栏 / 网格 / ChartPanel `el-button` → 原生 | ✅ Round 14 |
-| 行数标签去 `el-tag` | ✅ Round 14 |
-| 侧栏树 ArrowUp/Down/Home/End/Enter + roving tabindex | ✅ Round 14（`treeNav`） |
-| ArrowRight → ops；ops Escape/Left 回树项 | ✅ Round 14 |
-| 搜索 Escape 清空 | ✅ Round 14 |
-| Flowchart chunk preload + E2E 冷启动等待 | ✅ Round 14 |
-| EP `index-*` gzip | ~304.6（按钮已去；Input/Select/Dialog 仍在） |
+| 工具栏 `el-input` / `el-select` → 原生 | ✅ Round 15 |
+| ChartEditDrawer 高频按钮原生化（交换/刷新/重置/Save） | ✅ Round 15 |
+| 搜索 ArrowDown → 树焦点（`resolveSearchKeyAction`） | ✅ Round 15 |
+| E2E `switchViewType` 对齐原生 select | ✅ Round 15 |
+| EP `index-*` gzip | 仍 ~304.6（Edit Drawer / Dialog 异步仍共享桶；工具栏同步路径已去 Input/Select） |
+| 合并 R13–15 → main | ✅ Round 15 |
 
 ## 3. 验证命令
 
@@ -38,11 +37,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 15 计划（下一 cron · 周期 3/3 · 合并点）
+## 4. Round 16 计划（下一 cron · 新周期 1/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | 工具栏 `el-input` / `el-select` 原生化，或延后 CSV/Combine/Transform Dialog |
-| UX | ChartEditDrawer 内高频按钮原生化；评估 feedback 桶导入 |
-| A11y | 工具栏原生 select 键盘与 aria；树搜索与树焦点衔接（↓ 从搜索进树） |
-| Merge | **本轮合并到 main**（R13–15 周期满 3；`lastMergedRound` → 15） |
+| Perf | 拆 feedback / CSV / Combine / Transform 的 EP 桶；评估延后 ChartEditDrawer preload 或拆 Select 原生化 |
+| UX | 工具栏「视图类型」选中态可读性（原生 select 文案）；可选图表位置快捷切换 |
+| A11y | 树首项 ArrowUp 回搜索；Edit Drawer 内 select 键盘提示 |
+| Merge | Round 16 起新 3 轮周期；`lastMergedRound` 应为 15 |
