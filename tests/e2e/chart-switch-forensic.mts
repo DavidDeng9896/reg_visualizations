@@ -66,7 +66,7 @@ async function main() {
 
   await page.getByRole('button', { name: /Edit 图表/ }).click()
   await page.waitForSelector('text=图表配置')
-  const fitItem = page.locator('.el-drawer .el-form-item').filter({ hasText: '拟合' })
+  const fitItem = page.locator('.drawer-root .el-form-item, .el-drawer .el-form-item').filter({ hasText: '拟合' })
   await fitItem.locator('select[aria-label="拟合模型"]').selectOption('linear')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page.waitForTimeout(1000)
