@@ -2,7 +2,7 @@
   <div class="list-page">
     <header class="top">
       <div>
-        <h1>Insight Analysis</h1>
+        <h1 tabindex="-1">Insight Analysis</h1>
         <p class="sub">本地数据工作空间 · 导入 · 转换 · 可视化</p>
       </div>
       <div class="top-actions">

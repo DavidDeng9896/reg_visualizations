@@ -1,4 +1,6 @@
+import { nextTick } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { focusAfterNavigation } from '@/shared/ui/routeFocus'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -15,4 +17,11 @@ export const router = createRouter({
       props: true,
     },
   ],
+})
+
+router.afterEach((_to, _from, failure) => {
+  if (failure) return
+  void nextTick(() => {
+    focusAfterNavigation()
+  })
 })

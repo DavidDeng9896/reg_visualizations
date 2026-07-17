@@ -79,6 +79,28 @@ describe('native feedback', () => {
     expect(err?.getAttribute('role')).toBe('alert')
   })
 
+  it('exposes a keyboard-reachable close button that dismisses the toast', () => {
+    toast('info', '可关闭')
+    const el = document.querySelector('.ia-toast--info')!
+    const close = el.querySelector<HTMLButtonElement>('button.ia-toast__close')
+    expect(close).toBeTruthy()
+    expect(close!.getAttribute('aria-label')).toBe('关闭通知')
+    expect(close!.type).toBe('button')
+    close!.focus()
+    expect(document.activeElement).toBe(close)
+    close!.click()
+    expect(document.querySelector('.ia-toast--info')).toBeNull()
+  })
+
+  it('dismisses toast on Escape when focus is inside the toast', () => {
+    toast('warning', '按 Esc 关闭')
+    const el = document.querySelector('.ia-toast--warning')!
+    const close = el.querySelector<HTMLButtonElement>('button.ia-toast__close')!
+    close.focus()
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.querySelector('.ia-toast--warning')).toBeNull()
+  })
+
   it('danger confirm focuses Cancel and styles primary as danger', async () => {
     const p = confirm('确定删除？此操作不可撤销。', '删除', {
       danger: true,

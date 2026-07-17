@@ -9,27 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-198e1b4a-9c04-4a9e-9e9e-f728405a210c-f0db`（Round 24） |
-| 阶段 | **优化 Round 24 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=24`） |
-| 上次更新 | 2026-07-17 14:25 |
-| 单元 | **122/122 PASS**（+preferCancelInitialFocus / danger confirm） |
-| UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP） |
+| 分支 | `cursor/bc-f6f10d0c-e40d-4cd5-ba6c-1163130fb40c-50d3`（Round 25） |
+| 阶段 | **优化 Round 25 进行中**（周期 **1/3**；下一合并点 Round 27） |
+| 上次更新 | 2026-07-17 15:05 |
+| 单元 | 验证中 |
+| UI E2E | 验证中 |
+| Build | 验证中 |
 
-## 2. Round 24 对齐摘要
+## 2. Round 25 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| toast 窄屏边距 + safe-area + reduced-motion | ✅ Round 24 |
-| toast 悬停/焦点暂停自动关闭 | ✅ |
-| confirm 危险操作默认焦点 → Cancel | ✅ `preferCancelInitialFocus` |
-| 删除文案强化 + `danger` / `btn-danger` | ✅ 列表 / 侧栏 |
-| prompt 取消路径（Cancel / backdrop / Esc） | ✅ 单测覆盖 |
-| dialog 唯一 aria id | ✅ |
-| dist 无 Element Plus | ✅ 复核 |
-| 合并 | **Round 22–24 → main** |
+| toast 关闭按钮挂入 DOM + 键盘可达 | ✅ Round 25 |
+| toast Esc 关闭（焦点在 toast 内） | ✅ |
+| 工作区冷启动骨架 / 表格引擎 / 流程图占位 | ✅ `workspaceLoading` |
+| feedback.css 经 main.css 引入（与 Dexie 图解耦） | ✅ |
+| 路由跳转后焦点 → `#workspace-main` / `main` / `h1` | ✅ `routeFocus` |
+| 危险确认 Cancel 默认焦点（R24 回归） | ✅ 单测保留 |
+| 合并 | 否（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -39,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 25 计划（下一周期 1/3）
+## 4. Round 26 计划（下一周期 2/3）
 
-1. **UX**：工作区冷启动骨架 / 加载占位；toast 队列可达性（关闭按钮键盘）
-2. **Perf**：`projects` chunk（含 feedback）体积细分；可选把 feedback.css 与 Dexie 图解耦
-3. **A11y**：危险确认 Enter 行为文档化；侧栏删除 danger 回归；焦点恢复在路由跳转场景
+1. **UX**：列表空态/加载骨架对齐工作区；toast 队列多条时的键盘顺序
+2. **Perf**：观察 main CSS vs AnalysisList/Workspace chunk；流程图首屏 delay 微调
+3. **A11y**：skip-link 与 routeFocus 协作；侧栏删除 danger 再回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：否（周期 2/3；Round 27 合并）

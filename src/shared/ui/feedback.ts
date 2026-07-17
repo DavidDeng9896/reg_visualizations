@@ -12,7 +12,7 @@ import {
   type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
-import './feedback.css'
+// feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
 
@@ -58,6 +58,7 @@ export function toast(type: MessageType, message: string) {
   close.className = 'ia-toast__close'
   close.setAttribute('aria-label', '关闭通知')
   close.textContent = '×'
+  el.appendChild(close)
 
   let ttl = window.setTimeout(() => {
     if (el.isConnected) el.remove()
@@ -72,10 +73,17 @@ export function toast(type: MessageType, message: string) {
       if (el.isConnected) el.remove()
     }, TOAST_TTL_MS)
   }
-
-  close.addEventListener('click', () => {
+  const dismiss = () => {
     clearTtl()
     el.remove()
+  }
+
+  close.addEventListener('click', dismiss)
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      dismiss()
+    }
   })
   el.addEventListener('mouseenter', clearTtl)
   el.addEventListener('mouseleave', restartTtl)
