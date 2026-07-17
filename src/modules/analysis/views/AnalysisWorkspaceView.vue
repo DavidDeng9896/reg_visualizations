@@ -1,6 +1,6 @@
 <template>
   <div v-if="store.current" class="workspace">
-    <a class="skip-link" data-ia-skip="1" href="#workspace-main">跳到主内容</a>
+    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到主内容</a>
     <header class="header">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
@@ -63,7 +63,11 @@
     -->
     <div class="body">
       <main id="workspace-main" class="main" tabindex="-1">
-        <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
+        <FlowchartCanvas
+          v-if="store.mainMode === 'flowchart'"
+          :focus-id="focusId"
+          @add-data="onAddData"
+        />
         <TableChartWorkspace v-else-if="vxeReady" @add-data="onAddData" />
         <div v-else class="workspace-skel workspace-skel--main ia-skel" v-bind="workspaceSkeletonAttrs()">
           <div class="ia-skel__pulse" aria-hidden="true" />
@@ -105,6 +109,7 @@
 
 <script setup lang="ts">
 import {
+  computed,
   defineAsyncComponent,
   getCurrentInstance,
   h,
@@ -116,6 +121,7 @@ import {
 } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { workspaceSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
+import { workspaceSkipHref } from '@/modules/analysis/workspaceSkip'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
@@ -171,6 +177,16 @@ const draggingSidebar = ref(false)
 const addDataOpen = ref(false)
 const addDataRoot = ref<HTMLElement | null>(null)
 const addDataActive = ref<number | null>(null)
+
+const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
+const workspaceEmpty = computed(() => !store.workspaceResult)
+const skipHref = computed(() =>
+  workspaceSkipHref({
+    mode: store.mainMode,
+    flowchartEmpty: flowchartEmpty.value,
+    workspaceEmpty: workspaceEmpty.value,
+  }),
+)
 
 onMounted(async () => {
   document.addEventListener('pointerdown', onDocPointer, true)

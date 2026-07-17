@@ -131,6 +131,26 @@
       <span class="row-count" aria-label="行列数">{{ rowCountLabel }}</span>
     </div>
 
+    <div
+      v-if="noViewsHint"
+      class="no-views-hint"
+      role="region"
+      aria-label="新建视图引导"
+    >
+      <div class="no-views-hint__text">
+        <strong>{{ noViewsHint.title }}</strong>
+        <p>{{ noViewsHint.body }}</p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary empty-cta"
+        :aria-label="tableNoViewsCtaAria()"
+        @click="quickView"
+      >
+        New view
+      </button>
+    </div>
+
     <div v-if="showLayoutHint" class="layout-hint" role="status">
       <span>窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。</span>
       <button type="button" class="hint-dismiss" @click="onDismissLayoutHint">不再提示</button>
@@ -243,6 +263,7 @@ import {
   workspaceEmptyCtaAria,
   workspaceEmptyRegionAttrs,
 } from './workspaceEmpty'
+import { tableNoViewsCtaAria, tableNoViewsHint } from './tableNoViewsHint'
 import { warmIdle } from '@/shared/ui/warmIdle'
 import { handleMenuKeydown } from '@/shared/ui/menuNav'
 
@@ -297,6 +318,11 @@ const moreTouchStyle = computed(() => {
 const emptyCopy = computed(() =>
   workspaceEmptyCopy({ hasTables: (store.current?.tables.length ?? 0) > 0 }),
 )
+const noViewsHint = computed(() => {
+  const table = store.selectedTable
+  if (!table) return null
+  return tableNoViewsHint({ viewCount: table.views.length })
+})
 const moreDetailsRef = ref<HTMLDetailsElement | null>(null)
 const moreMenuIndex = ref<number | null>(null)
 const moreMenuItems = [{ disabled: false }, { disabled: false }]
@@ -985,6 +1011,34 @@ function exportCsv() {
 .empty-cta:focus-visible {
   outline: 2px solid var(--ia-accent);
   outline-offset: 2px;
+}
+.no-views-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: 0 12px 8px;
+  padding: 12px 14px;
+  background: #f0f7ff;
+  border: 1px solid #b3d0ff;
+  border-radius: 8px;
+  color: #1f2329;
+}
+.no-views-hint__text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.no-views-hint__text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.no-views-hint__text p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #646a73;
 }
 .tb-more-summary,
 .tb-more-item {
