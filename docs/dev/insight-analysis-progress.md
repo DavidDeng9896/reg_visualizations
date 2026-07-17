@@ -9,24 +9,24 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-96fd9508-d3c7-408b-9cd7-bf15d0820d84-739e`（Round 10–12） |
-| 阶段 | **优化 Round 12 完成并合并 main**（周期 **3/3**；`lastMergedRound=12`） |
-| 上次更新 | 2026-07-17 02:15 |
-| 单元 | **75/75 PASS**（含 menuNav） |
+| 分支 | `cursor/bc-31a1ed25-41d3-4d2f-9259-99466ef7f58a-d2f7`（Round 13） |
+| 阶段 | **优化 Round 13 完成**（新周期 **1/3**；`lastMergedRound=12`） |
+| 上次更新 | 2026-07-17 03:16 |
+| 单元 | **79/79 PASS**（含 sidebarTree） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 12 对齐摘要
+## 2. Round 13 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 侧栏 `+` / 节点 ⋯ EP Dropdown → 原生菜单 | ✅ Round 12 |
-| 侧栏添加数据文案与顶栏一致 | ✅ Round 12 |
-| 顶栏 + 侧栏菜单 Arrow/Home/End/Enter/Escape | ✅ Round 12（`menuNav`） |
-| Demo / 图种切换 canvas 墨迹轮询加固 | ✅ Round 12 |
-| EP `index-*` gzip | 仍 ~305（Tree/Input/Dialog 仍同步；Dropdown 已去） |
+| 侧栏 `el-tree` / 搜索 Input → 原生树 + `input[type=search]` | ✅ Round 13 |
+| 新建视图 / Connect external 去 EP Dialog/Button | ✅ Round 13 |
+| 菜单 Escape 关闭后焦点回到触发按钮；搜索 `aria-controls` | ✅ Round 13 |
+| Flowchart 异步加载（延后 vue-flow）+ E2E 冷启动等待 | ✅ Round 13 |
+| EP `index-*` gzip | 仍 ~305（工具栏/Edit/CSV 等仍用 EP Button/Input/Dialog） |
 
 ## 3. 验证命令
 
@@ -36,11 +36,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 13 计划（下一 cron · 新周期 1/3）
+## 4. Round 14 计划（下一 cron · 周期 2/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | 侧栏 `el-tree` / 搜索 Input 延后或轻量替代；评估 EP `index-*` 再砍 |
-| UX | Connect external / 新建视图对话框去 EP Button 或延后 Dialog |
-| A11y | 节点菜单打开后焦点回到触发按钮；侧栏搜索 `aria-controls` |
-| Merge | Round 13 起新 3 轮周期；`lastMergedRound` 应为 12 |
+| Perf | 工作区工具栏 / EditableGrid / ChartPanel `el-button` 原生化，再砍 EP 同步面 |
+| UX | 侧栏树键盘上下移动与 Enter 选择（roving tabindex） |
+| A11y | 原生新建视图对话框与 Create Analysis 行为对齐验证；搜索清空快捷键 |
+| Merge | Round 14 不合并（2/3）；下一合并点 Round 15 |
