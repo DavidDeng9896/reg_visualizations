@@ -9,14 +9,14 @@ describe('warmIdle', () => {
 
   it('uses requestIdleCallback when available', () => {
     const run = vi.fn()
-    const ric = vi.fn((cb: IdleRequestCallback) => {
+    const ric = vi.fn((cb: IdleRequestCallback, _opts?: IdleRequestOptions) => {
       cb({ didTimeout: false, timeRemaining: () => 10 } as IdleDeadline)
       return 1
     })
     vi.stubGlobal('requestIdleCallback', ric)
     warmIdle(run, 3000)
     expect(ric).toHaveBeenCalledTimes(1)
-    expect(ric.mock.calls[0][1]).toEqual({ timeout: 3000 })
+    expect(ric).toHaveBeenCalledWith(expect.any(Function), { timeout: 3000 })
     expect(run).toHaveBeenCalledTimes(1)
   })
 

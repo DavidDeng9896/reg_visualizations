@@ -9,25 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-a4eb9796-1a78-4a5f-b397-b928e8d7a83a-5691`（Round 13–15） |
-| 阶段 | **优化 Round 15 完成并合并 main**（周期 **3/3**；`lastMergedRound=15`） |
-| 上次更新 | 2026-07-17 05:30 |
-| 单元 | **85/85 PASS**（含 searchKeyAction） |
+| 分支 | `cursor/bc-e6e767cf-c525-4e3d-96a0-deecce16e836-ad57`（Round 16） |
+| 阶段 | **优化 Round 16 完成**（新周期 **1/3**；`lastMergedRound=15`） |
+| 上次更新 | 2026-07-17 06:07 |
+| 单元 | **87/87 PASS**（含 warmIdle、tree leave-to-search） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 15 对齐摘要
+## 2. Round 16 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 工具栏 `el-input` / `el-select` → 原生 | ✅ Round 15 |
-| ChartEditDrawer 高频按钮原生化（交换/刷新/重置/Save） | ✅ Round 15 |
-| 搜索 ArrowDown → 树焦点（`resolveSearchKeyAction`） | ✅ Round 15 |
-| E2E `switchViewType` 对齐原生 select | ✅ Round 15 |
-| EP `index-*` gzip | 仍 ~304.6（Edit Drawer / Dialog 异步仍共享桶；工具栏同步路径已去 Input/Select） |
-| 合并 R13–15 → main | ✅ Round 15 |
+| 延后 ChartEditDrawer / Transform idle preload + 意图预热 | ✅ Round 16 |
+| Add data 打开时预热 CSV / Combine Dialog | ✅ Round 16 |
+| 工具栏 select 当前值徽章可读性 | ✅ Round 16 |
+| 图表位置快捷分段（下/上/左/右） | ✅ Round 16 |
+| 树首项 ArrowUp → 搜索框 | ✅ Round 16 |
+| Edit Drawer 键盘提示 | ✅ Round 16 |
+| EP `index-*` gzip | 仍 ~304.6（延后加载时机；桶体积未变） |
+| 合并 | 否（周期 1/3；下一合并点 Round 18） |
 
 ## 3. 验证命令
 
@@ -37,11 +39,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 16 计划（下一 cron · 新周期 1/3）
+## 4. Round 17 计划（下一 cron · 周期 2/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | 拆 feedback / CSV / Combine / Transform 的 EP 桶；评估延后 ChartEditDrawer preload 或拆 Select 原生化 |
-| UX | 工具栏「视图类型」选中态可读性（原生 select 文案）；可选图表位置快捷切换 |
-| A11y | 树首项 ArrowUp 回搜索；Edit Drawer 内 select 键盘提示 |
-| Merge | Round 16 起新 3 轮周期；`lastMergedRound` 应为 15 |
+| Perf | CONFIGURE 高频 `el-select` 原生化试点（X/Y/聚合）；观察 EP 桶是否下降 |
+| UX | 窄屏下图表位置分段控件换行/触控；工具栏过长时折叠次要操作 |
+| A11y | 位置分段 `aria-controls` 指向工作区；搜索 Esc 后宣布结果数 |
+| Merge | 不合并；Round 18 为周期合并点 |
