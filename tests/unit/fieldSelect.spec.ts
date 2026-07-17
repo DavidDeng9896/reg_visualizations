@@ -3,6 +3,7 @@ import {
   CFG_MISS_ALERT_ID,
   cfgMissDescribedBy,
   columnSelectLabel,
+  focusCfgMissAfterBlockedSave,
   fromNativeSelectValue,
   selectedOptionValues,
   toNativeSelectValue,
@@ -44,5 +45,37 @@ describe('fieldSelect', () => {
       select.appendChild(opt)
     }
     expect(selectedOptionValues(select)).toEqual(['a', 'c'])
+  })
+
+  it('focuses cfg-miss alert after blocked Save (fallback to aria-invalid)', () => {
+    const root = document.createElement('div')
+    const alert = document.createElement('p')
+    alert.id = CFG_MISS_ALERT_ID
+    root.appendChild(alert)
+    document.body.appendChild(root)
+
+    expect(focusCfgMissAfterBlockedSave(root)).toBe(true)
+    expect(document.activeElement).toBe(alert)
+    expect(alert.tabIndex).toBe(-1)
+
+    root.remove()
+  })
+
+  it('falls back to first aria-invalid control when alert missing', () => {
+    const root = document.createElement('div')
+    const select = document.createElement('select')
+    select.setAttribute('aria-invalid', 'true')
+    root.appendChild(select)
+    document.body.appendChild(root)
+
+    expect(focusCfgMissAfterBlockedSave(root)).toBe(true)
+    expect(document.activeElement).toBe(select)
+
+    root.remove()
+  })
+
+  it('returns false when root empty', () => {
+    expect(focusCfgMissAfterBlockedSave(null)).toBe(false)
+    expect(focusCfgMissAfterBlockedSave(document.createElement('div'))).toBe(false)
   })
 })

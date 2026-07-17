@@ -19,6 +19,7 @@
             :id="CFG_MISS_ALERT_ID"
             class="cfg-miss"
             role="alert"
+            tabindex="-1"
           >
             必填槽位未完成：{{ configureMiss.join('、') }}。请按当前图种补齐后再保存。
           </p>
@@ -540,6 +541,7 @@ import {
   CFG_MISS_ALERT_ID,
   cfgMissDescribedBy,
   columnSelectLabel,
+  focusCfgMissAfterBlockedSave,
   fromNativeSelectValue,
   toNativeSelectValue,
 } from '@/modules/chart/fieldSelect'
@@ -897,6 +899,7 @@ function save() {
   if (configureMiss.value.length) {
     toast('warning', `请先完成必填槽位：${configureMiss.value.join('、')}`)
     tab.value = 'configure'
+    void nextTick(() => focusCfgMissAfterBlockedSave(panelRef.value))
     return
   }
   if (xRangeInvalid.value || yRangeInvalid.value) {
@@ -937,6 +940,10 @@ function save() {
   color: #c45656;
   background: #fef0f0;
   border-radius: 4px;
+}
+.cfg-miss:focus-visible {
+  outline: 2px solid #c45656;
+  outline-offset: 2px;
 }
 .range-error {
   margin: 0 0 12px 110px;

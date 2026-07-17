@@ -26,3 +26,23 @@ export function cfgMissDescribedBy(hasMiss: boolean): string | undefined {
 export function selectedOptionValues(select: HTMLSelectElement): string[] {
   return Array.from(select.selectedOptions, (opt) => opt.value)
 }
+
+/**
+ * After Save is blocked by missing required slots: focus cfg-miss alert (or first invalid control).
+ * Returns true when focus moved.
+ */
+export function focusCfgMissAfterBlockedSave(root: ParentNode | null | undefined): boolean {
+  if (!root) return false
+  const alert = root.querySelector<HTMLElement>(`#${CFG_MISS_ALERT_ID}`)
+  if (alert) {
+    if (alert.tabIndex < 0) alert.tabIndex = -1
+    alert.focus()
+    return true
+  }
+  const invalid = root.querySelector<HTMLElement>('[aria-invalid="true"]')
+  if (invalid) {
+    invalid.focus()
+    return true
+  }
+  return false
+}

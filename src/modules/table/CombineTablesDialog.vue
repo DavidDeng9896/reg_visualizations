@@ -1,75 +1,105 @@
 <template>
-  <el-dialog :model-value="modelValue" title="By combining tables" width="780px" @close="close">
-    <el-form label-width="110px">
-      <el-form-item label="左表">
-        <select v-model="leftId" class="native-field-select" style="width: 100%" aria-label="左表">
-          <option value="" disabled>请选择</option>
-          <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
-      </el-form-item>
-      <el-form-item label="右表">
-        <select v-model="rightId" class="native-field-select" style="width: 100%" aria-label="右表">
-          <option value="" disabled>请选择</option>
-          <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
-      </el-form-item>
-      <el-form-item label="连接类型">
-        <select v-model="joinType" class="native-field-select" style="width: 100%" aria-label="连接类型">
-          <option value="left">Left Join</option>
-          <option value="inner">Inner Join</option>
-          <option value="right">Right Join</option>
-          <option value="full">Full Join</option>
-          <option value="append">Append</option>
-        </select>
-      </el-form-item>
-      <template v-if="joinType !== 'append'">
-        <el-form-item label="左连接键">
-          <select
-            v-model="leftKeys"
-            multiple
-            class="native-field-select native-multi"
-            style="width: 100%"
-            aria-label="左连接键"
-          >
-            <option v-for="c in leftCols" :key="c.field" :value="c.field">{{ c.title }}</option>
-          </select>
-        </el-form-item>
-        <el-form-item label="右连接键">
-          <select
-            v-model="rightKeys"
-            multiple
-            class="native-field-select native-multi"
-            style="width: 100%"
-            aria-label="右连接键"
-          >
-            <option v-for="c in rightCols" :key="c.field" :value="c.field">{{ c.title }}</option>
-          </select>
-        </el-form-item>
-      </template>
-      <el-form-item label="新表名称">
-        <el-input v-model="name" />
-      </el-form-item>
-    </el-form>
-    <div class="preview-title">预览（前 20 行）{{ warning }}</div>
-    <el-table :data="preview" height="220" size="small" border>
-      <el-table-column v-for="c in previewCols" :key="c.field" :prop="c.field" :label="c.title" min-width="90" />
-    </el-table>
-    <template #footer>
-      <el-button @click="close">取消</el-button>
-      <el-button type="primary" :disabled="!canAdd" @click="add">Add table</el-button>
-    </template>
-  </el-dialog>
+  <div
+    v-if="modelValue"
+    class="dialog-root"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="combine-dialog-title"
+    @keydown.esc="close"
+    @keydown="onTrapKeydown"
+  >
+    <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
+    <div class="dialog-panel" ref="panelRef">
+      <header class="dialog-header">
+        <h2 id="combine-dialog-title">By combining tables</h2>
+        <button type="button" class="icon-close" aria-label="关闭" @click="close">×</button>
+      </header>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">左表</span>
+            <select v-model="leftId" class="native-field-select" aria-label="左表">
+              <option value="" disabled>请选择</option>
+              <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">右表</span>
+            <select v-model="rightId" class="native-field-select" aria-label="右表">
+              <option value="" disabled>请选择</option>
+              <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">连接类型</span>
+            <select v-model="joinType" class="native-field-select" aria-label="连接类型">
+              <option value="left">Left Join</option>
+              <option value="inner">Inner Join</option>
+              <option value="right">Right Join</option>
+              <option value="full">Full Join</option>
+              <option value="append">Append</option>
+            </select>
+          </label>
+          <template v-if="joinType !== 'append'">
+            <label class="field">
+              <span class="field-label">左连接键</span>
+              <select
+                v-model="leftKeys"
+                multiple
+                class="native-field-select native-multi"
+                aria-label="左连接键"
+                :aria-describedby="leftKeysStatusId"
+              >
+                <option v-for="c in leftCols" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
+              <span :id="leftKeysStatusId" class="sr-only" role="status" aria-live="polite">
+                {{ leftKeysStatus }}
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">右连接键</span>
+              <select
+                v-model="rightKeys"
+                multiple
+                class="native-field-select native-multi"
+                aria-label="右连接键"
+                :aria-describedby="rightKeysStatusId"
+              >
+                <option v-for="c in rightCols" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
+              <span :id="rightKeysStatusId" class="sr-only" role="status" aria-live="polite">
+                {{ rightKeysStatus }}
+              </span>
+            </label>
+          </template>
+          <label class="field">
+            <span class="field-label">新表名称</span>
+            <input v-model="name" type="text" class="native-input" aria-label="新表名称" autocomplete="off" />
+          </label>
+        </div>
+        <div class="preview-title">预览（前 20 行）{{ warning }}</div>
+        <el-table :data="preview" height="220" size="small" border>
+          <el-table-column v-for="c in previewCols" :key="c.field" :prop="c.field" :label="c.title" min-width="90" />
+        </el-table>
+      </div>
+      <footer class="dialog-footer">
+        <button type="button" class="btn" @click="close">取消</button>
+        <button type="button" class="btn btn-primary" :disabled="!canAdd" @click="add">Add table</button>
+      </footer>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { toast } from '@/shared/ui/feedback'
+import { multiSelectCountStatus } from '@/shared/ui/selectStatus'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { combineTables } from '@/modules/table/join'
 import type { JoinType, TableColumn } from '@/shared/types/analysis'
 import { uid } from '@/shared/utils/id'
 
-defineProps<{ modelValue: boolean }>()
+const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
 const store = useAnalysisStore()
 
@@ -82,10 +112,20 @@ const name = ref('Combined table')
 const preview = ref<Record<string, unknown>[]>([])
 const previewCols = ref<TableColumn[]>([])
 const warning = ref('')
+const panelRef = ref<HTMLElement | null>(null)
+let restoreFocus: HTMLElement | null = null
+
+const leftKeysStatusId = 'combine-left-keys-status'
+const rightKeysStatusId = 'combine-right-keys-status'
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
 const tables = computed(() => store.current?.tables || [])
 const leftCols = computed(() => tables.value.find((t) => t.id === leftId.value)?.columns || [])
 const rightCols = computed(() => tables.value.find((t) => t.id === rightId.value)?.columns || [])
+const leftKeysStatus = computed(() => multiSelectCountStatus(leftKeys.value.length, '左连接键'))
+const rightKeysStatus = computed(() => multiSelectCountStatus(rightKeys.value.length, '右连接键'))
 
 const canAdd = computed(() => {
   if (!leftId.value || !rightId.value || !name.value) return false
@@ -94,6 +134,60 @@ const canAdd = computed(() => {
 })
 
 watch([leftId, rightId, joinType, leftKeys, rightKeys], rebuild, { deep: true })
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) {
+      restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      document.body.style.overflow = 'hidden'
+      void nextTick(() => focusables()[0]?.focus())
+    } else {
+      document.body.style.overflow = ''
+      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+      restoreFocus = null
+    }
+  },
+)
+
+onMounted(() => {
+  if (props.modelValue) {
+    restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    document.body.style.overflow = 'hidden'
+    void nextTick(() => focusables()[0]?.focus())
+  }
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+})
+
+function focusables(): HTMLElement[] {
+  const root = panelRef.value
+  if (!root) return []
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+  )
+}
+
+function onTrapKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab') return
+  const list = focusables()
+  if (list.length < 2) return
+  const first = list[0]
+  const last = list[list.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (e.shiftKey) {
+    if (active === first || !list.includes(active as HTMLElement)) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else if (active === last || !list.includes(active as HTMLElement)) {
+    e.preventDefault()
+    first.focus()
+  }
+}
 
 function rebuild() {
   warning.value = ''
@@ -158,12 +252,97 @@ function add() {
 </script>
 
 <style scoped>
+.dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+.dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: min(780px, 100%);
+  max-height: min(90vh, 920px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #dee0e3;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 8px;
+  flex-shrink: 0;
+}
+.dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.icon-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #8f959e;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.icon-close:hover {
+  color: #1f2329;
+  background: #f2f3f5;
+}
+.dialog-body {
+  padding: 8px 18px 12px;
+  overflow: auto;
+  flex: 1;
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  flex-shrink: 0;
+  border-top: 1px solid #eef0f2;
+}
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 13px;
+  color: #646a73;
+}
 .preview-title {
-  margin: 8px 0;
+  margin: 12px 0 6px;
   color: #646a73;
   font-size: 13px;
 }
-.native-field-select {
+.native-field-select,
+.native-input {
   height: 32px;
   border: 1px solid #d0d3d6;
   border-radius: 6px;
@@ -171,8 +350,11 @@ function add() {
   background: #fff;
   color: #1f2329;
   font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
 }
-.native-field-select:focus-visible {
+.native-field-select:focus-visible,
+.native-input:focus-visible {
   outline: 2px solid #3370ff;
   outline-offset: 1px;
 }
@@ -180,5 +362,43 @@ function add() {
   height: auto;
   min-height: 88px;
   padding: 4px 6px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #d0d3d6;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn:hover:not(:disabled) {
+  border-color: #3370ff;
+  color: #3370ff;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: #3370ff;
+  border-color: #3370ff;
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
 }
 </style>

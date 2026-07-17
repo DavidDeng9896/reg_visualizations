@@ -166,7 +166,7 @@
       </div>
     </div>
 
-    <TransformDialog v-model="showTransforms" />
+    <TransformDialog v-if="showTransforms" v-model="showTransforms" />
     <ChartEditDrawer
       v-model="showChartEdit"
       :config="chartConfig"
