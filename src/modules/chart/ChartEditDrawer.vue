@@ -409,7 +409,7 @@
           </div>
         </div>
         <div
-          v-show="tab === 'style'"
+          v-if="tab === 'style'"
           id="chart-tab-style"
           class="drawer-tabpanel"
           role="tabpanel"

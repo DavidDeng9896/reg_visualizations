@@ -89,19 +89,34 @@
             @toggle="onMoreToggle"
             @keydown="onMoreKeydown"
           >
-            <summary class="btn tb-more-summary" aria-label="更多数据操作">更多</summary>
+            <summary
+              class="btn tb-more-summary"
+              aria-label="更多数据操作"
+              :style="moreTouchStyle"
+            >
+              更多
+            </summary>
             <div class="tb-more-menu" role="menu" aria-label="更多数据操作">
               <button
                 type="button"
-                class="btn"
+                class="btn tb-more-item"
                 role="menuitem"
+                :style="moreTouchStyle"
                 @click="openTransforms"
                 @pointerenter="warmTransformChunk"
                 @focus="warmTransformChunk"
               >
                 过滤 / 转换
               </button>
-              <button type="button" class="btn" role="menuitem" @click="exportCsv">导出 CSV</button>
+              <button
+                type="button"
+                class="btn tb-more-item"
+                role="menuitem"
+                :style="moreTouchStyle"
+                @click="exportCsv"
+              >
+                导出 CSV
+              </button>
             </div>
           </details>
         </div>
@@ -177,9 +192,27 @@
       @save="onChartSave"
     />
   </div>
-  <div v-else class="empty">
-    <h3>开始分析</h3>
-    <p>从侧栏选择表或视图，或使用「+ Add data」导入 CSV / 合并表。</p>
+  <div v-else class="empty" v-bind="workspaceEmptyRegionAttrs()">
+    <h3>{{ emptyCopy.title }}</h3>
+    <p>{{ emptyCopy.body }}</p>
+    <div class="empty__cta">
+      <button
+        type="button"
+        class="btn btn-primary empty-cta"
+        :aria-label="workspaceEmptyCtaAria('csv')"
+        @click="emit('add-data', 'csv')"
+      >
+        导入 CSV
+      </button>
+      <button
+        type="button"
+        class="btn empty-cta"
+        :aria-label="workspaceEmptyCtaAria('combine')"
+        @click="emit('add-data', 'combine')"
+      >
+        合并表
+      </button>
+    </div>
   </div>
 </template>
 
@@ -200,10 +233,20 @@ import {
   effectiveChartPosition,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
-import { isToolbarCompact, toolbarViewTypeSelectWidth } from './toolbarLayout'
+import {
+  isToolbarCompact,
+  toolbarMoreTouchMinPx,
+  toolbarViewTypeSelectWidth,
+} from './toolbarLayout'
+import {
+  workspaceEmptyCopy,
+  workspaceEmptyCtaAria,
+  workspaceEmptyRegionAttrs,
+} from './workspaceEmpty'
 import { warmIdle } from '@/shared/ui/warmIdle'
 import { handleMenuKeydown } from '@/shared/ui/menuNav'
 
+const emit = defineEmits<{ 'add-data': [cmd: string] }>()
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
@@ -246,6 +289,14 @@ const chartPosCurrentLabel = computed(
 )
 const toolbarCompact = computed(() => isToolbarCompact(viewportWidth.value))
 const viewTypeSelectWidth = computed(() => toolbarViewTypeSelectWidth(toolbarCompact.value))
+const moreTouchMin = computed(() => toolbarMoreTouchMinPx(toolbarCompact.value))
+const moreTouchStyle = computed(() => {
+  const px = moreTouchMin.value
+  return px == null ? undefined : { minHeight: `${px}px` }
+})
+const emptyCopy = computed(() =>
+  workspaceEmptyCopy({ hasTables: (store.current?.tables.length ?? 0) > 0 }),
+)
 const moreDetailsRef = ref<HTMLDetailsElement | null>(null)
 const moreMenuIndex = ref<number | null>(null)
 const moreMenuItems = [{ disabled: false }, { disabled: false }]
@@ -786,6 +837,15 @@ function exportCsv() {
   background: color-mix(in srgb, var(--ia-accent) 14%, #fff);
   color: var(--ia-accent);
 }
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
+}
 .layout-hint {
   display: flex;
   align-items: center;
@@ -899,14 +959,39 @@ function exportCsv() {
   padding: 48px 24px;
   color: #646a73;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  outline: none;
 }
 .empty h3 {
-  margin: 0 0 8px;
+  margin: 0;
   color: #1f2329;
   font-size: 18px;
 }
 .empty p {
   margin: 0;
   font-size: 14px;
+  max-width: 36em;
+}
+.empty__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.empty-cta:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.tb-more-summary,
+.tb-more-item {
+  box-sizing: border-box;
+}
+.ws-toolbar.is-compact .tb-more-summary,
+.ws-toolbar.is-compact .tb-more-item {
+  min-height: 44px;
 }
 </style>

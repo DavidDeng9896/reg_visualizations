@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   isToolbarCompact,
   TOOLBAR_COMPACT_MAX_WIDTH,
+  TOOLBAR_MORE_TOUCH_MIN_PX,
   TOOLBAR_VIEW_TYPE_WIDTH,
   TOOLBAR_VIEW_TYPE_WIDTH_COMPACT,
+  toolbarMoreTouchMinPx,
   toolbarViewTypeSelectWidth,
 } from '@/modules/table/toolbarLayout'
 
@@ -24,5 +26,11 @@ describe('toolbarLayout', () => {
     expect(TOOLBAR_VIEW_TYPE_WIDTH_COMPACT).toBe(112)
     expect(toolbarViewTypeSelectWidth(false)).toBe(150)
     expect(toolbarViewTypeSelectWidth(true)).toBe(112)
+  })
+
+  it('exposes a 44px min touch target for compact More control', () => {
+    expect(TOOLBAR_MORE_TOUCH_MIN_PX).toBe(44)
+    expect(toolbarMoreTouchMinPx(true)).toBe(44)
+    expect(toolbarMoreTouchMinPx(false)).toBe(null)
   })
 })

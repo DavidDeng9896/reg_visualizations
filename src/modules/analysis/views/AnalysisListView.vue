@@ -68,12 +68,18 @@
           <button
             type="button"
             class="btn empty-cta"
+            :aria-label="listEmptyCtaAria('demo')"
             :disabled="demoBusy"
             @click="createDemo"
           >
             {{ demoBusy ? '创建中…' : '一键 Demo' }}
           </button>
-          <button type="button" class="btn btn-primary empty-cta" @click="showCreate = true">
+          <button
+            type="button"
+            class="btn btn-primary empty-cta"
+            :aria-label="listEmptyCtaAria('create')"
+            @click="showCreate = true"
+          >
             + 创建 Analysis
           </button>
         </div>
@@ -91,7 +97,7 @@ import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
-import { listEmptyRegionAttrs } from '@/modules/analysis/listEmpty'
+import { listEmptyRegionAttrs, listEmptyCtaAria } from '@/modules/analysis/listEmpty'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 

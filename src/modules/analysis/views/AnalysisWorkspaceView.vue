@@ -64,7 +64,7 @@
     <div class="body">
       <main id="workspace-main" class="main" tabindex="-1">
         <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
-        <TableChartWorkspace v-else-if="vxeReady" />
+        <TableChartWorkspace v-else-if="vxeReady" @add-data="onAddData" />
         <div v-else class="workspace-skel workspace-skel--main ia-skel" v-bind="workspaceSkeletonAttrs()">
           <div class="ia-skel__pulse" aria-hidden="true" />
           <span class="sr-only">加载表格引擎…</span>
