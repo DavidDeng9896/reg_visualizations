@@ -112,8 +112,7 @@ async function newViewOfType(page: Page, type: string) {
   await page.locator('.ops-btn').first().click()
   await page.getByRole('menuitem', { name: 'New view' }).click()
   await page.waitForSelector('text=新建视图')
-  await page.locator('.el-dialog .el-select').last().click()
-  await page.getByRole('option', { name: new RegExp(`\\b${type}\\b`, 'i') }).click()
+  await page.getByLabel('View Type').selectOption(type)
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await page.waitForTimeout(1200)
 }
@@ -160,7 +159,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   await step('Flowchart按钮切换', async () => {
     await page.getByRole('button', { name: 'Flowchart', exact: true }).click()
     await page.waitForSelector('text=修改分析结构请从侧栏进行')
-    await page.locator('.el-tree-node__content').first().click()
+    await page.locator('.tree-node-content').first().click()
     await page.waitForTimeout(500)
   })
 

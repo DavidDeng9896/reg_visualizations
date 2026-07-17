@@ -178,15 +178,23 @@ function focusAddDataItem() {
   })
 }
 
+function focusAddDataTrigger() {
+  void nextTick(() => {
+    addDataRoot.value?.querySelector<HTMLElement>('button.btn-primary')?.focus()
+  })
+}
+
 function openAddData() {
   addDataOpen.value = true
   addDataActive.value = enabledMenuIndices(addDataItems)[0] ?? null
   focusAddDataItem()
 }
 
-function closeAddData() {
+function closeAddData(opts?: { restoreFocus?: boolean }) {
+  const wasOpen = addDataOpen.value
   addDataOpen.value = false
   addDataActive.value = null
+  if (wasOpen && opts?.restoreFocus !== false) focusAddDataTrigger()
 }
 
 function toggleAddData() {
@@ -195,7 +203,7 @@ function toggleAddData() {
 }
 
 function pickAddData(cmd: string) {
-  closeAddData()
+  closeAddData({ restoreFocus: false })
   onAddData(cmd)
 }
 
@@ -222,14 +230,14 @@ function onAddDataMenuKey(e: KeyboardEvent) {
       const item = addDataItems[i]
       if (item && !item.disabled) pickAddData(item.cmd)
     },
-    onClose: closeAddData,
+    onClose: () => closeAddData(),
   })
 }
 
 function onDocPointer(e: PointerEvent) {
   if (!addDataOpen.value) return
   const root = addDataRoot.value
-  if (root && !root.contains(e.target as Node)) closeAddData()
+  if (root && !root.contains(e.target as Node)) closeAddData({ restoreFocus: false })
 }
 
 function onAddData(cmd: string) {

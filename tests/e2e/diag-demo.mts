@@ -22,7 +22,7 @@ async function main() {
   await page.waitForTimeout(2000)
   const info = await page.evaluate(() => ({
     bodySlice: document.body.innerText.slice(0, 600),
-    treeText: document.querySelector('.el-tree')?.innerText || 'NO_TREE',
+    treeText: document.querySelector('.sidebar-tree')?.innerText || 'NO_TREE',
     opsCount: document.querySelectorAll('.ops button').length,
     buttons: [...document.querySelectorAll('button')]
       .map((b) => b.textContent?.trim())

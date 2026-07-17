@@ -108,7 +108,7 @@ async function main() {
     if (/应用加载出错|DataCloneError|could not be cloned/.test(bodyText)) {
       ctx.errors.push('UI shows clone/bootstrap error text')
     }
-    const tree = await p.locator('.el-tree').innerText()
+    const tree = await p.locator('.sidebar-tree').innerText()
     ctx.notes.push(`tree=${tree.replace(/\n/g, ' | ')}`)
     if (!/demo_dose_response|Scatter/i.test(tree)) {
       ctx.errors.push('Demo table/view missing from sidebar after navigate')
@@ -126,7 +126,7 @@ async function main() {
     if (!(await p.locator('text=修改分析结构请从侧栏进行').count())) {
       ctx.errors.push('flowchart banner missing')
     }
-    await p.locator('.el-tree-node__content').first().click()
+    await p.locator('.tree-node-content').first().click()
     await p.waitForTimeout(800)
   })
 
@@ -146,7 +146,7 @@ async function main() {
     await p.waitForTimeout(600)
     await p.getByRole('button', { name: 'Add table' }).click()
     await p.waitForTimeout(1000)
-    const tree = await p.locator('.el-tree').innerText()
+    const tree = await p.locator('.sidebar-tree').innerText()
     ctx.notes.push(`tree=${tree}`)
     if (!/selftest/i.test(tree)) ctx.errors.push(`CSV table not in sidebar: ${tree}`)
   })
@@ -161,12 +161,10 @@ async function main() {
     await p.locator('.ops-btn').first().click()
     await p.getByRole('menuitem', { name: 'New view' }).click()
     await p.waitForSelector('text=新建视图')
-    // View Type select inside dialog
-    await p.locator('.el-dialog .el-select').last().click()
-    await p.getByRole('option', { name: 'bar' }).click()
+    await p.getByLabel('View Type').selectOption('bar')
     await p.getByRole('button', { name: '创建', exact: true }).click()
     await p.waitForTimeout(1000)
-    const tree = await p.locator('.el-tree').innerText()
+    const tree = await p.locator('.sidebar-tree').innerText()
     ctx.notes.push(`tree=${tree.replace(/\n/g, ' | ')}`)
     if (!/\(bar\)/.test(tree)) ctx.errors.push('bar view not found in tree')
   })
@@ -191,7 +189,7 @@ async function main() {
     await p.getByRole('button', { name: /一键 Demo/ }).click()
     await p.waitForURL(/\/analyses\//)
     await p.waitForTimeout(1200)
-    await p.locator('.el-tree-node__content', { hasText: 'Scatter' }).first().click()
+    await p.locator('.tree-node-content', { hasText: 'Scatter' }).first().click()
     await p.waitForTimeout(400)
     await p.getByRole('button', { name: /过滤 \/ 转换/ }).click()
     await p.waitForSelector('text=过滤与转换')

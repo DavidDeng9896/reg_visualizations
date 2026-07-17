@@ -1,12 +1,13 @@
 <template>
   <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
-    <el-input
+    <input
       v-model="q"
-      placeholder="搜索表 / 视图"
-      clearable
-      size="small"
+      type="search"
       class="search"
+      placeholder="搜索表 / 视图"
       aria-label="搜索表或视图"
+      aria-controls="sidebar-tree"
+      autocomplete="off"
     />
     <div class="section-head">
       <span id="analysis-data-heading">ANALYSIS DATA</span>
@@ -47,43 +48,56 @@
     </div>
 
     <nav class="tree-nav" aria-labelledby="analysis-data-heading">
-      <el-tree
-        :data="treeData"
-        node-key="id"
-        default-expand-all
-        highlight-current
-        :expand-on-click-node="false"
-        :current-node-key="store.selectedNodeId || undefined"
+      <ul
+        id="sidebar-tree"
+        class="sidebar-tree"
+        role="tree"
         aria-label="表与视图树"
-        @node-click="onClick"
       >
-        <template #default="{ data }">
-          <div class="node" :aria-label="`${data.kind === 'table' ? '表' : '视图'} ${data.label}`">
-            <span class="label">{{ data.label }}</span>
+        <li
+          v-for="node in flatNodes"
+          :key="node.id"
+          class="tree-node"
+          role="none"
+          :style="{ '--tree-depth': node.depth }"
+        >
+          <div
+            class="tree-node-content"
+            role="treeitem"
+            :aria-selected="store.selectedNodeId === node.id"
+            :aria-level="node.depth + 1"
+            :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
+            :class="{ 'is-current': store.selectedNodeId === node.id }"
+            tabindex="0"
+            @click="onClick(node)"
+            @keydown.enter.prevent="onClick(node)"
+            @keydown.space.prevent="onClick(node)"
+          >
+            <span class="label">{{ node.label }}</span>
             <span class="ops" @click.stop>
-              <div class="menu-anchor" :ref="(el) => setOpsRoot(data.id, el)">
+              <div class="menu-anchor" :ref="(el) => setOpsRoot(node.id, el)">
                 <button
                   type="button"
                   class="icon-btn ops-btn"
-                  :aria-label="`${data.label} 更多操作`"
+                  :aria-label="`${node.label} 更多操作`"
                   aria-haspopup="menu"
-                  :aria-expanded="opsOpenId === data.id"
-                  :aria-controls="opsOpenId === data.id ? `node-ops-menu-${data.id}` : undefined"
-                  @click="toggleOps(data)"
-                  @keydown="(e) => onOpsTriggerKey(e, data)"
+                  :aria-expanded="opsOpenId === node.id"
+                  :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
+                  @click="toggleOps(node)"
+                  @keydown="(e) => onOpsTriggerKey(e, node)"
                 >
                   ⋯
                 </button>
                 <ul
-                  v-if="opsOpenId === data.id"
-                  :id="`node-ops-menu-${data.id}`"
+                  v-if="opsOpenId === node.id"
+                  :id="`node-ops-menu-${node.id}`"
                   class="native-menu native-menu-end"
                   role="menu"
-                  :aria-label="`${data.label} 更多操作`"
+                  :aria-label="`${node.label} 更多操作`"
                   @keydown="onOpsMenuKey"
                 >
                   <li
-                    v-for="(item, i) in opsItemsFor(data)"
+                    v-for="(item, i) in opsItemsFor(node)"
                     :key="item.cmd"
                     role="menuitem"
                     :tabindex="opsActive === i ? 0 : -1"
@@ -92,7 +106,7 @@
                       'is-danger': item.cmd === 'delete',
                       'has-divider': item.cmd === 'delete',
                     }"
-                    @click="pickOps(item.cmd, data)"
+                    @click="pickOps(item.cmd, node)"
                   >
                     {{ item.label }}
                   </li>
@@ -100,41 +114,71 @@
               </div>
             </span>
           </div>
-        </template>
-      </el-tree>
+        </li>
+      </ul>
+      <p v-if="!flatNodes.length" class="tree-empty">无匹配的表或视图</p>
     </nav>
 
     <div class="footer">
-      <el-button class="ext" @click="toast('info', 'Connect with external tool：后续版本')">
+      <button type="button" class="ext-btn" @click="toast('info', 'Connect with external tool：后续版本')">
         Connect with external tool
-      </el-button>
+      </button>
     </div>
 
-    <el-dialog v-model="showNewView" title="新建视图" width="400px">
-      <el-form label-width="90px">
-        <el-form-item label="名称">
-          <el-input v-model="newViewName" />
-        </el-form-item>
-        <el-form-item label="View Type">
-          <el-select v-model="newViewType" style="width: 100%">
-            <el-option v-for="t in viewTypes" :key="t" :label="t" :value="t" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showNewView = false">取消</el-button>
-        <el-button type="primary" @click="createView">创建</el-button>
-      </template>
-    </el-dialog>
+    <div
+      v-if="showNewView"
+      class="dialog-root"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-view-title"
+      @keydown.esc="closeNewView"
+      @keydown="onNewViewTrapKeydown"
+    >
+      <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="closeNewView" />
+      <div class="dialog-panel" ref="newViewPanelRef">
+        <header class="dialog-header">
+          <h2 id="new-view-title">新建视图</h2>
+          <button type="button" class="icon-close" aria-label="关闭" @click="closeNewView">×</button>
+        </header>
+        <form class="dialog-body" @submit.prevent="createView">
+          <label class="field">
+            <span class="field-label">名称</span>
+            <input
+              ref="newViewNameRef"
+              v-model="newViewName"
+              type="text"
+              required
+              autocomplete="off"
+              aria-label="视图名称"
+            />
+          </label>
+          <label class="field">
+            <span class="field-label">View Type</span>
+            <select v-model="newViewType" aria-label="View Type" required>
+              <option v-for="t in viewTypes" :key="t" :value="t">{{ t }}</option>
+            </select>
+          </label>
+          <footer class="dialog-footer">
+            <button type="button" class="btn" @click="closeNewView">取消</button>
+            <button type="submit" class="btn btn-primary">创建</button>
+          </footer>
+        </form>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { confirm, prompt, toast } from '@/shared/ui/feedback'
 import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
+import {
+  filterSidebarTree,
+  flattenSidebarTree,
+  type SidebarTreeNode,
+} from '@/modules/sidebar/sidebarTree'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -147,7 +191,13 @@ const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
 const newViewParent = ref<{ tableId: string; parentId: string } | null>(null)
+const newViewNameRef = ref<HTMLInputElement | null>(null)
+const newViewPanelRef = ref<HTMLElement | null>(null)
+let newViewRestoreFocus: HTMLElement | null = null
 const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
 const addItems = [
   { cmd: 'csv', label: 'From CSV', disabled: false },
@@ -163,43 +213,33 @@ const addActive = ref<number | null>(null)
 const opsRoots = new Map<string, HTMLElement>()
 const opsOpenId = ref<string | null>(null)
 const opsActive = ref<number | null>(null)
-const opsNode = ref<TreeNode | null>(null)
-
-type TreeNode = {
-  id: string
-  label: string
-  kind: 'table' | 'view'
-  tableId: string
-  children?: TreeNode[]
-}
+const opsNode = ref<SidebarTreeNode | null>(null)
 
 type OpsItem = { cmd: string; label: string; disabled?: boolean }
 
-const treeData = computed(() => {
+const rawTree = computed((): SidebarTreeNode[] => {
   const a = store.current
   if (!a) return []
-  const match = (s: string) => !q.value || s.toLowerCase().includes(q.value.toLowerCase())
-  const mapViews = (views: typeof a.tables[0]['views'], tableId: string): TreeNode[] =>
-    views
-      .map((v) => ({
-        id: v.id,
-        label: `${v.name} (${v.viewType})`,
-        kind: 'view' as const,
-        tableId,
-        children: mapViews(v.children, tableId),
-      }))
-      .filter((n) => match(n.label) || (n.children && n.children.length))
-
-  return a.tables
-    .map((t) => ({
-      id: t.id,
-      label: t.name,
-      kind: 'table' as const,
-      tableId: t.id,
-      children: mapViews(t.views, t.id),
+  const mapViews = (views: typeof a.tables[0]['views'], tableId: string): SidebarTreeNode[] =>
+    views.map((v) => ({
+      id: v.id,
+      label: `${v.name} (${v.viewType})`,
+      kind: 'view' as const,
+      tableId,
+      children: mapViews(v.children, tableId),
     }))
-    .filter((n) => match(n.label) || (n.children && n.children.length))
+
+  return a.tables.map((t) => ({
+    id: t.id,
+    label: t.name,
+    kind: 'table' as const,
+    tableId: t.id,
+    children: mapViews(t.views, t.id),
+  }))
 })
+
+const treeData = computed(() => filterSidebarTree(rawTree.value, q.value))
+const flatNodes = computed(() => flattenSidebarTree(treeData.value))
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer, true)
@@ -207,6 +247,19 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
+})
+
+watch(showNewView, (open) => {
+  if (open) {
+    newViewRestoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    document.body.style.overflow = 'hidden'
+    void nextTick(() => newViewNameRef.value?.focus())
+  } else {
+    document.body.style.overflow = ''
+    const el = newViewRestoreFocus
+    newViewRestoreFocus = null
+    if (el && document.contains(el)) void nextTick(() => el.focus())
+  }
 })
 
 function setOpsRoot(id: string, el: Element | ComponentPublicInstance | null) {
@@ -218,7 +271,7 @@ function setOpsRoot(id: string, el: Element | ComponentPublicInstance | null) {
   if (node) opsRoots.set(id, node)
 }
 
-function opsItemsFor(data: TreeNode): OpsItem[] {
+function opsItemsFor(data: SidebarTreeNode): OpsItem[] {
   const items: OpsItem[] = [
     { cmd: 'new-view', label: 'New view' },
     { cmd: 'rename', label: '重命名' },
@@ -239,13 +292,28 @@ function focusMenuItem(root: HTMLElement | null | undefined, index: number | nul
   })
 }
 
-function closeAdd() {
+function focusAddTrigger() {
+  void nextTick(() => {
+    addRoot.value?.querySelector<HTMLElement>('.icon-btn')?.focus()
+  })
+}
+
+function focusOpsTrigger(id: string | null) {
+  if (!id) return
+  void nextTick(() => {
+    opsRoots.get(id)?.querySelector<HTMLElement>('.ops-btn')?.focus()
+  })
+}
+
+function closeAdd(opts?: { restoreFocus?: boolean }) {
+  const wasOpen = addOpen.value
   addOpen.value = false
   addActive.value = null
+  if (wasOpen && opts?.restoreFocus !== false) focusAddTrigger()
 }
 
 function openAdd() {
-  closeOps()
+  closeOps({ restoreFocus: false })
   addOpen.value = true
   addActive.value = enabledMenuIndices(addItems)[0] ?? null
   focusMenuItem(addRoot.value, addActive.value)
@@ -257,7 +325,7 @@ function toggleAdd() {
 }
 
 function pickAdd(cmd: string) {
-  closeAdd()
+  closeAdd({ restoreFocus: false })
   emit('add-data', cmd)
 }
 
@@ -284,18 +352,21 @@ function onAddMenuKey(e: KeyboardEvent) {
       const item = addItems[i]
       if (item && !item.disabled) pickAdd(item.cmd)
     },
-    onClose: closeAdd,
+    onClose: () => closeAdd(),
   })
 }
 
-function closeOps() {
+function closeOps(opts?: { restoreFocus?: boolean }) {
+  const id = opsOpenId.value
+  const wasOpen = !!id
   opsOpenId.value = null
   opsActive.value = null
   opsNode.value = null
+  if (wasOpen && opts?.restoreFocus !== false) focusOpsTrigger(id)
 }
 
-function openOps(data: TreeNode) {
-  closeAdd()
+function openOps(data: SidebarTreeNode) {
+  closeAdd({ restoreFocus: false })
   opsNode.value = data
   opsOpenId.value = data.id
   const items = opsItemsFor(data)
@@ -303,17 +374,17 @@ function openOps(data: TreeNode) {
   focusMenuItem(opsRoots.get(data.id), opsActive.value)
 }
 
-function toggleOps(data: TreeNode) {
+function toggleOps(data: SidebarTreeNode) {
   if (opsOpenId.value === data.id) closeOps()
   else openOps(data)
 }
 
-function pickOps(cmd: string, data: TreeNode) {
-  closeOps()
+function pickOps(cmd: string, data: SidebarTreeNode) {
+  closeOps({ restoreFocus: false })
   onMenu(cmd, data)
 }
 
-function onOpsTriggerKey(e: KeyboardEvent, data: TreeNode) {
+function onOpsTriggerKey(e: KeyboardEvent, data: SidebarTreeNode) {
   if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
     if (opsOpenId.value !== data.id) {
       e.preventDefault()
@@ -339,7 +410,7 @@ function onOpsMenuKey(e: KeyboardEvent) {
       const item = items[i]
       if (item) pickOps(item.cmd, data)
     },
-    onClose: closeOps,
+    onClose: () => closeOps(),
   })
 }
 
@@ -347,19 +418,19 @@ function onDocPointer(e: PointerEvent) {
   const t = e.target as Node
   if (addOpen.value) {
     const root = addRoot.value
-    if (root && !root.contains(t)) closeAdd()
+    if (root && !root.contains(t)) closeAdd({ restoreFocus: false })
   }
   if (opsOpenId.value) {
     const root = opsRoots.get(opsOpenId.value)
-    if (root && !root.contains(t)) closeOps()
+    if (root && !root.contains(t)) closeOps({ restoreFocus: false })
   }
 }
 
-function onClick(data: TreeNode) {
+function onClick(data: SidebarTreeNode) {
   store.selectNode(data.id, 'workspace')
 }
 
-function onMenu(cmd: string, data: TreeNode) {
+function onMenu(cmd: string, data: SidebarTreeNode) {
   if (cmd === 'new-view') {
     newViewParent.value = { tableId: data.tableId, parentId: data.id }
     newViewName.value = 'New view'
@@ -384,12 +455,44 @@ function onMenu(cmd: string, data: TreeNode) {
   }
 }
 
+function closeNewView() {
+  showNewView.value = false
+}
+
+function newViewFocusables(): HTMLElement[] {
+  const root = newViewPanelRef.value
+  if (!root) return []
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+  )
+}
+
+function onNewViewTrapKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab') return
+  const list = newViewFocusables()
+  if (list.length < 2) return
+  const first = list[0]
+  const last = list[list.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (e.shiftKey) {
+    if (active === first || !list.includes(active as HTMLElement)) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else if (active === last || !list.includes(active as HTMLElement)) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 function createView() {
   if (!newViewParent.value) return
+  const name = newViewName.value.trim()
+  if (!name) return
   store.addView(
     newViewParent.value.tableId,
     newViewParent.value.parentId,
-    newViewName.value,
+    name,
     newViewType.value,
   )
   showNewView.value = false
@@ -408,12 +511,59 @@ function createView() {
   min-width: 0;
 }
 .search {
+  width: 100%;
+  height: 32px;
   margin-bottom: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.search:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+  border-color: var(--ia-accent);
 }
 .tree-nav {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+.sidebar-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tree-node-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 2px 4px 2px calc(8px + var(--tree-depth, 0) * 16px);
+  border-radius: 4px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.tree-node-content:hover {
+  background: #f2f3f5;
+}
+.tree-node-content.is-current {
+  background: var(--ia-accent-soft);
+  color: var(--ia-accent);
+}
+.tree-node-content:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: -1px;
+}
+.tree-empty {
+  margin: 8px 4px;
+  font-size: 12px;
+  color: #8f959e;
 }
 .section-head {
   display: flex;
@@ -424,18 +574,12 @@ function createView() {
   color: #646a73;
   margin-bottom: 6px;
 }
-.node {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding-right: 4px;
-}
 .label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  font-size: 13px;
 }
 .menu-anchor {
   position: relative;
@@ -515,7 +659,136 @@ function createView() {
   margin-top: auto;
   padding-top: 10px;
 }
-.ext {
+.ext-btn {
   width: 100%;
+  height: 32px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ext-btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.ext-btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+.dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: min(400px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--ia-border);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 8px;
+}
+.dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.icon-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #8f959e;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.icon-close:hover {
+  color: #1f2329;
+  background: #f2f3f5;
+}
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 18px 18px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 13px;
+  color: #646a73;
+}
+.field input,
+.field select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+  border-color: var(--ia-accent);
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+  font: inherit;
+}
+.btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
 }
 </style>

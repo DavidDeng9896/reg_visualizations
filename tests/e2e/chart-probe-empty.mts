@@ -28,8 +28,7 @@ async function main() {
   // Create bar view via sidebar
   await page.locator('.ops-btn').first().click()
   await page.getByRole('menuitem', { name: 'New view' }).click()
-  await page.locator('.el-dialog .el-select').last().click()
-  await page.getByRole('option', { name: 'bar' }).click()
+  await page.getByLabel('View Type').selectOption('bar')
   await page.getByRole('button', { name: '创建', exact: true }).click()
   await page.waitForTimeout(1500)
   await page.screenshot({ path: '/tmp/chart-bar-new.png', fullPage: true })
