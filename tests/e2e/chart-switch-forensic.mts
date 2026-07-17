@@ -24,8 +24,7 @@ async function ink(page: import('playwright').Page) {
 }
 
 async function switchType(page: import('playwright').Page, type: string) {
-  await page.locator('.ws-toolbar .el-select').first().click()
-  await page.getByRole('option', { name: type, exact: true }).click()
+  await page.getByLabel('视图类型').selectOption(type)
   await page.waitForTimeout(1200)
 }
 

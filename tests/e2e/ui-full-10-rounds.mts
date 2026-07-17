@@ -70,12 +70,9 @@ async function waitForCanvasInk(page: Page, minNonWhite: number, timeoutMs = 200
   throw new Error(`canvas ink timeout: ${JSON.stringify(last)}`)
 }
 
-/** Toolbar view-type select (first), not chart-position (second). */
+/** Toolbar view-type native select (aria-label 视图类型). */
 async function switchViewType(page: Page, type: string) {
-  const sel = page.locator('.ws-toolbar .el-select').first()
-  await sel.click()
-  // Labels may be "line" or "折线 line" — match by value token
-  await page.getByRole('option', { name: new RegExp(`\\b${type}\\b`, 'i') }).click()
+  await page.getByLabel('视图类型').selectOption(type)
   await page.waitForTimeout(1200)
 }
 

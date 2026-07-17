@@ -56,14 +56,12 @@ async function main() {
   })
 
   // Switch view type to pie via toolbar
-  await page.locator('.ws-toolbar .el-select').nth(1).click()
-  await page.getByRole('option', { name: 'pie' }).click()
+  await page.getByLabel('视图类型').selectOption('pie')
   await page.waitForTimeout(1000)
   await page.screenshot({ path: '/tmp/chart-pie-switch.png', fullPage: true })
 
   // Switch to heatmap
-  await page.locator('.ws-toolbar .el-select').nth(1).click()
-  await page.getByRole('option', { name: 'heatmap' }).click()
+  await page.getByLabel('视图类型').selectOption('heatmap')
   await page.waitForTimeout(1000)
   await page.screenshot({ path: '/tmp/chart-heatmap.png', fullPage: true })
 
