@@ -9,24 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-1e25b993-9e26-4dd8-8c54-4e6df582ded7-536f`（Round 28；含 R25–27 FF） |
-| 阶段 | **优化 Round 28 完成**（周期 **1/3**；下一合并点 Round 30） |
-| 上次更新 | 2026-07-17 18:08 |
-| 单元 | **140/140 PASS**（+workspaceEmpty / More touch / listEmptyCtaAria） |
+| 分支 | `cursor/bc-a6570169-0917-40df-a7a5-b51342655c34-43bc`（Round 29；含 R25–28 FF） |
+| 阶段 | **优化 Round 29 完成**（周期 **2/3**；下一合并点 Round 30） |
+| 上次更新 | 2026-07-17 19:33 |
+| 单元 | **150/150 PASS**（+flowchartEmpty / workspaceSkip / tableNoViewsHint / stylePanelChunk） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（dist 无 EP） |
 
-## 2. Round 28 对齐摘要
+## 2. Round 29 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 工作区空表 / 无选中引导 CTA | ✅ `workspaceEmpty` + 导入 CSV / 合并表 |
-| 窄屏「更多」触控目标 44px | ✅ `TOOLBAR_MORE_TOUCH_MIN_PX` |
-| ChartEditDrawer STYLE 按需挂载 | ✅ `v-if`（完整异步拆分延后） |
-| 列表空态 CTA aria 与顶栏去重 | ✅ `listEmptyCtaAria` |
-| 合并 | **否**（周期 1/3） |
+| 流程图空态 CTA 对齐工作区 | ✅ `flowchartEmpty` + 导入 CSV / 合并表 |
+| 表已选无视图 New view 引导 | ✅ `tableNoViewsHint` banner |
+| skip → `#flow-empty` / `#ws-empty` | ✅ `workspaceSkipHref` |
+| STYLE 独立异步 chunk | ⏸ 评估后仍 `sync-vif`（`stylePanelChunk`） |
+| confirm 时 toast inert 回归 | ✅ feedback 单测仍绿 |
+| 合并 | **否**（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -36,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 29 计划（下一周期 2/3）
+## 4. Round 30 计划（下一周期 3/3 · 合并）
 
-1. **UX**：流程图空态 CTA 对齐工作区；表已选无视图时强化 New view 引导
-2. **Perf**：评估 ChartEditDrawer STYLE 抽独立异步 chunk；继续监控 `projects`（~116.8k）
-3. **A11y**：空态 CTA 焦点顺序 / skip→`#ws-empty`；dialog+toast inert 回归
+1. **UX**：侧栏「无匹配」空态 CTA；New view 引导与侧栏 new-view 对话框焦点衔接
+2. **Perf**：`projects` chunk（~116.8k）细分 / Dexie 与 feedback 解耦再评估；FlowchartCanvas CSS 体积
+3. **A11y**：空态 CTA 焦点环统一；skip 哈希与 routeFocus 协作回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3）
+5. **合并**：**是** → 开 PR 合入 Round 25–30 → main（`lastMergedRound=30`）
