@@ -9,26 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-345acef9-ae05-44e0-bbe9-c63c73d34994-2a2c`（Round 31；含 R25–30 基线） |
-| 阶段 | **优化 Round 31 完成**（周期 **1/3**） |
-| 上次更新 | 2026-07-17 22:10 |
-| 单元 | **168/168 PASS**（+listSkip/main landmark、search force/no-match、sidebar inert、workspaceViewChunk、skip 决策） |
-| UI E2E | **10/10 PASS**（创建后 treeitem 焦点断言） |
-| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~66.1 / ~23.9；projects 仍 defer） |
+| 分支 | `cursor/bc-5870e4d3-15f2-4ed3-8877-eb86705ac882-1f46`（Round 32；含 R25–31 基线） |
+| 阶段 | **优化 Round 32 完成**（周期 **2/3**） |
+| 上次更新 | 2026-07-17 23:10 |
+| 单元 | **175/175 PASS**（+match live / reveal / overlay / feedback subscribe / tableChart chunk） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~66.8 / ~24.2；ChartEditDrawer ~34.9；STYLE/workspace/table sync 仍 defer） |
 
-## 2. Round 31 对齐摘要
+## 2. Round 32 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 清除搜索 live：Esc 去重 / 空态 CTA force 宣告；无匹配 live | ✅ Round 31 |
-| New view 创建后聚焦新树节点（E2E 覆盖） | ✅ |
-| `#analysis-list` contains 收窄（空态专用；有数据 → `#analysis-list-main`） | ✅ |
-| `#sidebar-empty` **不**纳入 workspace skip（主内容语义） | ✅ 评估结论 |
-| New view 对话框打开时侧栏 chrome `inert` | ✅ |
-| AnalysisWorkspaceView sync-shell 再拆分 | ✅ 仍 defer（`workspaceViewChunk`） |
-| 合并 | **否**（周期 1/3；下一合并点 Round 33） |
+| 侧栏搜索有匹配时 count live（去重） | ✅ Round 32 |
+| 无匹配 → 清除后 search focus + scrollIntoView | ✅ |
+| CSV / Combine / Transform 打开时侧栏 chrome `inert` | ✅ `workspaceOverlay` |
+| confirm/prompt 打开时侧栏 chrome `inert` | ✅ `onFeedbackDialogOpenChange` |
+| ChartEditDrawer STYLE / workspace / TableChartWorkspace 拆分 | ✅ 仍 defer（文档化） |
+| 合并 | **否**（周期 2/3；下一合并点 Round 33） |
 
 ## 3. 验证命令
 
@@ -38,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 32 计划（下一周期 2/3）
+## 4. Round 33 计划（下一周期 3/3 · 合并）
 
-1. **UX**：侧栏搜索有匹配时的可选 count live；无匹配 → 清除后焦点环/搜索框可见性回归
-2. **Perf**：ChartEditDrawer / STYLE 再评估；评估 `TableChartWorkspace` 与 workspace 壳的边界
-3. **A11y**：dialog `inert` 扩展到 CSV/Combine/Transform；confirm 打开时侧栏 inert 对齐
+1. **UX**：ChartEditDrawer 打开时主区/侧栏 inert 对齐；STYLE 分区键盘可达性回归
+2. **Perf**：projects chunk 再拆 feedback 边界评估；冷启动路由预取
+3. **A11y**：Transform/CSV 打开时 toast host inert（与 confirm 对齐）；dialog 焦点恢复统一
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3）
+5. **合并**：是 → 目标 `lastMergedRound=33`（含 R25–33；关闭/更新 PR #30）
