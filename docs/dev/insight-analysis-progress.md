@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-a6570169-0917-40df-a7a5-b51342655c34-43bc`（Round 29；含 R25–28 FF） |
-| 阶段 | **优化 Round 29 完成**（周期 **2/3**；下一合并点 Round 30） |
-| 上次更新 | 2026-07-17 19:33 |
-| 单元 | **150/150 PASS**（+flowchartEmpty / workspaceSkip / tableNoViewsHint / stylePanelChunk） |
+| 分支 | `cursor/bc-62543417-0c06-4f95-b90e-3e876af1f7e5-d4ee`（Round 30） |
+| 阶段 | **优化 Round 30 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=30`） |
+| 上次更新 | 2026-07-17 21:08 |
+| 单元 | **160/160 PASS**（+sidebarEmpty / newViewHandoff / projectsChunk / emptyCtaFocus / routeFocus empty） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP） |
+| Build | PASS（dist 无 EP；projects ~116.8 仍 defer split） |
 
-## 2. Round 29 对齐摘要
+## 2. Round 30 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 流程图空态 CTA 对齐工作区 | ✅ `flowchartEmpty` + 导入 CSV / 合并表 |
-| 表已选无视图 New view 引导 | ✅ `tableNoViewsHint` banner |
-| skip → `#flow-empty` / `#ws-empty` | ✅ `workspaceSkipHref` |
-| STYLE 独立异步 chunk | ⏸ 评估后仍 `sync-vif`（`stylePanelChunk`） |
-| confirm 时 toast inert 回归 | ✅ feedback 单测仍绿 |
-| 合并 | **否**（周期 2/3） |
+| 侧栏无匹配 / 无数据空态 CTA | ✅ Round 30 |
+| New view 引导 → 侧栏对话框焦点衔接 | ✅ |
+| 空态 CTA 焦点环统一（main.css） | ✅ |
+| skip 空态 landmark ↔ routeFocus 不抢焦 | ✅ |
+| projects chunk 细分评估 | ✅ 仍 defer（Dexie/store shared-entry） |
+| 合并 Round 25–30 → main | **进行中（本轮开 PR）** |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 30 计划（下一周期 3/3 · 合并）
+## 4. Round 31 计划（下一周期 1/3）
 
-1. **UX**：侧栏「无匹配」空态 CTA；New view 引导与侧栏 new-view 对话框焦点衔接
-2. **Perf**：`projects` chunk（~116.8k）细分 / Dexie 与 feedback 解耦再评估；FlowchartCanvas CSS 体积
-3. **A11y**：空态 CTA 焦点环统一；skip 哈希与 routeFocus 协作回归
+1. **UX**：侧栏搜索「无匹配」后清除搜索的 live 宣告与焦点环对齐；New view 创建成功后聚焦新树节点
+2. **Perf**：AnalysisWorkspaceView JS（~65.5k）侧栏空态/对话框体积再评估；FlowchartCanvas 保持 async
+3. **A11y**：`#sidebar-empty` 纳入 workspace skip 候选；dialog 打开时侧栏树 inert
 4. **验证**：unit + e2e:ui + build
-5. **合并**：**是** → 开 PR 合入 Round 25–30 → main（`lastMergedRound=30`）
+5. **合并**：否（周期 1/3）
