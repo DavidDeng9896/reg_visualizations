@@ -18,6 +18,16 @@
   pointer-events: none;
 }
 
+/* Confirm/prompt open: toast stays visible but not focusable / clickable (Round 27). */
+.ia-toast-host[inert] {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.ia-toast-host[inert] .ia-toast {
+  pointer-events: none;
+}
+
 .ia-toast {
   pointer-events: auto;
   display: flex;

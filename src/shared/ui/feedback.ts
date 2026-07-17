@@ -5,6 +5,8 @@
 
 import {
   FeedbackCancelError,
+  dismissNewestToastElement,
+  isFeedbackDialogOpen,
   listFocusable,
   preferCancelInitialFocus,
   toastLivePoliteness,
@@ -22,6 +24,8 @@ const TOAST_MAX = 5
 let toastHost: HTMLElement | null = null
 let toastSeq = 0
 let boxSeq = 0
+let openBoxCount = 0
+let docEscBound = false
 
 function ensureToastHost(): HTMLElement {
   if (toastHost && document.body.contains(toastHost)) return toastHost
@@ -30,7 +34,34 @@ function ensureToastHost(): HTMLElement {
   host.setAttribute('data-ia-toast-host', '1')
   document.body.appendChild(host)
   toastHost = host
+  bindDocumentEscape()
+  syncToastHostInert()
   return host
+}
+
+function syncToastHostInert() {
+  const host = toastHost
+  if (!host) return
+  if (openBoxCount > 0 || isFeedbackDialogOpen()) host.setAttribute('inert', '')
+  else host.removeAttribute('inert')
+}
+
+/** Document Escape closes the newest toast when no dialog owns the layer (Round 27). */
+function onDocumentEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (e.defaultPrevented) return
+  if (openBoxCount > 0 || isFeedbackDialogOpen()) return
+  const host = toastHost && document.body.contains(toastHost) ? toastHost : null
+  if (!host?.firstElementChild) return
+  e.preventDefault()
+  e.stopPropagation()
+  dismissNewestToastElement(host)
+}
+
+function bindDocumentEscape() {
+  if (docEscBound || typeof document === 'undefined') return
+  document.addEventListener('keydown', onDocumentEscape, true)
+  docEscBound = true
 }
 
 export function toast(type: MessageType, message: string) {
@@ -94,6 +125,7 @@ export function toast(type: MessageType, message: string) {
 
   // Newest first in DOM → Tab reaches the latest close button before older ones (Round 26).
   host.insertBefore(el, host.firstChild)
+  bindDocumentEscape()
 }
 
 /** Close buttons in Tab order (newest toast first). */
@@ -205,10 +237,15 @@ function openMessageBox(
     root.appendChild(panel)
     document.body.appendChild(root)
 
+    openBoxCount += 1
+    syncToastHostInert()
+
     let settled = false
     const cleanup = () => {
       root.removeEventListener('keydown', onKeydown)
       root.remove()
+      openBoxCount = Math.max(0, openBoxCount - 1)
+      syncToastHostInert()
       document.body.style.overflow = prevOverflow
       if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
     }
@@ -285,4 +322,10 @@ export async function prompt(
   return result as { value: string }
 }
 
-export { FeedbackCancelError, isFeedbackCancel, preferCancelInitialFocus } from './feedbackA11y'
+export {
+  FeedbackCancelError,
+  dismissNewestToastElement,
+  isFeedbackCancel,
+  isFeedbackDialogOpen,
+  preferCancelInitialFocus,
+} from './feedbackA11y'

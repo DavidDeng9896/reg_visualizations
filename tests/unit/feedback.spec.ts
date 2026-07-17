@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   FeedbackCancelError,
+  dismissNewestToastElement,
   isFeedbackCancel,
+  isFeedbackDialogOpen,
   listFocusable,
   preferCancelInitialFocus,
   toastLivePoliteness,
@@ -58,6 +60,28 @@ describe('feedbackA11y', () => {
     expect(isFeedbackCancel({ action: 'cancel' })).toBe(true)
     expect(isFeedbackCancel(new Error('nope'))).toBe(false)
   })
+
+  it('dismisses newest toast element and detects open dialogs', () => {
+    const host = document.createElement('div')
+    const a = document.createElement('div')
+    a.textContent = 'a'
+    const b = document.createElement('div')
+    b.textContent = 'b'
+    host.append(a, b)
+    expect(dismissNewestToastElement(host)).toBe(true)
+    expect([...host.children].map((c) => c.textContent)).toEqual(['b'])
+    expect(dismissNewestToastElement(host)).toBe(true)
+    expect(host.children.length).toBe(0)
+    expect(dismissNewestToastElement(host)).toBe(false)
+    expect(dismissNewestToastElement(null)).toBe(false)
+
+    expect(isFeedbackDialogOpen()).toBe(false)
+    const dlg = document.createElement('div')
+    dlg.setAttribute('data-ia-feedback', 'confirm')
+    document.body.appendChild(dlg)
+    expect(isFeedbackDialogOpen()).toBe(true)
+    dlg.remove()
+  })
 })
 
 describe('native feedback', () => {
@@ -109,6 +133,37 @@ describe('native feedback', () => {
     expect(closes).toHaveLength(3)
     const texts = closes.map((btn) => btn.parentElement?.querySelector('.ia-toast__text')?.textContent)
     expect(texts).toEqual(['third', 'second', 'first'])
+  })
+
+  it('document Escape dismisses the newest toast when no dialog is open', () => {
+    toast('info', 'old')
+    toast('success', 'new')
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    const texts = [...document.querySelectorAll('.ia-toast__text')].map((n) => n.textContent)
+    expect(texts).toEqual(['old'])
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.querySelector('.ia-toast')).toBeNull()
+  })
+
+  it('marks toast host inert while confirm is open so focus cannot reach toast close', async () => {
+    toast('info', 'behind dialog')
+    const host = document.querySelector('[data-ia-toast-host]')!
+    expect(host.hasAttribute('inert')).toBe(false)
+
+    const p = confirm('挡住 toast', '确认', { type: 'info' })
+    await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="confirm"]')).toBeTruthy())
+    expect(host.hasAttribute('inert')).toBe(true)
+
+    // Document Esc must not dismiss the toast while a dialog owns the layer
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.querySelector('.ia-toast--info')).toBeTruthy()
+    expect(document.querySelector('[data-ia-feedback="confirm"]')).toBeTruthy()
+
+    const root = document.querySelector('[data-ia-feedback="confirm"]')!
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await expect(p).rejects.toMatchObject({ action: 'cancel' })
+    expect(document.querySelector('.ia-toast--info')).toBeTruthy()
+    expect(host.hasAttribute('inert')).toBe(false)
   })
 
   it('danger confirm focuses Cancel and styles primary as danger', async () => {

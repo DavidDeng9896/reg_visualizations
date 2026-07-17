@@ -24,7 +24,7 @@
       </label>
     </div>
 
-    <div id="analysis-list" tabindex="-1">
+    <div v-bind="listEmptyRegionAttrs()">
       <div
         v-if="!listReady"
         class="list-skel ia-skel"
@@ -63,7 +63,20 @@
       </table>
       <div v-else class="empty-list" role="status">
         <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
-        <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
+        <p>还没有 Analysis。使用下方按钮快速体验，或创建后导入 CSV。</p>
+        <div class="empty-list__cta">
+          <button
+            type="button"
+            class="btn empty-cta"
+            :disabled="demoBusy"
+            @click="createDemo"
+          >
+            {{ demoBusy ? '创建中…' : '一键 Demo' }}
+          </button>
+          <button type="button" class="btn btn-primary empty-cta" @click="showCreate = true">
+            + 创建 Analysis
+          </button>
+        </div>
       </div>
     </div>
 
@@ -78,6 +91,7 @@ import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
+import { listEmptyRegionAttrs } from '@/modules/analysis/listEmpty'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 
@@ -250,6 +264,19 @@ h1 {
   filter: brightness(1.05);
   color: #fff;
 }
+.btn:focus-visible,
+.empty-cta:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.btn-primary:focus-visible {
+  outline-offset: 2px;
+}
+.link-danger:focus-visible {
+  outline: 2px solid var(--ia-danger, #d92d20);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .analysis-table {
   width: 100%;
   border-collapse: collapse;
@@ -341,6 +368,12 @@ h1 {
 .empty-list p {
   margin: 0;
   max-width: 36em;
+}
+.empty-list__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 @media (max-width: 640px) {
   .top {
