@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampTreeFocusIndex,
+  formatSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -31,6 +32,12 @@ describe('treeNav', () => {
     expect(resolveSearchKeyAction('ArrowDown', true)).toBe('enter-tree')
     expect(resolveSearchKeyAction('ArrowUp', true)).toBe(null)
     expect(resolveSearchKeyAction('Enter', true)).toBe(null)
+  })
+
+  it('announces visible node count after search clear', () => {
+    expect(formatSearchClearedStatus(0)).toBe('已清空搜索，无可见节点')
+    expect(formatSearchClearedStatus(1)).toBe('已清空搜索，显示 1 个节点')
+    expect(formatSearchClearedStatus(12)).toBe('已清空搜索，显示 12 个节点')
   })
 
   it('moves focus with wrap within bounds', () => {

@@ -11,6 +11,7 @@
       autocomplete="off"
       @keydown="onSearchKeydown"
     />
+    <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
     <div class="section-head">
       <span id="analysis-data-heading">ANALYSIS DATA</span>
       <div class="menu-anchor" ref="addRoot">
@@ -185,6 +186,7 @@ import {
 } from '@/modules/sidebar/sidebarTree'
 import {
   clampTreeFocusIndex,
+  formatSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -200,6 +202,7 @@ withDefaults(
 const store = useAnalysisStore()
 const q = ref('')
 const searchRef = ref<HTMLInputElement | null>(null)
+const searchStatus = ref('')
 const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
@@ -440,6 +443,10 @@ function onSearchKeydown(e: KeyboardEvent) {
   e.preventDefault()
   if (action === 'clear') {
     q.value = ''
+    // Announce after clear so the live region reflects the unfiltered tree.
+    void nextTick(() => {
+      searchStatus.value = formatSearchClearedStatus(flatNodes.value.length)
+    })
     return
   }
   // enter-tree: move focus to first (or current) visible tree item
@@ -644,6 +651,17 @@ function createView() {
   outline: 2px solid var(--ia-accent);
   outline-offset: 1px;
   border-color: var(--ia-accent);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .tree-nav {
   flex: 1;

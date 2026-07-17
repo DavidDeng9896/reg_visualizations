@@ -19,26 +19,32 @@
           </p>
           <el-form label-width="110px" size="small">
             <el-form-item v-if="showXY" :required="true" label="X / Categories">
-              <el-select
-                v-model="draft.configure.xField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.xField)"
                 aria-label="X 或 Categories 字段"
                 :aria-invalid="!draft.configure.xField || undefined"
+                @change="onXFieldChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="`${c.title} (${c.dataType})`" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">
+                  {{ columnSelectLabel(c) }}
+                </option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showXY" :required="true" label="Y / Measure">
-              <el-select
-                v-model="draft.configure.yField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.yField)"
                 aria-label="Y 或 Measure 字段"
                 :aria-invalid="!draft.configure.yField || undefined"
+                @change="onYFieldChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="`${c.title} (${c.dataType})`" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">
+                  {{ columnSelectLabel(c) }}
+                </option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showXY" label="Series / Color">
               <el-select v-model="draft.configure.seriesField" clearable style="width: 100%">
@@ -95,9 +101,14 @@
               </el-select>
             </el-form-item>
             <el-form-item label="聚合">
-              <el-select v-model="draft.configure.aggregation" style="width: 100%">
-                <el-option v-for="a in aggs" :key="a" :label="a" :value="a" />
-              </el-select>
+              <select
+                class="native-field-select"
+                :value="draft.configure.aggregation || 'count'"
+                aria-label="聚合方式"
+                @change="onAggregationChange"
+              >
+                <option v-for="a in aggs" :key="a" :value="a">{{ a }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="errorBarsEnabled" label="误差棒">
               <el-select
@@ -487,6 +498,11 @@ import {
   errorBarsAvailableForAggregation,
   errorBarsHint,
 } from '@/modules/chart/errorBars'
+import {
+  columnSelectLabel,
+  fromNativeSelectValue,
+  toNativeSelectValue,
+} from '@/modules/chart/fieldSelect'
 import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{
@@ -505,7 +521,21 @@ const tab = ref('configure')
 const draft = ref<ChartConfig>(cloneDeep(props.config))
 const panelRef = ref<HTMLElement | null>(null)
 const aggs = ['count', 'sum', 'min', 'max', 'mean', 'median'] as const
+type Aggregation = (typeof aggs)[number]
 let restoreFocus: HTMLElement | null = null
+
+function onXFieldChange(e: Event) {
+  draft.value.configure.xField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onYFieldChange(e: Event) {
+  draft.value.configure.yField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onAggregationChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value as Aggregation
+  draft.value.configure.aggregation = aggs.includes(v) ? v : 'count'
+}
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -854,6 +884,27 @@ function save() {
 }
 .title-row .el-input {
   flex: 1;
+}
+.native-field-select {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ia-border, #d0d3d6);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.native-field-select:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
+  border-color: var(--ia-accent, #3370ff);
+}
+.native-field-select[aria-invalid='true'] {
+  border-color: #c45656;
 }
 .btn {
   height: 28px;

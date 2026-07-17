@@ -44,6 +44,12 @@ export function resolveSearchKeyAction(key: string, hasQuery: boolean): SearchKe
   return null
 }
 
+/** Live-region copy after Escape clears the search query. */
+export function formatSearchClearedStatus(visibleCount: number): string {
+  if (visibleCount <= 0) return '已清空搜索，无可见节点'
+  return `已清空搜索，显示 ${visibleCount} 个节点`
+}
+
 export function nextTreeIndex(count: number, current: number): number | null {
   if (count <= 0) return null
   return (current + 1) % count

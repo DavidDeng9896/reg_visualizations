@@ -1,7 +1,7 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
     <a class="skip-link" href="#ws-toolbar">跳到工具栏</a>
-    <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1">
+    <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1" :class="{ 'is-compact': toolbarCompact }">
       <template v-if="store.selectedView">
         <div class="tb-group" role="group" aria-label="视图">
           <span class="tb-label">视图</span>
@@ -34,6 +34,7 @@
             class="pos-seg"
             role="group"
             aria-label="图表位置快捷切换"
+            aria-controls="ws-main"
             :aria-disabled="viewType === 'table' || undefined"
           >
             <button
@@ -50,7 +51,7 @@
               {{ p.short }}
             </button>
           </div>
-          <div class="tb-select-wrap">
+          <div v-if="!toolbarCompact" class="tb-select-wrap tb-pos-select">
             <select
               v-model="chartPos"
               class="tb-select"
@@ -77,8 +78,17 @@
         </div>
         <div class="tb-group" role="group" aria-label="数据">
           <span class="tb-label">数据</span>
-          <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
-          <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
+          <template v-if="!toolbarCompact">
+            <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
+            <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
+          </template>
+          <details v-else class="tb-more" @toggle="onMoreToggle">
+            <summary class="btn tb-more-summary" aria-label="更多数据操作">更多</summary>
+            <div class="tb-more-menu" role="group" aria-label="更多数据操作">
+              <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
+              <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
+            </div>
+          </details>
         </div>
       </template>
       <template v-else-if="store.selectedTable">
@@ -175,6 +185,7 @@ import {
   effectiveChartPosition,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
+import { isToolbarCompact } from './toolbarLayout'
 import { warmIdle } from '@/shared/ui/warmIdle'
 
 const store = useAnalysisStore()
@@ -217,6 +228,19 @@ const viewTypeCurrentLabel = computed(
 const chartPosCurrentLabel = computed(
   () => chartPosOptions.find((p) => p.value === chartPos.value)?.label ?? chartPos.value,
 )
+const toolbarCompact = computed(() => isToolbarCompact(viewportWidth.value))
+
+function onMoreToggle(e: Event) {
+  const el = e.target as HTMLDetailsElement
+  if (!el.open) return
+  const close = (ev: PointerEvent) => {
+    if (!el.contains(ev.target as Node)) {
+      el.open = false
+      document.removeEventListener('pointerdown', close, true)
+    }
+  }
+  document.addEventListener('pointerdown', close, true)
+}
 
 watch(
   () => store.selectedView,
@@ -564,14 +588,17 @@ function exportCsv() {
 }
 .pos-seg {
   display: inline-flex;
+  flex-wrap: wrap;
   border: 1px solid var(--ia-border);
   border-radius: 6px;
   overflow: hidden;
   background: #fff;
+  max-width: 100%;
 }
 .pos-seg-btn {
   height: 28px;
   min-width: 28px;
+  min-height: 28px;
   padding: 0 8px;
   border: 0;
   border-right: 1px solid var(--ia-border);
@@ -580,6 +607,14 @@ function exportCsv() {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  touch-action: manipulation;
+}
+.ws-toolbar.is-compact .pos-seg-btn {
+  height: 36px;
+  min-width: 40px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 .pos-seg-btn:last-child {
   border-right: 0;
@@ -601,6 +636,38 @@ function exportCsv() {
 .pos-seg-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+.tb-more {
+  position: relative;
+  display: inline-block;
+}
+.tb-more-summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.tb-more-summary::-webkit-details-marker {
+  display: none;
+}
+.tb-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.12);
+}
+.tb-more-menu .btn {
+  width: 100%;
+  justify-content: flex-start;
 }
 .tb-input:focus,
 .tb-select:focus {
