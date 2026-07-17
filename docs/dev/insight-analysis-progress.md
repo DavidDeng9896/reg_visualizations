@@ -9,25 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-b7ddaca6-9cbb-4cb0-8333-ac6f15e41b05-611f`（Round 19） |
-| 阶段 | **优化 Round 19 完成**（周期 **1/3**；`lastMergedRound=18`；下一合并点 Round 21） |
-| 上次更新 | 2026-07-17 09:10 |
-| 单元 | **102/102 PASS**（+selectStatus / focusCfgMissAfterBlockedSave） |
+| 分支 | `cursor/bc-9ad6b638-6d4d-4922-b5f9-e6183f01195d-a91b`（Round 20） |
+| 阶段 | **优化 Round 20 完成**（周期 **2/3**；`lastMergedRound=18`；下一合并点 Round 21） |
+| 上次更新 | 2026-07-17 10:08 |
+| 单元 | **106/106 PASS**（+uploadStatus / previewTable） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 19 对齐摘要
+## 2. Round 20 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform/Combine/CSV 原生 Dialog 壳 + 焦点陷阱 | ✅ Round 19 |
-| Transform/Combine/CSV 原生按钮；CSV Name / Transform inputs 原生 | ✅ Round 19 |
-| Combine multi-select 选中计数 live region | ✅ Round 19 |
-| cfg-miss ↔ Save 焦点联动（`focusCfgMissAfterBlockedSave`） | ✅ Round 19 |
-| EP `index-*` gzip | 仍 ~304.6（Drawer/Form/Tabs/Table/Upload 仍共享桶；`el-dialog` 已从三对话框移除） |
-| 合并 | 否（周期 1/3） |
+| CSV `el-upload` → 原生拖放 + file input | ✅ Round 20 |
+| CSV / Combine `el-table` → 原生预览 `<table>` | ✅ Round 20 |
+| Upload 文件名 `aria-live`（`fileSelectedStatus`） | ✅ Round 20 |
+| Transform 零 EP 确认 | ✅（无 `el-*` / element-plus） |
+| CSV / Combine 零 EP 确认 | ✅ |
+| ChartEditDrawer 原生壳 | ⏭️ Round 21（本轮优先去 Upload/Table） |
+| EP `index-*` gzip | 仍 ~304.6（Drawer/Form/Tabs/Switch/Slider/InputNumber 仍共享桶） |
+| 合并 | 否（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -37,8 +39,9 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 20 计划（周期 2/3）
+## 4. Round 21 计划（周期 3/3 · 合并）
 
-1. **Perf**：ChartEditDrawer 原生 Drawer 壳，或预览表改原生 `<table>`（冲击 CSV/Combine 的 `el-table` 桶）
-2. **UX**：CSV 上传区原生 file input（去 `el-upload`）；Transform 剩余 EP 清零验证
-3. **A11y**：原生 Dialog Esc/焦点恢复回归加固；Upload 区 `aria-describedby` 文件名宣告
+1. **Perf/UX**：ChartEditDrawer 原生 Drawer 壳（去 `el-drawer`），冲击 overlay / 焦点路径
+2. **UX**：Drawer 内高频 `el-switch` → 原生 checkbox；或 Tabs 原生分段
+3. **A11y**：Drawer Esc / 焦点陷阱 / 打开焦点回归对齐三对话框壳
+4. **合并**：Round 19–21 → main（`lastMergedRound=21`）
