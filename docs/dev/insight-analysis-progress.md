@@ -9,25 +9,24 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-aa5a54f3-afa0-46a0-a089-a0a1c9b9b8e8-6775`（Round 27） |
-| 阶段 | **优化 Round 27 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=27`） |
-| 上次更新 | 2026-07-17 17:08 |
-| 单元 | **135/135 PASS**（+listEmpty / toast Esc / inert） |
+| 分支 | `cursor/bc-1e25b993-9e26-4dd8-8c54-4e6df582ded7-536f`（Round 28；含 R25–27 FF） |
+| 阶段 | **优化 Round 28 完成**（周期 **1/3**；下一合并点 Round 30） |
+| 上次更新 | 2026-07-17 18:08 |
+| 单元 | **140/140 PASS**（+workspaceEmpty / More touch / listEmptyCtaAria） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（dist 无 EP） |
 
-## 2. Round 27 对齐摘要
+## 2. Round 28 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 空态 CTA + 焦点环 | ✅ 列表 empty-list 内 Demo / 创建 |
-| `#analysis-list` skip 落地 region | ✅ `listEmptyRegionAttrs` |
-| 多 toast Esc 关最新 | ✅ document capture + `dismissNewestToastElement` |
-| confirm 时 toast 不穿透 | ✅ toast host `inert` + 样式 |
-| projects 拆 toast 懒加载 | ✅ 评估后保留同步 API（Dexie 同图） |
-| 合并 Round 25–27 → main | ✅ 本轮开 PR |
+| 工作区空表 / 无选中引导 CTA | ✅ `workspaceEmpty` + 导入 CSV / 合并表 |
+| 窄屏「更多」触控目标 44px | ✅ `TOOLBAR_MORE_TOUCH_MIN_PX` |
+| ChartEditDrawer STYLE 按需挂载 | ✅ `v-if`（完整异步拆分延后） |
+| 列表空态 CTA aria 与顶栏去重 | ✅ `listEmptyCtaAria` |
+| 合并 | **否**（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -37,10 +36,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 28 计划（下一周期 1/3）
+## 4. Round 29 计划（下一周期 2/3）
 
-1. **UX**：工作区空表 / 无视图引导 CTA；窄屏工具栏「更多」触控目标复核
-2. **Perf**：ChartEditDrawer 按 CONFIGURE/STYLE 分区再拆异步；监控 `projects` JS（~116.8k）
-3. **A11y**：列表空态 CTA 与顶栏按钮 `aria` 去重宣告；dialog `inert` 与 toast 共存手测
+1. **UX**：流程图空态 CTA 对齐工作区；表已选无视图时强化 New view 引导
+2. **Perf**：评估 ChartEditDrawer STYLE 抽独立异步 chunk；继续监控 `projects`（~116.8k）
+3. **A11y**：空态 CTA 焦点顺序 / skip→`#ws-empty`；dialog+toast inert 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：否（周期 2/3）
