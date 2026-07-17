@@ -37,24 +37,29 @@
             <el-option label="图在左" value="left" />
             <el-option label="图在右" value="right" />
           </el-select>
-          <el-button size="small" @click="showChartEdit = true" :disabled="viewType === 'table'">
+          <button
+            type="button"
+            class="btn"
+            :disabled="viewType === 'table'"
+            @click="showChartEdit = true"
+          >
             Edit 图表
-          </el-button>
+          </button>
         </div>
         <div class="tb-group" role="group" aria-label="数据">
           <span class="tb-label">数据</span>
-          <el-button size="small" @click="showTransforms = true">过滤 / 转换</el-button>
-          <el-button size="small" @click="exportCsv">导出 CSV</el-button>
+          <button type="button" class="btn" @click="showTransforms = true">过滤 / 转换</button>
+          <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
         </div>
       </template>
       <template v-else-if="store.selectedTable">
         <div class="tb-group" role="group" aria-label="表操作">
           <strong>{{ store.selectedTable.name }}</strong>
-          <el-button size="small" type="primary" plain @click="quickView">New view</el-button>
-          <el-button size="small" @click="exportCsv">导出 CSV</el-button>
+          <button type="button" class="btn btn-primary-plain" @click="quickView">New view</button>
+          <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
         </div>
       </template>
-      <el-tag size="small" type="info" class="row-count">{{ rowCountLabel }}</el-tag>
+      <span class="row-count" aria-label="行列数">{{ rowCountLabel }}</span>
     </div>
 
     <div v-if="showLayoutHint" class="layout-hint" role="status">
@@ -434,6 +439,45 @@ function exportCsv() {
 }
 .row-count {
   margin-left: auto;
+  font-size: 12px;
+  line-height: 22px;
+  color: #646a73;
+  background: #f2f3f5;
+  border-radius: 4px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-primary-plain {
+  color: var(--ia-accent);
+  border-color: color-mix(in srgb, var(--ia-accent) 45%, #fff);
+  background: color-mix(in srgb, var(--ia-accent) 8%, #fff);
+}
+.btn-primary-plain:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ia-accent) 14%, #fff);
+  color: var(--ia-accent);
 }
 .layout-hint {
   display: flex;

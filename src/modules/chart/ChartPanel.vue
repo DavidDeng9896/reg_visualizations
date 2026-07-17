@@ -3,7 +3,7 @@
     <div class="toolbar">
       <div v-if="missing.length" class="need-block" role="status">
         <span class="need">缺少字段：{{ missing.join('、') }}</span>
-        <el-button size="small" type="primary" @click="emit('open-edit')">打开 Edit 配置</el-button>
+        <button type="button" class="btn btn-primary" @click="emit('open-edit')">打开 Edit 配置</button>
       </div>
       <span v-if="built.sampled" class="sample">
         已采样显示（全量 {{ built.totalRows }} 行，上限 {{ SAMPLE_LIMIT }}）
@@ -16,18 +16,38 @@
         <strong>轴 Scale：</strong>
         <span v-for="(w, i) in built.axisWarnings" :key="i">{{ w }}</span>
       </div>
-      <el-button size="small" :loading="engineLoading" @click="downloadFull">下载完整数据 CSV</el-button>
-      <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPng">
-        导出 PNG
-      </el-button>
-      <el-button size="small" :loading="engineLoading" :disabled="!chartReady" @click="exportPdf">
-        导出 PDF
-      </el-button>
+      <button
+        type="button"
+        class="btn"
+        :disabled="engineLoading"
+        :aria-busy="engineLoading"
+        @click="downloadFull"
+      >
+        {{ engineLoading ? '加载中…' : '下载完整数据 CSV' }}
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :disabled="engineLoading || !chartReady"
+        :aria-busy="engineLoading"
+        @click="exportPng"
+      >
+        {{ engineLoading ? '加载中…' : '导出 PNG' }}
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :disabled="engineLoading || !chartReady"
+        :aria-busy="engineLoading"
+        @click="exportPdf"
+      >
+        {{ engineLoading ? '加载中…' : '导出 PDF' }}
+      </button>
     </div>
     <div v-if="engineError" class="engine-error" role="alert">{{ engineError }}</div>
     <div v-if="missing.length" class="config-empty" role="status">
       <p>图表字段未配置完整，无法绘制有意义图形。</p>
-      <el-button type="primary" @click="emit('open-edit')">Edit 图表字段</el-button>
+      <button type="button" class="btn btn-primary" @click="emit('open-edit')">Edit 图表字段</button>
     </div>
     <div
       ref="elRef"
@@ -292,6 +312,38 @@ async function exportPdf() {
   align-items: center;
   margin-bottom: 6px;
   flex-wrap: wrap;
+}
+.btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
 }
 .sample {
   color: #e6a23c;

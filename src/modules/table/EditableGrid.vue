@@ -1,10 +1,10 @@
 <template>
   <div class="grid-wrap" tabindex="0" @keydown="onKey" @paste="onPaste">
     <div class="bar">
-      <el-button size="small" :disabled="!editable" @click="insertRow">插入行</el-button>
-      <el-button size="small" :disabled="!editable" @click="removeRows">删除选中行</el-button>
-      <el-button size="small" :disabled="!editable" @click="undo">Undo</el-button>
-      <el-button size="small" :disabled="!editable" @click="redo">Redo</el-button>
+      <button type="button" class="btn" :disabled="!editable" @click="insertRow">插入行</button>
+      <button type="button" class="btn" :disabled="!editable" @click="removeRows">删除选中行</button>
+      <button type="button" class="btn" :disabled="!editable" @click="undo">Undo</button>
+      <button type="button" class="btn" :disabled="!editable" @click="redo">Redo</button>
       <span v-if="!editable" class="hint hint-readonly" role="status">{{ readOnlyHint }}</span>
       <span class="hint">双击编辑 · Ctrl/Cmd+C/V 复制粘贴（TSV）· 不支持合并单元格</span>
     </div>
@@ -215,6 +215,29 @@ function onKey(e: KeyboardEvent) {
   padding: 6px 8px;
   border-bottom: 1px solid var(--ia-border);
   flex-wrap: wrap;
+}
+.btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .hint {
   font-size: 12px;
