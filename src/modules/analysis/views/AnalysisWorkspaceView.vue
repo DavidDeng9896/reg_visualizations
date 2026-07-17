@@ -166,6 +166,8 @@ onMounted(async () => {
   const app = instance?.appContext.app
   if (app) setupVxe(app)
   vxeReady.value = true
+  // Warm flowchart chunk after paint so first Flowchart click is not cold.
+  void import('@/modules/flowchart/FlowchartCanvas.vue')
 })
 
 onUnmounted(() => {
