@@ -47,58 +47,74 @@
               </select>
             </el-form-item>
             <el-form-item v-if="showXY" label="Series / Color">
-              <el-select v-model="draft.configure.seriesField" clearable style="width: 100%">
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.seriesField)"
+                aria-label="Series 或 Color 字段"
+                @change="onSeriesFieldChange"
+              >
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showPie" :required="true" label="Categories(Pie)">
-              <el-select
-                v-model="draft.configure.categoriesField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.categoriesField)"
                 aria-label="Pie Categories 字段"
                 :aria-invalid="!draft.configure.categoriesField || undefined"
+                @change="onCategoriesFieldChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showPie" label="Measure(Pie)">
-              <el-select v-model="draft.configure.measureField" clearable style="width: 100%">
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.measureField)"
+                aria-label="Pie Measure 字段"
+                @change="onMeasureFieldChange"
+              >
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Row">
-              <el-select
-                v-model="draft.configure.heatmapRowField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.heatmapRowField)"
                 aria-label="Heatmap 行字段"
                 :aria-invalid="!draft.configure.heatmapRowField || undefined"
+                @change="onHeatmapRowChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Col">
-              <el-select
-                v-model="draft.configure.heatmapColField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.heatmapColField)"
                 aria-label="Heatmap 列字段"
                 :aria-invalid="!draft.configure.heatmapColField || undefined"
+                @change="onHeatmapColChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Value">
-              <el-select
-                v-model="draft.configure.heatmapValueField"
-                clearable
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="toNativeSelectValue(draft.configure.heatmapValueField)"
                 aria-label="Heatmap 值字段"
                 :aria-invalid="!draft.configure.heatmapValueField || undefined"
+                @change="onHeatmapValueChange"
               >
-                <el-option v-for="c in columns" :key="c.field" :label="c.title" :value="c.field" />
-              </el-select>
+                <option value="">（清空）</option>
+                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+              </select>
             </el-form-item>
             <el-form-item label="聚合">
               <select
@@ -111,16 +127,17 @@
               </select>
             </el-form-item>
             <el-form-item v-if="errorBarsEnabled" label="误差棒">
-              <el-select
-                v-model="draft.configure.errorBars"
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="draft.configure.errorBars || 'none'"
                 :disabled="!errorBarsAggOk"
                 aria-label="误差棒"
+                @change="onErrorBarsChange"
               >
-                <el-option label="None" value="none" />
-                <el-option label="SD" value="sd" />
-                <el-option label="SEM" value="sem" />
-              </el-select>
+                <option value="none">None</option>
+                <option value="sd">SD</option>
+                <option value="sem">SEM</option>
+              </select>
               <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
             </el-form-item>
             <el-form-item v-else label="误差棒">
@@ -133,13 +150,18 @@
               <el-switch v-model="draft.configure.stacked" />
             </el-form-item>
             <el-form-item label="拟合">
-              <el-select v-model="draft.configure.fitModel" style="width: 100%" aria-label="拟合模型">
-                <el-option label="None" value="none" />
-                <el-option label="Point-to-Point" value="ptp" />
-                <el-option label="Linear" value="linear" />
-                <el-option label="Quadratic" value="quadratic" />
-                <el-option label="4PL" value="4pl" />
-              </el-select>
+              <select
+                class="native-field-select"
+                :value="draft.configure.fitModel || 'none'"
+                aria-label="拟合模型"
+                @change="onFitModelChange"
+              >
+                <option value="none">None</option>
+                <option value="ptp">Point-to-Point</option>
+                <option value="linear">Linear</option>
+                <option value="quadratic">Quadratic</option>
+                <option value="4pl">4PL</option>
+              </select>
               <p v-if="draft.configure.fitModel === '4pl'" class="fit-hint" role="note">
                 4PL 至少需要 4 个有效点，且 X/Y 均需有变化；可选手动约束上下渐近线（min / max）。
               </p>
@@ -195,15 +217,16 @@
               <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。</p>
             </el-form-item>
             <el-form-item label="色板">
-              <el-select
-                v-model="draft.configure.colorPalette"
-                style="width: 100%"
+              <select
+                class="native-field-select"
+                :value="draft.configure.colorPalette || 'light'"
                 aria-label="颜色色板预设"
+                @change="onColorPaletteChange"
               >
-                <el-option label="Light" value="light" />
-                <el-option label="Dark" value="dark" />
-                <el-option label="Alternate" value="alternate" />
-              </el-select>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="alternate">Alternate</option>
+              </select>
               <div
                 class="palette-preview"
                 role="img"
@@ -325,16 +348,16 @@
               <el-switch v-model="draft.style.legendShow" aria-label="显示图例" />
             </el-form-item>
             <el-form-item label="图例位置">
-              <el-select
+              <select
+                class="native-field-select"
                 v-model="draft.style.legendPosition"
-                style="width: 100%"
                 aria-label="图例位置"
               >
-                <el-option label="Left" value="left" />
-                <el-option label="Right" value="right" />
-                <el-option label="Top" value="top" />
-                <el-option label="Bottom" value="bottom" />
-              </el-select>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
+              </select>
             </el-form-item>
             <el-form-item label="图例 Label">
               <el-input
@@ -375,12 +398,16 @@
               </p>
             </el-form-item>
             <el-form-item v-if="pointShapeEnabled" label="点形状">
-              <el-select v-model="draft.style.pointShape" style="width: 100%" aria-label="点形状">
-                <el-option label="circle" value="circle" />
-                <el-option label="rect" value="rect" />
-                <el-option label="triangle" value="triangle" />
-                <el-option label="diamond" value="diamond" />
-              </el-select>
+              <select
+                class="native-field-select"
+                v-model="draft.style.pointShape"
+                aria-label="点形状"
+              >
+                <option value="circle">circle</option>
+                <option value="rect">rect</option>
+                <option value="triangle">triangle</option>
+                <option value="diamond">diamond</option>
+              </select>
               <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
             </el-form-item>
             <el-form-item v-else label="点形状">
@@ -391,10 +418,10 @@
             <section class="style-block" aria-labelledby="style-axes">
             <h3 class="style-section" id="style-axes">Axes</h3>
             <el-form-item label="X Range">
-              <el-select v-model="xRangeMode" style="width: 100%" aria-label="X 轴 Range 模式">
-                <el-option label="Automatic" value="auto" />
-                <el-option label="Manual" value="manual" />
-              </el-select>
+              <select class="native-field-select" v-model="xRangeMode" aria-label="X 轴 Range 模式">
+                <option value="auto">Automatic</option>
+                <option value="manual">Manual</option>
+              </select>
             </el-form-item>
             <template v-if="draft.style.xRangeMode === 'manual'">
               <el-form-item label="X Min">
@@ -420,10 +447,10 @@
               </p>
             </template>
             <el-form-item label="Y Range">
-              <el-select v-model="yRangeMode" style="width: 100%" aria-label="Y 轴 Range 模式">
-                <el-option label="Automatic" value="auto" />
-                <el-option label="Manual" value="manual" />
-              </el-select>
+              <select class="native-field-select" v-model="yRangeMode" aria-label="Y 轴 Range 模式">
+                <option value="auto">Automatic</option>
+                <option value="manual">Manual</option>
+              </select>
             </el-form-item>
             <template v-if="draft.style.yRangeMode === 'manual'">
               <el-form-item label="Y Min">
@@ -450,16 +477,16 @@
             </template>
             <template v-if="showScale">
               <el-form-item v-if="showXScale" label="X Scale">
-                <el-select v-model="xScale" style="width: 100%" aria-label="X 轴 Scale">
-                  <el-option label="Linear" value="linear" />
-                  <el-option label="Log" value="log" />
-                </el-select>
+                <select class="native-field-select" v-model="xScale" aria-label="X 轴 Scale">
+                  <option value="linear">Linear</option>
+                  <option value="log">Log</option>
+                </select>
               </el-form-item>
               <el-form-item v-if="showYScale" label="Y Scale">
-                <el-select v-model="yScale" style="width: 100%" aria-label="Y 轴 Scale">
-                  <el-option label="Linear" value="linear" />
-                  <el-option label="Log" value="log" />
-                </el-select>
+                <select class="native-field-select" v-model="yScale" aria-label="Y 轴 Scale">
+                  <option value="linear">Linear</option>
+                  <option value="log">Log</option>
+                </select>
               </el-form-item>
               <p class="fit-hint" role="note">对数轴（Log）要求数据全部为正值；否则运行时回退 Linear 并提示。</p>
             </template>
@@ -532,9 +559,53 @@ function onYFieldChange(e: Event) {
   draft.value.configure.yField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
 }
 
+function onSeriesFieldChange(e: Event) {
+  draft.value.configure.seriesField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onCategoriesFieldChange(e: Event) {
+  draft.value.configure.categoriesField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onMeasureFieldChange(e: Event) {
+  draft.value.configure.measureField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onHeatmapRowChange(e: Event) {
+  draft.value.configure.heatmapRowField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onHeatmapColChange(e: Event) {
+  draft.value.configure.heatmapColField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
+function onHeatmapValueChange(e: Event) {
+  draft.value.configure.heatmapValueField = fromNativeSelectValue((e.target as HTMLSelectElement).value)
+}
+
 function onAggregationChange(e: Event) {
   const v = (e.target as HTMLSelectElement).value as Aggregation
   draft.value.configure.aggregation = aggs.includes(v) ? v : 'count'
+}
+
+function onErrorBarsChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value
+  draft.value.configure.errorBars =
+    v === 'sd' || v === 'sem' || v === 'none' ? v : 'none'
+}
+
+function onFitModelChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value
+  const allowed = ['none', 'ptp', 'linear', 'quadratic', '4pl'] as const
+  draft.value.configure.fitModel = (allowed as readonly string[]).includes(v)
+    ? (v as (typeof allowed)[number])
+    : 'none'
+}
+
+function onColorPaletteChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value
+  draft.value.configure.colorPalette =
+    v === 'dark' || v === 'alternate' || v === 'light' ? v : 'light'
 }
 
 const FOCUSABLE =

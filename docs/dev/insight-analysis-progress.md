@@ -9,27 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-e6e767cf-c525-4e3d-96a0-deecce16e836-ad57`（Round 16） |
-| 阶段 | **优化 Round 16 完成**（新周期 **1/3**；`lastMergedRound=15`） |
-| 上次更新 | 2026-07-17 06:07 |
-| 单元 | **87/87 PASS**（含 warmIdle、tree leave-to-search） |
+| 分支 | `cursor/bc-0c8dcd08-0934-4c61-8235-bdda43821f40-2b7f`（Round 17） |
+| 阶段 | **优化 Round 17 完成**（周期 **2/3**；`lastMergedRound=15`；下一合并点 Round 18） |
+| 上次更新 | 2026-07-17 07:12 |
+| 单元 | **93/93 PASS**（含 fieldSelect / toolbarLayout / search cleared status） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 16 对齐摘要
+## 2. Round 17 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 延后 ChartEditDrawer / Transform idle preload + 意图预热 | ✅ Round 16 |
-| Add data 打开时预热 CSV / Combine Dialog | ✅ Round 16 |
-| 工具栏 select 当前值徽章可读性 | ✅ Round 16 |
-| 图表位置快捷分段（下/上/左/右） | ✅ Round 16 |
-| 树首项 ArrowUp → 搜索框 | ✅ Round 16 |
-| Edit Drawer 键盘提示 | ✅ Round 16 |
-| EP `index-*` gzip | 仍 ~304.6（延后加载时机；桶体积未变） |
-| 合并 | 否（周期 1/3；下一合并点 Round 18） |
+| CONFIGURE 全量 `el-select` → 原生（含 X/Y/聚合/拟合/色板等） | ✅ Round 17 |
+| STYLE 剩余 `el-select` → 原生（图例/点形状/Range/Scale） | ✅ Round 17 |
+| 窄屏工具栏 compact（≤720）：隐藏位置 select、次要操作折「更多」 | ✅ Round 17 |
+| 位置分段触控加大 + `aria-controls="ws-main"` | ✅ Round 17 |
+| 搜索 Esc 清空后宣告可见节点数 | ✅ Round 17 |
+| EP `index-*` gzip | 仍 ~304.6（Drawer/Tabs/Form/Input/Slider + Transform/Combine 仍共享桶） |
+| 合并 | 否（周期 2/3；Round 18 合并） |
 
 ## 3. 验证命令
 
@@ -39,11 +38,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 17 计划（下一 cron · 周期 2/3）
+## 4. Round 18 计划（下一 cron · 周期 3/3 · 合并）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | CONFIGURE 高频 `el-select` 原生化试点（X/Y/聚合）；观察 EP 桶是否下降 |
-| UX | 窄屏下图表位置分段控件换行/触控；工具栏过长时折叠次要操作 |
-| A11y | 位置分段 `aria-controls` 指向工作区；搜索 Esc 后宣布结果数 |
-| Merge | 不合并；Round 18 为周期合并点 |
+| Perf | Transform / Combine / CSV 的 `el-select` 原生化，或拆 EP 异步子桶；观察 `index-*` gzip |
+| UX | compact「更多」键盘可操作；窄屏隐藏视图类型徽章冗余 |
+| A11y | Drawer 原生 select 必填 `aria-describedby` 关联 cfg-miss |
+| Merge | **合并 Round 16–18 → main**（`lastMergedRound` → 18） |

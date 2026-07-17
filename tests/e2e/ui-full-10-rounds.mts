@@ -226,8 +226,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
     await drawer.waitFor({ state: 'visible', timeout: 15000 })
     const fitItem = drawer.locator('.el-form-item').filter({ hasText: '拟合' })
     await fitItem.scrollIntoViewIfNeeded()
-    await fitItem.locator('.el-select').click()
-    await page.getByRole('option', { name: 'Linear' }).click()
+    await fitItem.locator('select[aria-label="拟合模型"]').selectOption('linear')
     await drawer.getByRole('button', { name: 'Save', exact: true }).click()
     await drawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(async () => {
       await page.keyboard.press('Escape')
