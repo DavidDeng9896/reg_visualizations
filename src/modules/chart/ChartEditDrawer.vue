@@ -9,6 +9,9 @@
     @close="emit('update:modelValue', false)"
   >
     <div ref="panelRef" class="drawer-panel" @keydown="onTrapKeydown">
+      <p class="fit-hint drawer-a11y" role="note">
+        Tab 在面板内循环焦点；Esc 关闭。下拉字段可用方向键与 Enter 选择。
+      </p>
       <el-tabs v-model="tab">
         <el-tab-pane label="CONFIGURE" name="configure">
           <p v-if="configureMiss.length" class="cfg-miss" role="alert">
@@ -796,6 +799,9 @@ function save() {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+.drawer-a11y {
+  margin: 0 0 10px;
 }
 .footer {
   display: flex;

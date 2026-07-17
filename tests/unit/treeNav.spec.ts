@@ -12,6 +12,8 @@ describe('treeNav', () => {
   it('resolves arrow / home / end / enter / space actions', () => {
     expect(resolveTreeKeyAction('ArrowDown')).toBe('next')
     expect(resolveTreeKeyAction('ArrowUp')).toBe('prev')
+    expect(resolveTreeKeyAction('ArrowUp', 2)).toBe('prev')
+    expect(resolveTreeKeyAction('ArrowUp', 0)).toBe('leave-to-search')
     expect(resolveTreeKeyAction('Home')).toBe('first')
     expect(resolveTreeKeyAction('End')).toBe('last')
     expect(resolveTreeKeyAction('Enter')).toBe('activate')

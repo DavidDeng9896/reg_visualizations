@@ -6,15 +6,21 @@ export type TreeKeyAction =
   | 'activate'
   | 'ops'
   | 'leave-ops'
+  | 'leave-to-search'
 
 export type SearchKeyAction = 'clear' | 'enter-tree'
 
-export function resolveTreeKeyAction(key: string): TreeKeyAction | null {
+/**
+ * @param focusIndex Current roving index in the visible tree.
+ *   When `0`, ArrowUp leaves the tree back to the search box (no wrap).
+ *   Pass `-1` (default) to ignore index and always treat ArrowUp as `prev`.
+ */
+export function resolveTreeKeyAction(key: string, focusIndex = -1): TreeKeyAction | null {
   switch (key) {
     case 'ArrowDown':
       return 'next'
     case 'ArrowUp':
-      return 'prev'
+      return focusIndex === 0 ? 'leave-to-search' : 'prev'
     case 'Home':
       return 'first'
     case 'End':

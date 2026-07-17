@@ -14,43 +14,70 @@
             autocomplete="off"
             @change="onRename"
           />
-          <select
-            v-model="viewType"
-            class="tb-select"
-            style="width: 150px"
-            aria-label="视图类型"
-            @change="onViewType(viewType)"
-          >
-            <option v-for="t in viewTypeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
-          </select>
+          <div class="tb-select-wrap">
+            <select
+              v-model="viewType"
+              class="tb-select"
+              style="width: 150px"
+              aria-label="视图类型"
+              :data-current="viewTypeCurrentLabel"
+              @change="onViewType(viewType)"
+            >
+              <option v-for="t in viewTypeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
+            <span class="tb-current" aria-hidden="true">{{ viewTypeCurrentLabel }}</span>
+          </div>
         </div>
         <div class="tb-group" role="group" aria-label="布局">
           <span class="tb-label">布局</span>
-          <select
-            v-model="chartPos"
-            class="tb-select"
-            style="width: 140px"
-            aria-label="图表位置"
-            :disabled="viewType === 'table'"
-            @change="onPos(chartPos)"
+          <div
+            class="pos-seg"
+            role="group"
+            aria-label="图表位置快捷切换"
+            :aria-disabled="viewType === 'table' || undefined"
           >
-            <option value="bottom">图在下</option>
-            <option value="top">图在上</option>
-            <option value="left">图在左</option>
-            <option value="right">图在右</option>
-          </select>
+            <button
+              v-for="p in chartPosOptions"
+              :key="p.value"
+              type="button"
+              class="pos-seg-btn"
+              :aria-pressed="chartPos === p.value"
+              :aria-label="p.label"
+              :disabled="viewType === 'table'"
+              :title="p.label"
+              @click="onPos(p.value)"
+            >
+              {{ p.short }}
+            </button>
+          </div>
+          <div class="tb-select-wrap">
+            <select
+              v-model="chartPos"
+              class="tb-select"
+              style="width: 110px"
+              aria-label="图表位置"
+              :disabled="viewType === 'table'"
+              :data-current="chartPosCurrentLabel"
+              @change="onPos(chartPos)"
+            >
+              <option v-for="p in chartPosOptions" :key="p.value" :value="p.value">{{ p.label }}</option>
+            </select>
+            <span class="tb-current" aria-hidden="true">{{ chartPosCurrentLabel }}</span>
+          </div>
           <button
             type="button"
             class="btn"
             :disabled="viewType === 'table'"
-            @click="showChartEdit = true"
+            @click="openChartEdit"
+            @pointerenter="warmEditChunk"
+            @focus="warmEditChunk"
           >
             Edit 图表
           </button>
         </div>
         <div class="tb-group" role="group" aria-label="数据">
           <span class="tb-label">数据</span>
-          <button type="button" class="btn" @click="showTransforms = true">过滤 / 转换</button>
+          <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
           <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
         </div>
       </template>
@@ -84,7 +111,7 @@
           :rows="store.workspaceResult.rows"
           :config="chartConfig"
           @update:config="onChartSave"
-          @open-edit="showChartEdit = true"
+          @open-edit="openChartEdit"
         />
       </div>
       <div
@@ -148,10 +175,13 @@ import {
   effectiveChartPosition,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
+import { warmIdle } from '@/shared/ui/warmIdle'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
+let editChunkWarmed = false
+let transformChunkWarmed = false
 const bodyRef = ref<HTMLElement | null>(null)
 const splitterRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -169,10 +199,24 @@ const viewTypeOptions: { value: ViewType; label: string }[] = [
   { value: 'heatmap', label: '热力 heatmap' },
 ]
 
+const chartPosOptions: { value: ChartPosition; label: string; short: string }[] = [
+  { value: 'bottom', label: '图在下', short: '下' },
+  { value: 'top', label: '图在上', short: '上' },
+  { value: 'left', label: '图在左', short: '左' },
+  { value: 'right', label: '图在右', short: '右' },
+]
+
 const viewName = ref('')
 const viewType = ref<ViewType>('table')
 const chartPos = ref<ChartPosition>('bottom')
 const chartConfig = ref<ChartConfig>(store.defaultChartConfig())
+
+const viewTypeCurrentLabel = computed(
+  () => viewTypeOptions.find((t) => t.value === viewType.value)?.label ?? viewType.value,
+)
+const chartPosCurrentLabel = computed(
+  () => chartPosOptions.find((p) => p.value === chartPos.value)?.label ?? chartPos.value,
+)
 
 watch(
   () => store.selectedView,
@@ -243,12 +287,37 @@ function onViewport() {
   viewportWidth.value = window.innerWidth
 }
 
+function warmEditChunk() {
+  if (editChunkWarmed) return
+  editChunkWarmed = true
+  void import('@/modules/chart/ChartEditDrawer.vue')
+}
+
+function warmTransformChunk() {
+  if (transformChunkWarmed) return
+  transformChunkWarmed = true
+  void import('@/modules/transform/TransformDialog.vue')
+}
+
+function openChartEdit() {
+  warmEditChunk()
+  showChartEdit.value = true
+}
+
+function openTransforms() {
+  warmTransformChunk()
+  showTransforms.value = true
+}
+
 onMounted(() => {
   window.addEventListener('resize', onViewport, { passive: true })
   onViewport()
-  // Warm Edit/Transform async chunks after paint so first open is reliable.
-  void import('@/modules/chart/ChartEditDrawer.vue')
-  void import('@/modules/transform/TransformDialog.vue')
+  // Defer Edit/Transform EP buckets until idle so first paint stays lean;
+  // hover/focus/open still warms on intent for reliable first open.
+  warmIdle(() => {
+    warmEditChunk()
+    warmTransformChunk()
+  }, 5000)
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
@@ -347,11 +416,15 @@ function onViewType(t: ViewType) {
   chartConfig.value = next
   viewType.value = t
   store.updateView(store.selectedView.view.id, { viewType: t, chartConfig: next })
-  if (t !== 'table') focusSplitter()
+  if (t !== 'table') {
+    warmEditChunk()
+    focusSplitter()
+  }
 }
 
 function onPos(p: ChartPosition) {
   if (!store.selectedView) return
+  chartPos.value = p
   store.setChartPosition(store.selectedView.view.id, p)
   focusSplitter()
 }
@@ -454,6 +527,80 @@ function exportCsv() {
   color: #1f2329;
   font: inherit;
   font-size: 12px;
+}
+.tb-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.tb-select-wrap .tb-select {
+  /* Keep native control for a11y / form value; badge shows current pick clearly. */
+  color: transparent;
+  caret-color: transparent;
+}
+.tb-select-wrap .tb-select option {
+  color: #1f2329;
+}
+.tb-current {
+  position: absolute;
+  left: 8px;
+  right: 22px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #1f2329;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-select-wrap:has(.tb-select:disabled) .tb-current {
+  color: #8a9199;
+}
+.tb-select-wrap:has(.tb-select:focus) .tb-current {
+  color: var(--ia-accent);
+}
+.pos-seg {
+  display: inline-flex;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.pos-seg-btn {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--ia-border);
+  background: transparent;
+  color: #646a73;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pos-seg-btn:last-child {
+  border-right: 0;
+}
+.pos-seg-btn:hover:not(:disabled) {
+  color: var(--ia-accent);
+  background: color-mix(in srgb, var(--ia-accent) 8%, #fff);
+}
+.pos-seg-btn[aria-pressed='true'] {
+  color: var(--ia-accent);
+  background: color-mix(in srgb, var(--ia-accent) 14%, #fff);
+  font-weight: 600;
+}
+.pos-seg-btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: -2px;
+  z-index: 1;
+}
+.pos-seg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .tb-input:focus,
 .tb-select:focus {

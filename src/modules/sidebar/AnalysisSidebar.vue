@@ -1,6 +1,7 @@
 <template>
   <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
     <input
+      ref="searchRef"
       v-model="q"
       type="search"
       class="search"
@@ -198,6 +199,7 @@ withDefaults(
 )
 const store = useAnalysisStore()
 const q = ref('')
+const searchRef = ref<HTMLInputElement | null>(null)
 const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
@@ -343,6 +345,9 @@ function closeAdd(opts?: { restoreFocus?: boolean }) {
 
 function openAdd() {
   closeOps({ restoreFocus: false })
+  // Intent-warm dialogs owned by workspace (CSV / Combine).
+  void import('@/modules/table/CsvImportDialog.vue')
+  void import('@/modules/table/CombineTablesDialog.vue')
   addOpen.value = true
   addActive.value = enabledMenuIndices(addItems)[0] ?? null
   focusMenuItem(addRoot.value, addActive.value)
@@ -444,6 +449,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   focusTreeItem(target)
 }
 
+function focusSearch() {
+  void nextTick(() => {
+    searchRef.value?.focus()
+  })
+}
+
 function focusTreeItem(index: number | null) {
   if (index === null) return
   treeFocusIndex.value = index
@@ -461,11 +472,18 @@ function onTreeActivate(data: SidebarTreeNode, index: number) {
 }
 
 function onTreeItemKeydown(e: KeyboardEvent, data: SidebarTreeNode, index: number) {
-  const action = resolveTreeKeyAction(e.key)
+  const action = resolveTreeKeyAction(e.key, index)
   if (!action) return
 
   const count = flatNodes.value.length
   if (!count) return
+
+  if (action === 'leave-to-search') {
+    e.preventDefault()
+    e.stopPropagation()
+    focusSearch()
+    return
+  }
 
   if (action === 'ops') {
     e.preventDefault()
