@@ -10,17 +10,40 @@
     />
     <div class="section-head">
       <span id="analysis-data-heading">ANALYSIS DATA</span>
-      <el-dropdown trigger="click" @command="(c: string) => emit('add-data', c)">
-        <el-button size="small" text aria-label="添加数据">+</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="csv">From CSV</el-dropdown-item>
-            <el-dropdown-item command="combine">By combining tables</el-dropdown-item>
-            <el-dropdown-item disabled command="registry">From Registry</el-dropdown-item>
-            <el-dropdown-item disabled command="plate">From Plate</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+      <div class="menu-anchor" ref="addRoot">
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="添加数据"
+          aria-haspopup="menu"
+          :aria-expanded="addOpen"
+          aria-controls="sidebar-add-data-menu"
+          @click="toggleAdd"
+          @keydown="onAddTriggerKey"
+        >
+          +
+        </button>
+        <ul
+          v-if="addOpen"
+          id="sidebar-add-data-menu"
+          class="native-menu"
+          role="menu"
+          aria-label="添加数据"
+          @keydown="onAddMenuKey"
+        >
+          <li
+            v-for="(item, i) in addItems"
+            :key="item.cmd"
+            role="menuitem"
+            :tabindex="addActive === i ? 0 : -1"
+            :aria-disabled="item.disabled || undefined"
+            :class="{ 'is-disabled': item.disabled, 'is-active': addActive === i }"
+            @click="!item.disabled && pickAdd(item.cmd)"
+          >
+            {{ item.label }}
+          </li>
+        </ul>
+      </div>
     </div>
 
     <nav class="tree-nav" aria-labelledby="analysis-data-heading">
@@ -38,26 +61,43 @@
           <div class="node" :aria-label="`${data.kind === 'table' ? '表' : '视图'} ${data.label}`">
             <span class="label">{{ data.label }}</span>
             <span class="ops" @click.stop>
-              <el-dropdown trigger="click" @command="(c: string) => onMenu(c, data)">
-                <el-button
-                  size="small"
-                  text
-                  type="primary"
-                  class="ops-btn"
+              <div class="menu-anchor" :ref="(el) => setOpsRoot(data.id, el)">
+                <button
+                  type="button"
+                  class="icon-btn ops-btn"
                   :aria-label="`${data.label} 更多操作`"
+                  aria-haspopup="menu"
+                  :aria-expanded="opsOpenId === data.id"
+                  :aria-controls="opsOpenId === data.id ? `node-ops-menu-${data.id}` : undefined"
+                  @click="toggleOps(data)"
+                  @keydown="(e) => onOpsTriggerKey(e, data)"
                 >
                   ⋯
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="new-view">New view</el-dropdown-item>
-                    <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                    <el-dropdown-item command="jump">跳转到流程图</el-dropdown-item>
-                    <el-dropdown-item v-if="data.kind === 'view'" command="promote">提升为表</el-dropdown-item>
-                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+                </button>
+                <ul
+                  v-if="opsOpenId === data.id"
+                  :id="`node-ops-menu-${data.id}`"
+                  class="native-menu native-menu-end"
+                  role="menu"
+                  :aria-label="`${data.label} 更多操作`"
+                  @keydown="onOpsMenuKey"
+                >
+                  <li
+                    v-for="(item, i) in opsItemsFor(data)"
+                    :key="item.cmd"
+                    role="menuitem"
+                    :tabindex="opsActive === i ? 0 : -1"
+                    :class="{
+                      'is-active': opsActive === i,
+                      'is-danger': item.cmd === 'delete',
+                      'has-divider': item.cmd === 'delete',
+                    }"
+                    @click="pickOps(item.cmd, data)"
+                  >
+                    {{ item.label }}
+                  </li>
+                </ul>
+              </div>
             </span>
           </div>
         </template>
@@ -90,8 +130,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, type ComponentPublicInstance } from 'vue'
 import { confirm, prompt, toast } from '@/shared/ui/feedback'
+import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
 
@@ -108,6 +149,22 @@ const newViewType = ref<ViewType>('table')
 const newViewParent = ref<{ tableId: string; parentId: string } | null>(null)
 const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
 
+const addItems = [
+  { cmd: 'csv', label: 'From CSV', disabled: false },
+  { cmd: 'combine', label: 'By combining tables', disabled: false },
+  { cmd: 'registry', label: 'From Registry（暂未实现）', disabled: true },
+  { cmd: 'plate', label: 'From Plate（暂未实现）', disabled: true },
+] as const
+
+const addRoot = ref<HTMLElement | null>(null)
+const addOpen = ref(false)
+const addActive = ref<number | null>(null)
+
+const opsRoots = new Map<string, HTMLElement>()
+const opsOpenId = ref<string | null>(null)
+const opsActive = ref<number | null>(null)
+const opsNode = ref<TreeNode | null>(null)
+
 type TreeNode = {
   id: string
   label: string
@@ -115,6 +172,8 @@ type TreeNode = {
   tableId: string
   children?: TreeNode[]
 }
+
+type OpsItem = { cmd: string; label: string; disabled?: boolean }
 
 const treeData = computed(() => {
   const a = store.current
@@ -141,6 +200,160 @@ const treeData = computed(() => {
     }))
     .filter((n) => match(n.label) || (n.children && n.children.length))
 })
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointer, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointer, true)
+})
+
+function setOpsRoot(id: string, el: Element | ComponentPublicInstance | null) {
+  if (!el) {
+    opsRoots.delete(id)
+    return
+  }
+  const node = el instanceof HTMLElement ? el : ((el as ComponentPublicInstance).$el as HTMLElement | undefined)
+  if (node) opsRoots.set(id, node)
+}
+
+function opsItemsFor(data: TreeNode): OpsItem[] {
+  const items: OpsItem[] = [
+    { cmd: 'new-view', label: 'New view' },
+    { cmd: 'rename', label: '重命名' },
+    { cmd: 'jump', label: '跳转到流程图' },
+  ]
+  if (data.kind === 'view') items.push({ cmd: 'promote', label: '提升为表' })
+  items.push({ cmd: 'delete', label: '删除' })
+  return items
+}
+
+function focusMenuItem(root: HTMLElement | null | undefined, index: number | null) {
+  void nextTick(() => {
+    if (!root || index === null) return
+    const menu = root.querySelector('[role="menu"]')
+    if (!menu) return
+    const nodes = menu.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    nodes[index]?.focus()
+  })
+}
+
+function closeAdd() {
+  addOpen.value = false
+  addActive.value = null
+}
+
+function openAdd() {
+  closeOps()
+  addOpen.value = true
+  addActive.value = enabledMenuIndices(addItems)[0] ?? null
+  focusMenuItem(addRoot.value, addActive.value)
+}
+
+function toggleAdd() {
+  if (addOpen.value) closeAdd()
+  else openAdd()
+}
+
+function pickAdd(cmd: string) {
+  closeAdd()
+  emit('add-data', cmd)
+}
+
+function onAddTriggerKey(e: KeyboardEvent) {
+  if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+    if (!addOpen.value) {
+      e.preventDefault()
+      openAdd()
+    }
+  } else if (e.key === 'Escape' && addOpen.value) {
+    e.preventDefault()
+    closeAdd()
+  }
+}
+
+function onAddMenuKey(e: KeyboardEvent) {
+  handleMenuKeydown(e, addItems, {
+    getActiveIndex: () => addActive.value,
+    setActiveIndex: (i) => {
+      addActive.value = i
+      focusMenuItem(addRoot.value, i)
+    },
+    onActivate: (i) => {
+      const item = addItems[i]
+      if (item && !item.disabled) pickAdd(item.cmd)
+    },
+    onClose: closeAdd,
+  })
+}
+
+function closeOps() {
+  opsOpenId.value = null
+  opsActive.value = null
+  opsNode.value = null
+}
+
+function openOps(data: TreeNode) {
+  closeAdd()
+  opsNode.value = data
+  opsOpenId.value = data.id
+  const items = opsItemsFor(data)
+  opsActive.value = enabledMenuIndices(items)[0] ?? null
+  focusMenuItem(opsRoots.get(data.id), opsActive.value)
+}
+
+function toggleOps(data: TreeNode) {
+  if (opsOpenId.value === data.id) closeOps()
+  else openOps(data)
+}
+
+function pickOps(cmd: string, data: TreeNode) {
+  closeOps()
+  onMenu(cmd, data)
+}
+
+function onOpsTriggerKey(e: KeyboardEvent, data: TreeNode) {
+  if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+    if (opsOpenId.value !== data.id) {
+      e.preventDefault()
+      openOps(data)
+    }
+  } else if (e.key === 'Escape' && opsOpenId.value === data.id) {
+    e.preventDefault()
+    closeOps()
+  }
+}
+
+function onOpsMenuKey(e: KeyboardEvent) {
+  const data = opsNode.value
+  if (!data) return
+  const items = opsItemsFor(data)
+  handleMenuKeydown(e, items, {
+    getActiveIndex: () => opsActive.value,
+    setActiveIndex: (i) => {
+      opsActive.value = i
+      focusMenuItem(opsRoots.get(data.id), i)
+    },
+    onActivate: (i) => {
+      const item = items[i]
+      if (item) pickOps(item.cmd, data)
+    },
+    onClose: closeOps,
+  })
+}
+
+function onDocPointer(e: PointerEvent) {
+  const t = e.target as Node
+  if (addOpen.value) {
+    const root = addRoot.value
+    if (root && !root.contains(t)) closeAdd()
+  }
+  if (opsOpenId.value) {
+    const root = opsRoots.get(opsOpenId.value)
+    if (root && !root.contains(t)) closeOps()
+  }
+}
 
 function onClick(data: TreeNode) {
   store.selectNode(data.id, 'workspace')
@@ -224,10 +437,79 @@ function createView() {
   white-space: nowrap;
   flex: 1;
 }
-.ops-btn {
+.menu-anchor {
+  position: relative;
+}
+.icon-btn {
   min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #646a73;
+  font: inherit;
   font-size: 16px;
   font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: var(--ia-accent-soft);
+  color: var(--ia-accent);
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.ops-btn {
+  color: var(--ia-accent);
+}
+.native-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+.native-menu-end {
+  left: auto;
+  right: 0;
+}
+.native-menu li {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #1f2329;
+}
+.native-menu li:hover:not(.is-disabled),
+.native-menu li.is-active:not(.is-disabled),
+.native-menu li:focus-visible:not(.is-disabled) {
+  background: var(--ia-accent-soft);
+  color: var(--ia-accent);
+  outline: none;
+}
+.native-menu li.is-disabled {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+.native-menu li.has-divider {
+  margin-top: 4px;
+  border-top: 1px solid var(--ia-border);
+  padding-top: 10px;
+}
+.native-menu li.is-danger:hover,
+.native-menu li.is-danger.is-active,
+.native-menu li.is-danger:focus-visible {
+  background: #fef0f0;
+  color: #c45656;
 }
 .footer {
   margin-top: auto;

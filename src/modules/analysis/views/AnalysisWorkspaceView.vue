@@ -29,6 +29,7 @@
             :aria-expanded="addDataOpen"
             aria-controls="add-data-menu"
             @click="toggleAddData"
+            @keydown="onAddDataTriggerKey"
           >
             + Add data
           </button>
@@ -38,20 +39,19 @@
             class="add-data-menu"
             role="menu"
             aria-label="+ Add data"
+            @keydown="onAddDataMenuKey"
           >
-            <li role="menuitem" tabindex="-1" @click="pickAddData('csv')" @keydown.enter.prevent="pickAddData('csv')">
-              From CSV
-            </li>
             <li
+              v-for="(item, i) in addDataItems"
+              :key="item.cmd"
               role="menuitem"
-              tabindex="-1"
-              @click="pickAddData('combine')"
-              @keydown.enter.prevent="pickAddData('combine')"
+              :tabindex="addDataActive === i ? 0 : -1"
+              :aria-disabled="item.disabled || undefined"
+              :class="{ 'is-disabled': item.disabled, 'is-active': addDataActive === i }"
+              @click="!item.disabled && pickAddData(item.cmd)"
             >
-              By combining tables
+              {{ item.label }}
             </li>
-            <li role="menuitem" aria-disabled="true" class="is-disabled">From Registry（暂未实现）</li>
-            <li role="menuitem" aria-disabled="true" class="is-disabled">From Plate（暂未实现）</li>
           </ul>
         </div>
       </div>
@@ -92,13 +92,25 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, getCurrentInstance, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import {
+  defineAsyncComponent,
+  getCurrentInstance,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+} from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
 import { toast } from '@/shared/ui/feedback'
+import {
+  enabledMenuIndices,
+  handleMenuKeydown,
+} from '@/shared/ui/menuNav'
 import {
   clampSidebarWidth,
   loadSidebarWidth,
@@ -109,6 +121,13 @@ import {
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
+
+const addDataItems = [
+  { cmd: 'csv', label: 'From CSV', disabled: false },
+  { cmd: 'combine', label: 'By combining tables', disabled: false },
+  { cmd: 'registry', label: 'From Registry（暂未实现）', disabled: true },
+  { cmd: 'plate', label: 'From Plate（暂未实现）', disabled: true },
+] as const
 
 const vxeReady = shallowRef(false)
 const instance = getCurrentInstance()
@@ -122,10 +141,10 @@ const sidebarWidth = ref(loadSidebarWidth())
 const draggingSidebar = ref(false)
 const addDataOpen = ref(false)
 const addDataRoot = ref<HTMLElement | null>(null)
+const addDataActive = ref<number | null>(null)
 
 onMounted(async () => {
   document.addEventListener('pointerdown', onDocPointer, true)
-  document.addEventListener('keydown', onDocKey)
   // Vxe 仅动态导入，避免列表路由共享图误拉；表网格需等注册完成再挂载
   const [{ setupVxe }] = await Promise.all([
     import('@/modules/plugins/vxe'),
@@ -142,7 +161,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
-  document.removeEventListener('keydown', onDocKey)
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
 })
@@ -151,25 +169,67 @@ function stub(name: string) {
   toast('info', `${name}：后续版本`)
 }
 
+function focusAddDataItem() {
+  void nextTick(() => {
+    const menu = addDataRoot.value?.querySelector('#add-data-menu')
+    if (!menu || addDataActive.value === null) return
+    const nodes = menu.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    nodes[addDataActive.value]?.focus()
+  })
+}
+
+function openAddData() {
+  addDataOpen.value = true
+  addDataActive.value = enabledMenuIndices(addDataItems)[0] ?? null
+  focusAddDataItem()
+}
+
+function closeAddData() {
+  addDataOpen.value = false
+  addDataActive.value = null
+}
+
 function toggleAddData() {
-  addDataOpen.value = !addDataOpen.value
+  if (addDataOpen.value) closeAddData()
+  else openAddData()
 }
 
 function pickAddData(cmd: string) {
-  addDataOpen.value = false
+  closeAddData()
   onAddData(cmd)
+}
+
+function onAddDataTriggerKey(e: KeyboardEvent) {
+  if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+    if (!addDataOpen.value) {
+      e.preventDefault()
+      openAddData()
+    }
+  } else if (e.key === 'Escape' && addDataOpen.value) {
+    e.preventDefault()
+    closeAddData()
+  }
+}
+
+function onAddDataMenuKey(e: KeyboardEvent) {
+  handleMenuKeydown(e, addDataItems, {
+    getActiveIndex: () => addDataActive.value,
+    setActiveIndex: (i) => {
+      addDataActive.value = i
+      focusAddDataItem()
+    },
+    onActivate: (i) => {
+      const item = addDataItems[i]
+      if (item && !item.disabled) pickAddData(item.cmd)
+    },
+    onClose: closeAddData,
+  })
 }
 
 function onDocPointer(e: PointerEvent) {
   if (!addDataOpen.value) return
   const root = addDataRoot.value
-  if (root && !root.contains(e.target as Node)) addDataOpen.value = false
-}
-
-function onDocKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && addDataOpen.value) {
-    addDataOpen.value = false
-  }
+  if (root && !root.contains(e.target as Node)) closeAddData()
 }
 
 function onAddData(cmd: string) {
@@ -333,6 +393,7 @@ function onSidebarKey(e: KeyboardEvent) {
   color: #1f2329;
 }
 .add-data-menu li:hover:not(.is-disabled),
+.add-data-menu li.is-active:not(.is-disabled),
 .add-data-menu li:focus-visible:not(.is-disabled) {
   background: var(--ia-accent-soft);
   color: var(--ia-accent);
