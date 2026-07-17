@@ -238,6 +238,7 @@ import {
 } from '@/modules/sidebar/sidebarEmpty'
 import {
   newViewDialogDefaults,
+  resolveAfterCreateFocus,
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
 
@@ -707,13 +708,27 @@ function createView() {
   if (!newViewParent.value) return
   const name = newViewName.value.trim()
   if (!name) return
-  store.addView(
+  const view = store.addView(
     newViewParent.value.tableId,
     newViewParent.value.parentId,
     name,
     newViewType.value,
   )
+  const createdId = view?.id ?? null
+  // Opener CTA (e.g. no-views hint) may unmount — never restore it after create.
+  newViewRestoreFocus = null
   showNewView.value = false
+  const target = resolveAfterCreateFocus({ createdNodeId: createdId })
+  void nextTick(() => {
+    if (target === 'tree-node' && createdId) {
+      const idx = flatNodes.value.findIndex((n) => n.id === createdId)
+      if (idx >= 0) {
+        focusTreeItem(idx)
+        return
+      }
+    }
+    document.getElementById('workspace-main')?.focus({ preventScroll: true })
+  })
 }
 </script>
 

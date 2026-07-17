@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   newViewDialogDefaults,
+  resolveAfterCreateFocus,
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
 
@@ -22,5 +23,10 @@ describe('newViewHandoff', () => {
     expect(resolveNewViewRestoreFocus(explicit)).toBe(explicit)
     expect(resolveNewViewRestoreFocus(null)).toBe(other)
     document.body.innerHTML = ''
+  })
+
+  it('after create: prefer new tree node, else workspace main (never restore opener)', () => {
+    expect(resolveAfterCreateFocus({ createdNodeId: 'vw1' })).toBe('tree-node')
+    expect(resolveAfterCreateFocus({ createdNodeId: null })).toBe('workspace-main')
   })
 })
