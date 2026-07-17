@@ -157,8 +157,11 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   })
 
   await step('Flowchart按钮切换', async () => {
-    await page.getByRole('button', { name: 'Flowchart', exact: true }).click()
-    await page.waitForSelector('text=修改分析结构请从侧栏进行')
+    const btn = page.getByRole('button', { name: 'Flowchart', exact: true })
+    await btn.click()
+    // Cold first open may show "加载流程图…" while vue-flow chunk loads.
+    await page.getByRole('region', { name: '分析流程图' }).waitFor({ state: 'visible', timeout: 45000 })
+    await page.getByText('修改分析结构请从侧栏进行').waitFor({ state: 'visible', timeout: 15000 })
     await page.locator('.tree-node-content').first().click()
     await page.waitForTimeout(500)
   })

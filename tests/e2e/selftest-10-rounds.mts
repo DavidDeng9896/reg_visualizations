@@ -122,6 +122,7 @@ async function main() {
     await p.waitForURL(/\/analyses\//, { timeout: 15000 })
     await p.waitForTimeout(1000)
     await p.getByRole('button', { name: 'Flowchart', exact: true }).click()
+    await p.getByRole('region', { name: '分析流程图' }).waitFor({ state: 'visible', timeout: 45000 })
     await p.waitForTimeout(800)
     if (!(await p.locator('text=修改分析结构请从侧栏进行').count())) {
       ctx.errors.push('flowchart banner missing')

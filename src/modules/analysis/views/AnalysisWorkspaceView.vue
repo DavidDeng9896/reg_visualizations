@@ -95,6 +95,7 @@
 import {
   defineAsyncComponent,
   getCurrentInstance,
+  h,
   nextTick,
   onMounted,
   onUnmounted,
@@ -104,7 +105,6 @@ import {
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
-import FlowchartCanvas from '@/modules/flowchart/FlowchartCanvas.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
 import { toast } from '@/shared/ui/feedback'
 import {
@@ -121,6 +121,15 @@ import {
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
+const FlowchartCanvas = defineAsyncComponent({
+  loader: () => import('@/modules/flowchart/FlowchartCanvas.vue'),
+  delay: 0,
+  loadingComponent: {
+    setup() {
+      return () => h('div', { class: 'loading', role: 'status' }, '加载流程图…')
+    },
+  },
+})
 
 const addDataItems = [
   { cmd: 'csv', label: 'From CSV', disabled: false },

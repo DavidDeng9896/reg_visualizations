@@ -1,14 +1,14 @@
 # UI 全按钮浏览器自测 × 10 轮
 
-> 时间：2026-07-17T02:13:59.300Z
+> 时间：2026-07-17T03:11:20.566Z
 > BASE：http://127.0.0.1:5173
-> 结果：**10/10 轮全通过**
+> 结果：**9/10 轮全通过**
 
 ## 每轮汇总
 
 | Round | 状态 | 失败步骤 | console错误 |
 | --- | --- | --- | --- |
-| 1 | PASS | - | 0 |
+| 1 | FAIL | Flowchart按钮切换 | 0 |
 | 2 | PASS | - | 0 |
 | 3 | PASS | - | 0 |
 | 4 | PASS | - | 0 |
@@ -29,11 +29,14 @@
 - Edit 图表改拟合 Save
 - 导出 PNG / 过滤转换 / 跳转流程图 / 删除
 
-### Round 1 — PASS
+### Round 1 — FAIL
 
 - ✅ 首页-创建按钮可见
 - ✅ 一键Demo-散点图有墨迹
-- ✅ Flowchart按钮切换
+- ❌ Flowchart按钮切换 — TimeoutError: page.waitForSelector: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('text=修改分析结构请从侧栏进行') to be visible
+
 - ✅ Send output占位
 - ✅ Connect external占位
 - ✅ 新建bar视图-自动映射有效
