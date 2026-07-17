@@ -1,169 +1,171 @@
 <template>
   <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
-    <input
-      ref="searchRef"
-      v-model="q"
-      type="search"
-      class="search"
-      placeholder="搜索表 / 视图"
-      aria-label="搜索表或视图"
-      aria-controls="sidebar-tree"
-      autocomplete="off"
-      @keydown="onSearchKeydown"
-    />
-    <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
-    <div class="section-head">
-      <span id="analysis-data-heading">ANALYSIS DATA</span>
-      <div class="menu-anchor" ref="addRoot">
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label="添加数据"
-          aria-haspopup="menu"
-          :aria-expanded="addOpen"
-          aria-controls="sidebar-add-data-menu"
-          @click="toggleAdd"
-          @keydown="onAddTriggerKey"
-        >
-          +
-        </button>
-        <ul
-          v-if="addOpen"
-          id="sidebar-add-data-menu"
-          class="native-menu"
-          role="menu"
-          aria-label="添加数据"
-          @keydown="onAddMenuKey"
-        >
-          <li
-            v-for="(item, i) in addItems"
-            :key="item.cmd"
-            role="menuitem"
-            :tabindex="addActive === i ? 0 : -1"
-            :aria-disabled="item.disabled || undefined"
-            :class="{ 'is-disabled': item.disabled, 'is-active': addActive === i }"
-            @click="!item.disabled && pickAdd(item.cmd)"
-          >
-            {{ item.label }}
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <nav class="tree-nav" aria-labelledby="analysis-data-heading">
-      <ul
-        id="sidebar-tree"
-        class="sidebar-tree"
-        role="tree"
-        aria-label="表与视图树"
-      >
-        <li
-          v-for="(node, index) in flatNodes"
-          :key="node.id"
-          class="tree-node"
-          role="none"
-          :style="{ '--tree-depth': node.depth }"
-        >
-          <div
-            class="tree-node-content"
-            role="treeitem"
-            :aria-selected="store.selectedNodeId === node.id"
-            :aria-level="node.depth + 1"
-            :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
-            :class="{ 'is-current': store.selectedNodeId === node.id }"
-            :tabindex="treeItemTabIndex(index, treeFocusIndex)"
-            :data-tree-index="index"
-            @click="onTreeActivate(node, index)"
-            @focus="treeFocusIndex = index"
-            @keydown="(e) => onTreeItemKeydown(e, node, index)"
-          >
-            <span class="label">{{ node.label }}</span>
-            <span class="ops" @click.stop>
-              <div class="menu-anchor" :ref="(el) => setOpsRoot(node.id, el)">
-                <button
-                  type="button"
-                  class="icon-btn ops-btn"
-                  :aria-label="`${node.label} 更多操作`"
-                  aria-haspopup="menu"
-                  :aria-expanded="opsOpenId === node.id"
-                  :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
-                  tabindex="-1"
-                  @click="toggleOps(node)"
-                  @keydown="(e) => onOpsTriggerKey(e, node, index)"
-                >
-                  ⋯
-                </button>
-                <ul
-                  v-if="opsOpenId === node.id"
-                  :id="`node-ops-menu-${node.id}`"
-                  class="native-menu native-menu-end"
-                  role="menu"
-                  :aria-label="`${node.label} 更多操作`"
-                  @keydown="onOpsMenuKey"
-                >
-                  <li
-                    v-for="(item, i) in opsItemsFor(node)"
-                    :key="item.cmd"
-                    role="menuitem"
-                    :tabindex="opsActive === i ? 0 : -1"
-                    :class="{
-                      'is-active': opsActive === i,
-                      'is-danger': item.cmd === 'delete',
-                      'has-divider': item.cmd === 'delete',
-                    }"
-                    @click="pickOps(item.cmd, node)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
-              </div>
-            </span>
-          </div>
-        </li>
-      </ul>
-      <div
-        v-if="emptyKind"
-        class="tree-empty"
-        v-bind="sidebarEmptyRegionAttrs()"
-      >
-        <strong class="tree-empty__title">{{ emptyCopy.title }}</strong>
-        <p class="tree-empty__body">{{ emptyCopy.body }}</p>
-        <div class="tree-empty__cta">
-          <template v-if="emptyKind === 'no-data'">
-            <button
-              type="button"
-              class="btn btn-primary empty-cta"
-              :aria-label="sidebarEmptyCtaAria('csv')"
-              @click="emit('add-data', 'csv')"
-            >
-              导入 CSV
-            </button>
-            <button
-              type="button"
-              class="btn empty-cta"
-              :aria-label="sidebarEmptyCtaAria('combine')"
-              @click="emit('add-data', 'combine')"
-            >
-              合并表
-            </button>
-          </template>
+    <div class="sidebar-chrome" :inert="chromeInert || undefined">
+      <input
+        ref="searchRef"
+        v-model="q"
+        type="search"
+        class="search"
+        placeholder="搜索表 / 视图"
+        aria-label="搜索表或视图"
+        aria-controls="sidebar-tree"
+        autocomplete="off"
+        @keydown="onSearchKeydown"
+      />
+      <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
+      <div class="section-head">
+        <span id="analysis-data-heading">ANALYSIS DATA</span>
+        <div class="menu-anchor" ref="addRoot">
           <button
-            v-else
             type="button"
-            class="btn empty-cta"
-            :aria-label="sidebarEmptyCtaAria('clear')"
-            @click="clearSearch"
+            class="icon-btn"
+            aria-label="添加数据"
+            aria-haspopup="menu"
+            :aria-expanded="addOpen"
+            aria-controls="sidebar-add-data-menu"
+            @click="toggleAdd"
+            @keydown="onAddTriggerKey"
           >
-            清除搜索
+            +
           </button>
+          <ul
+            v-if="addOpen"
+            id="sidebar-add-data-menu"
+            class="native-menu"
+            role="menu"
+            aria-label="添加数据"
+            @keydown="onAddMenuKey"
+          >
+            <li
+              v-for="(item, i) in addItems"
+              :key="item.cmd"
+              role="menuitem"
+              :tabindex="addActive === i ? 0 : -1"
+              :aria-disabled="item.disabled || undefined"
+              :class="{ 'is-disabled': item.disabled, 'is-active': addActive === i }"
+              @click="!item.disabled && pickAdd(item.cmd)"
+            >
+              {{ item.label }}
+            </li>
+          </ul>
         </div>
       </div>
-    </nav>
 
-    <div class="footer">
-      <button type="button" class="ext-btn" @click="toast('info', 'Connect with external tool：后续版本')">
-        Connect with external tool
-      </button>
+      <nav class="tree-nav" aria-labelledby="analysis-data-heading">
+        <ul
+          id="sidebar-tree"
+          class="sidebar-tree"
+          role="tree"
+          aria-label="表与视图树"
+        >
+          <li
+            v-for="(node, index) in flatNodes"
+            :key="node.id"
+            class="tree-node"
+            role="none"
+            :style="{ '--tree-depth': node.depth }"
+          >
+            <div
+              class="tree-node-content"
+              role="treeitem"
+              :aria-selected="store.selectedNodeId === node.id"
+              :aria-level="node.depth + 1"
+              :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
+              :class="{ 'is-current': store.selectedNodeId === node.id }"
+              :tabindex="treeItemTabIndex(index, treeFocusIndex)"
+              :data-tree-index="index"
+              @click="onTreeActivate(node, index)"
+              @focus="treeFocusIndex = index"
+              @keydown="(e) => onTreeItemKeydown(e, node, index)"
+            >
+              <span class="label">{{ node.label }}</span>
+              <span class="ops" @click.stop>
+                <div class="menu-anchor" :ref="(el) => setOpsRoot(node.id, el)">
+                  <button
+                    type="button"
+                    class="icon-btn ops-btn"
+                    :aria-label="`${node.label} 更多操作`"
+                    aria-haspopup="menu"
+                    :aria-expanded="opsOpenId === node.id"
+                    :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
+                    tabindex="-1"
+                    @click="toggleOps(node)"
+                    @keydown="(e) => onOpsTriggerKey(e, node, index)"
+                  >
+                    ⋯
+                  </button>
+                  <ul
+                    v-if="opsOpenId === node.id"
+                    :id="`node-ops-menu-${node.id}`"
+                    class="native-menu native-menu-end"
+                    role="menu"
+                    :aria-label="`${node.label} 更多操作`"
+                    @keydown="onOpsMenuKey"
+                  >
+                    <li
+                      v-for="(item, i) in opsItemsFor(node)"
+                      :key="item.cmd"
+                      role="menuitem"
+                      :tabindex="opsActive === i ? 0 : -1"
+                      :class="{
+                        'is-active': opsActive === i,
+                        'is-danger': item.cmd === 'delete',
+                        'has-divider': item.cmd === 'delete',
+                      }"
+                      @click="pickOps(item.cmd, node)"
+                    >
+                      {{ item.label }}
+                    </li>
+                  </ul>
+                </div>
+              </span>
+            </div>
+          </li>
+        </ul>
+        <div
+          v-if="emptyKind"
+          class="tree-empty"
+          v-bind="sidebarEmptyRegionAttrs()"
+        >
+          <strong class="tree-empty__title">{{ emptyCopy.title }}</strong>
+          <p class="tree-empty__body">{{ emptyCopy.body }}</p>
+          <div class="tree-empty__cta">
+            <template v-if="emptyKind === 'no-data'">
+              <button
+                type="button"
+                class="btn btn-primary empty-cta"
+                :aria-label="sidebarEmptyCtaAria('csv')"
+                @click="emit('add-data', 'csv')"
+              >
+                导入 CSV
+              </button>
+              <button
+                type="button"
+                class="btn empty-cta"
+                :aria-label="sidebarEmptyCtaAria('combine')"
+                @click="emit('add-data', 'combine')"
+              >
+                合并表
+              </button>
+            </template>
+            <button
+              v-else
+              type="button"
+              class="btn empty-cta"
+              :aria-label="sidebarEmptyCtaAria('clear')"
+              @click="clearSearch"
+            >
+              清除搜索
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="footer">
+        <button type="button" class="ext-btn" @click="toast('info', 'Connect with external tool：后续版本')">
+          Connect with external tool
+        </button>
+      </div>
     </div>
 
     <div
@@ -223,6 +225,7 @@ import {
 } from '@/modules/sidebar/sidebarTree'
 import {
   clampTreeFocusIndex,
+  formatSearchNoMatchStatus,
   nextSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
@@ -241,6 +244,7 @@ import {
   resolveAfterCreateFocus,
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
+import { sidebarChromeInert } from '@/modules/sidebar/sidebarDialogInert'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -316,6 +320,7 @@ const emptyKind = computed(() =>
 const emptyCopy = computed(() =>
   emptyKind.value ? sidebarEmptyCopy(emptyKind.value) : { title: '', body: '' },
 )
+const chromeInert = computed(() => sidebarChromeInert(showNewView.value))
 
 watch(
   flatNodes,
@@ -323,6 +328,15 @@ watch(
     treeFocusIndex.value = clampTreeFocusIndex(nodes.length, treeFocusIndex.value)
   },
   { immediate: true },
+)
+
+watch(
+  [emptyKind, q],
+  ([kind, query]) => {
+    if (kind === 'no-match') {
+      searchStatus.value = formatSearchNoMatchStatus(query)
+    }
+  },
 )
 
 watch(
@@ -619,7 +633,10 @@ function onDocPointer(e: PointerEvent) {
 function clearSearch() {
   q.value = ''
   void nextTick(() => {
-    const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
+    // Empty-CTA clear always announces so users hear confirmation after no-match.
+    const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length, {
+      force: true,
+    })
     if (next !== null) searchStatus.value = next
     focusSearch()
   })
@@ -741,6 +758,13 @@ function createView() {
   display: flex;
   flex-direction: column;
   padding: 10px;
+  min-width: 0;
+}
+.sidebar-chrome {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
 }
 .search {

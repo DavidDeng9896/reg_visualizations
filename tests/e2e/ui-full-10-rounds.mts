@@ -111,7 +111,13 @@ async function newViewOfType(page: Page, type: string) {
   await page.waitForSelector('text=新建视图')
   await page.getByLabel('View Type').selectOption(type)
   await page.getByRole('button', { name: '创建', exact: true }).click()
-  await page.waitForTimeout(1200)
+  // Round 31: after create, focus lands on the new tree node (not body / opener CTA).
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute('role') === 'treeitem',
+    undefined,
+    { timeout: 8000 },
+  )
+  await page.waitForTimeout(800)
 }
 
 async function runRound(page: Page, round: number): Promise<RoundResult> {

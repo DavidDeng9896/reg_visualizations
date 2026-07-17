@@ -62,4 +62,16 @@ describe('routeFocus', () => {
       document.body.innerHTML = ''
     }
   })
+
+  it('does not treat analysis-list-main (table/skeleton) as an empty skip target (Round 31)', () => {
+    document.body.innerHTML = `
+      <main id="workspace-main" tabindex="-1">Main</main>
+      <div id="analysis-list-main" tabindex="-1"><button type="button">row</button></div>
+    `
+    const row = document.querySelector('button')!
+    row.focus()
+    expect(shouldSkipRouteFocus(document)).toBe(false)
+    expect(focusAfterNavigation(document)?.id).toBe('workspace-main')
+    document.body.innerHTML = ''
+  })
 })

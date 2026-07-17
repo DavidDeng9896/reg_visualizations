@@ -1,6 +1,6 @@
 <template>
   <div class="list-page">
-    <a class="skip-link" data-ia-skip="1" href="#analysis-list">跳到列表</a>
+    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到列表</a>
     <header class="top">
       <div>
         <h1 tabindex="-1">Insight Analysis</h1>
@@ -24,65 +24,68 @@
       </label>
     </div>
 
-    <div v-bind="listEmptyRegionAttrs()">
-      <div
-        v-if="!listReady"
-        class="list-skel ia-skel"
-        v-bind="listSkeletonAttrs()"
-      >
-        <div class="list-skel__rows" aria-hidden="true">
-          <div v-for="n in 4" :key="n" class="ia-skel__pulse list-skel__row" />
-        </div>
-        <span class="sr-only">加载中…</span>
+    <div
+      v-if="!listReady"
+      class="list-skel ia-skel"
+      v-bind="{ ...listMainRegionAttrs(), ...listSkeletonAttrs() }"
+    >
+      <div class="list-skel__rows" aria-hidden="true">
+        <div v-for="n in 4" :key="n" class="ia-skel__pulse list-skel__row" />
       </div>
-      <table v-else-if="filtered.length" class="analysis-table" aria-label="Analysis 列表">
-        <thead>
-          <tr>
-            <th scope="col">名称</th>
-            <th scope="col">项目</th>
-            <th scope="col">更新时间</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in filtered"
-            :key="row.id"
-            tabindex="0"
-            @click="open(row)"
-            @keydown.enter="open(row)"
-          >
-            <td>{{ row.name }}</td>
-            <td>{{ getProjectName(row.projectId) }}</td>
-            <td>{{ formatTime(row.updatedAt) }}</td>
-            <td>
-              <button type="button" class="link-danger" @click.stop="onRemove(row.id)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else class="empty-list" role="status">
-        <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
-        <p>还没有 Analysis。使用下方按钮快速体验，或创建后导入 CSV。</p>
-        <div class="empty-list__cta">
-          <button
-            type="button"
-            class="btn empty-cta"
-            :aria-label="listEmptyCtaAria('demo')"
-            :disabled="demoBusy"
-            @click="createDemo"
-          >
-            {{ demoBusy ? '创建中…' : '一键 Demo' }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary empty-cta"
-            :aria-label="listEmptyCtaAria('create')"
-            @click="showCreate = true"
-          >
-            + 创建 Analysis
-          </button>
-        </div>
+      <span class="sr-only">加载中…</span>
+    </div>
+    <table
+      v-else-if="filtered.length"
+      class="analysis-table"
+      aria-label="Analysis 列表"
+      v-bind="listMainRegionAttrs()"
+    >
+      <thead>
+        <tr>
+          <th scope="col">名称</th>
+          <th scope="col">项目</th>
+          <th scope="col">更新时间</th>
+          <th scope="col">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="row in filtered"
+          :key="row.id"
+          tabindex="0"
+          @click="open(row)"
+          @keydown.enter="open(row)"
+        >
+          <td>{{ row.name }}</td>
+          <td>{{ getProjectName(row.projectId) }}</td>
+          <td>{{ formatTime(row.updatedAt) }}</td>
+          <td>
+            <button type="button" class="link-danger" @click.stop="onRemove(row.id)">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-else class="empty-list" role="status" v-bind="listEmptyRegionAttrs()">
+      <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
+      <p>还没有 Analysis。使用下方按钮快速体验，或创建后导入 CSV。</p>
+      <div class="empty-list__cta">
+        <button
+          type="button"
+          class="btn empty-cta"
+          :aria-label="listEmptyCtaAria('demo')"
+          :disabled="demoBusy"
+          @click="createDemo"
+        >
+          {{ demoBusy ? '创建中…' : '一键 Demo' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary empty-cta"
+          :aria-label="listEmptyCtaAria('create')"
+          @click="showCreate = true"
+        >
+          + 创建 Analysis
+        </button>
       </div>
     </div>
 
@@ -97,7 +100,12 @@ import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
-import { listEmptyRegionAttrs, listEmptyCtaAria } from '@/modules/analysis/listEmpty'
+import {
+  listEmptyRegionAttrs,
+  listEmptyCtaAria,
+  listMainRegionAttrs,
+  listSkipHref,
+} from '@/modules/analysis/listEmpty'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 
@@ -114,6 +122,10 @@ const listReady = ref(false)
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
+)
+
+const skipHref = computed(() =>
+  listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
 )
 
 onMounted(async () => {

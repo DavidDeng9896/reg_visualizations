@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { workspaceSkipHref } from '@/modules/analysis/workspaceSkip'
+import {
+  includeSidebarEmptyInWorkspaceSkip,
+  workspaceSkipHref,
+} from '@/modules/analysis/workspaceSkip'
 
 describe('workspaceSkip', () => {
   it('targets flow-empty when flowchart has no nodes', () => {
@@ -37,5 +40,17 @@ describe('workspaceSkip', () => {
         workspaceEmpty: false,
       }),
     ).toBe('#workspace-main')
+  })
+
+  it('keeps #sidebar-empty out of workspace skip (main-content semantics, Round 31)', () => {
+    expect(includeSidebarEmptyInWorkspaceSkip()).toBe(false)
+    const href = workspaceSkipHref({
+      mode: 'workspace',
+      flowchartEmpty: false,
+      workspaceEmpty: true,
+      sidebarEmpty: true,
+    })
+    expect(href).toBe('#ws-empty')
+    expect(href).not.toContain('sidebar-empty')
   })
 })

@@ -50,16 +50,25 @@ export function formatSearchClearedStatus(visibleCount: number): string {
   return `已清空搜索，显示 ${visibleCount} 个节点`
 }
 
+/** Live-region copy when the sidebar filter yields zero nodes (Round 31). */
+export function formatSearchNoMatchStatus(query: string): string {
+  const q = query.trim()
+  return q ? `无匹配结果：${q}` : '无匹配结果'
+}
+
 /**
  * Next live-region status after clearing search.
  * Returns `null` when the message would duplicate the previous announcement
  * (consecutive Esc / identical visible count), so the region is not re-spammed.
+ * Empty-CTA clear may pass `{ force: true }` so the user always hears confirmation.
  */
 export function nextSearchClearedStatus(
   previous: string,
   visibleCount: number,
+  opts?: { force?: boolean },
 ): string | null {
   const next = formatSearchClearedStatus(visibleCount)
+  if (opts?.force) return next
   return previous === next ? null : next
 }
 
