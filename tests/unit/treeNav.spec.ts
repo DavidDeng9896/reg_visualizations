@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   clampTreeFocusIndex,
   formatSearchClearedStatus,
+  formatSearchMatchStatus,
   formatSearchNoMatchStatus,
   nextSearchClearedStatus,
+  nextSearchMatchStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
   resolveTreeKeyAction,
+  shouldRevealSearchAfterClear,
   treeItemTabIndex,
 } from '@/modules/sidebar/treeNav'
 
@@ -61,6 +64,26 @@ describe('treeNav', () => {
   it('announces no-match while the sidebar filter yields zero nodes', () => {
     expect(formatSearchNoMatchStatus('xyz')).toBe('无匹配结果：xyz')
     expect(formatSearchNoMatchStatus('  ')).toBe('无匹配结果')
+  })
+
+  it('announces match count while the sidebar filter yields nodes (Round 32)', () => {
+    expect(formatSearchMatchStatus('demo', 1)).toBe('找到 1 个匹配：demo')
+    expect(formatSearchMatchStatus('demo', 3)).toBe('找到 3 个匹配：demo')
+    expect(formatSearchMatchStatus('  ', 2)).toBe('')
+  })
+
+  it('dedupes consecutive identical match-count live statuses', () => {
+    const first = nextSearchMatchStatus('', 'ab', 2)
+    expect(first).toBe('找到 2 个匹配：ab')
+    expect(nextSearchMatchStatus(first!, 'ab', 2)).toBeNull()
+    expect(nextSearchMatchStatus(first!, 'ab', 4)).toBe('找到 4 个匹配：ab')
+    expect(nextSearchMatchStatus(first!, '', 4)).toBeNull()
+  })
+
+  it('reveals search after clearing from a no-match empty state', () => {
+    expect(shouldRevealSearchAfterClear('no-match')).toBe(true)
+    expect(shouldRevealSearchAfterClear('no-data')).toBe(false)
+    expect(shouldRevealSearchAfterClear(null)).toBe(false)
   })
 
   it('moves focus with wrap within bounds', () => {

@@ -266,6 +266,7 @@ import {
 import { tableNoViewsCtaAria, tableNoViewsHint } from './tableNoViewsHint'
 import { warmIdle } from '@/shared/ui/warmIdle'
 import { handleMenuKeydown } from '@/shared/ui/menuNav'
+import { setWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
 
 const emit = defineEmits<{ 'add-data': [cmd: string]; 'request-new-view': [] }>()
 const store = useAnalysisStore()
@@ -279,6 +280,8 @@ const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 12
 const splitRatio = ref(DEFAULT_SPLIT_RATIO)
 const dragging = ref(false)
 const layoutHintDismissed = ref(isLayoutHintDismissed())
+
+watch(showTransforms, (open) => setWorkspaceDialogOpen('transform', open))
 
 const viewTypeOptions: { value: ViewType; label: string }[] = [
   { value: 'table', label: '表格 table' },
@@ -482,6 +485,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
   window.removeEventListener('pointermove', onSplitterMove)
   window.removeEventListener('pointerup', onSplitterUp)
+  setWorkspaceDialogOpen('transform', false)
 })
 
 function onDismissLayoutHint() {

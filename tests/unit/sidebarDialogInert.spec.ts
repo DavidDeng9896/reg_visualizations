@@ -6,4 +6,11 @@ describe('sidebarDialogInert', () => {
     expect(sidebarChromeInert(true)).toBe(true)
     expect(sidebarChromeInert(false)).toBe(false)
   })
+
+  it('ORs any workspace / feedback overlay layer (Round 32)', () => {
+    expect(sidebarChromeInert(false, false, false)).toBe(false)
+    expect(sidebarChromeInert(false, true)).toBe(true)
+    expect(sidebarChromeInert(false, false, true, false)).toBe(true)
+    expect(sidebarChromeInert(true, false, false)).toBe(true)
+  })
 })

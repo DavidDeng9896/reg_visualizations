@@ -1,10 +1,12 @@
 /**
- * ChartEditDrawer STYLE panel chunk strategy (Round 29 eval).
+ * ChartEditDrawer STYLE panel chunk strategy (Round 32 re-eval).
  *
  * STYLE is still deeply two-way-bound to `draft` in ChartEditDrawer.vue.
  * Splitting into an async SFC would require lifting ~30+ draft.style fields
  * (or passing the whole draft + many emits). Round 28 already gates mount
  * with `v-if="tab === 'style'"` so STYLE DOM is deferred until the tab opens.
+ * Round 32: ChartEditDrawer stays async at the workspace boundary; STYLE
+ * remains sync-vif inside the drawer (no draft-binding split yet).
  *
  * Keep sync `v-if` until a draft-binding split is designed; record the deferral
  * so builds/tests document the decision.

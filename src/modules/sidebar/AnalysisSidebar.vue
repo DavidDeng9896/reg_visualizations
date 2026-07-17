@@ -213,7 +213,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
-import { confirm, isFeedbackCancel, prompt, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, onFeedbackDialogOpenChange, prompt, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
@@ -227,6 +227,8 @@ import {
   clampTreeFocusIndex,
   formatSearchNoMatchStatus,
   nextSearchClearedStatus,
+  nextSearchMatchStatus,
+  shouldRevealSearchAfterClear,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -245,6 +247,7 @@ import {
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
 import { sidebarChromeInert } from '@/modules/sidebar/sidebarDialogInert'
+import { anyWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -255,6 +258,7 @@ const store = useAnalysisStore()
 const q = ref('')
 const searchRef = ref<HTMLInputElement | null>(null)
 const searchStatus = ref('')
+const feedbackDialogOpen = ref(false)
 const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
@@ -263,6 +267,7 @@ const newViewNameRef = ref<HTMLInputElement | null>(null)
 const newViewPanelRef = ref<HTMLElement | null>(null)
 let newViewRestoreFocus: HTMLElement | null = null
 let pendingRestoreFocus: HTMLElement | null = null
+let stopFeedbackDialogListen: (() => void) | null = null
 const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
 
 const FOCUSABLE =
@@ -320,7 +325,9 @@ const emptyKind = computed(() =>
 const emptyCopy = computed(() =>
   emptyKind.value ? sidebarEmptyCopy(emptyKind.value) : { title: '', body: '' },
 )
-const chromeInert = computed(() => sidebarChromeInert(showNewView.value))
+const chromeInert = computed(() =>
+  sidebarChromeInert(showNewView.value, anyWorkspaceDialogOpen(), feedbackDialogOpen.value),
+)
 
 watch(
   flatNodes,
@@ -331,11 +338,14 @@ watch(
 )
 
 watch(
-  [emptyKind, q],
-  ([kind, query]) => {
+  [emptyKind, q, () => flatNodes.value.length],
+  ([kind, query, count]) => {
     if (kind === 'no-match') {
       searchStatus.value = formatSearchNoMatchStatus(query)
+      return
     }
+    const next = nextSearchMatchStatus(searchStatus.value, query, count)
+    if (next !== null) searchStatus.value = next
   },
 )
 
@@ -350,10 +360,15 @@ watch(
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer, true)
+  stopFeedbackDialogListen = onFeedbackDialogOpenChange((open) => {
+    feedbackDialogOpen.value = open
+  })
 })
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
+  stopFeedbackDialogListen?.()
+  stopFeedbackDialogListen = null
 })
 
 watch(showNewView, (open) => {
@@ -516,12 +531,14 @@ function onSearchKeydown(e: KeyboardEvent) {
   if (!action) return
   e.preventDefault()
   if (action === 'clear') {
+    const reveal = shouldRevealSearchAfterClear(emptyKind.value)
     q.value = ''
     // Announce after clear so the live region reflects the unfiltered tree;
     // skip when the message would duplicate the previous live status.
     void nextTick(() => {
       const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
       if (next !== null) searchStatus.value = next
+      if (reveal) focusSearch({ reveal: true })
     })
     return
   }
@@ -532,9 +549,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   focusTreeItem(target)
 }
 
-function focusSearch() {
+function focusSearch(opts?: { reveal?: boolean }) {
   void nextTick(() => {
-    searchRef.value?.focus()
+    const el = searchRef.value
+    if (!el) return
+    el.focus()
+    if (opts?.reveal) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
 }
 
@@ -631,6 +651,7 @@ function onDocPointer(e: PointerEvent) {
 }
 
 function clearSearch() {
+  const reveal = shouldRevealSearchAfterClear(emptyKind.value)
   q.value = ''
   void nextTick(() => {
     // Empty-CTA clear always announces so users hear confirmation after no-match.
@@ -638,7 +659,7 @@ function clearSearch() {
       force: true,
     })
     if (next !== null) searchStatus.value = next
-    focusSearch()
+    focusSearch({ reveal })
   })
 }
 

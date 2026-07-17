@@ -127,6 +127,7 @@ import {
   onUnmounted,
   ref,
   shallowRef,
+  watch,
 } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { workspaceSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
@@ -146,6 +147,7 @@ import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
+import { setWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
@@ -194,6 +196,9 @@ const sidebarRef = ref<{
   }) => void
 } | null>(null)
 
+watch(showCsv, (open) => setWorkspaceDialogOpen('csv', open))
+watch(showCombine, (open) => setWorkspaceDialogOpen('combine', open))
+
 const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
 const workspaceEmpty = computed(() => !store.workspaceResult)
 const skipHref = computed(() =>
@@ -226,6 +231,8 @@ onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
+  setWorkspaceDialogOpen('csv', false)
+  setWorkspaceDialogOpen('combine', false)
 })
 
 function stub(name: string) {

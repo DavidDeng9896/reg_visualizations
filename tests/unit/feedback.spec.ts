@@ -9,7 +9,13 @@ import {
   toastLivePoliteness,
   trapTabKey,
 } from '@/shared/ui/feedbackA11y'
-import { confirm, prompt, toast, listToastCloseButtons } from '@/shared/ui/feedback'
+import {
+  confirm,
+  onFeedbackDialogOpenChange,
+  prompt,
+  toast,
+  listToastCloseButtons,
+} from '@/shared/ui/feedback'
 
 describe('feedbackA11y', () => {
   it('maps toast live politeness by severity', () => {
@@ -164,6 +170,24 @@ describe('native feedback', () => {
     await expect(p).rejects.toMatchObject({ action: 'cancel' })
     expect(document.querySelector('.ia-toast--info')).toBeTruthy()
     expect(host.hasAttribute('inert')).toBe(false)
+  })
+
+  it('notifies subscribers when confirm opens and closes (Round 32)', async () => {
+    const seen: boolean[] = []
+    const stop = onFeedbackDialogOpenChange((open) => {
+      seen.push(open)
+    })
+    expect(seen[0]).toBe(false)
+
+    const p = confirm('订阅确认', '确认', { type: 'info' })
+    await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="confirm"]')).toBeTruthy())
+    expect(seen).toContain(true)
+
+    const root = document.querySelector('[data-ia-feedback="confirm"]')!
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await expect(p).rejects.toMatchObject({ action: 'cancel' })
+    expect(seen.at(-1)).toBe(false)
+    stop()
   })
 
   it('danger confirm focuses Cancel and styles primary as danger', async () => {

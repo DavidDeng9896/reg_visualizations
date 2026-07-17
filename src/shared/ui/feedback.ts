@@ -27,6 +27,26 @@ let boxSeq = 0
 let openBoxCount = 0
 let docEscBound = false
 
+type FeedbackDialogListener = (open: boolean) => void
+const feedbackDialogListeners = new Set<FeedbackDialogListener>()
+
+function notifyFeedbackDialogListeners() {
+  const open = openBoxCount > 0
+  feedbackDialogListeners.forEach((fn) => fn(open))
+}
+
+/**
+ * Subscribe to native confirm/prompt open state (Round 32).
+ * Invokes immediately with the current open flag; returns an unsubscribe.
+ */
+export function onFeedbackDialogOpenChange(fn: FeedbackDialogListener): () => void {
+  feedbackDialogListeners.add(fn)
+  fn(openBoxCount > 0)
+  return () => {
+    feedbackDialogListeners.delete(fn)
+  }
+}
+
 function ensureToastHost(): HTMLElement {
   if (toastHost && document.body.contains(toastHost)) return toastHost
   const host = document.createElement('div')
@@ -239,6 +259,7 @@ function openMessageBox(
 
     openBoxCount += 1
     syncToastHostInert()
+    notifyFeedbackDialogListeners()
 
     let settled = false
     const cleanup = () => {
@@ -246,6 +267,7 @@ function openMessageBox(
       root.remove()
       openBoxCount = Math.max(0, openBoxCount - 1)
       syncToastHostInert()
+      notifyFeedbackDialogListeners()
       document.body.style.overflow = prevOverflow
       if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
     }
