@@ -12,7 +12,7 @@
 | 分支 | `cursor/bc-62543417-0c06-4f95-b90e-3e876af1f7e5-d4ee`（Round 30） |
 | 阶段 | **优化 Round 30 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=30`） |
 | 上次更新 | 2026-07-17 21:08 |
-| 单元 | **160/160 PASS**（+sidebarEmpty / newViewHandoff / projectsChunk / emptyCtaFocus / routeFocus empty） |
+| 单元 | **161/161 PASS**（+sidebarEmpty / newViewHandoff / projectsChunk / emptyCtaFocus / routeFocus empty / after-create focus） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（dist 无 EP；projects ~116.8 仍 defer split） |
 
@@ -23,7 +23,7 @@
 | 需求 | 状态 |
 | --- | --- |
 | 侧栏无匹配 / 无数据空态 CTA | ✅ Round 30 |
-| New view 引导 → 侧栏对话框焦点衔接 | ✅ |
+| New view 引导 → 侧栏对话框焦点衔接 | ✅ 取消恢复 CTA；创建后聚焦新树节点 |
 | 空态 CTA 焦点环统一（main.css） | ✅ |
 | skip 空态 landmark ↔ routeFocus 不抢焦 | ✅ |
 | projects chunk 细分评估 | ✅ 仍 defer（Dexie/store shared-entry） |
