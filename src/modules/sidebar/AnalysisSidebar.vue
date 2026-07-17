@@ -1,6 +1,7 @@
 <template>
   <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
     <input
+      ref="searchRef"
       v-model="q"
       type="search"
       class="search"
@@ -10,6 +11,7 @@
       autocomplete="off"
       @keydown="onSearchKeydown"
     />
+    <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
     <div class="section-head">
       <span id="analysis-data-heading">ANALYSIS DATA</span>
       <div class="menu-anchor" ref="addRoot">
@@ -184,6 +186,7 @@ import {
 } from '@/modules/sidebar/sidebarTree'
 import {
   clampTreeFocusIndex,
+  nextSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -198,6 +201,8 @@ withDefaults(
 )
 const store = useAnalysisStore()
 const q = ref('')
+const searchRef = ref<HTMLInputElement | null>(null)
+const searchStatus = ref('')
 const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
@@ -343,6 +348,9 @@ function closeAdd(opts?: { restoreFocus?: boolean }) {
 
 function openAdd() {
   closeOps({ restoreFocus: false })
+  // Intent-warm dialogs owned by workspace (CSV / Combine).
+  void import('@/modules/table/CsvImportDialog.vue')
+  void import('@/modules/table/CombineTablesDialog.vue')
   addOpen.value = true
   addActive.value = enabledMenuIndices(addItems)[0] ?? null
   focusMenuItem(addRoot.value, addActive.value)
@@ -435,6 +443,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   e.preventDefault()
   if (action === 'clear') {
     q.value = ''
+    // Announce after clear so the live region reflects the unfiltered tree;
+    // skip when the message would duplicate the previous live status.
+    void nextTick(() => {
+      const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
+      if (next !== null) searchStatus.value = next
+    })
     return
   }
   // enter-tree: move focus to first (or current) visible tree item
@@ -442,6 +456,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   if (!count) return
   const target = clampTreeFocusIndex(count, treeFocusIndex.value) ?? 0
   focusTreeItem(target)
+}
+
+function focusSearch() {
+  void nextTick(() => {
+    searchRef.value?.focus()
+  })
 }
 
 function focusTreeItem(index: number | null) {
@@ -461,11 +481,18 @@ function onTreeActivate(data: SidebarTreeNode, index: number) {
 }
 
 function onTreeItemKeydown(e: KeyboardEvent, data: SidebarTreeNode, index: number) {
-  const action = resolveTreeKeyAction(e.key)
+  const action = resolveTreeKeyAction(e.key, index)
   if (!action) return
 
   const count = flatNodes.value.length
   if (!count) return
+
+  if (action === 'leave-to-search') {
+    e.preventDefault()
+    e.stopPropagation()
+    focusSearch()
+    return
+  }
 
   if (action === 'ops') {
     e.preventDefault()
@@ -626,6 +653,17 @@ function createView() {
   outline: 2px solid var(--ia-accent);
   outline-offset: 1px;
   border-color: var(--ia-accent);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .tree-nav {
   flex: 1;

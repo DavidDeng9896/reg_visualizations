@@ -2,34 +2,48 @@
   <el-dialog :model-value="modelValue" title="By combining tables" width="780px" @close="close">
     <el-form label-width="110px">
       <el-form-item label="左表">
-        <el-select v-model="leftId" style="width: 100%">
-          <el-option v-for="t in tables" :key="t.id" :label="t.name" :value="t.id" />
-        </el-select>
+        <select v-model="leftId" class="native-field-select" style="width: 100%" aria-label="左表">
+          <option value="" disabled>请选择</option>
+          <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
       </el-form-item>
       <el-form-item label="右表">
-        <el-select v-model="rightId" style="width: 100%">
-          <el-option v-for="t in tables" :key="t.id" :label="t.name" :value="t.id" />
-        </el-select>
+        <select v-model="rightId" class="native-field-select" style="width: 100%" aria-label="右表">
+          <option value="" disabled>请选择</option>
+          <option v-for="t in tables" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
       </el-form-item>
       <el-form-item label="连接类型">
-        <el-select v-model="joinType" style="width: 100%">
-          <el-option label="Left Join" value="left" />
-          <el-option label="Inner Join" value="inner" />
-          <el-option label="Right Join" value="right" />
-          <el-option label="Full Join" value="full" />
-          <el-option label="Append" value="append" />
-        </el-select>
+        <select v-model="joinType" class="native-field-select" style="width: 100%" aria-label="连接类型">
+          <option value="left">Left Join</option>
+          <option value="inner">Inner Join</option>
+          <option value="right">Right Join</option>
+          <option value="full">Full Join</option>
+          <option value="append">Append</option>
+        </select>
       </el-form-item>
       <template v-if="joinType !== 'append'">
         <el-form-item label="左连接键">
-          <el-select v-model="leftKeys" multiple style="width: 100%">
-            <el-option v-for="c in leftCols" :key="c.field" :label="c.title" :value="c.field" />
-          </el-select>
+          <select
+            v-model="leftKeys"
+            multiple
+            class="native-field-select native-multi"
+            style="width: 100%"
+            aria-label="左连接键"
+          >
+            <option v-for="c in leftCols" :key="c.field" :value="c.field">{{ c.title }}</option>
+          </select>
         </el-form-item>
         <el-form-item label="右连接键">
-          <el-select v-model="rightKeys" multiple style="width: 100%">
-            <el-option v-for="c in rightCols" :key="c.field" :label="c.title" :value="c.field" />
-          </el-select>
+          <select
+            v-model="rightKeys"
+            multiple
+            class="native-field-select native-multi"
+            style="width: 100%"
+            aria-label="右连接键"
+          >
+            <option v-for="c in rightCols" :key="c.field" :value="c.field">{{ c.title }}</option>
+          </select>
         </el-form-item>
       </template>
       <el-form-item label="新表名称">
@@ -148,5 +162,23 @@ function add() {
   margin: 8px 0;
   color: #646a73;
   font-size: 13px;
+}
+.native-field-select {
+  height: 32px;
+  border: 1px solid #d0d3d6;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #fff;
+  color: #1f2329;
+  font-size: 13px;
+}
+.native-field-select:focus-visible {
+  outline: 2px solid #3370ff;
+  outline-offset: 1px;
+}
+.native-multi {
+  height: auto;
+  min-height: 88px;
+  padding: 4px 6px;
 }
 </style>

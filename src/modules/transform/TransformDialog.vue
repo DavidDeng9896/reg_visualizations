@@ -3,18 +3,18 @@
     <template v-if="store.selectedView">
       <h4>视图过滤</h4>
       <div v-for="(f, i) in filters" :key="f.id" class="row">
-        <el-select v-model="f.field" style="width: 140px">
-          <el-option v-for="c in cols" :key="c.field" :label="c.title" :value="c.field" />
-        </el-select>
-        <el-select v-model="f.op" style="width: 120px">
-          <el-option label="等于" value="eq" />
-          <el-option label="不等于" value="neq" />
-          <el-option label="包含" value="contains" />
-          <el-option label="为空" value="empty" />
-          <el-option label="非空" value="notEmpty" />
-          <el-option label=">" value="gt" />
-          <el-option label="<" value="lt" />
-        </el-select>
+        <select v-model="f.field" class="native-field-select" style="width: 140px" aria-label="过滤字段">
+          <option v-for="c in cols" :key="c.field" :value="c.field">{{ c.title }}</option>
+        </select>
+        <select v-model="f.op" class="native-field-select" style="width: 120px" aria-label="过滤运算符">
+          <option value="eq">等于</option>
+          <option value="neq">不等于</option>
+          <option value="contains">包含</option>
+          <option value="empty">为空</option>
+          <option value="notEmpty">非空</option>
+          <option value="gt">&gt;</option>
+          <option value="lt">&lt;</option>
+        </select>
         <el-input v-model="f.value" style="width: 140px" :disabled="f.op === 'empty' || f.op === 'notEmpty'" />
         <el-button @click="filters.splice(i, 1)">删</el-button>
       </div>
@@ -22,22 +22,34 @@
 
       <h4 style="margin-top: 16px">转换步骤</h4>
       <div v-for="(t, i) in transforms" :key="t.id" class="row transform">
-        <el-select v-model="t.kind" style="width: 130px" @change="() => resetConfig(t)">
-          <el-option label="选列" value="select" />
-          <el-option label="重命名" value="rename" />
-          <el-option label="派生列" value="derived" />
-          <el-option label="去重" value="dedupe" />
-          <el-option label="排序" value="sort" />
-        </el-select>
+        <select
+          class="native-field-select"
+          style="width: 130px"
+          aria-label="转换类型"
+          :value="t.kind"
+          @change="onKindChange(t, $event)"
+        >
+          <option value="select">选列</option>
+          <option value="rename">重命名</option>
+          <option value="derived">派生列</option>
+          <option value="dedupe">去重</option>
+          <option value="sort">排序</option>
+        </select>
         <template v-if="t.kind === 'select' || t.kind === 'dedupe'">
-          <el-select v-model="t.config.fields" multiple style="width: 280px">
-            <el-option v-for="c in cols" :key="c.field" :label="c.title" :value="c.field" />
-          </el-select>
+          <select
+            v-model="t.config.fields"
+            multiple
+            class="native-field-select native-multi"
+            style="width: 280px"
+            aria-label="转换列"
+          >
+            <option v-for="c in cols" :key="c.field" :value="c.field">{{ c.title }}</option>
+          </select>
         </template>
         <template v-else-if="t.kind === 'rename'">
-          <el-select v-model="t.config.from" style="width: 120px">
-            <el-option v-for="c in cols" :key="c.field" :label="c.title" :value="c.field" />
-          </el-select>
+          <select v-model="t.config.from" class="native-field-select" style="width: 120px" aria-label="重命名源列">
+            <option v-for="c in cols" :key="c.field" :value="c.field">{{ c.title }}</option>
+          </select>
           <el-input v-model="t.config.to" placeholder="新 field" style="width: 120px" />
         </template>
         <template v-else-if="t.kind === 'derived'">
@@ -45,13 +57,25 @@
           <el-input v-model="t.config.expr" placeholder="如 colA + colB 或 concat(a,b)" style="width: 220px" />
         </template>
         <template v-else-if="t.kind === 'sort'">
-          <el-select v-model="sortField" style="width: 140px" @change="syncSort(t)">
-            <el-option v-for="c in cols" :key="c.field" :label="c.title" :value="c.field" />
-          </el-select>
-          <el-select v-model="sortOrder" style="width: 100px" @change="syncSort(t)">
-            <el-option label="升序" value="asc" />
-            <el-option label="降序" value="desc" />
-          </el-select>
+          <select
+            class="native-field-select"
+            style="width: 140px"
+            aria-label="排序字段"
+            :value="sortField"
+            @change="onSortField($event, t)"
+          >
+            <option v-for="c in cols" :key="c.field" :value="c.field">{{ c.title }}</option>
+          </select>
+          <select
+            class="native-field-select"
+            style="width: 100px"
+            aria-label="排序方向"
+            :value="sortOrder"
+            @change="onSortOrder($event, t)"
+          >
+            <option value="asc">升序</option>
+            <option value="desc">降序</option>
+          </select>
         </template>
         <el-button @click="transforms.splice(i, 1)">删</el-button>
         <el-button v-if="i" @click="move(i, -1)">上</el-button>
@@ -106,8 +130,21 @@ function addTransform() {
 function resetConfig(t: TransformStep) {
   t.config = t.kind === 'select' || t.kind === 'dedupe' ? { fields: [] } : {}
 }
+function onKindChange(t: TransformStep, e: Event) {
+  t.kind = (e.target as HTMLSelectElement).value as TransformStep['kind']
+  resetConfig(t)
+}
 function syncSort(t: TransformStep) {
   t.config = { sorts: [{ field: sortField.value, order: sortOrder.value }] }
+}
+function onSortField(e: Event, t: TransformStep) {
+  sortField.value = (e.target as HTMLSelectElement).value
+  syncSort(t)
+}
+function onSortOrder(e: Event, t: TransformStep) {
+  const v = (e.target as HTMLSelectElement).value
+  sortOrder.value = v === 'desc' ? 'desc' : 'asc'
+  syncSort(t)
 }
 function move(i: number, dir: number) {
   const j = i + dir
@@ -151,5 +188,23 @@ function save() {
 .err {
   color: #c45656;
   margin-top: 8px;
+}
+.native-field-select {
+  height: 32px;
+  border: 1px solid #d0d3d6;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #fff;
+  color: #1f2329;
+  font-size: 13px;
+}
+.native-field-select:focus-visible {
+  outline: 2px solid #3370ff;
+  outline-offset: 1px;
+}
+.native-multi {
+  height: auto;
+  min-height: 72px;
+  padding: 4px 6px;
 }
 </style>

@@ -6,15 +6,21 @@ export type TreeKeyAction =
   | 'activate'
   | 'ops'
   | 'leave-ops'
+  | 'leave-to-search'
 
 export type SearchKeyAction = 'clear' | 'enter-tree'
 
-export function resolveTreeKeyAction(key: string): TreeKeyAction | null {
+/**
+ * @param focusIndex Current roving index in the visible tree.
+ *   When `0`, ArrowUp leaves the tree back to the search box (no wrap).
+ *   Pass `-1` (default) to ignore index and always treat ArrowUp as `prev`.
+ */
+export function resolveTreeKeyAction(key: string, focusIndex = -1): TreeKeyAction | null {
   switch (key) {
     case 'ArrowDown':
       return 'next'
     case 'ArrowUp':
-      return 'prev'
+      return focusIndex === 0 ? 'leave-to-search' : 'prev'
     case 'Home':
       return 'first'
     case 'End':
@@ -36,6 +42,25 @@ export function resolveSearchKeyAction(key: string, hasQuery: boolean): SearchKe
   if (key === 'Escape' && hasQuery) return 'clear'
   if (key === 'ArrowDown') return 'enter-tree'
   return null
+}
+
+/** Live-region copy after Escape clears the search query. */
+export function formatSearchClearedStatus(visibleCount: number): string {
+  if (visibleCount <= 0) return '已清空搜索，无可见节点'
+  return `已清空搜索，显示 ${visibleCount} 个节点`
+}
+
+/**
+ * Next live-region status after clearing search.
+ * Returns `null` when the message would duplicate the previous announcement
+ * (consecutive Esc / identical visible count), so the region is not re-spammed.
+ */
+export function nextSearchClearedStatus(
+  previous: string,
+  visibleCount: number,
+): string | null {
+  const next = formatSearchClearedStatus(visibleCount)
+  return previous === next ? null : next
 }
 
 export function nextTreeIndex(count: number, current: number): number | null {

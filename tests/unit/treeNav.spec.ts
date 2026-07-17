@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampTreeFocusIndex,
+  formatSearchClearedStatus,
+  nextSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -12,6 +14,8 @@ describe('treeNav', () => {
   it('resolves arrow / home / end / enter / space actions', () => {
     expect(resolveTreeKeyAction('ArrowDown')).toBe('next')
     expect(resolveTreeKeyAction('ArrowUp')).toBe('prev')
+    expect(resolveTreeKeyAction('ArrowUp', 2)).toBe('prev')
+    expect(resolveTreeKeyAction('ArrowUp', 0)).toBe('leave-to-search')
     expect(resolveTreeKeyAction('Home')).toBe('first')
     expect(resolveTreeKeyAction('End')).toBe('last')
     expect(resolveTreeKeyAction('Enter')).toBe('activate')
@@ -29,6 +33,19 @@ describe('treeNav', () => {
     expect(resolveSearchKeyAction('ArrowDown', true)).toBe('enter-tree')
     expect(resolveSearchKeyAction('ArrowUp', true)).toBe(null)
     expect(resolveSearchKeyAction('Enter', true)).toBe(null)
+  })
+
+  it('announces visible node count after search clear', () => {
+    expect(formatSearchClearedStatus(0)).toBe('已清空搜索，无可见节点')
+    expect(formatSearchClearedStatus(1)).toBe('已清空搜索，显示 1 个节点')
+    expect(formatSearchClearedStatus(12)).toBe('已清空搜索，显示 12 个节点')
+  })
+
+  it('dedupes consecutive identical search-cleared live statuses', () => {
+    const first = nextSearchClearedStatus('', 3)
+    expect(first).toBe('已清空搜索，显示 3 个节点')
+    expect(nextSearchClearedStatus(first!, 3)).toBeNull()
+    expect(nextSearchClearedStatus(first!, 5)).toBe('已清空搜索，显示 5 个节点')
   })
 
   it('moves focus with wrap within bounds', () => {

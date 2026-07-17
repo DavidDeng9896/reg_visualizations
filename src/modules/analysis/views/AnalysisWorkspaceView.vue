@@ -196,6 +196,9 @@ function focusAddDataTrigger() {
 }
 
 function openAddData() {
+  // Intent-warm CSV / Combine dialogs so first open is not cold; keeps EP dialogs out of sync path.
+  void import('@/modules/table/CsvImportDialog.vue')
+  void import('@/modules/table/CombineTablesDialog.vue')
   addDataOpen.value = true
   addDataActive.value = enabledMenuIndices(addDataItems)[0] ?? null
   focusAddDataItem()
