@@ -9,26 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-bff008c0-67e5-4c38-9c7d-511dd1cadfcb-4ebe`（Round 21） |
-| 阶段 | **优化 Round 21 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=21`） |
-| 上次更新 | 2026-07-17 11:09 |
-| 单元 | **109/109 PASS**（+drawerA11y） |
+| 分支 | `cursor/bc-c8b29df9-45f2-42b2-826c-aa80b7cdaf26-cbf6`（Round 22） |
+| 阶段 | **优化 Round 22 完成**（周期 **1/3**；目标下一合并 `lastMergedRound=24`） |
+| 上次更新 | 2026-07-17 12:09 |
+| 单元 | **114/114 PASS**（+nativeNumber） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 21 对齐摘要
+## 2. Round 22 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEditDrawer `el-drawer` → 原生 Drawer 壳 | ✅ Round 21 |
-| CONFIGURE/STYLE `el-tabs` → 原生 tablist 分段 | ✅ Round 21 |
-| 全部 `el-switch` → 原生 `role=switch` | ✅ Round 21 |
-| Esc / 焦点陷阱 / 打开焦点 / 关闭焦点恢复 | ✅ 对齐三对话框壳 |
-| Tablist Home/End/方向键（`nextDrawerTab`） | ✅ |
-| EP `index-*` gzip | 仍 ~304.6（Form/Input/InputNumber/Slider 仍共享桶；Drawer/Tabs/Switch 已移除） |
-| 合并 | **Round 19–21 → main** |
+| ChartEditDrawer `el-input` / `el-input-number` → 原生 | ✅ Round 22 |
+| Opacity `el-slider` → 原生 `input[type=range]` + live | ✅ |
+| `el-form` / `el-form-item` → 原生 field-row 布局 | ✅ |
+| 数值越界 / Opacity live 宣告 | ✅（`nativeNumber.ts`） |
+| ChartEditDrawer **零** EP 组件 | ✅ |
+| Drawer CSS | ~22.4/4.0 → **~7.6/1.7** |
+| EP `index-*` gzip | 仍 ~304.6（根因：`feedback.ts` `import('element-plus')` 全量） |
+| 合并 | 否（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -38,8 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 22 计划（下一周期 1/3）
+## 4. Round 23 计划（下一周期 2/3）
 
-1. **Perf**：ChartEditDrawer `el-input` / `el-input-number` → 原生；冲击 EP 桶与 Drawer CSS
-2. **UX**：`el-slider`（Opacity）原生 range；可选 `el-form`/`el-form-item` 改原生 field 布局
-3. **A11y**：数值输入校验宣告；Opacity live region；Save/cfg-miss 回归
+1. **Perf**：`feedback.ts` toast/confirm → 原生 live toast / dialog，去掉全量 `element-plus` 导入，冲击 EP `index-*` 桶
+2. **UX**：可选把 Confirm（删除 Analysis 等）做成原生确认壳；Message 替换为轻量 toast
+3. **A11y**：toast 焦点/aria-live；确认框 Esc/焦点陷阱对齐三对话框
+4. **验证**：unit + e2e:ui + build；对照 EP chunk 体积
+5. **合并**：否（周期 2/3）
