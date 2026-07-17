@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-7aef9e09-29d6-48ea-bcec-9ec54962f841-2474`（Round 7–9） |
-| 阶段 | **优化 Round 9 完成并已 FF 合入 main**（`lastMergedRound=9`） |
-| 上次更新 | 2026-07-16 22:45 |
-| 单元 | **66/66 PASS**（含 seriesStyle） |
+| 分支 | `cursor/bc-5680a873-b3d4-493c-8ac3-a4f9d28c40f5-f6d4`（Round 10） |
+| 阶段 | **优化 Round 10 完成**（新周期 **1/3**；`lastMergedRound=9`） |
+| 上次更新 | 2026-07-17 00:12 |
+| 单元 | **68/68 PASS**（含 pointShape） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 9 对齐摘要
+## 2. Round 10 对齐摘要
 
-对照 `docs/features/charts/common.md` STYLE：
+对照 `docs/features/charts/common.md`：
 
 | 需求 | 状态 |
 | --- | --- |
-| STYLE 系列取色 picker（覆盖色板） | ✅ Round 9 |
-| Title 刷新恢复默认（视图/表名） | ✅ Round 9 |
-| Opacity 图种适用提示 | ✅ Round 9 |
-| MODEL TABLES 原生 `<details>`（去 el-collapse） | ✅ Round 9 |
-| 抽屉关闭焦点恢复加固；Demo 冷启动竞态 | ✅ Round 9 |
-| 交换 X/Y / Margins a11y | ✅ Round 9 |
+| 色板 Light/Dark/Alternate 预览色块（§2.5） | ✅ Round 10 |
+| Point Shape 图种适用提示（line/scatter/box） | ✅ Round 10 |
+| STYLE 分区标题 Title / Layout / Series / Axes | ✅ Round 10 |
+| 系列取色 color input 键盘焦点环 | ✅ Round 10 |
+| 创建对话框去 EP（列表路由瘦身） | ✅ Round 10 |
+| EP `index-*` ~305KB gzip 工作区仍在 | 评估：忌 `manualChunks`；下一轮继续原生替换工作区 Button/Dropdown |
 
 ## 3. 验证命令
 
@@ -37,11 +37,11 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 10 计划（下一 cron · 新周期 1/3）
+## 4. Round 11 计划（下一 cron · 周期 2/3）
 
 | ID | 描述 |
 | --- | --- |
-| Perf | EP 共享 `index-*` ~305KB gzip 仍在：评估 Select/Dropdown 按路由异步，忌 `manualChunks('element-plus')` |
-| UX | Point Shape 图种适用；色板预览色块（common.md §2.5） |
-| A11y | 系列取色原生 color input 键盘抽检；STYLE 长表单分区标题 |
-| Merge | Round 10 起新 3 轮周期；`lastMergedRound` 应为 9 |
+| Perf | 工作区顶栏 `+ Add data` Dropdown / Tag / Button → 原生或更细异步；忌 `manualChunks('element-plus')` |
+| UX | CONFIGURE 色板预览与 STYLE 系列取色联动提示；误差棒图种适用提示（common.md §2.4） |
+| A11y | 原生创建对话框焦点陷阱；STYLE 分区 `aria-labelledby` |
+| Merge | 本周期下一合并点 **Round 12** |
