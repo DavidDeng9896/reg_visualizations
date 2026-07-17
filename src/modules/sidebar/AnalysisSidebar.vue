@@ -8,6 +8,7 @@
       aria-label="搜索表或视图"
       aria-controls="sidebar-tree"
       autocomplete="off"
+      @keydown="onSearchKeydown"
     />
     <div class="section-head">
       <span id="analysis-data-heading">ANALYSIS DATA</span>
@@ -55,7 +56,7 @@
         aria-label="表与视图树"
       >
         <li
-          v-for="node in flatNodes"
+          v-for="(node, index) in flatNodes"
           :key="node.id"
           class="tree-node"
           role="none"
@@ -68,10 +69,11 @@
             :aria-level="node.depth + 1"
             :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
             :class="{ 'is-current': store.selectedNodeId === node.id }"
-            tabindex="0"
-            @click="onClick(node)"
-            @keydown.enter.prevent="onClick(node)"
-            @keydown.space.prevent="onClick(node)"
+            :tabindex="treeItemTabIndex(index, treeFocusIndex)"
+            :data-tree-index="index"
+            @click="onTreeActivate(node, index)"
+            @focus="treeFocusIndex = index"
+            @keydown="(e) => onTreeItemKeydown(e, node, index)"
           >
             <span class="label">{{ node.label }}</span>
             <span class="ops" @click.stop>
@@ -83,8 +85,9 @@
                   aria-haspopup="menu"
                   :aria-expanded="opsOpenId === node.id"
                   :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
+                  tabindex="-1"
                   @click="toggleOps(node)"
-                  @keydown="(e) => onOpsTriggerKey(e, node)"
+                  @keydown="(e) => onOpsTriggerKey(e, node, index)"
                 >
                   ⋯
                 </button>
@@ -179,6 +182,13 @@ import {
   flattenSidebarTree,
   type SidebarTreeNode,
 } from '@/modules/sidebar/sidebarTree'
+import {
+  clampTreeFocusIndex,
+  nextTreeIndex,
+  prevTreeIndex,
+  resolveTreeKeyAction,
+  treeItemTabIndex,
+} from '@/modules/sidebar/treeNav'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -240,6 +250,24 @@ const rawTree = computed((): SidebarTreeNode[] => {
 
 const treeData = computed(() => filterSidebarTree(rawTree.value, q.value))
 const flatNodes = computed(() => flattenSidebarTree(treeData.value))
+const treeFocusIndex = ref<number | null>(null)
+
+watch(
+  flatNodes,
+  (nodes) => {
+    treeFocusIndex.value = clampTreeFocusIndex(nodes.length, treeFocusIndex.value)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => store.selectedNodeId,
+  (id) => {
+    if (!id) return
+    const idx = flatNodes.value.findIndex((n) => n.id === id)
+    if (idx >= 0) treeFocusIndex.value = idx
+  },
+)
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer, true)
@@ -384,16 +412,82 @@ function pickOps(cmd: string, data: SidebarTreeNode) {
   onMenu(cmd, data)
 }
 
-function onOpsTriggerKey(e: KeyboardEvent, data: SidebarTreeNode) {
+function onOpsTriggerKey(e: KeyboardEvent, data: SidebarTreeNode, index: number) {
+  if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
+    if (opsOpenId.value === data.id) closeOps({ restoreFocus: false })
+    focusTreeItem(index)
+    return
+  }
   if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
     if (opsOpenId.value !== data.id) {
       e.preventDefault()
       openOps(data)
     }
-  } else if (e.key === 'Escape' && opsOpenId.value === data.id) {
-    e.preventDefault()
-    closeOps()
   }
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (!q.value) return
+  e.preventDefault()
+  q.value = ''
+}
+
+function focusTreeItem(index: number | null) {
+  if (index === null) return
+  treeFocusIndex.value = index
+  void nextTick(() => {
+    const el = document.querySelector<HTMLElement>(
+      `#sidebar-tree [data-tree-index="${index}"]`,
+    )
+    el?.focus()
+  })
+}
+
+function onTreeActivate(data: SidebarTreeNode, index: number) {
+  treeFocusIndex.value = index
+  store.selectNode(data.id, 'workspace')
+}
+
+function onTreeItemKeydown(e: KeyboardEvent, data: SidebarTreeNode, index: number) {
+  const action = resolveTreeKeyAction(e.key)
+  if (!action) return
+
+  const count = flatNodes.value.length
+  if (!count) return
+
+  if (action === 'ops') {
+    e.preventDefault()
+    e.stopPropagation()
+    treeFocusIndex.value = index
+    void nextTick(() => {
+      opsRoots.get(data.id)?.querySelector<HTMLElement>('.ops-btn')?.focus()
+    })
+    return
+  }
+
+  if (action === 'leave-ops') {
+    // Already on the treeitem; ignore Left so ops-only leave path stays on the button.
+    return
+  }
+
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (action === 'activate') {
+    onTreeActivate(data, index)
+    return
+  }
+
+  let next: number | null = index
+  if (action === 'next') next = nextTreeIndex(count, index)
+  else if (action === 'prev') next = prevTreeIndex(count, index)
+  else if (action === 'first') next = 0
+  else if (action === 'last') next = count - 1
+
+  if (next !== null) focusTreeItem(next)
 }
 
 function onOpsMenuKey(e: KeyboardEvent) {
@@ -424,10 +518,6 @@ function onDocPointer(e: PointerEvent) {
     const root = opsRoots.get(opsOpenId.value)
     if (root && !root.contains(t)) closeOps({ restoreFocus: false })
   }
-}
-
-function onClick(data: SidebarTreeNode) {
-  store.selectNode(data.id, 'workspace')
 }
 
 function onMenu(cmd: string, data: SidebarTreeNode) {
