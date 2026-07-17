@@ -222,7 +222,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
   await step('Edit图表-改拟合-Save', async () => {
     await switchViewType(page, 'scatter')
     await page.getByRole('button', { name: /Edit 图表/ }).click()
-    const drawer = page.locator('.el-drawer').filter({ hasText: '图表配置' })
+    const drawer = page.locator('.drawer-root').filter({ hasText: '图表配置' })
     await drawer.waitFor({ state: 'visible', timeout: 15000 })
     const fitItem = drawer.locator('.el-form-item').filter({ hasText: '拟合' })
     await fitItem.scrollIntoViewIfNeeded()
@@ -237,7 +237,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
 
   await step('导出PNG按钮可点', async () => {
     // Ensure Edit drawer is not covering the chart toolbar.
-    await page.locator('.el-drawer').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => undefined)
+    await page.locator('.drawer-root').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => undefined)
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 5000 }).catch(() => null),
       page.getByRole('button', { name: '导出 PNG' }).click(),

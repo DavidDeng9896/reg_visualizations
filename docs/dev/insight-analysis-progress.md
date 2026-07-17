@@ -9,27 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-0b2f7a1e-4fdf-49c9-bad4-da75790da2bf-4c26`（Round 18） |
-| 阶段 | **优化 Round 18 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=18`） |
-| 上次更新 | 2026-07-17 08:09 |
-| 单元 | **97/97 PASS**（+cfgMissDescribedBy / selectedOptionValues / view-type width / search dedupe） |
+| 分支 | `cursor/bc-bff008c0-67e5-4c38-9c7d-511dd1cadfcb-4ebe`（Round 21） |
+| 阶段 | **优化 Round 21 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=21`） |
+| 上次更新 | 2026-07-17 11:09 |
+| 单元 | **109/109 PASS**（+drawerA11y） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS |
 
-## 2. Round 18 对齐摘要
+## 2. Round 21 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform / Combine `el-select` → 原生（含 multi） | ✅ Round 18 |
-| CSV Dialog | 无 `el-select`（跳过） |
-| compact「更多」Esc / 方向键（menuNav） | ✅ Round 18 |
-| 窄屏视图类型 select 宽度 150→112 | ✅ Round 18 |
-| Drawer 必填 select `aria-describedby` → `#chart-cfg-miss` | ✅ Round 18 |
-| 搜索 live region 连续相同文案去重 | ✅ Round 18 |
-| EP `index-*` gzip | 仍 ~304.6（Dialog/Drawer/Form/Input/Table/Button 仍共享桶；`el-select` CSS 已消失） |
-| 合并 | **Round 16–18 → main** |
+| ChartEditDrawer `el-drawer` → 原生 Drawer 壳 | ✅ Round 21 |
+| CONFIGURE/STYLE `el-tabs` → 原生 tablist 分段 | ✅ Round 21 |
+| 全部 `el-switch` → 原生 `role=switch` | ✅ Round 21 |
+| Esc / 焦点陷阱 / 打开焦点 / 关闭焦点恢复 | ✅ 对齐三对话框壳 |
+| Tablist Home/End/方向键（`nextDrawerTab`） | ✅ |
+| EP `index-*` gzip | 仍 ~304.6（Form/Input/InputNumber/Slider 仍共享桶；Drawer/Tabs/Switch 已移除） |
+| 合并 | **Round 19–21 → main** |
 
 ## 3. 验证命令
 
@@ -39,8 +38,8 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 19 计划（下一周期 1/3）
+## 4. Round 22 计划（下一周期 1/3）
 
-1. **Perf**：原生 Dialog/Drawer 壳，或拆 EP 子桶（Tabs/Form vs Dialog），冲击 `index-*` gzip
-2. **UX**：Transform/Combine 原生按钮替换 `el-button`；CSV Name 原生 input
-3. **A11y**：Combine multi-select 选中计数 live region；cfg-miss 与 Save 焦点联动
+1. **Perf**：ChartEditDrawer `el-input` / `el-input-number` → 原生；冲击 EP 桶与 Drawer CSS
+2. **UX**：`el-slider`（Opacity）原生 range；可选 `el-form`/`el-form-item` 改原生 field 布局
+3. **A11y**：数值输入校验宣告；Opacity live region；Save/cfg-miss 回归

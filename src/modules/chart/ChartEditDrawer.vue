@@ -1,24 +1,73 @@
 <template>
-  <el-drawer
-    :model-value="modelValue"
-    title="图表配置"
-    size="400px"
-    destroy-on-close
-    @opened="onOpened"
-    @closed="onClosed"
-    @close="emit('update:modelValue', false)"
+  <div
+    v-if="modelValue"
+    class="drawer-root"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="chart-edit-drawer-title"
+    @keydown.esc="close"
+    @keydown="onTrapKeydown"
   >
-    <div ref="panelRef" class="drawer-panel" @keydown="onTrapKeydown">
+    <button
+      type="button"
+      class="drawer-backdrop"
+      tabindex="-1"
+      aria-label="关闭图表配置"
+      @click="close"
+    />
+    <aside ref="panelRef" class="drawer-panel" aria-labelledby="chart-edit-drawer-title">
+      <header class="drawer-header">
+        <h2 id="chart-edit-drawer-title">图表配置</h2>
+        <button type="button" class="icon-close" aria-label="关闭" @click="close">×</button>
+      </header>
       <p class="fit-hint drawer-a11y" role="note">
         Tab 在面板内循环焦点；Esc 关闭。下拉字段可用方向键与 Enter 选择。
       </p>
-      <el-tabs v-model="tab">
-        <el-tab-pane label="CONFIGURE" name="configure">
+      <div
+        class="drawer-tablist"
+        role="tablist"
+        aria-label="图表配置分区"
+        @keydown="onTabListKeydown"
+      >
+        <button
+          id="chart-tab-configure-btn"
+          type="button"
+          class="drawer-tab"
+          role="tab"
+          :aria-selected="tab === 'configure'"
+          aria-controls="chart-tab-configure"
+          :tabindex="tab === 'configure' ? 0 : -1"
+          @click="tab = 'configure'"
+        >
+          CONFIGURE
+        </button>
+        <button
+          id="chart-tab-style-btn"
+          type="button"
+          class="drawer-tab"
+          role="tab"
+          :aria-selected="tab === 'style'"
+          aria-controls="chart-tab-style"
+          :tabindex="tab === 'style' ? 0 : -1"
+          @click="tab = 'style'"
+        >
+          STYLE
+        </button>
+      </div>
+      <div class="drawer-body">
+        <div
+          v-show="tab === 'configure'"
+          id="chart-tab-configure"
+          class="drawer-tabpanel"
+          role="tabpanel"
+          aria-labelledby="chart-tab-configure-btn"
+        >
           <p
             v-if="configureMiss.length"
             :id="CFG_MISS_ALERT_ID"
             class="cfg-miss"
             role="alert"
+            tabindex="-1"
           >
             必填槽位未完成：{{ configureMiss.join('、') }}。请按当前图种补齐后再保存。
           </p>
@@ -155,10 +204,16 @@
               <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
             </el-form-item>
             <el-form-item label="水平柱">
-              <el-switch v-model="horiz" />
+              <label class="native-switch">
+                <input v-model="horiz" type="checkbox" role="switch" aria-label="水平柱" />
+                <span class="native-switch-ui" aria-hidden="true" />
+              </label>
             </el-form-item>
             <el-form-item label="堆叠">
-              <el-switch v-model="draft.configure.stacked" />
+              <label class="native-switch">
+                <input v-model="draft.configure.stacked" type="checkbox" role="switch" aria-label="堆叠" />
+                <span class="native-switch-ui" aria-hidden="true" />
+              </label>
             </el-form-item>
             <el-form-item label="拟合">
               <select
@@ -181,10 +236,15 @@
               v-if="draft.configure.fitModel === 'linear' || draft.configure.fitModel === 'quadratic'"
               label="过原点"
             >
-              <el-switch
-                v-model="draft.configure.fitThroughOrigin"
-                aria-label="线性或二次拟合强制过原点"
-              />
+              <label class="native-switch">
+                <input
+                  v-model="draft.configure.fitThroughOrigin"
+                  type="checkbox"
+                  role="switch"
+                  aria-label="线性或二次拟合强制过原点"
+                />
+                <span class="native-switch-ui" aria-hidden="true" />
+              </label>
             </el-form-item>
             <template v-if="draft.configure.fitModel === '4pl'">
               <el-form-item label="4PL min">
@@ -207,7 +267,15 @@
               </el-form-item>
             </template>
             <el-form-item label="Exclude flagged">
-              <el-switch v-model="draft.configure.excludeFlagged" />
+              <label class="native-switch">
+                <input
+                  v-model="draft.configure.excludeFlagged"
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Exclude flagged"
+                />
+                <span class="native-switch-ui" aria-hidden="true" />
+              </label>
             </el-form-item>
             <el-form-item label="Custom X label">
               <el-input v-model="draft.configure.xLabel" aria-label="X 轴自定义标签" />
@@ -256,8 +324,14 @@
               </p>
             </el-form-item>
           </el-form>
-        </el-tab-pane>
-        <el-tab-pane label="STYLE" name="style">
+        </div>
+        <div
+          v-show="tab === 'style'"
+          id="chart-tab-style"
+          class="drawer-tabpanel"
+          role="tabpanel"
+          aria-labelledby="chart-tab-style-btn"
+        >
           <el-form label-width="110px" size="small">
             <section class="style-block" aria-labelledby="style-title">
             <h3 class="style-section" id="style-title">Title</h3>
@@ -356,7 +430,15 @@
               <p class="fit-hint" role="note">{{ opacityHintText }}</p>
             </el-form-item>
             <el-form-item label="图例">
-              <el-switch v-model="draft.style.legendShow" aria-label="显示图例" />
+              <label class="native-switch">
+                <input
+                  v-model="draft.style.legendShow"
+                  type="checkbox"
+                  role="switch"
+                  aria-label="显示图例"
+                />
+                <span class="native-switch-ui" aria-hidden="true" />
+              </label>
             </el-form-item>
             <el-form-item label="图例位置">
               <select
@@ -503,18 +585,18 @@
             </template>
             </section>
           </el-form>
-        </el-tab-pane>
-      </el-tabs>
+        </div>
+      </div>
       <div class="footer">
-        <button type="button" class="btn" @click="emit('update:modelValue', false)">Cancel</button>
+        <button type="button" class="btn" @click="close">Cancel</button>
         <button type="button" class="btn btn-primary" @click="save">Save</button>
       </div>
-    </div>
-  </el-drawer>
+    </aside>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ChartConfig, TableColumn, ViewType } from '@/shared/types/analysis'
 import { cloneDeep } from '@/shared/utils/clone'
 import { isManualRangeInvalid } from '@/modules/chart/axisRange'
@@ -540,9 +622,11 @@ import {
   CFG_MISS_ALERT_ID,
   cfgMissDescribedBy,
   columnSelectLabel,
+  focusCfgMissAfterBlockedSave,
   fromNativeSelectValue,
   toNativeSelectValue,
 } from '@/modules/chart/fieldSelect'
+import { nextDrawerTab, type DrawerTab } from '@/modules/chart/drawerA11y'
 import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{
@@ -557,7 +641,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }>()
 
-const tab = ref('configure')
+const tab = ref<DrawerTab>('configure')
 const draft = ref<ChartConfig>(cloneDeep(props.config))
 const panelRef = ref<HTMLElement | null>(null)
 const aggs = ['count', 'sum', 'min', 'max', 'mean', 'median'] as const
@@ -849,30 +933,69 @@ const yRangeInvalid = computed(() =>
 )
 
 function focusables(): HTMLElement[] {
-  const root = panelRef.value?.closest('.el-drawer') || panelRef.value
+  const root = panelRef.value
   if (!root) return []
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
+    (el) =>
+      !el.hasAttribute('disabled') &&
+      el.getAttribute('aria-hidden') !== 'true' &&
+      el.offsetParent !== null,
   )
 }
 
-function onOpened() {
-  restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-  void nextTick(() => {
-    const list = focusables()
-    const closeBtn = list.find((el) => el.classList.contains('el-drawer__close-btn'))
-    ;(closeBtn || list[0])?.focus()
-  })
+function close() {
+  emit('update:modelValue', false)
 }
 
-function onClosed() {
-  // Prefer previously focused Edit trigger; fall back to workspace toolbar.
+function restoreFocusToTrigger() {
   const target =
     restoreFocus && document.contains(restoreFocus)
       ? restoreFocus
       : (document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null)
   target?.focus?.()
   restoreFocus = null
+}
+
+function openDrawer() {
+  restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  document.body.style.overflow = 'hidden'
+  void nextTick(() => {
+    const list = focusables()
+    const closeBtn = list.find((el) => el.classList.contains('icon-close'))
+    ;(closeBtn || list[0])?.focus()
+  })
+}
+
+function closeDrawer() {
+  document.body.style.overflow = ''
+  restoreFocusToTrigger()
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) openDrawer()
+    else closeDrawer()
+  },
+)
+
+onMounted(() => {
+  if (props.modelValue) openDrawer()
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+})
+
+function onTabListKeydown(e: KeyboardEvent) {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Home' && e.key !== 'End') return
+  e.preventDefault()
+  tab.value = nextDrawerTab(tab.value, e.key)
+  void nextTick(() => {
+    const id = tab.value === 'configure' ? 'chart-tab-configure-btn' : 'chart-tab-style-btn'
+    document.getElementById(id)?.focus()
+  })
 }
 
 function onTrapKeydown(e: KeyboardEvent) {
@@ -887,7 +1010,7 @@ function onTrapKeydown(e: KeyboardEvent) {
       e.preventDefault()
       last.focus()
     }
-  } else if (active === last) {
+  } else if (active === last || !list.includes(active as HTMLElement)) {
     e.preventDefault()
     first.focus()
   }
@@ -897,6 +1020,7 @@ function save() {
   if (configureMiss.value.length) {
     toast('warning', `请先完成必填槽位：${configureMiss.value.join('、')}`)
     tab.value = 'configure'
+    void nextTick(() => focusCfgMissAfterBlockedSave(panelRef.value))
     return
   }
   if (xRangeInvalid.value || yRangeInvalid.value) {
@@ -905,23 +1029,168 @@ function save() {
     return
   }
   emit('save', cloneDeep(draft.value))
+  close()
 }
 </script>
 
 <style scoped>
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-end;
+}
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
 .drawer-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  width: min(400px, 100vw);
+  height: 100%;
+  background: #fff;
+  border-left: 1px solid #dee0e3;
+  box-shadow: -8px 0 28px rgba(15, 23, 42, 0.12);
+  padding: 0 16px 16px;
+  box-sizing: border-box;
+}
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0 8px;
+  flex-shrink: 0;
+}
+.drawer-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2329;
+}
+.icon-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #8f959e;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.icon-close:hover {
+  color: #1f2329;
+  background: #f2f3f5;
+}
+.icon-close:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
 }
 .drawer-a11y {
   margin: 0 0 10px;
+}
+.drawer-tablist {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #f2f3f5;
+  flex-shrink: 0;
+}
+.drawer-tab {
+  flex: 1;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #646a73;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.drawer-tab[aria-selected='true'] {
+  background: #fff;
+  color: #1f2329;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.drawer-tab:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
+}
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+.drawer-tabpanel {
+  min-height: 0;
+}
+.native-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.native-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+.native-switch-ui {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #c9cdd4;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.native-switch-ui::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: transform 0.15s ease;
+}
+.native-switch input:checked + .native-switch-ui {
+  background: var(--ia-accent, #3370ff);
+}
+.native-switch input:checked + .native-switch-ui::after {
+  transform: translateX(16px);
+}
+.native-switch input:focus-visible + .native-switch-ui {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 2px;
 }
 .footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid #ebeef5;
 }
 .fit-hint {
   margin: 6px 0 0;
@@ -937,6 +1206,10 @@ function save() {
   color: #c45656;
   background: #fef0f0;
   border-radius: 4px;
+}
+.cfg-miss:focus-visible {
+  outline: 2px solid #c45656;
+  outline-offset: 2px;
 }
 .range-error {
   margin: 0 0 12px 110px;

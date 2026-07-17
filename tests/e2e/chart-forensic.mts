@@ -54,7 +54,7 @@ async function main() {
     await page.getByRole('button', { name: /Edit 图表/ }).click()
     await page.waitForTimeout(500)
     await page.screenshot({ path: '/tmp/chart-forensic-edit.png', fullPage: true })
-    const drawerText = await page.locator('.el-drawer, .el-overlay').innerText().catch(() => '')
+    const drawerText = await page.locator('.drawer-root, .el-drawer, .el-overlay').innerText().catch(() => '')
     fs.writeFileSync('/tmp/chart-forensic-drawer.txt', drawerText)
     await page.getByRole('button', { name: 'Save', exact: true }).click().catch(() => {})
     await page.waitForTimeout(1000)

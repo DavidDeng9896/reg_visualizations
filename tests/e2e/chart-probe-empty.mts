@@ -68,7 +68,7 @@ async function main() {
   // Open edit and check if fields empty
   await page.getByRole('button', { name: /Edit 图表/ }).click()
   await page.waitForTimeout(500)
-  const drawer = await page.locator('.el-drawer').innerText()
+  const drawer = await page.locator('.drawer-root, .el-drawer').innerText()
   await page.screenshot({ path: '/tmp/chart-heatmap-edit.png', fullPage: true })
 
   const out = { barInfo, drawer: drawer.slice(0, 800), errors }
