@@ -10,11 +10,11 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/bc-f6f10d0c-e40d-4cd5-ba6c-1163130fb40c-50d3`（Round 25） |
-| 阶段 | **优化 Round 25 进行中**（周期 **1/3**；下一合并点 Round 27） |
+| 阶段 | **优化 Round 25 完成**（周期 **1/3**；下一合并点 Round 27） |
 | 上次更新 | 2026-07-17 15:05 |
-| 单元 | 验证中 |
-| UI E2E | 验证中 |
-| Build | 验证中 |
+| 单元 | **127/127 PASS**（+toast close / workspaceLoading / routeFocus） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（feedback CSS → index；dist 无 EP） |
 
 ## 2. Round 25 对齐摘要
 
@@ -25,7 +25,7 @@
 | toast 关闭按钮挂入 DOM + 键盘可达 | ✅ Round 25 |
 | toast Esc 关闭（焦点在 toast 内） | ✅ |
 | 工作区冷启动骨架 / 表格引擎 / 流程图占位 | ✅ `workspaceLoading` |
-| feedback.css 经 main.css 引入（与 Dexie 图解耦） | ✅ |
+| feedback.css 经 main.css 引入（与 Dexie 图解耦） | ✅ index CSS ~4.1k |
 | 路由跳转后焦点 → `#workspace-main` / `main` / `h1` | ✅ `routeFocus` |
 | 危险确认 Cancel 默认焦点（R24 回归） | ✅ 单测保留 |
 | 合并 | 否（周期 1/3） |
