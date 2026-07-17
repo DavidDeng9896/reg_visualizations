@@ -3,6 +3,7 @@ import {
   FeedbackCancelError,
   isFeedbackCancel,
   listFocusable,
+  preferCancelInitialFocus,
   toastLivePoliteness,
   trapTabKey,
 } from '@/shared/ui/feedbackA11y'
@@ -14,6 +15,15 @@ describe('feedbackA11y', () => {
     expect(toastLivePoliteness('success')).toBe('polite')
     expect(toastLivePoliteness('warning')).toBe('assertive')
     expect(toastLivePoliteness('error')).toBe('assertive')
+  })
+
+  it('prefers Cancel initial focus for destructive confirms', () => {
+    expect(preferCancelInitialFocus()).toBe(true)
+    expect(preferCancelInitialFocus({ type: 'warning' })).toBe(true)
+    expect(preferCancelInitialFocus({ type: 'error' })).toBe(true)
+    expect(preferCancelInitialFocus({ danger: true, type: 'info' })).toBe(true)
+    expect(preferCancelInitialFocus({ type: 'info' })).toBe(false)
+    expect(preferCancelInitialFocus({ type: 'success' })).toBe(false)
   })
 
   it('lists focusable controls and traps Tab', () => {
@@ -69,11 +79,30 @@ describe('native feedback', () => {
     expect(err?.getAttribute('role')).toBe('alert')
   })
 
+  it('danger confirm focuses Cancel and styles primary as danger', async () => {
+    const p = confirm('确定删除？此操作不可撤销。', '删除', {
+      danger: true,
+      confirmButtonText: '删除',
+    })
+    await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="confirm"]')).toBeTruthy())
+    const panel = document.querySelector('.ia-feedback-panel')!
+    expect(panel.getAttribute('data-ia-danger')).toBe('1')
+    const cancel = [...panel.querySelectorAll('button')].find((b) => b.textContent === '取消')!
+    const dangerBtn = panel.querySelector('[data-ia-confirm-danger]')!
+    expect(dangerBtn.textContent).toBe('删除')
+    expect(dangerBtn.className).toContain('btn-danger')
+    await vi.waitFor(() => expect(document.activeElement).toBe(cancel))
+
+    cancel.click()
+    await expect(p).rejects.toMatchObject({ action: 'cancel' })
+  })
+
   it('confirm resolves on OK and rejects on Esc', async () => {
-    const okPromise = confirm('确定删除？', '确认')
+    const okPromise = confirm('确定继续？', '确认', { type: 'info', confirmButtonText: '确定' })
     await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="confirm"]')).toBeTruthy())
     const panel = document.querySelector('.ia-feedback-panel')!
     const primary = [...panel.querySelectorAll('button')].find((b) => b.textContent === '确定')!
+    await vi.waitFor(() => expect(document.activeElement).toBe(primary))
     primary.click()
     await expect(okPromise).resolves.toBe(true)
 
@@ -84,16 +113,30 @@ describe('native feedback', () => {
     await expect(cancelPromise).rejects.toMatchObject({ action: 'cancel' })
   })
 
-  it('prompt returns input value', async () => {
+  it('prompt returns input value and cancels via backdrop / Cancel', async () => {
     const p = prompt('新名称', '重命名', { inputValue: 'old' })
     await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="prompt"]')).toBeTruthy())
     const input = document.querySelector<HTMLInputElement>('.ia-feedback-input')!
     expect(input.value).toBe('old')
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
     input.value = 'new-name'
     const primary = [...document.querySelectorAll('.ia-feedback-panel button')].find(
       (b) => b.textContent === '确定',
     ) as HTMLButtonElement
     primary.click()
     await expect(p).resolves.toEqual({ value: 'new-name' })
+
+    const cancelViaBtn = prompt('名称', '重命名')
+    await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="prompt"]')).toBeTruthy())
+    const cancel = [...document.querySelectorAll('.ia-feedback-panel button')].find(
+      (b) => b.textContent === '取消',
+    ) as HTMLButtonElement
+    cancel.click()
+    await expect(cancelViaBtn).rejects.toMatchObject({ action: 'cancel' })
+
+    const cancelViaBackdrop = prompt('名称', '重命名')
+    await vi.waitFor(() => expect(document.querySelector('[data-ia-feedback="prompt"]')).toBeTruthy())
+    document.querySelector<HTMLButtonElement>('.ia-feedback-backdrop')!.click()
+    await expect(cancelViaBackdrop).rejects.toMatchObject({ action: 'cancel' })
   })
 })

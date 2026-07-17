@@ -1,13 +1,15 @@
 /**
- * Native toast / confirm / prompt — zero Element Plus (Round 23).
+ * Native toast / confirm / prompt — zero Element Plus (Round 23+24).
  * Keeps the same public API as the former ElMessage / ElMessageBox wrappers.
  */
 
 import {
   FeedbackCancelError,
   listFocusable,
+  preferCancelInitialFocus,
   toastLivePoliteness,
   trapTabKey,
+  type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
 import './feedback.css'
@@ -19,6 +21,7 @@ const TOAST_MAX = 5
 
 let toastHost: HTMLElement | null = null
 let toastSeq = 0
+let boxSeq = 0
 
 function ensureToastHost(): HTMLElement {
   if (toastHost && document.body.contains(toastHost)) return toastHost
@@ -55,17 +58,38 @@ export function toast(type: MessageType, message: string) {
   close.className = 'ia-toast__close'
   close.setAttribute('aria-label', '关闭通知')
   close.textContent = '×'
-  close.addEventListener('click', () => el.remove())
-  el.appendChild(close)
 
-  host.appendChild(el)
-  window.setTimeout(() => {
+  let ttl = window.setTimeout(() => {
     if (el.isConnected) el.remove()
   }, TOAST_TTL_MS)
+
+  const clearTtl = () => {
+    window.clearTimeout(ttl)
+  }
+  const restartTtl = () => {
+    clearTtl()
+    ttl = window.setTimeout(() => {
+      if (el.isConnected) el.remove()
+    }, TOAST_TTL_MS)
+  }
+
+  close.addEventListener('click', () => {
+    clearTtl()
+    el.remove()
+  })
+  el.addEventListener('mouseenter', clearTtl)
+  el.addEventListener('mouseleave', restartTtl)
+  el.addEventListener('focusin', clearTtl)
+  el.addEventListener('focusout', (e) => {
+    if (!el.contains(e.relatedTarget as Node | null)) restartTtl()
+  })
+
+  host.appendChild(el)
 }
 
 type ConfirmOptions = {
-  type?: 'warning' | 'info' | 'success' | 'error'
+  type?: ConfirmTone
+  danger?: boolean
   confirmButtonText?: string
   cancelButtonText?: string
 }
@@ -92,6 +116,10 @@ function openMessageBox(
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
+    const uid = ++boxSeq
+    const titleId = `ia-feedback-title-${uid}`
+    const messageId = `ia-feedback-message-${uid}`
+
     const root = document.createElement('div')
     root.className = 'ia-feedback-root'
     root.setAttribute('data-ia-feedback', mode)
@@ -107,20 +135,21 @@ function openMessageBox(
     panel.className = 'ia-feedback-panel'
     panel.setAttribute('role', 'dialog')
     panel.setAttribute('aria-modal', 'true')
-    panel.setAttribute('aria-labelledby', 'ia-feedback-title')
-    panel.setAttribute('aria-describedby', 'ia-feedback-message')
+    panel.setAttribute('aria-labelledby', titleId)
+    panel.setAttribute('aria-describedby', messageId)
+    if (options?.danger) panel.setAttribute('data-ia-danger', '1')
 
     const header = document.createElement('header')
     header.className = 'ia-feedback-header'
     const h2 = document.createElement('h2')
-    h2.id = 'ia-feedback-title'
+    h2.id = titleId
     h2.textContent = title
     header.appendChild(h2)
 
     const body = document.createElement('div')
     body.className = 'ia-feedback-body'
     const msg = document.createElement('p')
-    msg.id = 'ia-feedback-message'
+    msg.id = messageId
     msg.className = 'ia-feedback-message'
     msg.textContent = message
     body.appendChild(msg)
@@ -145,8 +174,10 @@ function openMessageBox(
 
     const confirmBtn = document.createElement('button')
     confirmBtn.type = 'button'
-    confirmBtn.className = 'btn btn-primary'
+    const danger = Boolean(options?.danger) || options?.type === 'error'
+    confirmBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary'
     confirmBtn.textContent = options?.confirmButtonText || '确定'
+    if (danger) confirmBtn.setAttribute('data-ia-confirm-danger', '1')
 
     footer.appendChild(cancelBtn)
     footer.appendChild(confirmBtn)
@@ -202,16 +233,20 @@ function openMessageBox(
     confirmBtn.addEventListener('click', settleConfirm)
     root.addEventListener('keydown', onKeydown)
 
-    // Focus: prompt → input; confirm → primary (safer default for destructive).
+    // Focus: prompt → input; destructive confirm → Cancel; else → Confirm.
     requestAnimationFrame(() => {
       if (input) {
         input.focus()
         input.select()
-      } else {
-        const items = listFocusable(panel)
-        const prefer = items.find((el) => el === confirmBtn) || items[0]
-        prefer?.focus()
+        return
       }
+      const items = listFocusable(panel)
+      const wantCancel = preferCancelInitialFocus(options)
+      const prefer =
+        (wantCancel
+          ? items.find((el) => el === cancelBtn)
+          : items.find((el) => el === confirmBtn)) || items[0]
+      prefer?.focus()
     })
   })
 }
@@ -234,4 +269,4 @@ export async function prompt(
   return result as { value: string }
 }
 
-export { FeedbackCancelError, isFeedbackCancel } from './feedbackA11y'
+export { FeedbackCancelError, isFeedbackCancel, preferCancelInitialFocus } from './feedbackA11y'

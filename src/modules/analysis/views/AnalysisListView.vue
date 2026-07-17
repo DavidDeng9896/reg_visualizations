@@ -136,7 +136,10 @@ function open(row: { id: string }) {
 
 async function onRemove(id: string) {
   try {
-    await confirm('确定删除该 Analysis？', '确认')
+    await confirm('确定删除该 Analysis？此操作不可撤销。', '删除 Analysis', {
+      danger: true,
+      confirmButtonText: '删除',
+    })
   } catch (err) {
     if (isFeedbackCancel(err)) return
     throw err

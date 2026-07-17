@@ -577,7 +577,10 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
     store.promoteViewToTable(data.id)
     toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    void confirm('确定删除？子视图将一并删除。', '确认')
+    void confirm('确定删除？子视图将一并删除。此操作不可撤销。', '删除节点', {
+      danger: true,
+      confirmButtonText: '删除',
+    })
       .then(() => {
         const r = store.deleteNode(data.id)
         if (!r.ok) toast('error', r.reason || '删除失败')

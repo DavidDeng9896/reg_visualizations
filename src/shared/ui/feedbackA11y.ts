@@ -34,9 +34,24 @@ export function trapTabKey(root: ParentNode, event: KeyboardEvent): boolean {
 
 export type ToastKind = 'success' | 'warning' | 'info' | 'error'
 
+export type ConfirmTone = 'warning' | 'info' | 'success' | 'error'
+
 /** Map toast kind to polite/assertive live politeness. */
 export function toastLivePoliteness(kind: ToastKind): 'polite' | 'assertive' {
   return kind === 'error' || kind === 'warning' ? 'assertive' : 'polite'
+}
+
+/**
+ * Destructive / warning confirms should land focus on Cancel so Enter does not
+ * accidentally confirm (Round 24 a11y). Info/success may focus Confirm.
+ */
+export function preferCancelInitialFocus(options?: {
+  type?: ConfirmTone
+  danger?: boolean
+}): boolean {
+  if (options?.danger) return true
+  const tone = options?.type ?? 'warning'
+  return tone === 'warning' || tone === 'error'
 }
 
 export class FeedbackCancelError extends Error {
