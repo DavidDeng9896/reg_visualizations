@@ -50,6 +50,19 @@ export function formatSearchClearedStatus(visibleCount: number): string {
   return `已清空搜索，显示 ${visibleCount} 个节点`
 }
 
+/**
+ * Next live-region status after clearing search.
+ * Returns `null` when the message would duplicate the previous announcement
+ * (consecutive Esc / identical visible count), so the region is not re-spammed.
+ */
+export function nextSearchClearedStatus(
+  previous: string,
+  visibleCount: number,
+): string | null {
+  const next = formatSearchClearedStatus(visibleCount)
+  return previous === next ? null : next
+}
+
 export function nextTreeIndex(count: number, current: number): number | null {
   if (count <= 0) return null
   return (current + 1) % count

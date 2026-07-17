@@ -18,7 +18,7 @@
             <select
               v-model="viewType"
               class="tb-select"
-              style="width: 150px"
+              :style="{ width: `${viewTypeSelectWidth}px` }"
               aria-label="视图类型"
               :data-current="viewTypeCurrentLabel"
               @change="onViewType(viewType)"
@@ -82,11 +82,26 @@
             <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
             <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
           </template>
-          <details v-else class="tb-more" @toggle="onMoreToggle">
+          <details
+            v-else
+            ref="moreDetailsRef"
+            class="tb-more"
+            @toggle="onMoreToggle"
+            @keydown="onMoreKeydown"
+          >
             <summary class="btn tb-more-summary" aria-label="更多数据操作">更多</summary>
-            <div class="tb-more-menu" role="group" aria-label="更多数据操作">
-              <button type="button" class="btn" @click="openTransforms" @pointerenter="warmTransformChunk" @focus="warmTransformChunk">过滤 / 转换</button>
-              <button type="button" class="btn" @click="exportCsv">导出 CSV</button>
+            <div class="tb-more-menu" role="menu" aria-label="更多数据操作">
+              <button
+                type="button"
+                class="btn"
+                role="menuitem"
+                @click="openTransforms"
+                @pointerenter="warmTransformChunk"
+                @focus="warmTransformChunk"
+              >
+                过滤 / 转换
+              </button>
+              <button type="button" class="btn" role="menuitem" @click="exportCsv">导出 CSV</button>
             </div>
           </details>
         </div>
@@ -185,8 +200,9 @@ import {
   effectiveChartPosition,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
-import { isToolbarCompact } from './toolbarLayout'
+import { isToolbarCompact, toolbarViewTypeSelectWidth } from './toolbarLayout'
 import { warmIdle } from '@/shared/ui/warmIdle'
+import { handleMenuKeydown } from '@/shared/ui/menuNav'
 
 const store = useAnalysisStore()
 const showTransforms = ref(false)
@@ -229,10 +245,52 @@ const chartPosCurrentLabel = computed(
   () => chartPosOptions.find((p) => p.value === chartPos.value)?.label ?? chartPos.value,
 )
 const toolbarCompact = computed(() => isToolbarCompact(viewportWidth.value))
+const viewTypeSelectWidth = computed(() => toolbarViewTypeSelectWidth(toolbarCompact.value))
+const moreDetailsRef = ref<HTMLDetailsElement | null>(null)
+const moreMenuIndex = ref<number | null>(null)
+const moreMenuItems = [{ disabled: false }, { disabled: false }]
+
+function focusMoreMenuItem(index: number | null) {
+  moreMenuIndex.value = index
+  if (index === null) return
+  void nextTick(() => {
+    const buttons = moreDetailsRef.value?.querySelectorAll<HTMLButtonElement>('.tb-more-menu .btn')
+    buttons?.[index]?.focus()
+  })
+}
+
+function closeMoreMenu() {
+  const el = moreDetailsRef.value
+  if (el) el.open = false
+  moreMenuIndex.value = null
+  void nextTick(() => {
+    moreDetailsRef.value?.querySelector<HTMLElement>('summary')?.focus()
+  })
+}
+
+function onMoreKeydown(e: KeyboardEvent) {
+  const el = moreDetailsRef.value
+  if (!el?.open) return
+  handleMenuKeydown(e, moreMenuItems, {
+    getActiveIndex: () => moreMenuIndex.value,
+    setActiveIndex: (index) => focusMoreMenuItem(index),
+    onActivate: (index) => {
+      const buttons = el.querySelectorAll<HTMLButtonElement>('.tb-more-menu .btn')
+      buttons[index]?.click()
+      closeMoreMenu()
+    },
+    onClose: () => closeMoreMenu(),
+  })
+}
 
 function onMoreToggle(e: Event) {
   const el = e.target as HTMLDetailsElement
-  if (!el.open) return
+  if (!el.open) {
+    moreMenuIndex.value = null
+    return
+  }
+  moreMenuIndex.value = 0
+  void nextTick(() => focusMoreMenuItem(0))
   const close = (ev: PointerEvent) => {
     if (!el.contains(ev.target as Node)) {
       el.open = false
@@ -668,6 +726,12 @@ function exportCsv() {
 .tb-more-menu .btn {
   width: 100%;
   justify-content: flex-start;
+  border: 0;
+  border-radius: 4px;
+}
+.tb-more-menu .btn:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
 }
 .tb-input:focus,
 .tb-select:focus {

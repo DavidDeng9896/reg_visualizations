@@ -14,7 +14,12 @@
       </p>
       <el-tabs v-model="tab">
         <el-tab-pane label="CONFIGURE" name="configure">
-          <p v-if="configureMiss.length" class="cfg-miss" role="alert">
+          <p
+            v-if="configureMiss.length"
+            :id="CFG_MISS_ALERT_ID"
+            class="cfg-miss"
+            role="alert"
+          >
             必填槽位未完成：{{ configureMiss.join('、') }}。请按当前图种补齐后再保存。
           </p>
           <el-form label-width="110px" size="small">
@@ -24,6 +29,7 @@
                 :value="toNativeSelectValue(draft.configure.xField)"
                 aria-label="X 或 Categories 字段"
                 :aria-invalid="!draft.configure.xField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('X'))"
                 @change="onXFieldChange"
               >
                 <option value="">（清空）</option>
@@ -38,6 +44,7 @@
                 :value="toNativeSelectValue(draft.configure.yField)"
                 aria-label="Y 或 Measure 字段"
                 :aria-invalid="!draft.configure.yField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Y'))"
                 @change="onYFieldChange"
               >
                 <option value="">（清空）</option>
@@ -63,6 +70,7 @@
                 :value="toNativeSelectValue(draft.configure.categoriesField)"
                 aria-label="Pie Categories 字段"
                 :aria-invalid="!draft.configure.categoriesField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Categories'))"
                 @change="onCategoriesFieldChange"
               >
                 <option value="">（清空）</option>
@@ -86,6 +94,7 @@
                 :value="toNativeSelectValue(draft.configure.heatmapRowField)"
                 aria-label="Heatmap 行字段"
                 :aria-invalid="!draft.configure.heatmapRowField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Row'))"
                 @change="onHeatmapRowChange"
               >
                 <option value="">（清空）</option>
@@ -98,6 +107,7 @@
                 :value="toNativeSelectValue(draft.configure.heatmapColField)"
                 aria-label="Heatmap 列字段"
                 :aria-invalid="!draft.configure.heatmapColField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Col'))"
                 @change="onHeatmapColChange"
               >
                 <option value="">（清空）</option>
@@ -110,6 +120,7 @@
                 :value="toNativeSelectValue(draft.configure.heatmapValueField)"
                 aria-label="Heatmap 值字段"
                 :aria-invalid="!draft.configure.heatmapValueField || undefined"
+                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Value'))"
                 @change="onHeatmapValueChange"
               >
                 <option value="">（清空）</option>
@@ -526,6 +537,8 @@ import {
   errorBarsHint,
 } from '@/modules/chart/errorBars'
 import {
+  CFG_MISS_ALERT_ID,
+  cfgMissDescribedBy,
   columnSelectLabel,
   fromNativeSelectValue,
   toNativeSelectValue,

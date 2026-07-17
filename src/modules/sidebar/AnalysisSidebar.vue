@@ -186,7 +186,7 @@ import {
 } from '@/modules/sidebar/sidebarTree'
 import {
   clampTreeFocusIndex,
-  formatSearchClearedStatus,
+  nextSearchClearedStatus,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
@@ -443,9 +443,11 @@ function onSearchKeydown(e: KeyboardEvent) {
   e.preventDefault()
   if (action === 'clear') {
     q.value = ''
-    // Announce after clear so the live region reflects the unfiltered tree.
+    // Announce after clear so the live region reflects the unfiltered tree;
+    // skip when the message would duplicate the previous live status.
     void nextTick(() => {
-      searchStatus.value = formatSearchClearedStatus(flatNodes.value.length)
+      const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
+      if (next !== null) searchStatus.value = next
     })
     return
   }
