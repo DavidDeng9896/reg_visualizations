@@ -267,7 +267,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
     await page.waitForTimeout(500)
     const row = page.getByRole('row', { name: /Demo Dose Response/ }).first()
     await row.getByRole('button', { name: '删除' }).click()
-    await page.getByRole('button', { name: '确定' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '删除' }).click()
     await page.waitForTimeout(500)
   })
 
