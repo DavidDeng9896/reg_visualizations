@@ -60,7 +60,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { confirm, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
@@ -135,7 +135,12 @@ function open(row: { id: string }) {
 }
 
 async function onRemove(id: string) {
-  await confirm('确定删除该 Analysis？', '确认')
+  try {
+    await confirm('确定删除该 Analysis？', '确认')
+  } catch (err) {
+    if (isFeedbackCancel(err)) return
+    throw err
+  }
   await store.removeAnalysis(id)
   toast('success', '已删除')
 }

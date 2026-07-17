@@ -175,7 +175,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
-import { confirm, prompt, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, prompt, toast } from '@/shared/ui/feedback'
 import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
@@ -563,9 +563,13 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
     newViewType.value = 'table'
     showNewView.value = true
   } else if (cmd === 'rename') {
-    void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') }).then(({ value }) => {
-      if (value) store.renameNode(data.id, value)
-    })
+    void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') })
+      .then(({ value }) => {
+        if (value) store.renameNode(data.id, value)
+      })
+      .catch((err) => {
+        if (!isFeedbackCancel(err)) throw err
+      })
   } else if (cmd === 'jump') {
     emit('jump-flowchart', data.id)
   } else if (cmd === 'promote') {
@@ -573,11 +577,15 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
     store.promoteViewToTable(data.id)
     toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    void confirm('确定删除？子视图将一并删除。', '确认').then(() => {
-      const r = store.deleteNode(data.id)
-      if (!r.ok) toast('error', r.reason || '删除失败')
-      else toast('success', '已删除')
-    })
+    void confirm('确定删除？子视图将一并删除。', '确认')
+      .then(() => {
+        const r = store.deleteNode(data.id)
+        if (!r.ok) toast('error', r.reason || '删除失败')
+        else toast('success', '已删除')
+      })
+      .catch((err) => {
+        if (!isFeedbackCancel(err)) throw err
+      })
   }
 }
 
