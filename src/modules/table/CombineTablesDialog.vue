@@ -78,9 +78,21 @@
           </label>
         </div>
         <div class="preview-title">预览（前 20 行）{{ warning }}</div>
-        <el-table :data="preview" height="220" size="small" border>
-          <el-table-column v-for="c in previewCols" :key="c.field" :prop="c.field" :label="c.title" min-width="90" />
-        </el-table>
+        <div class="preview-wrap" role="region" aria-label="合并预览">
+          <table v-if="previewCols.length" class="preview-table">
+            <thead>
+              <tr>
+                <th v-for="c in previewCols" :key="c.field" scope="col">{{ c.title }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, ri) in preview" :key="ri">
+                <td v-for="c in previewCols" :key="c.field">{{ formatPreviewCell(row[c.field]) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="preview-empty">选择表与连接条件后显示预览</div>
+        </div>
       </div>
       <footer class="dialog-footer">
         <button type="button" class="btn" @click="close">取消</button>
@@ -93,6 +105,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { toast } from '@/shared/ui/feedback'
+import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { multiSelectCountStatus } from '@/shared/ui/selectStatus'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { combineTables } from '@/modules/table/join'
@@ -207,7 +220,7 @@ function rebuild() {
       rightKeys: rightKeys.value,
     })
     previewCols.value = result.columns
-    preview.value = result.rows.slice(0, 20)
+    preview.value = slicePreviewRows(result.rows, 20)
     if (!result.rows.length) warning.value = '（警告：结果为空）'
   } catch (e) {
     warning.value = String(e)
@@ -340,6 +353,46 @@ function add() {
   margin: 12px 0 6px;
   color: #646a73;
   font-size: 13px;
+}
+.preview-wrap {
+  height: 220px;
+  overflow: auto;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+}
+.preview-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #8f959e;
+  font-size: 13px;
+}
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.preview-table th,
+.preview-table td {
+  border-bottom: 1px solid #eef0f2;
+  border-right: 1px solid #eef0f2;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f7f8fa;
+  font-weight: 600;
+  color: #646a73;
+  z-index: 1;
+}
+.preview-table tbody tr:hover td {
+  background: #f5f8ff;
 }
 .native-field-select,
 .native-input {

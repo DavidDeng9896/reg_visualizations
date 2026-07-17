@@ -17,15 +17,35 @@
       <div class="dialog-body">
         <div class="grid">
           <div>
-            <el-upload
-              drag
-              :auto-upload="false"
-              accept=".csv,text/csv"
-              :show-file-list="false"
-              :on-change="onFile"
+            <div
+              class="upload-zone"
+              :class="{ 'is-dragover': dragOver }"
+              role="button"
+              tabindex="0"
+              aria-label="拖放或选择 CSV 文件"
+              :aria-describedby="fileStatusId"
+              @click="openFilePicker"
+              @keydown.enter.prevent="openFilePicker"
+              @keydown.space.prevent="openFilePicker"
+              @dragenter.prevent="onDragEnter"
+              @dragover.prevent
+              @dragleave.prevent="onDragLeave"
+              @drop.prevent="onDrop"
             >
               <div class="upload-tip">拖放或选择 CSV 文件</div>
-            </el-upload>
+              <div v-if="fileName" class="upload-file" aria-hidden="true">{{ fileName }}</div>
+            </div>
+            <input
+              ref="fileInputRef"
+              type="file"
+              class="sr-only-input"
+              accept=".csv,text/csv"
+              aria-label="选择 CSV 文件"
+              @change="onFileInput"
+            />
+            <span :id="fileStatusId" class="sr-only" role="status" aria-live="polite">
+              {{ fileStatus }}
+            </span>
             <label class="field" style="margin-top: 12px">
               <span class="field-label">Name table</span>
               <input
@@ -39,15 +59,21 @@
           </div>
           <div>
             <div class="preview-title">预览（前 20 行）</div>
-            <el-table :data="previewRows" height="280" size="small" border>
-              <el-table-column
-                v-for="c in columns"
-                :key="c.field"
-                :prop="c.field"
-                :label="c.title"
-                min-width="100"
-              />
-            </el-table>
+            <div class="preview-wrap" role="region" aria-label="CSV 预览">
+              <table v-if="columns.length" class="preview-table">
+                <thead>
+                  <tr>
+                    <th v-for="c in columns" :key="c.field" scope="col">{{ c.title }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, ri) in previewRows" :key="ri">
+                    <td v-for="c in columns" :key="c.field">{{ formatPreviewCell(row[c.field]) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-else class="preview-empty">选择 CSV 后显示预览</div>
+            </div>
           </div>
         </div>
       </div>
@@ -60,10 +86,11 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Papa from 'papaparse'
-import type { UploadFile } from 'element-plus'
 import { toast } from '@/shared/ui/feedback'
+import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
+import { fileSelectedStatus, isCsvFileName } from '@/shared/ui/uploadStatus'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { buildColumnsFromRows, withRowIds } from '@/shared/utils/schema'
 import { uid } from '@/shared/utils/id'
@@ -78,8 +105,14 @@ const rows = ref<Record<string, unknown>[]>([])
 const columns = ref<TableColumn[]>([])
 const previewRows = ref<Record<string, unknown>[]>([])
 const fileName = ref('')
+const dragOver = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 let restoreFocus: HTMLElement | null = null
+let dragDepth = 0
+
+const fileStatusId = 'csv-file-status'
+const fileStatus = computed(() => fileSelectedStatus(fileName.value))
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -93,6 +126,7 @@ watch(
       void nextTick(() => focusables()[0]?.focus())
     } else {
       document.body.style.overflow = ''
+      resetForm()
       if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
       restoreFocus = null
     }
@@ -111,6 +145,17 @@ onUnmounted(() => {
   document.body.style.overflow = ''
   if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
 })
+
+function resetForm() {
+  tableName.value = ''
+  rows.value = []
+  columns.value = []
+  previewRows.value = []
+  fileName.value = ''
+  dragOver.value = false
+  dragDepth = 0
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
 
 function focusables(): HTMLElement[] {
   const root = panelRef.value
@@ -142,24 +187,55 @@ function close() {
   emit('update:modelValue', false)
 }
 
-function onFile(file: UploadFile) {
-  const raw = file.raw
-  if (!raw) return
-  fileName.value = raw.name
-  tableName.value = raw.name.replace(/\.csv$/i, '')
-  Papa.parse(raw, {
+function openFilePicker() {
+  fileInputRef.value?.click()
+}
+
+function onDragEnter() {
+  dragDepth += 1
+  dragOver.value = true
+}
+
+function onDragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (dragDepth === 0) dragOver.value = false
+}
+
+function onDrop(e: DragEvent) {
+  dragDepth = 0
+  dragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) parseFile(file)
+}
+
+function onFileInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) parseFile(file)
+}
+
+function parseFile(file: File) {
+  if (!isCsvFileName(file.name) && file.type !== 'text/csv') {
+    toast('error', '请选择 CSV 文件')
+    return
+  }
+  fileName.value = file.name
+  tableName.value = file.name.replace(/\.csv$/i, '')
+  Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: (res) => {
       if (res.errors?.length) {
         toast('error', 'CSV 解析失败：' + res.errors[0].message)
         rows.value = []
+        columns.value = []
+        previewRows.value = []
         return
       }
       const data = withRowIds(res.data as Record<string, unknown>[])
       rows.value = data
       columns.value = buildColumnsFromRows(data)
-      previewRows.value = data.slice(0, 20)
+      previewRows.value = slicePreviewRows(data, 20)
     },
     error: () => toast('error', 'CSV 解析失败'),
   })
@@ -261,14 +337,101 @@ function add() {
     grid-template-columns: 1fr;
   }
 }
+.upload-zone {
+  border: 1px dashed #c9cdd4;
+  border-radius: 8px;
+  background: #fafbfc;
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.upload-zone:hover,
+.upload-zone:focus-visible {
+  border-color: #3370ff;
+  background: #f5f8ff;
+  outline: none;
+}
+.upload-zone.is-dragover {
+  border-color: #3370ff;
+  background: #eef3ff;
+}
 .upload-tip {
-  padding: 24px;
   color: #646a73;
+  font-size: 13px;
+}
+.upload-file {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #1f2329;
+  word-break: break-all;
+}
+.sr-only-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .preview-title {
   font-size: 13px;
   margin-bottom: 6px;
   color: #646a73;
+}
+.preview-wrap {
+  height: 280px;
+  overflow: auto;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+}
+.preview-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #8f959e;
+  font-size: 13px;
+}
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.preview-table th,
+.preview-table td {
+  border-bottom: 1px solid #eef0f2;
+  border-right: 1px solid #eef0f2;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f7f8fa;
+  font-weight: 600;
+  color: #646a73;
+  z-index: 1;
+}
+.preview-table tbody tr:hover td {
+  background: #f5f8ff;
 }
 .field {
   display: flex;
