@@ -7,6 +7,8 @@ export type TreeKeyAction =
   | 'ops'
   | 'leave-ops'
 
+export type SearchKeyAction = 'clear' | 'enter-tree'
+
 export function resolveTreeKeyAction(key: string): TreeKeyAction | null {
   switch (key) {
     case 'ArrowDown':
@@ -27,6 +29,13 @@ export function resolveTreeKeyAction(key: string): TreeKeyAction | null {
     default:
       return null
   }
+}
+
+/** Sidebar search box: Escape clears; ArrowDown moves focus into the tree. */
+export function resolveSearchKeyAction(key: string, hasQuery: boolean): SearchKeyAction | null {
+  if (key === 'Escape' && hasQuery) return 'clear'
+  if (key === 'ArrowDown') return 'enter-tree'
+  return null
 }
 
 export function nextTreeIndex(count: number, current: number): number | null {

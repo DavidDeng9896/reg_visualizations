@@ -5,38 +5,40 @@
       <template v-if="store.selectedView">
         <div class="tb-group" role="group" aria-label="视图">
           <span class="tb-label">视图</span>
-          <el-input
+          <input
             v-model="viewName"
-            size="small"
+            type="text"
+            class="tb-input"
             style="width: 180px"
             aria-label="视图名称"
-            @change="store.renameNode(store.selectedView.view.id, viewName)"
+            autocomplete="off"
+            @change="onRename"
           />
-          <el-select
+          <select
             v-model="viewType"
-            size="small"
+            class="tb-select"
             style="width: 150px"
             aria-label="视图类型"
-            @change="onViewType"
+            @change="onViewType(viewType)"
           >
-            <el-option v-for="t in viewTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
-          </el-select>
+            <option v-for="t in viewTypeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
         </div>
         <div class="tb-group" role="group" aria-label="布局">
           <span class="tb-label">布局</span>
-          <el-select
+          <select
             v-model="chartPos"
-            size="small"
+            class="tb-select"
             style="width: 140px"
             aria-label="图表位置"
             :disabled="viewType === 'table'"
-            @change="onPos"
+            @change="onPos(chartPos)"
           >
-            <el-option label="图在下" value="bottom" />
-            <el-option label="图在上" value="top" />
-            <el-option label="图在左" value="left" />
-            <el-option label="图在右" value="right" />
-          </el-select>
+            <option value="bottom">图在下</option>
+            <option value="top">图在上</option>
+            <option value="left">图在左</option>
+            <option value="right">图在右</option>
+          </select>
           <button
             type="button"
             class="btn"
@@ -329,6 +331,11 @@ function onSplitterKey(e: KeyboardEvent) {
   persistSplitRatio(next)
 }
 
+function onRename() {
+  if (!store.selectedView) return
+  store.renameNode(store.selectedView.view.id, viewName.value)
+}
+
 function onViewType(t: ViewType) {
   if (!store.selectedView) return
   const cols = store.workspaceResult?.columns || store.selectedView.table.columns
@@ -436,6 +443,28 @@ function exportCsv() {
   text-transform: none;
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+.tb-input,
+.tb-select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+}
+.tb-input:focus,
+.tb-select:focus {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+  border-color: var(--ia-accent);
+}
+.tb-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f5f6f7;
 }
 .row-count {
   margin-left: auto;

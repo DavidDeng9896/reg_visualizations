@@ -3,6 +3,7 @@ import {
   clampTreeFocusIndex,
   nextTreeIndex,
   prevTreeIndex,
+  resolveSearchKeyAction,
   resolveTreeKeyAction,
   treeItemTabIndex,
 } from '@/modules/sidebar/treeNav'
@@ -19,6 +20,15 @@ describe('treeNav', () => {
     expect(resolveTreeKeyAction('ArrowLeft')).toBe('leave-ops')
     expect(resolveTreeKeyAction('Escape')).toBe(null)
     expect(resolveTreeKeyAction('Tab')).toBe(null)
+  })
+
+  it('resolves search Escape clear and ArrowDown enter-tree', () => {
+    expect(resolveSearchKeyAction('Escape', true)).toBe('clear')
+    expect(resolveSearchKeyAction('Escape', false)).toBe(null)
+    expect(resolveSearchKeyAction('ArrowDown', false)).toBe('enter-tree')
+    expect(resolveSearchKeyAction('ArrowDown', true)).toBe('enter-tree')
+    expect(resolveSearchKeyAction('ArrowUp', true)).toBe(null)
+    expect(resolveSearchKeyAction('Enter', true)).toBe(null)
   })
 
   it('moves focus with wrap within bounds', () => {

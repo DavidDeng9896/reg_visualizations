@@ -186,6 +186,7 @@ import {
   clampTreeFocusIndex,
   nextTreeIndex,
   prevTreeIndex,
+  resolveSearchKeyAction,
   resolveTreeKeyAction,
   treeItemTabIndex,
 } from '@/modules/sidebar/treeNav'
@@ -429,10 +430,18 @@ function onOpsTriggerKey(e: KeyboardEvent, data: SidebarTreeNode, index: number)
 }
 
 function onSearchKeydown(e: KeyboardEvent) {
-  if (e.key !== 'Escape') return
-  if (!q.value) return
+  const action = resolveSearchKeyAction(e.key, Boolean(q.value))
+  if (!action) return
   e.preventDefault()
-  q.value = ''
+  if (action === 'clear') {
+    q.value = ''
+    return
+  }
+  // enter-tree: move focus to first (or current) visible tree item
+  const count = flatNodes.value.length
+  if (!count) return
+  const target = clampTreeFocusIndex(count, treeFocusIndex.value) ?? 0
+  focusTreeItem(target)
 }
 
 function focusTreeItem(index: number | null) {

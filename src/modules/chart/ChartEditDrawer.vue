@@ -169,16 +169,15 @@
               <el-input v-model="draft.configure.yLabel" aria-label="Y 轴自定义标签" />
             </el-form-item>
             <el-form-item v-if="showXY" label="交换 X/Y">
-              <el-button
-                size="small"
-                type="primary"
-                plain
+              <button
+                type="button"
+                class="btn btn-primary-plain"
                 aria-label="交换 X 与 Y 轴映射及轴级设置"
                 title="交换字段、标签、Scale 与轴 Range"
                 @click="onSwapAxes"
               >
                 交换 X ↔ Y
-              </el-button>
+              </button>
               <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。</p>
             </el-form-item>
             <el-form-item label="色板">
@@ -217,14 +216,15 @@
             <el-form-item label="Title">
               <div class="title-row">
                 <el-input v-model="draft.style.title" aria-label="图表标题" />
-                <el-button
-                  size="small"
+                <button
+                  type="button"
+                  class="btn"
                   aria-label="刷新标题为默认（视图或表名）"
                   title="刷新恢复默认标题"
                   @click="resetTitle"
                 >
                   刷新
-                </el-button>
+                </button>
               </div>
             </el-form-item>
             <el-form-item label="Subtitle">
@@ -346,14 +346,14 @@
                     @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
                     @keydown.enter.prevent
                   />
-                  <el-button
-                    size="small"
-                    text
+                  <button
+                    type="button"
+                    class="btn btn-text"
                     :aria-label="`重置系列 ${key} 颜色为色板默认`"
                     @click="clearSeriesColor(key)"
                   >
                     重置
-                  </el-button>
+                  </button>
                 </label>
               </div>
               <p class="fit-hint" role="note">
@@ -454,8 +454,8 @@
         </el-tab-pane>
       </el-tabs>
       <div class="footer">
-        <el-button @click="emit('update:modelValue', false)">Cancel</el-button>
-        <el-button type="primary" @click="save">Save</el-button>
+        <button type="button" class="btn" @click="emit('update:modelValue', false)">Cancel</button>
+        <button type="button" class="btn btn-primary" @click="save">Save</button>
       </div>
     </div>
   </el-drawer>
@@ -848,6 +848,49 @@ function save() {
 }
 .title-row .el-input {
   flex: 1;
+}
+.btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border, #d0d3d6);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--ia-accent, #3370ff);
+  color: var(--ia-accent, #3370ff);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
+}
+.btn-primary {
+  background: var(--ia-accent, #3370ff);
+  border-color: var(--ia-accent, #3370ff);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
+}
+.btn-primary-plain {
+  color: var(--ia-accent, #3370ff);
+  border-color: color-mix(in srgb, var(--ia-accent, #3370ff) 45%, #fff);
+  background: color-mix(in srgb, var(--ia-accent, #3370ff) 8%, #fff);
+}
+.btn-text {
+  height: auto;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  color: var(--ia-accent, #3370ff);
+}
+.btn-text:hover {
+  background: color-mix(in srgb, var(--ia-accent, #3370ff) 8%, #fff);
 }
 .series-colors {
   display: flex;
