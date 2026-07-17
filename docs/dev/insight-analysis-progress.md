@@ -9,26 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-58a1b181-c65c-4787-ad71-ab05f0b43108-eef6`（Round 26） |
-| 阶段 | **优化 Round 26 完成**（周期 **2/3**；下一合并点 Round 27） |
-| 上次更新 | 2026-07-17 16:08 |
-| 单元 | **131/131 PASS**（+listSkeleton / toast Tab / skip routeFocus / dangerConfirm） |
+| 分支 | `cursor/bc-aa5a54f3-afa0-46a0-a089-a0a1c9b9b8e8-6775`（Round 27） |
+| 阶段 | **优化 Round 27 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=27`） |
+| 上次更新 | 2026-07-17 17:08 |
+| 单元 | **135/135 PASS**（+listEmpty / toast Esc / inert） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（共享 skel CSS；dist 无 EP） |
+| Build | PASS（dist 无 EP） |
 
-## 2. Round 26 对齐摘要
+## 2. Round 27 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 列表加载骨架对齐工作区 pulse | ✅ `listSkeletonAttrs` + `ia-skel` |
-| 列表空态视觉对齐 | ✅ pulse + 渐变空态 |
-| toast 多条 Tab → 最新关闭钮 | ✅ `insertBefore` + `listToastCloseButtons` |
-| Flowchart loading delay 200ms | ✅ 避免暖缓存闪烁 |
-| skip-link 与 routeFocus 协作 | ✅ `shouldSkipRouteFocus` + `data-ia-skip` |
-| 侧栏/列表删除 danger 统一 | ✅ `dangerDeleteOptions` |
-| 合并 | 否（周期 2/3） |
+| 空态 CTA + 焦点环 | ✅ 列表 empty-list 内 Demo / 创建 |
+| `#analysis-list` skip 落地 region | ✅ `listEmptyRegionAttrs` |
+| 多 toast Esc 关最新 | ✅ document capture + `dismissNewestToastElement` |
+| confirm 时 toast 不穿透 | ✅ toast host `inert` + 样式 |
+| projects 拆 toast 懒加载 | ✅ 评估后保留同步 API（Dexie 同图） |
+| 合并 Round 25–27 → main | ✅ 本轮开 PR |
 
 ## 3. 验证命令
 
@@ -38,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 27 计划（下一周期 3/3 · 合并）
+## 4. Round 28 计划（下一周期 1/3）
 
-1. **UX**：列表 skip → `#analysis-list` 与 routeFocus 落地验证；空态 CTA 焦点环
-2. **Perf**：`projects` JS（Dexie+feedback）是否拆 toast 宿主懒加载；观察 index CSS 增量
-3. **A11y**：多 toast Esc 关闭「最新」；confirm 打开时 toast Tab 不穿透
+1. **UX**：工作区空表 / 无视图引导 CTA；窄屏工具栏「更多」触控目标复核
+2. **Perf**：ChartEditDrawer 按 CONFIGURE/STYLE 分区再拆异步；监控 `projects` JS（~116.8k）
+3. **A11y**：列表空态 CTA 与顶栏按钮 `aria` 去重宣告；dialog `inert` 与 toast 共存手测
 4. **验证**：unit + e2e:ui + build
-5. **合并**：**是**（合并 Round 25–27 → main）
+5. **合并**：否（周期 1/3）
