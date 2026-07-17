@@ -5,8 +5,9 @@
     aria-modal="true"
     aria-labelledby="create-analysis-title"
     @keydown.esc="close"
+    @keydown="onTrapKeydown"
   >
-    <button type="button" class="dialog-backdrop" aria-label="关闭对话框" @click="close" />
+    <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
     <div class="dialog-panel" ref="panelRef">
       <header class="dialog-header">
         <h2 id="create-analysis-title">创建 Analysis</h2>
@@ -56,6 +57,9 @@ const nameRef = ref<HTMLInputElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 let restoreFocus: HTMLElement | null = null
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
 const canSubmit = computed(() => !!name.value.trim() && !!projectId.value)
 
 watch(
@@ -78,6 +82,32 @@ onUnmounted(() => {
   document.body.style.overflow = ''
   if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
 })
+
+function focusables(): HTMLElement[] {
+  const root = panelRef.value
+  if (!root) return []
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+  )
+}
+
+function onTrapKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Tab') return
+  const list = focusables()
+  if (list.length < 2) return
+  const first = list[0]
+  const last = list[list.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (e.shiftKey) {
+    if (active === first || !list.includes(active as HTMLElement)) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else if (active === last || !list.includes(active as HTMLElement)) {
+    e.preventDefault()
+    first.focus()
+  }
+}
 
 function close() {
   emit('update:modelValue', false)

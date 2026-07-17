@@ -8,24 +8,52 @@
         <span>{{ getProjectName(store.current.projectId) }}</span>
         <span>/</span>
         <strong>{{ store.current.name }}</strong>
-        <el-tag v-if="store.saving" size="small" type="info" style="margin-left: 8px">保存中…</el-tag>
+        <span v-if="store.saving" class="saving-tag" role="status">保存中…</span>
       </div>
       <div class="actions">
-        <el-button :type="store.mainMode === 'flowchart' ? 'primary' : 'default'" @click="store.mainMode = 'flowchart'">
+        <button
+          type="button"
+          class="btn"
+          :class="{ 'btn-primary': store.mainMode === 'flowchart' }"
+          :aria-pressed="store.mainMode === 'flowchart'"
+          @click="store.mainMode = 'flowchart'"
+        >
           Flowchart
-        </el-button>
-        <el-button @click="stub('Send output')">Send output</el-button>
-        <el-dropdown trigger="click" @command="onAddData">
-          <el-button type="primary">+ Add data</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="csv">From CSV</el-dropdown-item>
-              <el-dropdown-item command="combine">By combining tables</el-dropdown-item>
-              <el-dropdown-item command="registry" disabled>From Registry（暂未实现）</el-dropdown-item>
-              <el-dropdown-item command="plate" disabled>From Plate（暂未实现）</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        </button>
+        <button type="button" class="btn" @click="stub('Send output')">Send output</button>
+        <div class="add-data" ref="addDataRoot">
+          <button
+            type="button"
+            class="btn btn-primary"
+            aria-haspopup="menu"
+            :aria-expanded="addDataOpen"
+            aria-controls="add-data-menu"
+            @click="toggleAddData"
+          >
+            + Add data
+          </button>
+          <ul
+            v-if="addDataOpen"
+            id="add-data-menu"
+            class="add-data-menu"
+            role="menu"
+            aria-label="+ Add data"
+          >
+            <li role="menuitem" tabindex="-1" @click="pickAddData('csv')" @keydown.enter.prevent="pickAddData('csv')">
+              From CSV
+            </li>
+            <li
+              role="menuitem"
+              tabindex="-1"
+              @click="pickAddData('combine')"
+              @keydown.enter.prevent="pickAddData('combine')"
+            >
+              By combining tables
+            </li>
+            <li role="menuitem" aria-disabled="true" class="is-disabled">From Registry（暂未实现）</li>
+            <li role="menuitem" aria-disabled="true" class="is-disabled">From Plate（暂未实现）</li>
+          </ul>
+        </div>
       </div>
     </header>
 
@@ -92,8 +120,12 @@ const showCombine = ref(false)
 const focusId = ref<string | null>(null)
 const sidebarWidth = ref(loadSidebarWidth())
 const draggingSidebar = ref(false)
+const addDataOpen = ref(false)
+const addDataRoot = ref<HTMLElement | null>(null)
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', onDocPointer, true)
+  document.addEventListener('keydown', onDocKey)
   // Vxe 仅动态导入，避免列表路由共享图误拉；表网格需等注册完成再挂载
   const [{ setupVxe }] = await Promise.all([
     import('@/modules/plugins/vxe'),
@@ -109,12 +141,35 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointer, true)
+  document.removeEventListener('keydown', onDocKey)
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
 })
 
 function stub(name: string) {
   toast('info', `${name}：后续版本`)
+}
+
+function toggleAddData() {
+  addDataOpen.value = !addDataOpen.value
+}
+
+function pickAddData(cmd: string) {
+  addDataOpen.value = false
+  onAddData(cmd)
+}
+
+function onDocPointer(e: PointerEvent) {
+  if (!addDataOpen.value) return
+  const root = addDataRoot.value
+  if (root && !root.contains(e.target as Node)) addDataOpen.value = false
+}
+
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && addDataOpen.value) {
+    addDataOpen.value = false
+  }
 }
 
 function onAddData(cmd: string) {
@@ -212,9 +267,80 @@ function onSidebarKey(e: KeyboardEvent) {
   color: var(--ia-accent);
   text-decoration: none;
 }
+.saving-tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #646a73;
+  background: #f2f3f5;
+  border-radius: 4px;
+}
 .actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+}
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
+}
+.add-data {
+  position: relative;
+}
+.add-data-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+.add-data-menu li {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #1f2329;
+}
+.add-data-menu li:hover:not(.is-disabled),
+.add-data-menu li:focus-visible:not(.is-disabled) {
+  background: var(--ia-accent-soft);
+  color: var(--ia-accent);
+  outline: none;
+}
+.add-data-menu li.is-disabled {
+  color: #c0c4cc;
+  cursor: not-allowed;
 }
 .body {
   flex: 1;

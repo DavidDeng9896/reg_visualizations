@@ -96,12 +96,21 @@
                 <el-option v-for="a in aggs" :key="a" :label="a" :value="a" />
               </el-select>
             </el-form-item>
-            <el-form-item label="误差棒">
-              <el-select v-model="draft.configure.errorBars" style="width: 100%">
+            <el-form-item v-if="errorBarsEnabled" label="误差棒">
+              <el-select
+                v-model="draft.configure.errorBars"
+                style="width: 100%"
+                :disabled="!errorBarsAggOk"
+                aria-label="误差棒"
+              >
                 <el-option label="None" value="none" />
                 <el-option label="SD" value="sd" />
                 <el-option label="SEM" value="sem" />
               </el-select>
+              <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
+            </el-form-item>
+            <el-form-item v-else label="误差棒">
+              <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
             </el-form-item>
             <el-form-item label="水平柱">
               <el-switch v-model="horiz" />
@@ -195,12 +204,15 @@
                   :title="c"
                 />
               </div>
-              <p class="fit-hint" role="note">Light / Dark / Alternate 预设；下方色块为预览（common.md §2.5）。</p>
+              <p class="fit-hint" role="note">
+                Light / Dark / Alternate 预设；下方色块为默认分配预览。STYLE · Series 取色可覆盖单个系列（common.md §2.5）。
+              </p>
             </el-form-item>
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="STYLE" name="style">
           <el-form label-width="110px" size="small">
+            <section class="style-block" aria-labelledby="style-title">
             <h3 class="style-section" id="style-title">Title</h3>
             <el-form-item label="Title">
               <div class="title-row">
@@ -218,7 +230,9 @@
             <el-form-item label="Subtitle">
               <el-input v-model="draft.style.subtitle" aria-label="图表副标题" />
             </el-form-item>
+            </section>
 
+            <section class="style-block" aria-labelledby="style-layout">
             <h3 class="style-section" id="style-layout">Layout</h3>
             <el-form-item label="Width (px)">
               <el-input-number
@@ -316,7 +330,9 @@
                 aria-label="图例自定义标签"
               />
             </el-form-item>
+            </section>
 
+            <section class="style-block" aria-labelledby="style-series">
             <h3 class="style-section" id="style-series">Series</h3>
             <el-form-item v-if="seriesKeys.length" label="系列取色">
               <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
@@ -340,7 +356,9 @@
                   </el-button>
                 </label>
               </div>
-              <p class="fit-hint" role="note">覆盖色板默认分配；Tab 可聚焦色块，重置后恢复当前色板槽位色。</p>
+              <p class="fit-hint" role="note">
+                覆盖 CONFIGURE 色板默认色；重置后回到上方色板预览对应槽位。Tab 可聚焦色块。
+              </p>
             </el-form-item>
             <el-form-item v-if="pointShapeEnabled" label="点形状">
               <el-select v-model="draft.style.pointShape" style="width: 100%" aria-label="点形状">
@@ -354,7 +372,9 @@
             <el-form-item v-else label="点形状">
               <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
             </el-form-item>
+            </section>
 
+            <section class="style-block" aria-labelledby="style-axes">
             <h3 class="style-section" id="style-axes">Axes</h3>
             <el-form-item label="X Range">
               <el-select v-model="xRangeMode" style="width: 100%" aria-label="X 轴 Range 模式">
@@ -429,6 +449,7 @@
               </el-form-item>
               <p class="fit-hint" role="note">对数轴（Log）要求数据全部为正值；否则运行时回退 Linear 并提示。</p>
             </template>
+            </section>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -458,6 +479,11 @@ import {
   pointShapeHint,
   resolveSeriesColor,
 } from '@/modules/chart/seriesStyle'
+import {
+  errorBarsAppliesTo,
+  errorBarsAvailableForAggregation,
+  errorBarsHint,
+} from '@/modules/chart/errorBars'
 import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{
@@ -531,6 +557,24 @@ const opacityEnabled = computed(() => opacityAppliesTo(props.viewType))
 const opacityHintText = computed(() => opacityHint(props.viewType))
 const pointShapeEnabled = computed(() => pointShapeAppliesTo(props.viewType))
 const pointShapeHintText = computed(() => pointShapeHint(props.viewType))
+const errorBarsEnabled = computed(() => errorBarsAppliesTo(props.viewType))
+const errorBarsAggOk = computed(() =>
+  errorBarsAvailableForAggregation(draft.value.configure.aggregation),
+)
+const errorBarsHintText = computed(() =>
+  errorBarsHint(props.viewType, draft.value.configure.aggregation),
+)
+
+watch(
+  () => [props.viewType, draft.value.configure.aggregation] as const,
+  () => {
+    if (!errorBarsAppliesTo(props.viewType) || !errorBarsAvailableForAggregation(draft.value.configure.aggregation)) {
+      if (draft.value.configure.errorBars && draft.value.configure.errorBars !== 'none') {
+        draft.value.configure.errorBars = 'none'
+      }
+    }
+  },
+)
 
 const seriesKeys = computed(() =>
   listSeriesKeys(props.viewType, props.rows || [], draft.value.configure),
@@ -838,6 +882,12 @@ function save() {
   outline: 2px solid var(--ia-accent, #2f6fed);
   outline-offset: 2px;
 }
+.style-block {
+  display: block;
+}
+.style-block:first-child .style-section {
+  margin-top: 0;
+}
 .style-section {
   margin: 16px 0 10px;
   padding-bottom: 4px;
@@ -846,9 +896,6 @@ function save() {
   letter-spacing: 0.02em;
   color: #646a73;
   border-bottom: 1px solid #ebeef5;
-}
-.style-section:first-child {
-  margin-top: 0;
 }
 .palette-preview {
   display: flex;
