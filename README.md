@@ -27,4 +27,4 @@ npm run build
 
 ## 技术栈
 
-Vue3 · Vite · TypeScript · Pinia · Element Plus · vxe-table · Vue Flow · ECharts · Dexie
+Vue3 · Vite · TypeScript · Pinia · vxe-table · Vue Flow · ECharts · Dexie

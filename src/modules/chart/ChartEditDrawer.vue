@@ -71,259 +71,342 @@
           >
             必填槽位未完成：{{ configureMiss.join('、') }}。请按当前图种补齐后再保存。
           </p>
-          <el-form label-width="110px" size="small">
-            <el-form-item v-if="showXY" :required="true" label="X / Categories">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.xField)"
-                aria-label="X 或 Categories 字段"
-                :aria-invalid="!draft.configure.xField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('X'))"
-                @change="onXFieldChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">
-                  {{ columnSelectLabel(c) }}
-                </option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showXY" :required="true" label="Y / Measure">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.yField)"
-                aria-label="Y 或 Measure 字段"
-                :aria-invalid="!draft.configure.yField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Y'))"
-                @change="onYFieldChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">
-                  {{ columnSelectLabel(c) }}
-                </option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showXY" label="Series / Color">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.seriesField)"
-                aria-label="Series 或 Color 字段"
-                @change="onSeriesFieldChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showPie" :required="true" label="Categories(Pie)">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.categoriesField)"
-                aria-label="Pie Categories 字段"
-                :aria-invalid="!draft.configure.categoriesField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Categories'))"
-                @change="onCategoriesFieldChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showPie" label="Measure(Pie)">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.measureField)"
-                aria-label="Pie Measure 字段"
-                @change="onMeasureFieldChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Row">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.heatmapRowField)"
-                aria-label="Heatmap 行字段"
-                :aria-invalid="!draft.configure.heatmapRowField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Row'))"
-                @change="onHeatmapRowChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Col">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.heatmapColField)"
-                aria-label="Heatmap 列字段"
-                :aria-invalid="!draft.configure.heatmapColField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Col'))"
-                @change="onHeatmapColChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="showHeatmap" :required="true" label="Heatmap Value">
-              <select
-                class="native-field-select"
-                :value="toNativeSelectValue(draft.configure.heatmapValueField)"
-                aria-label="Heatmap 值字段"
-                :aria-invalid="!draft.configure.heatmapValueField || undefined"
-                :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Value'))"
-                @change="onHeatmapValueChange"
-              >
-                <option value="">（清空）</option>
-                <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item label="聚合">
-              <select
-                class="native-field-select"
-                :value="draft.configure.aggregation || 'count'"
-                aria-label="聚合方式"
-                @change="onAggregationChange"
-              >
-                <option v-for="a in aggs" :key="a" :value="a">{{ a }}</option>
-              </select>
-            </el-form-item>
-            <el-form-item v-if="errorBarsEnabled" label="误差棒">
-              <select
-                class="native-field-select"
-                :value="draft.configure.errorBars || 'none'"
-                :disabled="!errorBarsAggOk"
-                aria-label="误差棒"
-                @change="onErrorBarsChange"
-              >
-                <option value="none">None</option>
-                <option value="sd">SD</option>
-                <option value="sem">SEM</option>
-              </select>
-              <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
-            </el-form-item>
-            <el-form-item v-else label="误差棒">
-              <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
-            </el-form-item>
-            <el-form-item label="水平柱">
-              <label class="native-switch">
-                <input v-model="horiz" type="checkbox" role="switch" aria-label="水平柱" />
-                <span class="native-switch-ui" aria-hidden="true" />
-              </label>
-            </el-form-item>
-            <el-form-item label="堆叠">
-              <label class="native-switch">
-                <input v-model="draft.configure.stacked" type="checkbox" role="switch" aria-label="堆叠" />
-                <span class="native-switch-ui" aria-hidden="true" />
-              </label>
-            </el-form-item>
-            <el-form-item label="拟合">
-              <select
-                class="native-field-select"
-                :value="draft.configure.fitModel || 'none'"
-                aria-label="拟合模型"
-                @change="onFitModelChange"
-              >
-                <option value="none">None</option>
-                <option value="ptp">Point-to-Point</option>
-                <option value="linear">Linear</option>
-                <option value="quadratic">Quadratic</option>
-                <option value="4pl">4PL</option>
-              </select>
-              <p v-if="draft.configure.fitModel === '4pl'" class="fit-hint" role="note">
-                4PL 至少需要 4 个有效点，且 X/Y 均需有变化；可选手动约束上下渐近线（min / max）。
-              </p>
-            </el-form-item>
-            <el-form-item
+          <div class="field-form">
+            <div v-if="showXY" class="field-row">
+              <span class="field-label">X / Categories <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.xField)"
+                  aria-label="X 或 Categories 字段"
+                  :aria-invalid="!draft.configure.xField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('X'))"
+                  @change="onXFieldChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">
+                    {{ columnSelectLabel(c) }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showXY" class="field-row">
+              <span class="field-label">Y / Measure <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.yField)"
+                  aria-label="Y 或 Measure 字段"
+                  :aria-invalid="!draft.configure.yField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Y'))"
+                  @change="onYFieldChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">
+                    {{ columnSelectLabel(c) }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showXY" class="field-row">
+              <span class="field-label">Series / Color</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.seriesField)"
+                  aria-label="Series 或 Color 字段"
+                  @change="onSeriesFieldChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showPie" class="field-row">
+              <span class="field-label">Categories(Pie) <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.categoriesField)"
+                  aria-label="Pie Categories 字段"
+                  :aria-invalid="!draft.configure.categoriesField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Categories'))"
+                  @change="onCategoriesFieldChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showPie" class="field-row">
+              <span class="field-label">Measure(Pie)</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.measureField)"
+                  aria-label="Pie Measure 字段"
+                  @change="onMeasureFieldChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showHeatmap" class="field-row">
+              <span class="field-label">Heatmap Row <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.heatmapRowField)"
+                  aria-label="Heatmap 行字段"
+                  :aria-invalid="!draft.configure.heatmapRowField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Row'))"
+                  @change="onHeatmapRowChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showHeatmap" class="field-row">
+              <span class="field-label">Heatmap Col <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.heatmapColField)"
+                  aria-label="Heatmap 列字段"
+                  :aria-invalid="!draft.configure.heatmapColField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Col'))"
+                  @change="onHeatmapColChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="showHeatmap" class="field-row">
+              <span class="field-label">Heatmap Value <abbr title="必填">*</abbr></span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="toNativeSelectValue(draft.configure.heatmapValueField)"
+                  aria-label="Heatmap 值字段"
+                  :aria-invalid="!draft.configure.heatmapValueField || undefined"
+                  :aria-describedby="cfgMissDescribedBy(configureMiss.includes('Heatmap Value'))"
+                  @change="onHeatmapValueChange"
+                >
+                  <option value="">（清空）</option>
+                  <option v-for="c in columns" :key="c.field" :value="c.field">{{ c.title }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">聚合</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="draft.configure.aggregation || 'count'"
+                  aria-label="聚合方式"
+                  @change="onAggregationChange"
+                >
+                  <option v-for="a in aggs" :key="a" :value="a">{{ a }}</option>
+                </select>
+              </div>
+            </div>
+            <div v-if="errorBarsEnabled" class="field-row">
+              <span class="field-label">误差棒</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="draft.configure.errorBars || 'none'"
+                  :disabled="!errorBarsAggOk"
+                  aria-label="误差棒"
+                  @change="onErrorBarsChange"
+                >
+                  <option value="none">None</option>
+                  <option value="sd">SD</option>
+                  <option value="sem">SEM</option>
+                </select>
+                <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
+              </div>
+            </div>
+            <div v-else class="field-row">
+              <span class="field-label">误差棒</span>
+              <div class="field-control">
+                <p class="fit-hint" role="note">{{ errorBarsHintText }}</p>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">水平柱</span>
+              <div class="field-control">
+                <label class="native-switch">
+                  <input v-model="horiz" type="checkbox" role="switch" aria-label="水平柱" />
+                  <span class="native-switch-ui" aria-hidden="true" />
+                </label>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">堆叠</span>
+              <div class="field-control">
+                <label class="native-switch">
+                  <input v-model="draft.configure.stacked" type="checkbox" role="switch" aria-label="堆叠" />
+                  <span class="native-switch-ui" aria-hidden="true" />
+                </label>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">拟合</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="draft.configure.fitModel || 'none'"
+                  aria-label="拟合模型"
+                  @change="onFitModelChange"
+                >
+                  <option value="none">None</option>
+                  <option value="ptp">Point-to-Point</option>
+                  <option value="linear">Linear</option>
+                  <option value="quadratic">Quadratic</option>
+                  <option value="4pl">4PL</option>
+                </select>
+                <p v-if="draft.configure.fitModel === '4pl'" class="fit-hint" role="note">
+                  4PL 至少需要 4 个有效点，且 X/Y 均需有变化；可选手动约束上下渐近线（min / max）。
+                </p>
+              </div>
+            </div>
+            <div
               v-if="draft.configure.fitModel === 'linear' || draft.configure.fitModel === 'quadratic'"
-              label="过原点"
+              class="field-row"
             >
-              <label class="native-switch">
-                <input
-                  v-model="draft.configure.fitThroughOrigin"
-                  type="checkbox"
-                  role="switch"
-                  aria-label="线性或二次拟合强制过原点"
-                />
-                <span class="native-switch-ui" aria-hidden="true" />
-              </label>
-            </el-form-item>
+              <span class="field-label">过原点</span>
+              <div class="field-control">
+                <label class="native-switch">
+                  <input
+                    v-model="draft.configure.fitThroughOrigin"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="线性或二次拟合强制过原点"
+                  />
+                  <span class="native-switch-ui" aria-hidden="true" />
+                </label>
+              </div>
+            </div>
             <template v-if="draft.configure.fitModel === '4pl'">
-              <el-form-item label="4PL min">
-                <el-input-number
-                  v-model="fitMin"
-                  :controls="false"
-                  placeholder="自动"
-                  style="width: 100%"
-                  aria-label="4PL 下渐近线约束"
-                />
-              </el-form-item>
-              <el-form-item label="4PL max">
-                <el-input-number
-                  v-model="fitMax"
-                  :controls="false"
-                  placeholder="自动"
-                  style="width: 100%"
-                  aria-label="4PL 上渐近线约束"
-                />
-              </el-form-item>
+              <div class="field-row">
+                <span class="field-label">4PL min</span>
+                <div class="field-control">
+                  <input
+                    type="number"
+                    class="native-input"
+                    :value="formatOptionalNumber(fitMin)"
+                    placeholder="自动"
+                    aria-label="4PL 下渐近线约束"
+                    @input="fitMin = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+              </div>
+              <div class="field-row">
+                <span class="field-label">4PL max</span>
+                <div class="field-control">
+                  <input
+                    type="number"
+                    class="native-input"
+                    :value="formatOptionalNumber(fitMax)"
+                    placeholder="自动"
+                    aria-label="4PL 上渐近线约束"
+                    @input="fitMax = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+              </div>
             </template>
-            <el-form-item label="Exclude flagged">
-              <label class="native-switch">
+            <div class="field-row">
+              <span class="field-label">Exclude flagged</span>
+              <div class="field-control">
+                <label class="native-switch">
+                  <input
+                    v-model="draft.configure.excludeFlagged"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="Exclude flagged"
+                  />
+                  <span class="native-switch-ui" aria-hidden="true" />
+                </label>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Custom X label</span>
+              <div class="field-control">
                 <input
-                  v-model="draft.configure.excludeFlagged"
-                  type="checkbox"
-                  role="switch"
-                  aria-label="Exclude flagged"
-                />
-                <span class="native-switch-ui" aria-hidden="true" />
-              </label>
-            </el-form-item>
-            <el-form-item label="Custom X label">
-              <el-input v-model="draft.configure.xLabel" aria-label="X 轴自定义标签" />
-            </el-form-item>
-            <el-form-item label="Custom Y label">
-              <el-input v-model="draft.configure.yLabel" aria-label="Y 轴自定义标签" />
-            </el-form-item>
-            <el-form-item v-if="showXY" label="交换 X/Y">
-              <button
-                type="button"
-                class="btn btn-primary-plain"
-                aria-label="交换 X 与 Y 轴映射及轴级设置"
-                title="交换字段、标签、Scale 与轴 Range"
-                @click="onSwapAxes"
-              >
-                交换 X ↔ Y
-              </button>
-              <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。</p>
-            </el-form-item>
-            <el-form-item label="色板">
-              <select
-                class="native-field-select"
-                :value="draft.configure.colorPalette || 'light'"
-                aria-label="颜色色板预设"
-                @change="onColorPaletteChange"
-              >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="alternate">Alternate</option>
-              </select>
-              <div
-                class="palette-preview"
-                role="img"
-                :aria-label="`当前色板预览：${draft.configure.colorPalette || 'light'}`"
-              >
-                <span
-                  v-for="(c, i) in palette"
-                  :key="`${c}-${i}`"
-                  class="palette-swatch"
-                  :style="{ background: c }"
-                  :title="c"
+                  v-model="draft.configure.xLabel"
+                  type="text"
+                  class="native-input"
+                  aria-label="X 轴自定义标签"
+                  autocomplete="off"
                 />
               </div>
-              <p class="fit-hint" role="note">
-                Light / Dark / Alternate 预设；下方色块为默认分配预览。STYLE · Series 取色可覆盖单个系列（common.md §2.5）。
-              </p>
-            </el-form-item>
-          </el-form>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Custom Y label</span>
+              <div class="field-control">
+                <input
+                  v-model="draft.configure.yLabel"
+                  type="text"
+                  class="native-input"
+                  aria-label="Y 轴自定义标签"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div v-if="showXY" class="field-row">
+              <span class="field-label">交换 X/Y</span>
+              <div class="field-control">
+                <button
+                  type="button"
+                  class="btn btn-primary-plain"
+                  aria-label="交换 X 与 Y 轴映射及轴级设置"
+                  title="交换字段、标签、Scale 与轴 Range"
+                  @click="onSwapAxes"
+                >
+                  交换 X ↔ Y
+                </button>
+                <p class="fit-hint" role="note">
+                  同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。
+                </p>
+              </div>
+            </div>
+            <div class="field-row">
+              <span class="field-label">色板</span>
+              <div class="field-control">
+                <select
+                  class="native-field-select"
+                  :value="draft.configure.colorPalette || 'light'"
+                  aria-label="颜色色板预设"
+                  @change="onColorPaletteChange"
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="alternate">Alternate</option>
+                </select>
+                <div
+                  class="palette-preview"
+                  role="img"
+                  :aria-label="`当前色板预览：${draft.configure.colorPalette || 'light'}`"
+                >
+                  <span
+                    v-for="(c, i) in palette"
+                    :key="`${c}-${i}`"
+                    class="palette-swatch"
+                    :style="{ background: c }"
+                    :title="c"
+                  />
+                </div>
+                <p class="fit-hint" role="note">
+                  Light / Dark / Alternate 预设；下方色块为默认分配预览。STYLE · Series 取色可覆盖单个系列（common.md
+                  §2.5）。
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
         <div
           v-show="tab === 'style'"
@@ -332,259 +415,378 @@
           role="tabpanel"
           aria-labelledby="chart-tab-style-btn"
         >
-          <el-form label-width="110px" size="small">
+          <div class="field-form">
             <section class="style-block" aria-labelledby="style-title">
-            <h3 class="style-section" id="style-title">Title</h3>
-            <el-form-item label="Title">
-              <div class="title-row">
-                <el-input v-model="draft.style.title" aria-label="图表标题" />
-                <button
-                  type="button"
-                  class="btn"
-                  aria-label="刷新标题为默认（视图或表名）"
-                  title="刷新恢复默认标题"
-                  @click="resetTitle"
-                >
-                  刷新
-                </button>
+              <h3 class="style-section" id="style-title">Title</h3>
+              <div class="field-row">
+                <span class="field-label">Title</span>
+                <div class="field-control">
+                  <div class="title-row">
+                    <input
+                      v-model="draft.style.title"
+                      type="text"
+                      class="native-input"
+                      aria-label="图表标题"
+                      autocomplete="off"
+                    />
+                    <button
+                      type="button"
+                      class="btn"
+                      aria-label="刷新标题为默认（视图或表名）"
+                      title="刷新恢复默认标题"
+                      @click="resetTitle"
+                    >
+                      刷新
+                    </button>
+                  </div>
+                </div>
               </div>
-            </el-form-item>
-            <el-form-item label="Subtitle">
-              <el-input v-model="draft.style.subtitle" aria-label="图表副标题" />
-            </el-form-item>
+              <div class="field-row">
+                <span class="field-label">Subtitle</span>
+                <div class="field-control">
+                  <input
+                    v-model="draft.style.subtitle"
+                    type="text"
+                    class="native-input"
+                    aria-label="图表副标题"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
             </section>
 
             <section class="style-block" aria-labelledby="style-layout">
-            <h3 class="style-section" id="style-layout">Layout</h3>
-            <el-form-item label="Width (px)">
-              <el-input-number
-                v-model="chartWidth"
-                :min="120"
-                :max="4000"
-                :controls="true"
-                style="width: 100%"
-                aria-label="图表宽度像素"
-                placeholder="自适应"
-              />
-            </el-form-item>
-            <el-form-item label="Height (px)">
-              <el-input-number
-                v-model="chartHeight"
-                :min="120"
-                :max="4000"
-                :controls="true"
-                style="width: 100%"
-                aria-label="图表高度像素"
-                placeholder="自适应"
-              />
-            </el-form-item>
-            <el-form-item label="Margins">
-              <div class="margins" role="group" aria-label="图表四边边距像素">
-                <label>
-                  <span>Top</span>
-                  <el-input-number
-                    v-model="marginTop"
-                    :min="0"
-                    :max="400"
-                    :controls="false"
-                    aria-label="上边距"
+              <h3 class="style-section" id="style-layout">Layout</h3>
+              <div class="field-row">
+                <span class="field-label">Width (px)</span>
+                <div class="field-control">
+                  <input
+                    type="number"
+                    class="native-input"
+                    min="120"
+                    max="4000"
+                    :value="formatOptionalNumber(chartWidth)"
+                    placeholder="自适应"
+                    aria-label="图表宽度像素"
+                    :aria-describedby="numberStatus ? 'chart-number-status' : undefined"
+                    @input="onChartWidthInput(($event.target as HTMLInputElement).value)"
                   />
-                </label>
-                <label>
-                  <span>Right</span>
-                  <el-input-number
-                    v-model="marginRight"
-                    :min="0"
-                    :max="400"
-                    :controls="false"
-                    aria-label="右边距"
-                  />
-                </label>
-                <label>
-                  <span>Bottom</span>
-                  <el-input-number
-                    v-model="marginBottom"
-                    :min="0"
-                    :max="400"
-                    :controls="false"
-                    aria-label="下边距"
-                  />
-                </label>
-                <label>
-                  <span>Left</span>
-                  <el-input-number
-                    v-model="marginLeft"
-                    :min="0"
-                    :max="400"
-                    :controls="false"
-                    aria-label="左边距"
-                  />
-                </label>
+                </div>
               </div>
-            </el-form-item>
-            <el-form-item v-if="opacityEnabled" label="Opacity">
-              <el-slider v-model="opacity" :min="0.1" :max="1" :step="0.05" aria-label="透明度" />
-              <p class="fit-hint" role="note">{{ opacityHintText }}</p>
-            </el-form-item>
-            <el-form-item v-else label="Opacity">
-              <p class="fit-hint" role="note">{{ opacityHintText }}</p>
-            </el-form-item>
-            <el-form-item label="图例">
-              <label class="native-switch">
-                <input
-                  v-model="draft.style.legendShow"
-                  type="checkbox"
-                  role="switch"
-                  aria-label="显示图例"
-                />
-                <span class="native-switch-ui" aria-hidden="true" />
-              </label>
-            </el-form-item>
-            <el-form-item label="图例位置">
-              <select
-                class="native-field-select"
-                v-model="draft.style.legendPosition"
-                aria-label="图例位置"
+              <div class="field-row">
+                <span class="field-label">Height (px)</span>
+                <div class="field-control">
+                  <input
+                    type="number"
+                    class="native-input"
+                    min="120"
+                    max="4000"
+                    :value="formatOptionalNumber(chartHeight)"
+                    placeholder="自适应"
+                    aria-label="图表高度像素"
+                    :aria-describedby="numberStatus ? 'chart-number-status' : undefined"
+                    @input="onChartHeightInput(($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+              </div>
+              <div class="field-row">
+                <span class="field-label">Margins</span>
+                <div class="field-control">
+                  <div class="margins" role="group" aria-label="图表四边边距像素">
+                    <label>
+                      <span>Top</span>
+                      <input
+                        type="number"
+                        class="native-input"
+                        min="0"
+                        max="400"
+                        :value="formatOptionalNumber(marginTop)"
+                        aria-label="上边距"
+                        @input="onMarginInput('marginTop', ($event.target as HTMLInputElement).value)"
+                      />
+                    </label>
+                    <label>
+                      <span>Right</span>
+                      <input
+                        type="number"
+                        class="native-input"
+                        min="0"
+                        max="400"
+                        :value="formatOptionalNumber(marginRight)"
+                        aria-label="右边距"
+                        @input="onMarginInput('marginRight', ($event.target as HTMLInputElement).value)"
+                      />
+                    </label>
+                    <label>
+                      <span>Bottom</span>
+                      <input
+                        type="number"
+                        class="native-input"
+                        min="0"
+                        max="400"
+                        :value="formatOptionalNumber(marginBottom)"
+                        aria-label="下边距"
+                        @input="onMarginInput('marginBottom', ($event.target as HTMLInputElement).value)"
+                      />
+                    </label>
+                    <label>
+                      <span>Left</span>
+                      <input
+                        type="number"
+                        class="native-input"
+                        min="0"
+                        max="400"
+                        :value="formatOptionalNumber(marginLeft)"
+                        aria-label="左边距"
+                        @input="onMarginInput('marginLeft', ($event.target as HTMLInputElement).value)"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div v-if="opacityEnabled" class="field-row">
+                <span class="field-label">Opacity</span>
+                <div class="field-control">
+                  <div class="opacity-row">
+                    <input
+                      type="range"
+                      class="native-range"
+                      min="0.1"
+                      max="1"
+                      step="0.05"
+                      :value="opacity"
+                      aria-label="透明度"
+                      :aria-valuetext="opacityLive"
+                      aria-describedby="chart-opacity-status"
+                      @input="onOpacityInput(($event.target as HTMLInputElement).value)"
+                    />
+                    <span class="opacity-value" aria-hidden="true">{{ opacity.toFixed(2) }}</span>
+                  </div>
+                  <p id="chart-opacity-status" class="sr-live" aria-live="polite">{{ opacityLive }}</p>
+                  <p class="fit-hint" role="note">{{ opacityHintText }}</p>
+                </div>
+              </div>
+              <div v-else class="field-row">
+                <span class="field-label">Opacity</span>
+                <div class="field-control">
+                  <p class="fit-hint" role="note">{{ opacityHintText }}</p>
+                </div>
+              </div>
+              <p
+                v-if="numberStatus"
+                id="chart-number-status"
+                class="sr-live"
+                role="status"
+                aria-live="polite"
               >
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
-              </select>
-            </el-form-item>
-            <el-form-item label="图例 Label">
-              <el-input
-                v-model="draft.style.legendLabel"
-                clearable
-                placeholder="可选自定义前缀"
-                aria-label="图例自定义标签"
-              />
-            </el-form-item>
+                {{ numberStatus }}
+              </p>
+              <div class="field-row">
+                <span class="field-label">图例</span>
+                <div class="field-control">
+                  <label class="native-switch">
+                    <input
+                      v-model="draft.style.legendShow"
+                      type="checkbox"
+                      role="switch"
+                      aria-label="显示图例"
+                    />
+                    <span class="native-switch-ui" aria-hidden="true" />
+                  </label>
+                </div>
+              </div>
+              <div class="field-row">
+                <span class="field-label">图例位置</span>
+                <div class="field-control">
+                  <select
+                    class="native-field-select"
+                    v-model="draft.style.legendPosition"
+                    aria-label="图例位置"
+                  >
+                    <option value="left">Left</option>
+                    <option value="right">Right</option>
+                    <option value="top">Top</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <span class="field-label">图例 Label</span>
+                <div class="field-control">
+                  <input
+                    v-model="draft.style.legendLabel"
+                    type="text"
+                    class="native-input"
+                    placeholder="可选自定义前缀"
+                    aria-label="图例自定义标签"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
             </section>
 
             <section class="style-block" aria-labelledby="style-series">
-            <h3 class="style-section" id="style-series">Series</h3>
-            <el-form-item v-if="seriesKeys.length" label="系列取色">
-              <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
-                <label v-for="(key, i) in seriesKeys" :key="key" class="series-color-row">
-                  <span class="series-name">{{ key }}</span>
-                  <input
-                    type="color"
-                    class="series-color-input"
-                    :value="seriesColorValue(key, i)"
-                    :aria-label="`系列 ${key} 颜色`"
-                    @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
-                    @keydown.enter.prevent
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-text"
-                    :aria-label="`重置系列 ${key} 颜色为色板默认`"
-                    @click="clearSeriesColor(key)"
-                  >
-                    重置
-                  </button>
-                </label>
+              <h3 class="style-section" id="style-series">Series</h3>
+              <div v-if="seriesKeys.length" class="field-row">
+                <span class="field-label">系列取色</span>
+                <div class="field-control">
+                  <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
+                    <label v-for="(key, i) in seriesKeys" :key="key" class="series-color-row">
+                      <span class="series-name">{{ key }}</span>
+                      <input
+                        type="color"
+                        class="series-color-input"
+                        :value="seriesColorValue(key, i)"
+                        :aria-label="`系列 ${key} 颜色`"
+                        @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
+                        @keydown.enter.prevent
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-text"
+                        :aria-label="`重置系列 ${key} 颜色为色板默认`"
+                        @click="clearSeriesColor(key)"
+                      >
+                        重置
+                      </button>
+                    </label>
+                  </div>
+                  <p class="fit-hint" role="note">
+                    覆盖 CONFIGURE 色板默认色；重置后回到上方色板预览对应槽位。Tab 可聚焦色块。
+                  </p>
+                </div>
               </div>
-              <p class="fit-hint" role="note">
-                覆盖 CONFIGURE 色板默认色；重置后回到上方色板预览对应槽位。Tab 可聚焦色块。
-              </p>
-            </el-form-item>
-            <el-form-item v-if="pointShapeEnabled" label="点形状">
-              <select
-                class="native-field-select"
-                v-model="draft.style.pointShape"
-                aria-label="点形状"
-              >
-                <option value="circle">circle</option>
-                <option value="rect">rect</option>
-                <option value="triangle">triangle</option>
-                <option value="diamond">diamond</option>
-              </select>
-              <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
-            </el-form-item>
-            <el-form-item v-else label="点形状">
-              <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
-            </el-form-item>
+              <div v-if="pointShapeEnabled" class="field-row">
+                <span class="field-label">点形状</span>
+                <div class="field-control">
+                  <select
+                    class="native-field-select"
+                    v-model="draft.style.pointShape"
+                    aria-label="点形状"
+                  >
+                    <option value="circle">circle</option>
+                    <option value="rect">rect</option>
+                    <option value="triangle">triangle</option>
+                    <option value="diamond">diamond</option>
+                  </select>
+                  <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
+                </div>
+              </div>
+              <div v-else class="field-row">
+                <span class="field-label">点形状</span>
+                <div class="field-control">
+                  <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
+                </div>
+              </div>
             </section>
 
             <section class="style-block" aria-labelledby="style-axes">
-            <h3 class="style-section" id="style-axes">Axes</h3>
-            <el-form-item label="X Range">
-              <select class="native-field-select" v-model="xRangeMode" aria-label="X 轴 Range 模式">
-                <option value="auto">Automatic</option>
-                <option value="manual">Manual</option>
-              </select>
-            </el-form-item>
-            <template v-if="draft.style.xRangeMode === 'manual'">
-              <el-form-item label="X Min">
-                <el-input-number
-                  v-model="xMin"
-                  :controls="false"
-                  style="width: 100%"
-                  aria-label="X 轴最小值"
-                  :aria-invalid="xRangeInvalid || undefined"
-                />
-              </el-form-item>
-              <el-form-item label="X Max">
-                <el-input-number
-                  v-model="xMax"
-                  :controls="false"
-                  style="width: 100%"
-                  aria-label="X 轴最大值"
-                  :aria-invalid="xRangeInvalid || undefined"
-                />
-              </el-form-item>
-              <p v-if="xRangeInvalid" class="range-error" role="alert">
-                X 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
-              </p>
-            </template>
-            <el-form-item label="Y Range">
-              <select class="native-field-select" v-model="yRangeMode" aria-label="Y 轴 Range 模式">
-                <option value="auto">Automatic</option>
-                <option value="manual">Manual</option>
-              </select>
-            </el-form-item>
-            <template v-if="draft.style.yRangeMode === 'manual'">
-              <el-form-item label="Y Min">
-                <el-input-number
-                  v-model="yMin"
-                  :controls="false"
-                  style="width: 100%"
-                  aria-label="Y 轴最小值"
-                  :aria-invalid="yRangeInvalid || undefined"
-                />
-              </el-form-item>
-              <el-form-item label="Y Max">
-                <el-input-number
-                  v-model="yMax"
-                  :controls="false"
-                  style="width: 100%"
-                  aria-label="Y 轴最大值"
-                  :aria-invalid="yRangeInvalid || undefined"
-                />
-              </el-form-item>
-              <p v-if="yRangeInvalid" class="range-error" role="alert">
-                Y 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
-              </p>
-            </template>
-            <template v-if="showScale">
-              <el-form-item v-if="showXScale" label="X Scale">
-                <select class="native-field-select" v-model="xScale" aria-label="X 轴 Scale">
-                  <option value="linear">Linear</option>
-                  <option value="log">Log</option>
-                </select>
-              </el-form-item>
-              <el-form-item v-if="showYScale" label="Y Scale">
-                <select class="native-field-select" v-model="yScale" aria-label="Y 轴 Scale">
-                  <option value="linear">Linear</option>
-                  <option value="log">Log</option>
-                </select>
-              </el-form-item>
-              <p class="fit-hint" role="note">对数轴（Log）要求数据全部为正值；否则运行时回退 Linear 并提示。</p>
-            </template>
+              <h3 class="style-section" id="style-axes">Axes</h3>
+              <div class="field-row">
+                <span class="field-label">X Range</span>
+                <div class="field-control">
+                  <select class="native-field-select" v-model="xRangeMode" aria-label="X 轴 Range 模式">
+                    <option value="auto">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+              </div>
+              <template v-if="draft.style.xRangeMode === 'manual'">
+                <div class="field-row">
+                  <span class="field-label">X Min</span>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="native-input"
+                      :value="formatOptionalNumber(xMin)"
+                      aria-label="X 轴最小值"
+                      :aria-invalid="xRangeInvalid || undefined"
+                      @input="xMin = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">X Max</span>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="native-input"
+                      :value="formatOptionalNumber(xMax)"
+                      aria-label="X 轴最大值"
+                      :aria-invalid="xRangeInvalid || undefined"
+                      @input="xMax = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                </div>
+                <p v-if="xRangeInvalid" class="range-error" role="alert">
+                  X 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
+                </p>
+              </template>
+              <div class="field-row">
+                <span class="field-label">Y Range</span>
+                <div class="field-control">
+                  <select class="native-field-select" v-model="yRangeMode" aria-label="Y 轴 Range 模式">
+                    <option value="auto">Automatic</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+              </div>
+              <template v-if="draft.style.yRangeMode === 'manual'">
+                <div class="field-row">
+                  <span class="field-label">Y Min</span>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="native-input"
+                      :value="formatOptionalNumber(yMin)"
+                      aria-label="Y 轴最小值"
+                      :aria-invalid="yRangeInvalid || undefined"
+                      @input="yMin = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <span class="field-label">Y Max</span>
+                  <div class="field-control">
+                    <input
+                      type="number"
+                      class="native-input"
+                      :value="formatOptionalNumber(yMax)"
+                      aria-label="Y 轴最大值"
+                      :aria-invalid="yRangeInvalid || undefined"
+                      @input="yMax = parseOptionalNumber(($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                </div>
+                <p v-if="yRangeInvalid" class="range-error" role="alert">
+                  Y 轴 Manual 范围无效：最小值必须小于最大值；保存前请修正，否则将回退 Automatic。
+                </p>
+              </template>
+              <template v-if="showScale">
+                <div v-if="showXScale" class="field-row">
+                  <span class="field-label">X Scale</span>
+                  <div class="field-control">
+                    <select class="native-field-select" v-model="xScale" aria-label="X 轴 Scale">
+                      <option value="linear">Linear</option>
+                      <option value="log">Log</option>
+                    </select>
+                  </div>
+                </div>
+                <div v-if="showYScale" class="field-row">
+                  <span class="field-label">Y Scale</span>
+                  <div class="field-control">
+                    <select class="native-field-select" v-model="yScale" aria-label="Y 轴 Scale">
+                      <option value="linear">Linear</option>
+                      <option value="log">Log</option>
+                    </select>
+                  </div>
+                </div>
+                <p class="fit-hint scale-hint" role="note">
+                  对数轴（Log）要求数据全部为正值；否则运行时回退 Linear 并提示。
+                </p>
+              </template>
             </section>
-          </el-form>
+          </div>
         </div>
       </div>
       <div class="footer">
@@ -627,6 +829,14 @@ import {
   toNativeSelectValue,
 } from '@/modules/chart/fieldSelect'
 import { nextDrawerTab, type DrawerTab } from '@/modules/chart/drawerA11y'
+import {
+  clampNumber,
+  formatOptionalNumber,
+  numberOutOfRangeStatus,
+  opacityLiveStatus,
+  parseOpacity,
+  parseOptionalNumber,
+} from '@/modules/chart/nativeNumber'
 import { toast } from '@/shared/ui/feedback'
 
 const props = defineProps<{
@@ -644,6 +854,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; save: [ChartConfig] }
 const tab = ref<DrawerTab>('configure')
 const draft = ref<ChartConfig>(cloneDeep(props.config))
 const panelRef = ref<HTMLElement | null>(null)
+const numberStatus = ref('')
 const aggs = ['count', 'sum', 'min', 'max', 'mean', 'median'] as const
 type Aggregation = (typeof aggs)[number]
 let restoreFocus: HTMLElement | null = null
@@ -754,6 +965,7 @@ const opacity = computed({
   },
 })
 
+const opacityLive = computed(() => opacityLiveStatus(opacity.value))
 const opacityEnabled = computed(() => opacityAppliesTo(props.viewType))
 const opacityHintText = computed(() => opacityHint(props.viewType))
 const pointShapeEnabled = computed(() => pointShapeAppliesTo(props.viewType))
@@ -831,6 +1043,49 @@ const chartHeight = computed({
     draft.value.style.height = v == null || !Number.isFinite(v) ? undefined : v
   },
 })
+
+function applyBoundedOptional(
+  label: string,
+  raw: string,
+  min: number,
+  max: number,
+  apply: (v: number | undefined) => void,
+) {
+  const parsed = parseOptionalNumber(raw)
+  numberStatus.value = numberOutOfRangeStatus(label, parsed, min, max)
+  apply(parsed == null ? undefined : clampNumber(parsed, min, max))
+}
+
+function onChartWidthInput(raw: string) {
+  applyBoundedOptional('宽度', raw, 120, 4000, (v) => {
+    chartWidth.value = v
+  })
+}
+
+function onChartHeightInput(raw: string) {
+  applyBoundedOptional('高度', raw, 120, 4000, (v) => {
+    chartHeight.value = v
+  })
+}
+
+function onMarginInput(
+  key: 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft',
+  raw: string,
+) {
+  const labels = {
+    marginTop: '上边距',
+    marginRight: '右边距',
+    marginBottom: '下边距',
+    marginLeft: '左边距',
+  } as const
+  applyBoundedOptional(labels[key], raw, 0, 400, (v) => {
+    draft.value.style[key] = v
+  })
+}
+
+function onOpacityInput(raw: string) {
+  opacity.value = parseOpacity(raw)
+}
 
 function onSwapAxes() {
   draft.value.configure = swapAxesConfigure(draft.value.configure)
@@ -959,6 +1214,7 @@ function restoreFocusToTrigger() {
 function openDrawer() {
   restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   document.body.style.overflow = 'hidden'
+  numberStatus.value = ''
   void nextTick(() => {
     const list = focusables()
     const closeBtn = list.find((el) => el.classList.contains('icon-close'))
@@ -1138,6 +1394,86 @@ function save() {
 .drawer-tabpanel {
   min-height: 0;
 }
+.field-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.field-label {
+  padding-top: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #646a73;
+}
+.field-label abbr {
+  text-decoration: none;
+  color: #c45656;
+  margin-left: 2px;
+}
+.field-control {
+  min-width: 0;
+}
+.native-input {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ia-border, #d0d3d6);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.native-input:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 1px;
+  border-color: var(--ia-accent, #3370ff);
+}
+.native-input[aria-invalid='true'] {
+  border-color: #c45656;
+}
+.native-range {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--ia-accent, #3370ff);
+}
+.native-range:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 2px;
+}
+.opacity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.opacity-value {
+  flex-shrink: 0;
+  min-width: 2.5em;
+  font-size: 12px;
+  color: #646a73;
+  font-variant-numeric: tabular-nums;
+}
+.sr-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .native-switch {
   display: inline-flex;
   align-items: center;
@@ -1198,6 +1534,9 @@ function save() {
   line-height: 1.4;
   color: #8f959e;
 }
+.scale-hint {
+  margin-left: 118px;
+}
 .cfg-miss {
   margin: 0 0 12px;
   padding: 8px 10px;
@@ -1212,7 +1551,7 @@ function save() {
   outline-offset: 2px;
 }
 .range-error {
-  margin: 0 0 12px 110px;
+  margin: 0 0 4px 118px;
   font-size: 12px;
   line-height: 1.4;
   color: #c45656;
@@ -1230,16 +1569,13 @@ function save() {
   font-size: 12px;
   color: #646a73;
 }
-.margins :deep(.el-input-number) {
-  width: 100%;
-}
 .title-row {
   display: flex;
   gap: 8px;
   width: 100%;
   align-items: center;
 }
-.title-row .el-input {
+.title-row .native-input {
   flex: 1;
 }
 .native-field-select {
@@ -1340,13 +1676,15 @@ function save() {
   outline-offset: 2px;
 }
 .style-block {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .style-block:first-child .style-section {
   margin-top: 0;
 }
 .style-section {
-  margin: 16px 0 10px;
+  margin: 6px 0 0;
   padding-bottom: 4px;
   font-size: 13px;
   font-weight: 600;

@@ -9,26 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-bff008c0-67e5-4c38-9c7d-511dd1cadfcb-4ebe`（Round 21） |
-| 阶段 | **优化 Round 21 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=21`） |
-| 上次更新 | 2026-07-17 11:09 |
-| 单元 | **109/109 PASS**（+drawerA11y） |
+| 分支 | `cursor/bc-198e1b4a-9c04-4a9e-9e9e-f728405a210c-f0db`（Round 24） |
+| 阶段 | **优化 Round 24 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=24`） |
+| 上次更新 | 2026-07-17 14:25 |
+| 单元 | **122/122 PASS**（+preferCancelInitialFocus / danger confirm） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS |
+| Build | PASS（dist 无 EP） |
 
-## 2. Round 21 对齐摘要
+## 2. Round 24 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEditDrawer `el-drawer` → 原生 Drawer 壳 | ✅ Round 21 |
-| CONFIGURE/STYLE `el-tabs` → 原生 tablist 分段 | ✅ Round 21 |
-| 全部 `el-switch` → 原生 `role=switch` | ✅ Round 21 |
-| Esc / 焦点陷阱 / 打开焦点 / 关闭焦点恢复 | ✅ 对齐三对话框壳 |
-| Tablist Home/End/方向键（`nextDrawerTab`） | ✅ |
-| EP `index-*` gzip | 仍 ~304.6（Form/Input/InputNumber/Slider 仍共享桶；Drawer/Tabs/Switch 已移除） |
-| 合并 | **Round 19–21 → main** |
+| toast 窄屏边距 + safe-area + reduced-motion | ✅ Round 24 |
+| toast 悬停/焦点暂停自动关闭 | ✅ |
+| confirm 危险操作默认焦点 → Cancel | ✅ `preferCancelInitialFocus` |
+| 删除文案强化 + `danger` / `btn-danger` | ✅ 列表 / 侧栏 |
+| prompt 取消路径（Cancel / backdrop / Esc） | ✅ 单测覆盖 |
+| dialog 唯一 aria id | ✅ |
+| dist 无 Element Plus | ✅ 复核 |
+| 合并 | **Round 22–24 → main** |
 
 ## 3. 验证命令
 
@@ -38,8 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 22 计划（下一周期 1/3）
+## 4. Round 25 计划（下一周期 1/3）
 
-1. **Perf**：ChartEditDrawer `el-input` / `el-input-number` → 原生；冲击 EP 桶与 Drawer CSS
-2. **UX**：`el-slider`（Opacity）原生 range；可选 `el-form`/`el-form-item` 改原生 field 布局
-3. **A11y**：数值输入校验宣告；Opacity live region；Save/cfg-miss 回归
+1. **UX**：工作区冷启动骨架 / 加载占位；toast 队列可达性（关闭按钮键盘）
+2. **Perf**：`projects` chunk（含 feedback）体积细分；可选把 feedback.css 与 Dexie 图解耦
+3. **A11y**：危险确认 Enter 行为文档化；侧栏删除 danger 回归；焦点恢复在路由跳转场景
+4. **验证**：unit + e2e:ui + build
+5. **合并**：否（周期 1/3）

@@ -223,7 +223,7 @@ async function main() {
     await p.goto(BASE, { waitUntil: 'networkidle' })
     await p.waitForSelector('text=Delete Me')
     await p.getByRole('row', { name: /Delete Me/ }).getByRole('button', { name: '删除' }).click()
-    await p.getByRole('button', { name: '确定' }).click()
+    await p.getByRole('dialog').getByRole('button', { name: '删除' }).click()
     await p.waitForTimeout(600)
     const text = await p.locator('body').innerText()
     if (text.includes('Delete Me')) ctx.errors.push('Delete Me still present')

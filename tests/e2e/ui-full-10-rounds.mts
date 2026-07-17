@@ -224,9 +224,9 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
     await page.getByRole('button', { name: /Edit 图表/ }).click()
     const drawer = page.locator('.drawer-root').filter({ hasText: '图表配置' })
     await drawer.waitFor({ state: 'visible', timeout: 15000 })
-    const fitItem = drawer.locator('.el-form-item').filter({ hasText: '拟合' })
-    await fitItem.scrollIntoViewIfNeeded()
-    await fitItem.locator('select[aria-label="拟合模型"]').selectOption('linear')
+    const fitSelect = drawer.locator('select[aria-label="拟合模型"]')
+    await fitSelect.scrollIntoViewIfNeeded()
+    await fitSelect.selectOption('linear')
     await drawer.getByRole('button', { name: 'Save', exact: true }).click()
     await drawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(async () => {
       await page.keyboard.press('Escape')
@@ -267,7 +267,7 @@ async function runRound(page: Page, round: number): Promise<RoundResult> {
     await page.waitForTimeout(500)
     const row = page.getByRole('row', { name: /Demo Dose Response/ }).first()
     await row.getByRole('button', { name: '删除' }).click()
-    await page.getByRole('button', { name: '确定' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '删除' }).click()
     await page.waitForTimeout(500)
   })
 
