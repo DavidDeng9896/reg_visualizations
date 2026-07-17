@@ -63,3 +63,30 @@ export function opacityHint(viewType: ViewType): string {
   }
   return '当前视图不适用 Opacity。'
 }
+
+/** Point Shape：Line 节点 / Scatter / Box 散点标记（common.md · 各专章） */
+export function pointShapeAppliesTo(viewType: ViewType): boolean {
+  return viewType === 'line' || viewType === 'scatter' || viewType === 'box'
+}
+
+export function pointShapeHint(viewType: ViewType): string {
+  if (viewType === 'line') {
+    return '控制折线数据点标记形状（节点）。'
+  }
+  if (viewType === 'scatter') {
+    return '控制散点标记形状。'
+  }
+  if (viewType === 'box') {
+    return '控制箱线图上叠加点的标记形状。'
+  }
+  if (viewType === 'bar') {
+    return 'Point Shape 不适用于柱状图。'
+  }
+  if (viewType === 'pie') {
+    return 'Point Shape 不适用于饼图。'
+  }
+  if (viewType === 'heatmap') {
+    return 'Point Shape 不适用于热力图。'
+  }
+  return '当前视图不适用 Point Shape。'
+}

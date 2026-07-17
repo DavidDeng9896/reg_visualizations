@@ -5,6 +5,8 @@ import {
   opacityAppliesTo,
   opacityHint,
   paletteColors,
+  pointShapeAppliesTo,
+  pointShapeHint,
   resolveSeriesColor,
 } from '@/modules/chart/seriesStyle'
 import type { ChartConfigure } from '@/shared/types/analysis'
@@ -91,5 +93,24 @@ describe('opacityAppliesTo / opacityHint', () => {
   it('explains applicability for UI hint', () => {
     expect(opacityHint('bar')).toMatch(/柱|点|透明/)
     expect(opacityHint('heatmap')).toMatch(/不适用|热力/)
+  })
+})
+
+describe('pointShapeAppliesTo / pointShapeHint', () => {
+  it('applies to line / scatter / box only', () => {
+    expect(pointShapeAppliesTo('line')).toBe(true)
+    expect(pointShapeAppliesTo('scatter')).toBe(true)
+    expect(pointShapeAppliesTo('box')).toBe(true)
+    expect(pointShapeAppliesTo('bar')).toBe(false)
+    expect(pointShapeAppliesTo('pie')).toBe(false)
+    expect(pointShapeAppliesTo('heatmap')).toBe(false)
+    expect(pointShapeAppliesTo('table')).toBe(false)
+  })
+
+  it('explains applicability for UI hint', () => {
+    expect(pointShapeHint('scatter')).toMatch(/散点|标记/)
+    expect(pointShapeHint('line')).toMatch(/节点|折线/)
+    expect(pointShapeHint('bar')).toMatch(/不适用|柱/)
+    expect(pointShapeHint('heatmap')).toMatch(/不适用|热力/)
   })
 })

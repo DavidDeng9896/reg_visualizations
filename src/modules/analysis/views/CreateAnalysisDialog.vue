@@ -1,24 +1,47 @@
 <template>
-  <el-dialog :model-value="modelValue" title="创建 Analysis" width="420px" @close="emit('update:modelValue', false)">
-    <el-form label-width="80px">
-      <el-form-item label="名称" required>
-        <el-input v-model="name" placeholder="例如 Dose Response" />
-      </el-form-item>
-      <el-form-item label="项目" required>
-        <el-select v-model="projectId" style="width: 100%">
-          <el-option v-for="p in MOCK_PROJECTS" :key="p.id" :label="p.name" :value="p.id" />
-        </el-select>
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" :disabled="!name.trim() || !projectId" @click="submit">创建</el-button>
-    </template>
-  </el-dialog>
+  <div
+    class="dialog-root"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="create-analysis-title"
+    @keydown.esc="close"
+  >
+    <button type="button" class="dialog-backdrop" aria-label="关闭对话框" @click="close" />
+    <div class="dialog-panel" ref="panelRef">
+      <header class="dialog-header">
+        <h2 id="create-analysis-title">创建 Analysis</h2>
+        <button type="button" class="icon-close" aria-label="关闭" @click="close">×</button>
+      </header>
+      <form class="dialog-body" @submit.prevent="submit">
+        <label class="field">
+          <span class="field-label">名称 <abbr title="必填">*</abbr></span>
+          <input
+            ref="nameRef"
+            v-model="name"
+            type="text"
+            required
+            placeholder="例如 Dose Response"
+            aria-required="true"
+            autocomplete="off"
+          />
+        </label>
+        <label class="field">
+          <span class="field-label">项目 <abbr title="必填">*</abbr></span>
+          <select v-model="projectId" required aria-required="true" aria-label="项目">
+            <option v-for="p in MOCK_PROJECTS" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </label>
+        <footer class="dialog-footer">
+          <button type="button" class="btn" @click="close">取消</button>
+          <button type="submit" class="btn btn-primary" :disabled="!canSubmit">创建</button>
+        </footer>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MOCK_PROJECTS } from '@/shared/mock/projects'
 
 const props = defineProps<{ modelValue: boolean }>()
@@ -29,6 +52,11 @@ const emit = defineEmits<{
 
 const name = ref('')
 const projectId = ref(MOCK_PROJECTS[0].id)
+const nameRef = ref<HTMLInputElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
+let restoreFocus: HTMLElement | null = null
+
+const canSubmit = computed(() => !!name.value.trim() && !!projectId.value)
 
 watch(
   () => props.modelValue,
@@ -40,9 +68,147 @@ watch(
   },
 )
 
+onMounted(() => {
+  restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  document.body.style.overflow = 'hidden'
+  void nextTick(() => nameRef.value?.focus())
+})
+
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+})
+
+function close() {
+  emit('update:modelValue', false)
+}
+
 function submit() {
   const n = name.value.trim()
   if (!n || !projectId.value) return
   emit('create', { name: n, projectId: projectId.value })
 }
 </script>
+
+<style scoped>
+.dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+.dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid var(--ia-border);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 8px;
+}
+.dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.icon-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: #8f959e;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.icon-close:hover {
+  color: #1f2329;
+  background: #f2f3f5;
+}
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 18px 18px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 13px;
+  color: #646a73;
+}
+.field-label abbr {
+  text-decoration: none;
+  color: #c45656;
+}
+.field input,
+.field select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 1px;
+  border-color: var(--ia-accent);
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
+}
+</style>

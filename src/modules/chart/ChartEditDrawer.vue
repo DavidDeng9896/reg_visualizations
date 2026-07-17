@@ -173,16 +173,35 @@
               <p class="fit-hint" role="note">同时交换字段映射、自定义标签、Scale 与 STYLE 轴 Range。可用键盘激活按钮。</p>
             </el-form-item>
             <el-form-item label="色板">
-              <el-select v-model="draft.configure.colorPalette" style="width: 100%">
+              <el-select
+                v-model="draft.configure.colorPalette"
+                style="width: 100%"
+                aria-label="颜色色板预设"
+              >
                 <el-option label="Light" value="light" />
                 <el-option label="Dark" value="dark" />
                 <el-option label="Alternate" value="alternate" />
               </el-select>
+              <div
+                class="palette-preview"
+                role="img"
+                :aria-label="`当前色板预览：${draft.configure.colorPalette || 'light'}`"
+              >
+                <span
+                  v-for="(c, i) in palette"
+                  :key="`${c}-${i}`"
+                  class="palette-swatch"
+                  :style="{ background: c }"
+                  :title="c"
+                />
+              </div>
+              <p class="fit-hint" role="note">Light / Dark / Alternate 预设；下方色块为预览（common.md §2.5）。</p>
             </el-form-item>
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="STYLE" name="style">
           <el-form label-width="110px" size="small">
+            <h3 class="style-section" id="style-title">Title</h3>
             <el-form-item label="Title">
               <div class="title-row">
                 <el-input v-model="draft.style.title" aria-label="图表标题" />
@@ -199,6 +218,8 @@
             <el-form-item label="Subtitle">
               <el-input v-model="draft.style.subtitle" aria-label="图表副标题" />
             </el-form-item>
+
+            <h3 class="style-section" id="style-layout">Layout</h3>
             <el-form-item label="Width (px)">
               <el-input-number
                 v-model="chartWidth"
@@ -272,29 +293,6 @@
             <el-form-item v-else label="Opacity">
               <p class="fit-hint" role="note">{{ opacityHintText }}</p>
             </el-form-item>
-            <el-form-item v-if="seriesKeys.length" label="系列取色">
-              <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
-                <label v-for="(key, i) in seriesKeys" :key="key" class="series-color-row">
-                  <span class="series-name">{{ key }}</span>
-                  <input
-                    type="color"
-                    class="series-color-input"
-                    :value="seriesColorValue(key, i)"
-                    :aria-label="`系列 ${key} 颜色`"
-                    @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
-                  />
-                  <el-button
-                    size="small"
-                    text
-                    :aria-label="`重置系列 ${key} 颜色为色板默认`"
-                    @click="clearSeriesColor(key)"
-                  >
-                    重置
-                  </el-button>
-                </label>
-              </div>
-              <p class="fit-hint" role="note">覆盖色板默认分配；重置后恢复当前色板槽位色。</p>
-            </el-form-item>
             <el-form-item label="图例">
               <el-switch v-model="draft.style.legendShow" aria-label="显示图例" />
             </el-form-item>
@@ -318,14 +316,46 @@
                 aria-label="图例自定义标签"
               />
             </el-form-item>
-            <el-form-item label="点形状">
+
+            <h3 class="style-section" id="style-series">Series</h3>
+            <el-form-item v-if="seriesKeys.length" label="系列取色">
+              <div class="series-colors" role="group" aria-label="逐系列颜色覆盖">
+                <label v-for="(key, i) in seriesKeys" :key="key" class="series-color-row">
+                  <span class="series-name">{{ key }}</span>
+                  <input
+                    type="color"
+                    class="series-color-input"
+                    :value="seriesColorValue(key, i)"
+                    :aria-label="`系列 ${key} 颜色`"
+                    @input="onSeriesColorInput(key, ($event.target as HTMLInputElement).value)"
+                    @keydown.enter.prevent
+                  />
+                  <el-button
+                    size="small"
+                    text
+                    :aria-label="`重置系列 ${key} 颜色为色板默认`"
+                    @click="clearSeriesColor(key)"
+                  >
+                    重置
+                  </el-button>
+                </label>
+              </div>
+              <p class="fit-hint" role="note">覆盖色板默认分配；Tab 可聚焦色块，重置后恢复当前色板槽位色。</p>
+            </el-form-item>
+            <el-form-item v-if="pointShapeEnabled" label="点形状">
               <el-select v-model="draft.style.pointShape" style="width: 100%" aria-label="点形状">
                 <el-option label="circle" value="circle" />
                 <el-option label="rect" value="rect" />
                 <el-option label="triangle" value="triangle" />
                 <el-option label="diamond" value="diamond" />
               </el-select>
+              <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
             </el-form-item>
+            <el-form-item v-else label="点形状">
+              <p class="fit-hint" role="note">{{ pointShapeHintText }}</p>
+            </el-form-item>
+
+            <h3 class="style-section" id="style-axes">Axes</h3>
             <el-form-item label="X Range">
               <el-select v-model="xRangeMode" style="width: 100%" aria-label="X 轴 Range 模式">
                 <el-option label="Automatic" value="auto" />
@@ -424,6 +454,8 @@ import {
   opacityAppliesTo,
   opacityHint,
   paletteColors,
+  pointShapeAppliesTo,
+  pointShapeHint,
   resolveSeriesColor,
 } from '@/modules/chart/seriesStyle'
 import { toast } from '@/shared/ui/feedback'
@@ -497,6 +529,8 @@ const opacity = computed({
 
 const opacityEnabled = computed(() => opacityAppliesTo(props.viewType))
 const opacityHintText = computed(() => opacityHint(props.viewType))
+const pointShapeEnabled = computed(() => pointShapeAppliesTo(props.viewType))
+const pointShapeHintText = computed(() => pointShapeHint(props.viewType))
 
 const seriesKeys = computed(() =>
   listSeriesKeys(props.viewType, props.rows || [], draft.value.configure),
@@ -799,5 +833,34 @@ function save() {
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
+}
+.series-color-input:focus-visible {
+  outline: 2px solid var(--ia-accent, #2f6fed);
+  outline-offset: 2px;
+}
+.style-section {
+  margin: 16px 0 10px;
+  padding-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #646a73;
+  border-bottom: 1px solid #ebeef5;
+}
+.style-section:first-child {
+  margin-top: 0;
+}
+.palette-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.palette-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
 }
 </style>
