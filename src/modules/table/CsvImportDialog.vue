@@ -125,8 +125,9 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
 function restoreFocusToTrigger() {
-  // Prefer captured opener (flowchart empty CTA / Add data); else empty landmark.
-  restoreFocusEl(restoreFocus, () => flowchartEmptyCsvFocusFallback())
+  // Prefer captured opener (flowchart/workspace empty CTA / Add data); else empty landmark.
+  // Round 52: visible ring so empty CTA × toast remains discoverable.
+  restoreFocusEl(restoreFocus, () => flowchartEmptyCsvFocusFallback(), { visibleRing: true })
   restoreFocus = null
 }
 

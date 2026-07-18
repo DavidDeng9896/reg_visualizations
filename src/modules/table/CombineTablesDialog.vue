@@ -156,7 +156,8 @@ const canAdd = computed(() => {
 watch([leftId, rightId, joinType, leftKeys, rightKeys], rebuild, { deep: true })
 
 function restoreFocusToTrigger() {
-  restoreFocusEl(restoreFocus, () => flowchartEmptyCombineFocusFallback())
+  // Round 52: visible ring for workspace/flowchart empty CTA × toast.
+  restoreFocusEl(restoreFocus, () => flowchartEmptyCombineFocusFallback(), { visibleRing: true })
   restoreFocus = null
 }
 

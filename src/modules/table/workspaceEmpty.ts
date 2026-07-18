@@ -1,6 +1,11 @@
-/** Workspace empty-state copy / landmark / CTA a11y (Round 28). */
+/** Workspace empty-state copy / landmark / CTA a11y (Round 28–52). */
+
+import { restoreFocusEl } from '@/shared/ui/focusRestore'
 
 export const WORKSPACE_EMPTY_REGION_LABEL = '工作区引导'
+
+/** Prefer primary CSV CTA inside the workspace empty landmark. */
+export const WORKSPACE_EMPTY_CSV_CTA_SELECTOR = '#ws-empty .empty-cta.btn-primary'
 
 export function workspaceEmptyRegionAttrs() {
   return {
@@ -26,4 +31,51 @@ export function workspaceEmptyCopy(opts: { hasTables: boolean }): { title: strin
 
 export function workspaceEmptyCtaAria(cmd: 'csv' | 'combine'): string {
   return cmd === 'csv' ? '从工作区空态导入 CSV' : '从工作区空态合并表'
+}
+
+/**
+ * Round 52: workspace empty CTA focus ring coexists with a toast (parity with
+ * list empty Demo/Create CTA × toast — toast stays interactive).
+ */
+export function workspaceEmptyCtaCoexistsWithToast(): true {
+  return true
+}
+
+/** First focusable empty CTA inside `#ws-empty` (CSV preferred). */
+export function workspaceEmptyCtaSelector(): string {
+  return '#ws-empty .empty-cta'
+}
+
+/**
+ * Land keyboard focus on the workspace empty CSV CTA with a visible restore
+ * ring (Round 52 — toast may coexist; host stays interactive).
+ */
+export function applyWorkspaceEmptyCtaFocus(doc: Document = document): void {
+  const found =
+    doc.querySelector(WORKSPACE_EMPTY_CSV_CTA_SELECTOR) ||
+    doc.querySelector(workspaceEmptyCtaSelector())
+  const el = found instanceof HTMLElement ? found : null
+  restoreFocusEl(el, () => {
+    const region = doc.getElementById('ws-empty')
+    return region instanceof HTMLElement ? region : null
+  }, { visibleRing: true })
+}
+
+/**
+ * Focus restore fallback after CSV/Combine closes from workspace empty
+ * (Round 52 — prefer CTA, then landmark).
+ */
+export function workspaceEmptyCtaFocusFallback(
+  cmd: 'csv' | 'combine' = 'csv',
+  doc: Document = document,
+): HTMLElement | null {
+  const aria = workspaceEmptyCtaAria(cmd)
+  const byAria = doc.querySelector(`#ws-empty [aria-label="${aria}"]`)
+  if (byAria instanceof HTMLElement) return byAria
+  const primary = doc.querySelector(WORKSPACE_EMPTY_CSV_CTA_SELECTOR)
+  if (primary instanceof HTMLElement) return primary
+  const any = doc.querySelector(workspaceEmptyCtaSelector())
+  if (any instanceof HTMLElement) return any
+  const region = doc.getElementById('ws-empty')
+  return region instanceof HTMLElement ? region : null
 }

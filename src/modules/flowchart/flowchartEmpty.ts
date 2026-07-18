@@ -1,4 +1,6 @@
-/** Flowchart empty-state copy / landmark / CTA a11y (Round 29–36). */
+/** Flowchart empty-state copy / landmark / CTA a11y (Round 29–52). */
+
+import { workspaceEmptyCtaFocusFallback } from '@/modules/table/workspaceEmpty'
 
 export const FLOW_EMPTY_REGION_LABEL = '流程图引导'
 
@@ -30,25 +32,29 @@ export function flowchartEmptyCtaAria(cmd: 'csv' | 'combine'): string {
 
 /**
  * Focus restore target after CSV overlay closes from flowchart empty (Round 35).
- * Prefer the captured CTA; fall back to the empty region landmark.
+ * Prefer the captured CTA; fall back to flowchart empty, then workspace empty
+ * (Round 52 — workspace empty CTA × toast parity).
  */
 export function flowchartEmptyCsvFocusFallback(
   doc: Document = document,
 ): HTMLElement | null {
   return (
     (doc.querySelector(FLOW_EMPTY_CSV_CTA_SELECTOR) as HTMLElement | null) ||
-    (doc.getElementById('flow-empty') as HTMLElement | null)
+    (doc.getElementById('flow-empty') as HTMLElement | null) ||
+    workspaceEmptyCtaFocusFallback('csv', doc)
   )
 }
 
 /**
  * Focus restore target after Combine overlay closes from flowchart empty (Round 36).
+ * Round 52: also fall through to workspace empty Combine CTA.
  */
 export function flowchartEmptyCombineFocusFallback(
   doc: Document = document,
 ): HTMLElement | null {
   return (
     (doc.querySelector(FLOW_EMPTY_COMBINE_CTA_SELECTOR) as HTMLElement | null) ||
-    (doc.getElementById('flow-empty') as HTMLElement | null)
+    (doc.getElementById('flow-empty') as HTMLElement | null) ||
+    workspaceEmptyCtaFocusFallback('combine', doc)
   )
 }

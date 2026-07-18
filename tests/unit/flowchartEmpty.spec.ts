@@ -51,21 +51,31 @@ describe('flowchartEmpty', () => {
     expect(flowchartEmptyCsvFocusFallback()).toBeNull()
   })
 
-  it('restores focus to flowchart empty Combine CTA after overlay (Round 36)', () => {
-    const root = document.createElement('div')
-    root.id = 'flow-empty'
+  it('falls through to workspace empty CSV CTA when flowchart empty is gone (Round 52)', () => {
+    const ws = document.createElement('div')
+    ws.id = 'ws-empty'
     const cta = document.createElement('button')
-    cta.setAttribute('aria-label', '从流程图空态合并表')
-    root.appendChild(cta)
-    document.body.appendChild(root)
+    cta.className = 'btn btn-primary empty-cta'
+    cta.setAttribute('aria-label', '从工作区空态导入 CSV')
+    ws.appendChild(cta)
+    document.body.appendChild(ws)
 
-    expect(FLOW_EMPTY_COMBINE_CTA_SELECTOR).toContain('从流程图空态合并表')
+    expect(flowchartEmptyCsvFocusFallback()).toBe(cta)
+    ws.remove()
+    expect(flowchartEmptyCsvFocusFallback()).toBeNull()
+  })
+
+  it('falls through to workspace empty Combine CTA when flowchart empty is gone (Round 52)', () => {
+    const ws = document.createElement('div')
+    ws.id = 'ws-empty'
+    const cta = document.createElement('button')
+    cta.className = 'btn empty-cta'
+    cta.setAttribute('aria-label', '从工作区空态合并表')
+    ws.appendChild(cta)
+    document.body.appendChild(ws)
+
     expect(flowchartEmptyCombineFocusFallback()).toBe(cta)
-
-    cta.remove()
-    expect(flowchartEmptyCombineFocusFallback()).toBe(root)
-
-    root.remove()
+    ws.remove()
     expect(flowchartEmptyCombineFocusFallback()).toBeNull()
   })
 })

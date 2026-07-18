@@ -56,6 +56,10 @@
  * Round 51: empty Demo CTA×toast + Create Cancel skip→Tab + empty CTA
  * aria-controls preserve + Delete Esc×Demo regression remain tiny; List gzip
  * still keep-route-lazy. projects / workspace re-checked separately.
+ *
+ * Round 52: workspace empty CTA×toast + Demo success focus + skip→empty Tab
+ * + Create Esc×Demo regression remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -79,6 +83,7 @@ export type ListPageChunkStrategy = {
   round49Reeval: 'keep-route-lazy'
   round50Reeval: 'keep-route-lazy'
   round51Reeval: 'keep-route-lazy'
+  round52Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -101,6 +106,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round49Reeval: 'keep-route-lazy',
     round50Reeval: 'keep-route-lazy',
     round51Reeval: 'keep-route-lazy',
+    round52Reeval: 'keep-route-lazy',
   }
 }
 
