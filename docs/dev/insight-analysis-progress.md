@@ -9,7 +9,7 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-34622ec3-4021-45df-a9de-68bc8e9511ea-14c9`（Round 46） |
+| 分支 | `cursor/bc-34622ec3-4021-45df-a9de-68bc8e9511ea-8470`（Round 46） |
 | 阶段 | **优化 Round 46 完成**（周期 **1/3**；下一合并点 Round 48） |
 | 上次更新 | 2026-07-18 13:10 |
 | 单元 | **320/320 PASS**（+listSkipFocusLanding / listSkipLandmarkRouteFocus / deleteCancelToastRing / demoFailCreateEscRing / dangerCancelToastRing / chunk R46） |
