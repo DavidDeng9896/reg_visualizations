@@ -206,7 +206,7 @@
           </label>
           <footer class="dialog-footer">
             <button type="button" class="btn" @click="closeNewView">取消</button>
-            <button type="submit" class="btn btn-primary">Create</button>
+            <button type="submit" class="btn btn-primary">创建</button>
           </footer>
         </form>
       </div>
