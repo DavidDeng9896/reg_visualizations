@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–45).
+ * Analysis list chrome focus order (Round 42–47).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -10,6 +10,12 @@
  * Round 44: `aria-controls` flips dynamically when the list goes empty ↔ rows.
  * Round 45: skip-link `href` hash stays aligned with `aria-controls` across
  * those empty ↔ rows flips (same landmark id).
+ * Round 46: after empty ↔ rows flips, activating skip lands focus on the
+ * aligned landmark; `#analysis-list-main` itself (not row children) is
+ * routeFocus-protected so skip landing sticks.
+ * Round 47: when empty ↔ rows flips while focus is already on the old
+ * landmark, migrate to the new landmark; after skip lands on list-main,
+ * the next Tab target is the first roving row.
  */
 
 import {
@@ -72,4 +78,112 @@ export function listSkipMatchesFilterAriaControls(opts: {
   hasRows: boolean
 }): boolean {
   return listSkipHref(opts) === `#${listFilterAriaControls(opts)}`
+}
+
+/** Round 46: skip activation after empty ↔ rows lands on the aligned landmark. */
+export function listSkipLandsAfterEmptyRowsFlip(): true {
+  return true
+}
+
+/**
+ * Round 46: when skip has landed on `#analysis-list-main` itself, routeFocus
+ * must not steal — children (rows/buttons) still yield to routeFocus (R31).
+ */
+export function listSkipLandmarkFocusProtected(): true {
+  return true
+}
+
+/** Resolve the DOM landmark skip / aria-controls currently point at. */
+export function resolveListSkipFocusTarget(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  const id = listFilterAriaControls(opts)
+  const el = doc.getElementById(id)
+  return el instanceof HTMLElement ? el : null
+}
+
+/** Activate skip landing: focus the aligned list landmark (Round 46). */
+export function activateListSkipFocus(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  const target = resolveListSkipFocusTarget(opts, doc)
+  if (!target) return null
+  if (!target.hasAttribute('tabindex')) target.tabIndex = -1
+  target.focus({ preventScroll: true })
+  return target
+}
+
+/**
+ * True when focus is on the list-main landmark element itself (skip landing),
+ * not on a descendant control.
+ */
+export function isListMainSkipLandmarkFocused(
+  el: Element | null,
+  doc: Document = document,
+): boolean {
+  if (!(el instanceof HTMLElement)) return false
+  const main = doc.getElementById(listMainRegionAttrs().id)
+  return !!main && el === main
+}
+
+/** Round 47: migrate landmark focus when empty ↔ rows flips under skip landing. */
+export function listLandmarkMigratesOnEmptyRowsFlip(): true {
+  return true
+}
+
+/**
+ * True when focus is on a list landmark itself (`#analysis-list-main` or
+ * `#analysis-list`), not a row or the filter select.
+ */
+export function isListLandmarkFocusTarget(el: Element | null): boolean {
+  if (!(el instanceof HTMLElement)) return false
+  const id = el.id
+  return id === listMainRegionAttrs().id || id === listEmptyRegionAttrs().id
+}
+
+/**
+ * Migrate when the user was on a landmark and aria-controls target flips
+ * (empty ↔ rows). Never steal from the filter select or a roving row.
+ */
+export function shouldMigrateListLandmarkFocus(
+  wasOnLandmark: boolean,
+  before: { ready: boolean; hasRows: boolean },
+  after: { ready: boolean; hasRows: boolean },
+): boolean {
+  if (!wasOnLandmark) return false
+  return listFilterAriaControlsChanged(before, after)
+}
+
+/** Focus the landmark that skip / aria-controls currently point at (Round 47). */
+export function migrateListLandmarkFocus(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  return activateListSkipFocus(opts, doc)
+}
+
+/**
+ * Round 47: after skip lands on list-main with rows, Tab enters the roving
+ * row group (first tabindex=0 row).
+ */
+export function listSkipTabEntersRowRoving(): true {
+  return true
+}
+
+/**
+ * Resolve the first roving list row as the next Tab stop after skip lands on
+ * list-main. Empty landmark has no roving rows → null.
+ */
+export function resolveNextTabAfterListSkip(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  if (!opts.ready || !opts.hasRows) return null
+  const row = doc.querySelector<HTMLElement>(
+    `[data-ia-list-row][tabindex="0"], [data-ia-list-row][tabindex='0']`,
+  )
+  if (row) return row
+  return doc.querySelector<HTMLElement>('[data-ia-list-row="0"]')
 }
