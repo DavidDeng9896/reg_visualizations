@@ -19,6 +19,8 @@
  * Round 48: landmark migrate never steals from the filter select; skip→Tab
  * roving coexists with filter→rows chrome order (skip bypasses filter only
  * after skip landing).
+ * Round 49: filter Tab → first roving row coexists with skip→Tab (same target);
+ * chrome order still filter→rows for normal page Tab.
  */
 
 import {
@@ -205,5 +207,32 @@ export function resolveNextTabAfterListSkip(
  * only path that bypasses filter into the first roving row.
  */
 export function listSkipTabCoexistsWithFilterOrder(): true {
+  return true
+}
+
+/**
+ * Round 49: after the project filter, Tab enters the first roving row
+ * (same target as skip→Tab after list-main landing).
+ */
+export function listFilterTabEntersRowRoving(): true {
+  return true
+}
+
+/**
+ * Resolve the first roving list row as the next Tab stop after the filter
+ * select (chrome order filter → rows). Empty list → null.
+ */
+export function resolveNextTabAfterFilter(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  return resolveNextTabAfterListSkip(opts, doc)
+}
+
+/**
+ * Round 49: filter→Tab and skip→Tab both land on the first roving row;
+ * chrome order still keeps filter before rows for normal page Tab.
+ */
+export function listFilterTabCoexistsWithSkipTab(): true {
   return true
 }

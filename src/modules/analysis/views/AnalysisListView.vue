@@ -1,6 +1,7 @@
 <template>
   <div class="list-page">
     <a
+      ref="skipLinkEl"
       class="skip-link"
       data-ia-skip="1"
       :href="skipHref"
@@ -143,7 +144,10 @@ import {
   applyListDeleteFocus,
   planListDeleteFocus,
 } from '@/modules/analysis/listDeleteFocus'
-import { listDeleteSuccessToastMessage } from '@/modules/analysis/listDeleteToastFocus'
+import {
+  listDeleteRovingIndex,
+  listDeleteSuccessToastMessage,
+} from '@/modules/analysis/listDeleteToastFocus'
 import {
   clampListRowFocus,
   isListRowFocusTarget,
@@ -154,7 +158,10 @@ import {
 } from '@/modules/analysis/listRowNav'
 import { listFilterAriaControls, isListLandmarkFocusTarget, shouldMigrateListLandmarkFocus, migrateListLandmarkFocus } from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
-import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
+import {
+  listSkipVisibleWhenCreateClosed,
+  syncListSkipVisibility,
+} from '@/modules/analysis/listSkipCreate'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -169,6 +176,8 @@ const listReady = ref(false)
 const createRestoreFocus = ref<HTMLElement | null>(null)
 /** Round 41: single Tab stop in the analysis table (roving tabindex). */
 const rowFocusIndex = ref<number | null>(null)
+/** Round 49: skip-link el for Create-open hide regression (`hidden` + aria-hidden). */
+const skipLinkEl = ref<HTMLElement | null>(null)
 let createWarmed = false
 
 const filtered = computed(() =>
@@ -216,6 +225,10 @@ const skipHref = computed(() =>
 watch(showCreate, (open) => {
   setToastHostExternalInert(open)
   if (!open) createRestoreFocus.value = null
+  // Round 49: keep skip DOM hide contract aligned with Create Teleport.
+  void nextTick(() => {
+    if (skipLinkEl.value) syncListSkipVisibility(skipLinkEl.value, open)
+  })
 }, { immediate: true })
 
 onUnmounted(() => {
@@ -349,11 +362,13 @@ async function onRemove(id: string) {
   }
   await store.removeAnalysis(id)
   // Round 41: toast + focus ring coexist; focus after toast so ring wins.
+  // Round 49: roving index clamped via listDeleteRovingIndex (= plan bounds).
   toast('success', listDeleteSuccessToastMessage())
   await nextTick()
-  const plan = planListDeleteFocus(deletedIndex, filtered.value.length)
-  if (plan.kind === 'row') rowFocusIndex.value = plan.index
-  else rowFocusIndex.value = null
+  const remaining = filtered.value.length
+  const roving = listDeleteRovingIndex(deletedIndex, remaining)
+  const plan = planListDeleteFocus(deletedIndex, remaining)
+  rowFocusIndex.value = roving
   applyListDeleteFocus(plan)
 }
 </script>

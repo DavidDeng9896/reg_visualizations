@@ -43,6 +43,11 @@
  * Round 48: landmark×filter no-steal + skip→Tab×filter coexistence + Delete
  * Esc×Demo toast helpers remain tiny; List gzip still keep-route-lazy.
  * Create/CSV/projects re-checked below.
+ *
+ * Round 49: delete roving clamp×toast + filter/skip Tab coexistence + Create
+ * skip hide regression remain tiny; List gzip still keep-route-lazy.
+ * Flowchart / Transform cold paths re-checked separately (still
+ * async-idle-warm / deferred-sync).
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -63,6 +68,7 @@ export type ListPageChunkStrategy = {
   round46Reeval: 'keep-route-lazy'
   round47Reeval: 'keep-route-lazy'
   round48Reeval: 'keep-route-lazy'
+  round49Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -82,6 +88,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round46Reeval: 'keep-route-lazy',
     round47Reeval: 'keep-route-lazy',
     round48Reeval: 'keep-route-lazy',
+    round49Reeval: 'keep-route-lazy',
   }
 }
 

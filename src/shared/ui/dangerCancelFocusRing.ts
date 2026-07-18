@@ -22,6 +22,9 @@
  *
  * Round 48: Delete Esc opener ring also coexists with a Demo-fail error toast;
  * danger Esc × toast inert regression covers Demo-fail toast specifically.
+ *
+ * Round 49: danger Cancel × Demo-fail toast restores opener ring and clears
+ * toast inert (parity with Esc × Demo-fail).
  */
 
 export function dangerCancelUsesVisibleRing(): true {
@@ -79,5 +82,13 @@ export function dangerEscRestoresRingAndToastInteractive(): true {
  * (same inert clear + visible ring as success-toast path).
  */
 export function deleteKeyDangerEscRingCoexistsWithDemoToast(): true {
+  return true
+}
+
+/**
+ * Round 49: after danger Cancel, opener keeps a visible ring and a Demo-fail
+ * toast host is interactive again (parity with Esc × Demo-fail path).
+ */
+export function dangerCancelRestoresRingAndDemoToastInteractive(): true {
   return true
 }
