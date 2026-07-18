@@ -64,11 +64,13 @@
       </thead>
       <tbody>
         <tr
-          v-for="row in filtered"
+          v-for="(row, index) in filtered"
           :key="row.id"
-          tabindex="0"
+          :tabindex="listRowTabIndex(index, rowFocusIndex)"
+          :data-ia-list-row="index"
           @click="open(row)"
-          @keydown.enter="open(row)"
+          @focus="rowFocusIndex = index"
+          @keydown="onRowKeydown($event, index, row)"
         >
           <td>{{ row.name }}</td>
           <td>{{ getProjectName(row.projectId) }}</td>
@@ -131,11 +133,18 @@ import {
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 import { scheduleWorkspaceRoutePrefetch } from '@/shared/ui/routePrefetch'
-import { scheduleCreateAnalysisWarm } from '@/modules/analysis/createAnalysisChunk'
+import { scheduleCreateAnalysisWarm, demoSuccessPathWarmsCreate } from '@/modules/analysis/createAnalysisChunk'
 import {
   applyListDeleteFocus,
   planListDeleteFocus,
 } from '@/modules/analysis/listDeleteFocus'
+import { listDeleteSuccessToastMessage } from '@/modules/analysis/listDeleteToastFocus'
+import {
+  clampListRowFocus,
+  listRowTabIndex,
+  nextListRowFocus,
+  resolveListRowKeyAction,
+} from '@/modules/analysis/listRowNav'
 import { demoFailToastMessage } from '@/modules/analysis/demoFailToastCreate'
 import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
 
@@ -150,11 +159,17 @@ const projectFilter = ref('')
 const demoBusy = ref(false)
 const listReady = ref(false)
 const createRestoreFocus = ref<HTMLElement | null>(null)
+/** Round 41: single Tab stop in the analysis table (roving tabindex). */
+const rowFocusIndex = ref<number | null>(null)
 let createWarmed = false
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
 )
+
+watch(filtered, (rows) => {
+  rowFocusIndex.value = clampListRowFocus(rowFocusIndex.value, rows.length)
+})
 
 const skipHref = computed(() =>
   listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
@@ -207,6 +222,8 @@ async function onCreate(payload: { name: string; projectId: string }) {
 
 async function createDemo() {
   if (demoBusy.value) return
+  // Round 41: Demo success path must never schedule Create warm.
+  void demoSuccessPathWarmsCreate()
   demoBusy.value = true
   try {
     const a = await store.createAnalysis('Demo Dose Response', MOCK_PROJECTS[0].id)
@@ -248,6 +265,30 @@ function open(row: { id: string }) {
   router.push(`/analyses/${row.id}`)
 }
 
+function focusListRow(index: number) {
+  rowFocusIndex.value = index
+  void nextTick(() => {
+    const el = document.querySelector(`[data-ia-list-row="${index}"]`)
+    if (el instanceof HTMLElement) el.focus()
+  })
+}
+
+function onRowKeydown(
+  ev: KeyboardEvent,
+  index: number,
+  row: { id: string },
+) {
+  const action = resolveListRowKeyAction(ev.key)
+  if (!action) return
+  ev.preventDefault()
+  if (action === 'activate') {
+    open(row)
+    return
+  }
+  const next = nextListRowFocus(action, index, filtered.value.length)
+  if (next !== null) focusListRow(next)
+}
+
 async function onRemove(id: string) {
   const deletedIndex = filtered.value.findIndex((row) => row.id === id)
   try {
@@ -261,10 +302,13 @@ async function onRemove(id: string) {
     throw err
   }
   await store.removeAnalysis(id)
-  toast('success', '已删除')
-  // Round 40: delete control is gone — land on remaining row or empty Create CTA.
+  // Round 41: toast + focus ring coexist; focus after toast so ring wins.
+  toast('success', listDeleteSuccessToastMessage())
   await nextTick()
-  applyListDeleteFocus(planListDeleteFocus(deletedIndex, filtered.value.length))
+  const plan = planListDeleteFocus(deletedIndex, filtered.value.length)
+  if (plan.kind === 'row') rowFocusIndex.value = plan.index
+  else rowFocusIndex.value = null
+  applyListDeleteFocus(plan)
 }
 </script>
 

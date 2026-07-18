@@ -33,6 +33,14 @@ export function demoCtaLeavesCreateWarmIndependent(): true {
   return true
 }
 
+/**
+ * Demo success path must not schedule Create warm (Round 41).
+ * Create triggers (hover/focus/click) remain the only warm entry.
+ */
+export function demoSuccessPathWarmsCreate(): false {
+  return false
+}
+
 type CreateImport = () => Promise<unknown>
 
 /** Idle-warm CreateAnalysisDialog after list Create interaction (Round 38–39). */

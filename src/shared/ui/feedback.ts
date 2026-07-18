@@ -14,7 +14,8 @@ import {
   type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
-import { captureFocusEl, restoreFocusEl } from './focusRestore'
+import { captureFocusEl, paintFocusRestoreRing, restoreFocusEl } from './focusRestore'
+import { dangerCancelUsesVisibleRing } from './dangerCancelFocusRing'
 // feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
@@ -325,6 +326,7 @@ function openMessageBox(
     root.addEventListener('keydown', onKeydown)
 
     // Focus: prompt → input; destructive confirm → Cancel; else → Confirm.
+    // Round 41: danger Cancel gets a visible restore ring (scripted focus).
     requestAnimationFrame(() => {
       if (input) {
         input.focus()
@@ -338,6 +340,14 @@ function openMessageBox(
           ? items.find((el) => el === cancelBtn)
           : items.find((el) => el === confirmBtn)) || items[0]
       prefer?.focus()
+      if (
+        prefer === cancelBtn &&
+        wantCancel &&
+        danger &&
+        dangerCancelUsesVisibleRing()
+      ) {
+        paintFocusRestoreRing(cancelBtn)
+      }
     })
   })
 }

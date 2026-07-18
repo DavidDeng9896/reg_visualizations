@@ -1,0 +1,68 @@
+/**
+ * Analysis list table row keyboard navigation (Round 41).
+ *
+ * Rows previously all used tabindex=0 (many Tab stops). Roving tabindex keeps
+ * a single tab stop in the list; Arrow/Home/End move focus; Enter/Space open.
+ */
+
+export type ListRowKeyAction = 'next' | 'prev' | 'first' | 'last' | 'activate'
+
+export function listRowRovingEnabled(): true {
+  return true
+}
+
+/** Roving tabindex: only the focused row is in the tab order; default first. */
+export function listRowTabIndex(index: number, focusIndex: number | null): 0 | -1 {
+  if (focusIndex === null) return index === 0 ? 0 : -1
+  return index === focusIndex ? 0 : -1
+}
+
+export function resolveListRowKeyAction(key: string): ListRowKeyAction | null {
+  switch (key) {
+    case 'ArrowDown':
+      return 'next'
+    case 'ArrowUp':
+      return 'prev'
+    case 'Home':
+      return 'first'
+    case 'End':
+      return 'last'
+    case 'Enter':
+    case ' ':
+      return 'activate'
+    default:
+      return null
+  }
+}
+
+/** Clamp / default the roving focus index for `count` visible rows. */
+export function clampListRowFocus(
+  current: number | null,
+  count: number,
+): number | null {
+  if (count <= 0) return null
+  if (current === null || current < 0) return 0
+  if (current >= count) return count - 1
+  return current
+}
+
+/** Next focus index after a key action (null when list empty). */
+export function nextListRowFocus(
+  action: ListRowKeyAction,
+  current: number | null,
+  count: number,
+): number | null {
+  if (count <= 0 || action === 'activate') return clampListRowFocus(current, count)
+  const base = clampListRowFocus(current, count)
+  if (base === null) return null
+  switch (action) {
+    case 'next':
+      return Math.min(base + 1, count - 1)
+    case 'prev':
+      return Math.max(base - 1, 0)
+    case 'first':
+      return 0
+    case 'last':
+      return count - 1
+  }
+}
