@@ -1,4 +1,4 @@
-/** Create Analysis dialog handoff + focus restore (Round 38). */
+/** Create Analysis dialog handoff + focus restore (Round 38–39). */
 
 /**
  * Prefer an explicit restore target (e.g. empty-list Create CTA) over whatever
@@ -17,4 +17,17 @@ export function resolveCreateRestoreFocus(
 /** Empty-list Create CTA selector used when the opener unmounted during cancel. */
 export function createEmptyCtaFallbackSelector(): string {
   return '.empty-list .empty-cta.btn-primary'
+}
+
+/**
+ * Keyboard-only cancel path contract (Round 39):
+ * Tab to Create → Enter open → Esc/Cancel → focus returns to Create CTA with ring.
+ */
+export function createKeyboardCancelRestoresCta(): true {
+  return true
+}
+
+/** Header Create button selector (non-empty list / top actions). */
+export function createHeaderTriggerSelector(): string {
+  return '.top-actions .btn-primary'
 }

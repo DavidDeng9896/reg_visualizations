@@ -45,4 +45,20 @@ describe('overlayEsc (Round 36–37)', () => {
     newView.remove()
     expect(workspaceOverlayEscAllowed()).toBe(true)
   })
+
+  it('blocks Esc on Create while confirm owns the layer (Round 39)', () => {
+    const create = document.createElement('div')
+    create.setAttribute('data-ia-create', '1')
+    document.body.appendChild(create)
+    expect(workspaceOverlayEscAllowed()).toBe(true)
+
+    const root = document.createElement('div')
+    root.setAttribute('data-ia-feedback', 'confirm')
+    document.body.appendChild(root)
+    expect(workspaceOverlayEscAllowed()).toBe(false)
+
+    root.remove()
+    create.remove()
+    expect(workspaceOverlayEscAllowed()).toBe(true)
+  })
 })

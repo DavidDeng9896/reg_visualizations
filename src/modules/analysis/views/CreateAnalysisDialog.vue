@@ -92,7 +92,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  restoreFocusEl(restoreFocus, () => resolveCreateRestoreFocus(null))
+  // Round 39: paint a temporary ring — browsers often skip :focus-visible on scripted focus.
+  restoreFocusEl(restoreFocus, () => resolveCreateRestoreFocus(null), { visibleRing: true })
 })
 
 function focusables(): HTMLElement[] {

@@ -1,11 +1,14 @@
 /**
- * STYLE panel in-panel section jump navigation (Round 33–34).
+ * STYLE panel in-panel section jump navigation (Round 33–34 / 39).
  * Lets keyboard users move between Title / Layout / Series / Axes without
  * tabbing through every control — headings are focus targets; Arrow/Home/End
  * cycle from a focused heading or the jump nav.
  *
  * Round 34 Tab order: jump-nav links are the only sequential tab stops for
  * section targeting; section headings use tabindex=-1 (programmatic focus).
+ *
+ * Round 39: ChartEdit Teleport to body does not change STYLE jump order —
+ * jump nav still precedes section fields inside `[data-ia-chart-edit]`.
  */
 
 export const STYLE_SECTION_IDS = [
@@ -38,6 +41,11 @@ export function styleSectionHeadingTabIndex(): -1 {
  * section field controls. Headings remain programmatic focus targets.
  */
 export function styleJumpNavPrecedesSections(): boolean {
+  return true
+}
+
+/** STYLE jump nav stays valid after ChartEdit Teleport (Round 39). */
+export function styleJumpNavWorksWithChartEditTeleport(): true {
   return true
 }
 

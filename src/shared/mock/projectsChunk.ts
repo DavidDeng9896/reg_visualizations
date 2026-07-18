@@ -1,5 +1,5 @@
 /**
- * Entry-chunk strategy for mock projects vs Dexie/store/feedback (Round 30–38 eval).
+ * Entry-chunk strategy for mock projects vs Dexie/store/feedback (Round 30–39 eval).
  *
  * Build names the shared list/workspace graph after `projects.ts`, but most of
  * the ~100KB+ is Dexie + analysisStore + feedback JS. `MOCK_PROJECTS` itself is
@@ -19,6 +19,9 @@
  * Round 38: revisited after Create/New view Teleport + Create idle-warm — still
  * no clean async boundary for Dexie/store/feedback without racing first
  * toast/confirm on list delete / Demo create. Keep shared; warm Create instead.
+ *
+ * Round 39: list cold-start + Create warm timeout tweak does not unlock a Dexie
+ * split; keep shared entry.
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -32,6 +35,8 @@ export type ProjectsChunkStrategy = {
   round35Feedback: 'keep-shared'
   /** Round 38 re-eval — still keep Dexie/store/feedback on shared entry. */
   round38Reeval: 'keep-shared'
+  /** Round 39 re-eval — still keep shared after Create warm / list chunk pass. */
+  round39Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -42,5 +47,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     splitDeferred: true,
     round35Feedback: 'keep-shared',
     round38Reeval: 'keep-shared',
+    round39Reeval: 'keep-shared',
   }
 }
