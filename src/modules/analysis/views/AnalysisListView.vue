@@ -108,6 +108,7 @@ import {
 } from '@/modules/analysis/listEmpty'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
+import { scheduleWorkspaceRoutePrefetch } from '@/shared/ui/routePrefetch'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -129,6 +130,8 @@ const skipHref = computed(() =>
 )
 
 onMounted(async () => {
+  // Defer workspace chunk warm until list is interactive (Round 34).
+  scheduleWorkspaceRoutePrefetch(router)
   try {
     await store.loadList()
   } finally {
