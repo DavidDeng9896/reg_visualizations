@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   analysisRoutePrefetchPaths,
+  analysisWorkspacePrefetchPaths,
   scheduleRoutePrefetch,
+  scheduleWorkspaceRoutePrefetch,
   warmMatchedComponents,
 } from '@/shared/ui/routePrefetch'
 
 describe('routePrefetch', () => {
-  it('lists cold-start routes to warm (Round 33)', () => {
-    expect(analysisRoutePrefetchPaths()).toEqual(['/', '/analyses/__prefetch__'])
+  it('cold-start warms list only — not workspace (Round 34)', () => {
+    expect(analysisRoutePrefetchPaths()).toEqual(['/'])
+    expect(analysisWorkspacePrefetchPaths()).toEqual(['/analyses/__prefetch__'])
   })
 
   it('invokes lazy component factories on matched records', () => {
@@ -20,7 +23,7 @@ describe('routePrefetch', () => {
     expect(loader).toHaveBeenCalledTimes(1)
   })
 
-  it('schedules resolve + warm for each path via idle helper', () => {
+  it('schedules list resolve via idle helper on boot', () => {
     const loader = vi.fn().mockResolvedValue({ default: {} })
     const resolve = vi.fn((path: string) => ({
       matched: [{ components: { default: loader } }],
@@ -30,7 +33,20 @@ describe('routePrefetch', () => {
     scheduleRoutePrefetch({ resolve }, { idle })
     expect(idle).toHaveBeenCalledTimes(1)
     expect(resolve).toHaveBeenCalledWith('/')
+    expect(resolve).not.toHaveBeenCalledWith('/analyses/__prefetch__')
+    expect(loader).toHaveBeenCalledTimes(1)
+  })
+
+  it('schedules workspace warm from list page (Round 34)', () => {
+    const loader = vi.fn().mockResolvedValue({ default: {} })
+    const resolve = vi.fn((path: string) => ({
+      matched: [{ components: { default: loader } }],
+      path,
+    }))
+    const idle = vi.fn((run: () => void) => run())
+    scheduleWorkspaceRoutePrefetch({ resolve }, { idle })
+    expect(idle).toHaveBeenCalledTimes(1)
     expect(resolve).toHaveBeenCalledWith('/analyses/__prefetch__')
-    expect(loader).toHaveBeenCalledTimes(2)
+    expect(loader).toHaveBeenCalledTimes(1)
   })
 })

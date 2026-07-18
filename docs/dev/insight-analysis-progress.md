@@ -9,26 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-2c9e87b7-1166-4474-afd8-b65cd5fdbb7f-99ee`（Round 33；含 R25–32 基线） |
-| 阶段 | **优化 Round 33 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=33`） |
-| 上次更新 | 2026-07-18 00:10 |
-| 单元 | **190/190 PASS**（+STYLE nav / focusRestore / toast overlay / routePrefetch / chartEdit overlay） |
-| UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.0 / ~24.3；ChartEditDrawer ~36.2；projects feedback 仍 js-shared） |
+| 分支 | `cursor/bc-ba896d11-9037-495f-b81c-cbeab86dfa70-7491`（Round 34） |
+| 阶段 | **优化 Round 34 进行中**（周期 **1/3**；`lastMergedRound=33`） |
+| 上次更新 | 2026-07-18 01:10 |
+| 单元 | **196/196 PASS**（+mainBehind / skipHide / STYLE tab / editDrawerChunk / prefetch split） |
+| UI E2E | 待验证 |
+| Build | 待验证 |
 
-## 2. Round 33 对齐摘要
+## 2. Round 34 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEditDrawer 打开 → 主区 surface / 顶栏 / 侧栏 chrome inert | ✅ `chartEdit` + `ws-surface` + `shellBehindOverlay` |
-| STYLE 分区键盘跳转（Title/Layout/Series/Axes） | ✅ `styleSectionNav` + jump nav |
-| CSV/Combine/Transform/ChartEdit → toast host inert | ✅ `setToastHostExternalInert` |
-| dialog 焦点恢复统一 | ✅ `focusRestore`（feedback + ChartEditDrawer） |
-| projects/feedback 边界再评估 | ✅ 仍 defer；`css-decoupled-js-shared` |
-| 冷启动路由预取 | ✅ `scheduleRoutePrefetch` |
-| 合并 | **是**（周期 3/3；R25–33 → main） |
+| ChartEditDrawer Teleport 到 body | ✅ `Teleport to="body"` + `data-ia-chart-edit` |
+| 主区 inert：csv/combine/chartEdit（含流程图） | ✅ `mainBehindWorkspaceOverlay` |
+| Transform 不 inert `#workspace-main` | ✅ 仅 `ws-surface` inert |
+| skip-link 在 overlay 打开时隐藏 | ✅ `skipLinkHiddenBehindOverlay` |
+| STYLE jump / Tab：heading tabindex=-1 | ✅ `styleSectionHeadingTabIndex` |
+| EditDrawer fitEngine/色板分包评估 | ✅ `editDrawerChunk`（仍 deferred） |
+| 冷启动仅预取列表；workspace 延后到列表页 | ✅ `scheduleWorkspaceRoutePrefetch` |
+| 合并 | 否（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -38,10 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 34 计划（下一周期 1/3）
+## 4. Round 35 计划（下一周期 2/3）
 
-1. **UX**：ChartEditDrawer Teleport 到 body（彻底脱离主区 DOM）；STYLE jump 与 Tab 顺序回归
-2. **Perf**：EditDrawer 分包评估（fitEngine / series 色板）；列表页预取是否过早拉 workspace
-3. **A11y**：流程图模式下 overlay inert 覆盖；skip-link 在 drawer 打开时隐藏
+1. **UX**：TransformDialog Teleport to body → 可纳入 `mainBehindWorkspaceOverlay`
+2. **Perf**：projects / feedback 边界再评估；EditDrawer 打开后再 warm fit 相关 runtime
+3. **A11y**：流程图空态 + CSV overlay 焦点回归；drawer Teleport 后 Esc/焦点陷阱回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：否（周期 2/3）

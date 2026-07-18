@@ -1,14 +1,22 @@
 /**
- * Cold-start route module prefetch (Round 33).
- * After first paint, warm list + workspace route chunks so the first
- * Analysis open pays less for async imports. Uses a sentinel analysis id
- * that only triggers the route component resolve (store handles missing).
+ * Cold-start route module prefetch (Round 33–34).
+ *
+ * Round 34: cold start only warms the list route. Prefetching the workspace
+ * chunk from `/` pulled AnalysisWorkspaceView (+ sidebar/table shell deps)
+ * before the user opened an analysis — wasteful on list-only sessions.
+ * Workspace warm is scheduled from the list page after mount instead.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
 
+/** Paths warmed on app boot (list only). */
 export function analysisRoutePrefetchPaths(): string[] {
-  return ['/', '/analyses/__prefetch__']
+  return ['/']
+}
+
+/** Paths warmed after the list page is interactive. */
+export function analysisWorkspacePrefetchPaths(): string[] {
+  return ['/analyses/__prefetch__']
 }
 
 export type RoutePrefetchRecord = {
@@ -41,14 +49,30 @@ export function warmMatchedComponents(loc: RoutePrefetchLocation): number {
   return warmed
 }
 
-export function scheduleRoutePrefetch(
+function schedulePaths(
   router: { resolve: (to: string) => unknown },
+  paths: string[],
   options: RoutePrefetchOptions = {},
 ): void {
   const idle = options.idle ?? ((run: () => void) => warmIdle(run))
   idle(() => {
-    for (const path of analysisRoutePrefetchPaths()) {
+    for (const path of paths) {
       warmMatchedComponents(router.resolve(path) as RoutePrefetchLocation)
     }
   })
+}
+
+export function scheduleRoutePrefetch(
+  router: { resolve: (to: string) => unknown },
+  options: RoutePrefetchOptions = {},
+): void {
+  schedulePaths(router, analysisRoutePrefetchPaths(), options)
+}
+
+/** Call from AnalysisListView after mount — deferred workspace chunk warm. */
+export function scheduleWorkspaceRoutePrefetch(
+  router: { resolve: (to: string) => unknown },
+  options: RoutePrefetchOptions = {},
+): void {
+  schedulePaths(router, analysisWorkspacePrefetchPaths(), options)
 }

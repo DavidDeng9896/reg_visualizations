@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   anyWorkspaceDialogOpen,
+  mainBehindWorkspaceOverlay,
   resetWorkspaceDialogFlags,
   setWorkspaceDialogOpen,
+  skipLinkHiddenBehindOverlay,
   workspaceDialogFlags,
 } from '@/modules/analysis/workspaceOverlay'
 
@@ -33,5 +35,30 @@ describe('workspaceOverlay', () => {
     expect(anyWorkspaceDialogOpen()).toBe(true)
     setWorkspaceDialogOpen('chartEdit', false)
     expect(anyWorkspaceDialogOpen()).toBe(false)
+  })
+
+  it('inerts main for csv / combine / chartEdit but not transform (Round 34)', () => {
+    expect(mainBehindWorkspaceOverlay()).toBe(false)
+    setWorkspaceDialogOpen('transform', true)
+    expect(mainBehindWorkspaceOverlay()).toBe(false)
+    expect(anyWorkspaceDialogOpen()).toBe(true)
+    setWorkspaceDialogOpen('transform', false)
+    setWorkspaceDialogOpen('csv', true)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
+    setWorkspaceDialogOpen('csv', false)
+    setWorkspaceDialogOpen('combine', true)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
+    setWorkspaceDialogOpen('combine', false)
+    setWorkspaceDialogOpen('chartEdit', true)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
+  })
+
+  it('hides skip-links while any workspace overlay is open (Round 34)', () => {
+    expect(skipLinkHiddenBehindOverlay()).toBe(false)
+    setWorkspaceDialogOpen('chartEdit', true)
+    expect(skipLinkHiddenBehindOverlay()).toBe(true)
+    setWorkspaceDialogOpen('chartEdit', false)
+    setWorkspaceDialogOpen('transform', true)
+    expect(skipLinkHiddenBehindOverlay()).toBe(true)
   })
 })
