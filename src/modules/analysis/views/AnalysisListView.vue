@@ -1,6 +1,7 @@
 <template>
   <div class="list-page">
-    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到列表</a>
+    <a class="skip-link" data-ia-skip="1" :href="skipHref" v-show="!showCreate">跳到列表</a>
+    <div class="list-shell" :inert="showCreate || undefined">
     <header class="top">
       <div>
         <h1 tabindex="-1">Insight Analysis</h1>
@@ -10,7 +11,15 @@
         <button type="button" class="btn" :disabled="demoBusy" @click="createDemo">
           {{ demoBusy ? '创建中…' : '一键 Demo（含示例数据）' }}
         </button>
-        <button type="button" class="btn btn-primary" @click="showCreate = true">+ 创建 Analysis</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          @pointerenter="warmCreateOnce"
+          @focus="warmCreateOnce"
+          @click="openCreate"
+        >
+          + 创建 Analysis
+        </button>
       </div>
     </header>
 
@@ -82,21 +91,29 @@
           type="button"
           class="btn btn-primary empty-cta"
           :aria-label="listEmptyCtaAria('create')"
-          @click="showCreate = true"
+          @pointerenter="warmCreateOnce"
+          @focus="warmCreateOnce"
+          @click="openCreate"
         >
           + 创建 Analysis
         </button>
       </div>
     </div>
+    </div>
 
-    <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
+    <CreateAnalysisDialog
+      v-if="showCreate"
+      v-model="showCreate"
+      :restore-target="createRestoreFocus"
+      @create="onCreate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, setToastHostExternalInert, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
@@ -109,6 +126,7 @@ import {
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 import { scheduleWorkspaceRoutePrefetch } from '@/shared/ui/routePrefetch'
+import { scheduleCreateAnalysisWarm } from '@/modules/analysis/createAnalysisChunk'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -120,6 +138,8 @@ const showCreate = ref(false)
 const projectFilter = ref('')
 const demoBusy = ref(false)
 const listReady = ref(false)
+const createRestoreFocus = ref<HTMLElement | null>(null)
+let createWarmed = false
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
@@ -129,13 +149,22 @@ const skipHref = computed(() =>
   listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
 )
 
+watch(showCreate, (open) => {
+  setToastHostExternalInert(open)
+  if (!open) createRestoreFocus.value = null
+}, { immediate: true })
+
+onUnmounted(() => {
+  setToastHostExternalInert(false)
+})
+
 onMounted(async () => {
-  // Defer workspace chunk warm until list is interactive (Round 34).
-  scheduleWorkspaceRoutePrefetch(router)
+  // Round 37: warm workspace only after list is interactive (not during loadList).
   try {
     await store.loadList()
   } finally {
     listReady.value = true
+    scheduleWorkspaceRoutePrefetch(router)
   }
 })
 
@@ -143,8 +172,23 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleString()
 }
 
+/** Round 38: warm Create chunk on first Create trigger interaction (not at listReady). */
+function warmCreateOnce() {
+  if (createWarmed) return
+  createWarmed = true
+  scheduleCreateAnalysisWarm()
+}
+
+function openCreate(ev: Event) {
+  warmCreateOnce()
+  const target = ev.currentTarget
+  createRestoreFocus.value = target instanceof HTMLElement ? target : null
+  showCreate.value = true
+}
+
 async function onCreate(payload: { name: string; projectId: string }) {
   const a = await store.createAnalysis(payload.name, payload.projectId)
+  createRestoreFocus.value = null
   showCreate.value = false
   toast('success', '已创建')
   router.push(`/analyses/${a.id}`)

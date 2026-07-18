@@ -9,26 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-17f09584-8191-440e-ad31-592ba465693e-4f36`（Round 36；含 R34–35 cherry-pick） |
-| 阶段 | **优化 Round 36 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=36`） |
-| 上次更新 | 2026-07-18 03:09 |
-| 单元 | **206/206 PASS**（+dialogMarkers / overlayEsc / transformChunk / combine focus） |
+| 分支 | `cursor/bc-9b54daa6-af82-468f-86f7-7fe81ed7c064-9cbe`（Round 38；含 R37 cherry-pick） |
+| 阶段 | **优化 Round 38 完成**（周期 **2/3**；下一合并点 Round 39） |
+| 上次更新 | 2026-07-18 05:07 |
+| 单元 | **221/221 PASS**（+createAnalysisHandoff / createAnalysisChunk / overlayFocusRing / overlayCoexistence） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.4 / ~24.5；ChartEditDrawer ~36.8；Transform ~8.4；CSV ~25.2；Combine ~9.3；projects 仍 js-shared） |
+| Build | PASS（dist 无 EP；CreateAnalysisDialog ~3.4；CsvImportDialog ~6.1；papaparse ~19.9；AnalysisWorkspaceView ~67.5；projects 仍 js-shared） |
 
-## 2. Round 36 对齐摘要
+## 2. Round 38 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| CSV / Combine Teleport 到 body | ✅ 与 Transform/ChartEdit DOM 位置一致 |
-| dialog 统一 `data-ia-*` | ✅ `dialogMarkers` + csv/combine/transform/chart-edit |
-| Transform 打开后 idle-warm pipeline | ✅ `schedulePipelineWarm` |
-| Workspace toolbar 再拆评估 | ✅ 仍 deferred（`workspaceViewChunk` / `tableChartWorkspaceChunk`） |
-| Combine 焦点恢复 | ✅ `focusRestore` + `flowchartEmptyCombineFocusFallback` |
-| danger confirm × transform Esc | ✅ `workspaceOverlayEscAllowed`（feedback 打开时底层 Esc 让路） |
-| 合并 | **是**（周期 3/3；R34–36 → main） |
+| 列表 Create 空态 CTA ↔ Teleport 焦点回归 | ✅ `createAnalysisHandoff` + `restoreTarget` |
+| Combine/CSV 空态 × New view 并存 | ✅ `overlayCoexistence`（skip/main inert） |
+| CreateAnalysis idle-warm（列表交互后） | ✅ `scheduleCreateAnalysisWarm` on Create hover/focus |
+| projects / STYLE chunk 再评估 | ✅ 仍 deferred（`round38Reeval` / `stylePanelRound38Decision`） |
+| 全 overlay 焦点环矩阵 | ✅ `overlayFocusRing`；CSV/Combine/Transform 显式 close/footer rings |
+| skip-link × New view | ✅ 已由 R37 flags 覆盖；R38 共存抽检 |
+| 合并 | **否**（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -38,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 37 计划（下一周期 1/3）
+## 4. Round 39 计划（下一 cron · 周期 3/3 · 合并）
 
-1. **UX**：CreateAnalysisDialog / New view Teleport + `data-ia-*`；空态 CTA 与 Combine 路径回归
-2. **Perf**：CSV PapaParse 边界评估；列表→工作区冷启动时序再压
-3. **A11y**：New view × danger confirm Esc；全 overlay 焦点环抽检
+1. **UX**：Create 取消后焦点可见环；空列表 Demo CTA 与 Create warm 并存；ChartEdit STYLE jump × Teleport 抽检
+2. **Perf**：list chunk / AnalysisListView 再压；Create warm 是否与 workspace prefetch 争用评估
+3. **A11y**：confirm × Create Esc；toast inert × Create；键盘-only Create→cancel→CTA
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：是（周期 3/3；R37–39 → main，目标 `lastMergedRound=39`）
