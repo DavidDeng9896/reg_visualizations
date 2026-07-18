@@ -1,6 +1,7 @@
 <template>
   <div class="list-page">
-    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到列表</a>
+    <a class="skip-link" data-ia-skip="1" :href="skipHref" v-show="!showCreate">跳到列表</a>
+    <div class="list-shell" :inert="showCreate || undefined">
     <header class="top">
       <div>
         <h1 tabindex="-1">Insight Analysis</h1>
@@ -88,15 +89,16 @@
         </button>
       </div>
     </div>
+    </div>
 
     <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, setToastHostExternalInert, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
@@ -129,13 +131,19 @@ const skipHref = computed(() =>
   listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
 )
 
+watch(showCreate, (open) => setToastHostExternalInert(open), { immediate: true })
+
+onUnmounted(() => {
+  setToastHostExternalInert(false)
+})
+
 onMounted(async () => {
-  // Defer workspace chunk warm until list is interactive (Round 34).
-  scheduleWorkspaceRoutePrefetch(router)
+  // Round 37: warm workspace only after list is interactive (not during loadList).
   try {
     await store.loadList()
   } finally {
     listReady.value = true
+    scheduleWorkspaceRoutePrefetch(router)
   }
 })
 

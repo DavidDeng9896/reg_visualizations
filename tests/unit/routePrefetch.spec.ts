@@ -37,7 +37,7 @@ describe('routePrefetch', () => {
     expect(loader).toHaveBeenCalledTimes(1)
   })
 
-  it('schedules workspace warm from list page (Round 34)', () => {
+  it('schedules workspace warm from list page after interactive (Round 34–37)', () => {
     const loader = vi.fn().mockResolvedValue({ default: {} })
     const resolve = vi.fn((path: string) => ({
       matched: [{ components: { default: loader } }],
