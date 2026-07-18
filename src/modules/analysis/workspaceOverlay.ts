@@ -1,7 +1,14 @@
 /**
- * Workspace modal open flags shared across shell / table / sidebar (Round 32–33).
+ * Workspace modal open flags shared across shell / table / sidebar (Round 32–36).
  * Keeps sidebar chrome inert while CSV / Combine / Transform / ChartEdit dialogs
  * are open without prop-drilling through async chunks.
+ *
+ * Round 34: ChartEditDrawer teleports to body; main inert for csv / combine /
+ * chartEdit (covers flowchart mode).
+ * Round 35: TransformDialog also teleports to body → transform joins
+ * `mainBehindWorkspaceOverlay` (unified with csv / combine / chartEdit).
+ * Round 36: CSV / Combine also teleport to body; all four overlays share
+ * `data-ia-*` markers and Esc-yields-to-feedback contract.
  */
 
 import { reactive } from 'vue'
@@ -26,6 +33,19 @@ export function anyWorkspaceDialogOpen(): boolean {
     workspaceDialogFlags.transform ||
     workspaceDialogFlags.chartEdit
   )
+}
+
+/**
+ * Whether `#workspace-main` (flowchart or table/chart) should be inert.
+ * All teleported / sibling overlays (csv, combine, transform, chartEdit).
+ */
+export function mainBehindWorkspaceOverlay(): boolean {
+  return anyWorkspaceDialogOpen()
+}
+
+/** Skip-links outside inert regions should hide while any overlay owns focus. */
+export function skipLinkHiddenBehindOverlay(): boolean {
+  return anyWorkspaceDialogOpen()
 }
 
 /** Test helper — reset all flags between specs. */

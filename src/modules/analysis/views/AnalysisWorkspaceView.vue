@@ -1,6 +1,11 @@
 <template>
   <div v-if="store.current" class="workspace">
-    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到主内容</a>
+    <a
+      v-show="!hideSkipLink"
+      class="skip-link"
+      data-ia-skip="1"
+      :href="skipHref"
+    >跳到主内容</a>
     <header class="header" :inert="shellBehindOverlay || undefined">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
@@ -62,7 +67,12 @@
       键盘 Tab 优先进入工具栏/表图，再回侧栏导航（a11y）。
     -->
     <div class="body">
-      <main id="workspace-main" class="main" tabindex="-1">
+      <main
+        id="workspace-main"
+        class="main"
+        tabindex="-1"
+        :inert="mainBehindOverlay || undefined"
+      >
         <FlowchartCanvas
           v-if="store.mainMode === 'flowchart'"
           :focus-id="focusId"
@@ -102,6 +112,7 @@
       </div>
     </div>
 
+    <!-- CSV / Combine teleport to body (Round 36); mount stays on workspace shell. -->
     <CsvImportDialog v-if="showCsv" v-model="showCsv" />
     <CombineTablesDialog v-if="showCombine" v-model="showCombine" />
   </div>
@@ -150,7 +161,9 @@ import {
 } from '@/modules/sidebar/sidebarPrefs'
 import {
   anyWorkspaceDialogOpen,
+  mainBehindWorkspaceOverlay,
   setWorkspaceDialogOpen,
+  skipLinkHiddenBehindOverlay,
 } from '@/modules/analysis/workspaceOverlay'
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
@@ -209,6 +222,8 @@ watch(
 )
 
 const shellBehindOverlay = computed(() => anyWorkspaceDialogOpen())
+const mainBehindOverlay = computed(() => mainBehindWorkspaceOverlay())
+const hideSkipLink = computed(() => skipLinkHiddenBehindOverlay())
 const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
 const workspaceEmpty = computed(() => !store.workspaceResult)
 const skipHref = computed(() =>

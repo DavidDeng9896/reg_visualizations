@@ -1,11 +1,14 @@
 <template>
+  <!-- Teleport to body so drawer is outside workspace main (Round 34). -->
+  <Teleport to="body">
   <div
     v-if="modelValue"
     class="drawer-root"
     role="dialog"
     aria-modal="true"
     aria-labelledby="chart-edit-drawer-title"
-    @keydown.esc="close"
+    data-ia-chart-edit="1"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button
@@ -435,7 +438,7 @@
               <h3
                 class="style-section"
                 id="style-title"
-                tabindex="-1"
+                :tabindex="styleSectionHeadingTabIndex()"
                 data-style-section="1"
                 @keydown="onStyleSectionHeadingKey"
               >
@@ -482,7 +485,7 @@
               <h3
                 class="style-section"
                 id="style-layout"
-                tabindex="-1"
+                :tabindex="styleSectionHeadingTabIndex()"
                 data-style-section="1"
                 @keydown="onStyleSectionHeadingKey"
               >
@@ -660,7 +663,7 @@
               <h3
                 class="style-section"
                 id="style-series"
-                tabindex="-1"
+                :tabindex="styleSectionHeadingTabIndex()"
                 data-style-section="1"
                 @keydown="onStyleSectionHeadingKey"
               >
@@ -723,7 +726,7 @@
               <h3
                 class="style-section"
                 id="style-axes"
-                tabindex="-1"
+                :tabindex="styleSectionHeadingTabIndex()"
                 data-style-section="1"
                 @keydown="onStyleSectionHeadingKey"
               >
@@ -842,6 +845,7 @@
       </div>
     </aside>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -879,6 +883,7 @@ import { nextDrawerTab, type DrawerTab } from '@/modules/chart/drawerA11y'
 import {
   STYLE_SECTION_IDS,
   nextStyleSection,
+  styleSectionHeadingTabIndex,
   styleSectionNavLabel,
   type StyleSectionId,
 } from '@/modules/chart/styleSectionNav'
@@ -891,7 +896,9 @@ import {
   parseOptionalNumber,
 } from '@/modules/chart/nativeNumber'
 import { toast } from '@/shared/ui/feedback'
+import { scheduleFitRuntimeWarm } from '@/modules/chart/editDrawerChunk'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 
 const props = defineProps<{
   modelValue: boolean
@@ -1252,6 +1259,11 @@ function focusables(): HTMLElement[] {
   )
 }
 
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
+}
+
 function close() {
   emit('update:modelValue', false)
 }
@@ -1267,6 +1279,8 @@ function openDrawer() {
   restoreFocus = captureFocusEl()
   document.body.style.overflow = 'hidden'
   numberStatus.value = ''
+  // Warm fitEngine after drawer is open so MODEL / fit paths stay snappy (R35).
+  scheduleFitRuntimeWarm()
   void nextTick(() => {
     const list = focusables()
     const closeBtn = list.find((el) => el.classList.contains('icon-close'))

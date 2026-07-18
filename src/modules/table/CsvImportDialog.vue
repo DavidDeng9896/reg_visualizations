@@ -1,11 +1,14 @@
 <template>
+  <!-- Teleport to body so dialog is outside #workspace-main (Round 36). -->
+  <Teleport to="body">
   <div
     v-if="modelValue"
     class="dialog-root"
     role="dialog"
     aria-modal="true"
     aria-labelledby="csv-dialog-title"
-    @keydown.esc="close"
+    data-ia-csv="1"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
@@ -83,6 +86,7 @@
       </footer>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -91,6 +95,9 @@ import Papa from 'papaparse'
 import { toast } from '@/shared/ui/feedback'
 import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { fileSelectedStatus, isCsvFileName } from '@/shared/ui/uploadStatus'
+import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { flowchartEmptyCsvFocusFallback } from '@/modules/flowchart/flowchartEmpty'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { buildColumnsFromRows, withRowIds } from '@/shared/utils/schema'
 import { uid } from '@/shared/utils/id'
@@ -117,33 +124,44 @@ const fileStatus = computed(() => fileSelectedStatus(fileName.value))
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
+function restoreFocusToTrigger() {
+  // Prefer captured opener (flowchart empty CTA / Add data); else empty landmark.
+  restoreFocusEl(restoreFocus, () => flowchartEmptyCsvFocusFallback())
+  restoreFocus = null
+}
+
+function openDialog() {
+  restoreFocus = captureFocusEl()
+  document.body.style.overflow = 'hidden'
+  void nextTick(() => {
+    const list = focusables()
+    const closeBtn = list.find((el) => el.classList.contains('icon-close'))
+    ;(closeBtn || list[0])?.focus()
+  })
+}
+
+function closeDialog() {
+  document.body.style.overflow = ''
+  resetForm()
+  restoreFocusToTrigger()
+}
+
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) {
-      restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
-      void nextTick(() => focusables()[0]?.focus())
-    } else {
-      document.body.style.overflow = ''
-      resetForm()
-      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
-      restoreFocus = null
-    }
+    if (open) openDialog()
+    else closeDialog()
   },
 )
 
 onMounted(() => {
-  if (props.modelValue) {
-    restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    document.body.style.overflow = 'hidden'
-    void nextTick(() => focusables()[0]?.focus())
-  }
+  if (props.modelValue) openDialog()
 })
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+  restoreFocusEl(restoreFocus)
+  restoreFocus = null
 })
 
 function resetForm() {
@@ -161,7 +179,10 @@ function focusables(): HTMLElement[] {
   const root = panelRef.value
   if (!root) return []
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+    (el) =>
+      !el.hasAttribute('disabled') &&
+      el.getAttribute('aria-hidden') !== 'true' &&
+      el.offsetParent !== null,
   )
 }
 
@@ -181,6 +202,11 @@ function onTrapKeydown(e: KeyboardEvent) {
     e.preventDefault()
     first.focus()
   }
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function close() {
