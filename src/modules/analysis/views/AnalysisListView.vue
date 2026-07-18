@@ -11,7 +11,15 @@
         <button type="button" class="btn" :disabled="demoBusy" @click="createDemo">
           {{ demoBusy ? '创建中…' : '一键 Demo（含示例数据）' }}
         </button>
-        <button type="button" class="btn btn-primary" @click="showCreate = true">+ 创建 Analysis</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          @pointerenter="warmCreateOnce"
+          @focus="warmCreateOnce"
+          @click="openCreate"
+        >
+          + 创建 Analysis
+        </button>
       </div>
     </header>
 
@@ -83,7 +91,9 @@
           type="button"
           class="btn btn-primary empty-cta"
           :aria-label="listEmptyCtaAria('create')"
-          @click="showCreate = true"
+          @pointerenter="warmCreateOnce"
+          @focus="warmCreateOnce"
+          @click="openCreate"
         >
           + 创建 Analysis
         </button>
@@ -91,7 +101,12 @@
     </div>
     </div>
 
-    <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
+    <CreateAnalysisDialog
+      v-if="showCreate"
+      v-model="showCreate"
+      :restore-target="createRestoreFocus"
+      @create="onCreate"
+    />
   </div>
 </template>
 
@@ -111,6 +126,7 @@ import {
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 import { scheduleWorkspaceRoutePrefetch } from '@/shared/ui/routePrefetch'
+import { scheduleCreateAnalysisWarm } from '@/modules/analysis/createAnalysisChunk'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -122,6 +138,8 @@ const showCreate = ref(false)
 const projectFilter = ref('')
 const demoBusy = ref(false)
 const listReady = ref(false)
+const createRestoreFocus = ref<HTMLElement | null>(null)
+let createWarmed = false
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
@@ -131,7 +149,10 @@ const skipHref = computed(() =>
   listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
 )
 
-watch(showCreate, (open) => setToastHostExternalInert(open), { immediate: true })
+watch(showCreate, (open) => {
+  setToastHostExternalInert(open)
+  if (!open) createRestoreFocus.value = null
+}, { immediate: true })
 
 onUnmounted(() => {
   setToastHostExternalInert(false)
@@ -151,8 +172,23 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleString()
 }
 
+/** Round 38: warm Create chunk on first Create trigger interaction (not at listReady). */
+function warmCreateOnce() {
+  if (createWarmed) return
+  createWarmed = true
+  scheduleCreateAnalysisWarm()
+}
+
+function openCreate(ev: Event) {
+  warmCreateOnce()
+  const target = ev.currentTarget
+  createRestoreFocus.value = target instanceof HTMLElement ? target : null
+  showCreate.value = true
+}
+
 async function onCreate(payload: { name: string; projectId: string }) {
   const a = await store.createAnalysis(payload.name, payload.projectId)
+  createRestoreFocus.value = null
   showCreate.value = false
   toast('success', '已创建')
   router.push(`/analyses/${a.id}`)

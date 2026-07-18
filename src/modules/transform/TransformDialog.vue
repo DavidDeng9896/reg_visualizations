@@ -371,6 +371,10 @@ function save() {
   color: #1f2329;
   background: #f2f3f5;
 }
+.icon-close:focus-visible {
+  outline: 2px solid var(--ia-accent, #2f6fed);
+  outline-offset: 2px;
+}
 .dialog-body {
   padding: 8px 18px 12px;
   overflow: auto;
@@ -433,6 +437,10 @@ function save() {
   color: #1f2329;
   cursor: pointer;
   font-size: 13px;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent, #2f6fed);
+  outline-offset: 2px;
 }
 .btn:hover {
   border-color: #3370ff;
