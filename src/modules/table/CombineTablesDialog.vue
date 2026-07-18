@@ -112,7 +112,7 @@ import { toast } from '@/shared/ui/feedback'
 import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { multiSelectCountStatus } from '@/shared/ui/selectStatus'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
-import { flowchartEmptyCombineFocusFallback } from '@/modules/flowchart/flowchartEmpty'
+import { applyCombineCancelFocus } from '@/modules/table/combineCancelToast'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { combineTables } from '@/modules/table/join'
@@ -156,8 +156,9 @@ const canAdd = computed(() => {
 watch([leftId, rightId, joinType, leftKeys, rightKeys], rebuild, { deep: true })
 
 function restoreFocusToTrigger() {
-  // Round 52: visible ring for workspace/flowchart empty CTA × toast.
-  restoreFocusEl(restoreFocus, () => flowchartEmptyCombineFocusFallback(), { visibleRing: true })
+  // Round 52–53: visible ring for workspace/flowchart empty CTA × toast;
+  // Combine Cancel × toast coexistence via applyCombineCancelFocus.
+  applyCombineCancelFocus(restoreFocus)
   restoreFocus = null
 }
 

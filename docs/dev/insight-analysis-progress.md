@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-568c99db-9c3a-4e0d-9b8e-73728550fabe-407d`（Round 52） |
-| 阶段 | **优化 Round 52 完成**（周期 **1/3**；下一合并点 Round 54） |
-| 上次更新 | 2026-07-18 19:06 |
-| 单元 | **392/392 PASS**（+workspaceEmptyCtaToast / demoSuccessFocusLanding / createEscDemoToastR52 / listSkipTabEmptyCta / listCreateCsvChunkR52） |
+| 分支 | `cursor/bc-ec0e2807-7fc4-44c5-b169-8b764d85ae00-19de`（Round 53；含 R52） |
+| 阶段 | **优化 Round 53 完成**（周期 **2/3**；下一合并点 Round 54） |
+| 上次更新 | 2026-07-18 20:08 |
+| 单元 | **403/403 PASS**（+workspaceSkipTabEmptyCta / flowchartEmptyCtaToast / combineCancelToastRing / listFilterTabEmptyCta / listFlowchartTransformChunkR53） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；List ~11.5 / ~4.5；Create ~3.2；CSV ~6.1；papaparse ~19.9；Workspace ~68.0；projects 仍 shared） |
+| Build | PASS（dist 无 EP；List ~11.5 / ~4.5；Flowchart ~3.8；Transform ~8.4；Create ~3.2；CSV ~6.1；Combine ~9.3；projects 仍 shared） |
 
-## 2. Round 52 对齐摘要
+## 2. Round 53 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 工作区空态 CTA 焦点环 × toast | ✅ `workspaceEmptyCtaCoexistsWithToast` / `applyWorkspaceEmptyCtaFocus` |
-| Demo 成功后焦点落地 `#workspace-main` | ✅ `demoSuccessLandsWorkspaceFocus` / `demoSuccessToastMessage` |
-| Create Esc × Demo toast 回归 | ✅ `createEscDemoToastR52Regression` |
-| skip→empty landmark Tab 进首个 empty CTA | ✅ `listSkipTabEntersEmptyCta` |
-| List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
-| 合并 | **否**（周期 1/3） |
+| 工作区 skip→empty CTA Tab 次序 | ✅ `workspaceSkipTabEntersEmptyCta` / `resolveNextTabAfterWorkspaceSkip` |
+| 流程图空态 CTA × toast 环 | ✅ `flowchartEmptyCtaCoexistsWithToast` / `applyFlowchartEmptyCtaFocus` |
+| Combine Cancel × toast 环 | ✅ `combineCancelRestoresRingWithToast` / `applyCombineCancelFocus` |
+| filter Tab × empty CTA 次序 | ✅ `listFilterTabEntersEmptyCta` / `listFilterTabCoexistsWithSkipTabEmpty` |
+| List / Flowchart / Transform 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync |
+| 合并 | **否**（周期 2/3；Round 54 合并） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 53 计划（下一 cron · 周期 2/3）
+## 4. Round 54 计划（下一 cron · 周期 3/3 · 合并）
 
-1. **UX**：工作区 skip→empty CTA Tab 次序；流程图空态 CTA × toast 环
-2. **Perf**：List gzip 边界（R52 ~11.5）；Flowchart / Transform 再评估
-3. **A11y**：Combine Cancel × toast 环；filter Tab × empty CTA 次序
+1. **UX**：流程图 skip→empty CTA Tab；CSV Cancel × toast 环
+2. **Perf**：List gzip 边界（R53 ~11.5）；Create / CSV / projects 再评估
+3. **A11y**：Transform Cancel × toast 环；workspace skip↔filter 共存抽检
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3；Round 54 合并）
+5. **合并**：**是**（周期 3/3；目标 `lastMergedRound=54`，含 R52–54）

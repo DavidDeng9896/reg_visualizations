@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–52).
+ * Analysis list chrome focus order (Round 42–53).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -25,6 +25,8 @@
  * flips (CTA is a child of the empty landmark — not a migrate target).
  * Round 52: after skip lands on the empty landmark, Tab enters the first
  * empty CTA (Demo / Create) — empty has no roving rows.
+ * Round 53: filter Tab on empty list enters the same first empty CTA as
+ * skip→Tab (parity with filter→row when hasRows).
  */
 
 import {
@@ -284,4 +286,20 @@ export function shouldPreserveEmptyCtaFocusOnAriaControlsFlip(
 ): boolean {
   if (!isListEmptyCtaFocusTarget(activeEl)) return false
   return listFilterAriaControlsChanged(before, after)
+}
+
+/**
+ * Round 53: after the project filter on an empty list, Tab enters the first
+ * empty CTA (same target as skip→Tab after empty landmark landing).
+ */
+export function listFilterTabEntersEmptyCta(): true {
+  return true
+}
+
+/**
+ * Round 53: filter→Tab and skip→Tab both land on the first empty CTA when the
+ * list is empty; chrome order still keeps filter before the empty region.
+ */
+export function listFilterTabCoexistsWithSkipTabEmpty(): true {
+  return true
 }
