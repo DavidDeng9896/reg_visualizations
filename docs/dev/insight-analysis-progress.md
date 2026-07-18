@@ -9,25 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-5870e4d3-15f2-4ed3-8877-eb86705ac882-1f46`（Round 32；含 R25–31 基线） |
-| 阶段 | **优化 Round 32 完成**（周期 **2/3**） |
-| 上次更新 | 2026-07-17 23:10 |
-| 单元 | **175/175 PASS**（+match live / reveal / overlay / feedback subscribe / tableChart chunk） |
+| 分支 | `cursor/bc-2c9e87b7-1166-4474-afd8-b65cd5fdbb7f-99ee`（Round 33；含 R25–32 基线） |
+| 阶段 | **优化 Round 33 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=33`） |
+| 上次更新 | 2026-07-18 00:10 |
+| 单元 | **190/190 PASS**（+STYLE nav / focusRestore / toast overlay / routePrefetch / chartEdit overlay） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~66.8 / ~24.2；ChartEditDrawer ~34.9；STYLE/workspace/table sync 仍 defer） |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.0 / ~24.3；ChartEditDrawer ~36.2；projects feedback 仍 js-shared） |
 
-## 2. Round 32 对齐摘要
+## 2. Round 33 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| 侧栏搜索有匹配时 count live（去重） | ✅ Round 32 |
-| 无匹配 → 清除后 search focus + scrollIntoView | ✅ |
-| CSV / Combine / Transform 打开时侧栏 chrome `inert` | ✅ `workspaceOverlay` |
-| confirm/prompt 打开时侧栏 chrome `inert` | ✅ `onFeedbackDialogOpenChange` |
-| ChartEditDrawer STYLE / workspace / TableChartWorkspace 拆分 | ✅ 仍 defer（文档化） |
-| 合并 | **否**（周期 2/3；下一合并点 Round 33） |
+| ChartEditDrawer 打开 → 主区 surface / 顶栏 / 侧栏 chrome inert | ✅ `chartEdit` + `ws-surface` + `shellBehindOverlay` |
+| STYLE 分区键盘跳转（Title/Layout/Series/Axes） | ✅ `styleSectionNav` + jump nav |
+| CSV/Combine/Transform/ChartEdit → toast host inert | ✅ `setToastHostExternalInert` |
+| dialog 焦点恢复统一 | ✅ `focusRestore`（feedback + ChartEditDrawer） |
+| projects/feedback 边界再评估 | ✅ 仍 defer；`css-decoupled-js-shared` |
+| 冷启动路由预取 | ✅ `scheduleRoutePrefetch` |
+| 合并 | **是**（周期 3/3；R25–33 → main） |
 
 ## 3. 验证命令
 
@@ -37,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 33 计划（下一周期 3/3 · 合并）
+## 4. Round 34 计划（下一周期 1/3）
 
-1. **UX**：ChartEditDrawer 打开时主区/侧栏 inert 对齐；STYLE 分区键盘可达性回归
-2. **Perf**：projects chunk 再拆 feedback 边界评估；冷启动路由预取
-3. **A11y**：Transform/CSV 打开时 toast host inert（与 confirm 对齐）；dialog 焦点恢复统一
+1. **UX**：ChartEditDrawer Teleport 到 body（彻底脱离主区 DOM）；STYLE jump 与 Tab 顺序回归
+2. **Perf**：EditDrawer 分包评估（fitEngine / series 色板）；列表页预取是否过早拉 workspace
+3. **A11y**：流程图模式下 overlay inert 覆盖；skip-link 在 drawer 打开时隐藏
 4. **验证**：unit + e2e:ui + build
-5. **合并**：是 → 目标 `lastMergedRound=33`（含 R25–33；关闭/更新 PR #30）
+5. **合并**：否（周期 1/3）
