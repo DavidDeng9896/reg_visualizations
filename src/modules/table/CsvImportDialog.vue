@@ -248,11 +248,11 @@ function parseFile(file: File) {
   }
   fileName.value = file.name
   tableName.value = file.name.replace(/\.csv$/i, '')
-  void loadPapa().then(({ default: Papa }) => {
+  void loadPapa().then((Papa) => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (res) => {
+      complete: (res: { data: unknown[]; errors?: { message: string }[] }) => {
         if (res.errors?.length) {
           toast('error', 'CSV 解析失败：' + res.errors[0].message)
           rows.value = []
