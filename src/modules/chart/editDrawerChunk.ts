@@ -1,5 +1,5 @@
 /**
- * ChartEditDrawer code-split + warm-up evaluation (Round 34–35).
+ * ChartEditDrawer code-split + warm-up evaluation (Round 34–55).
  *
  * Candidates considered:
  * - `fitEngine`: already consumed by chart runtime / ChartPanel path, not by
@@ -17,6 +17,9 @@
  * (`defineAsyncComponent` in TableChartWorkspace). STYLE stays sync-vif
  * (see stylePanelChunk). Keep this deferral until a draft-binding or
  * palette/runtime split is designed.
+ *
+ * Round 55: Cancel×toast restore helpers are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -32,6 +35,24 @@ export function editDrawerFitEngineSplitMode(): EditDrawerChunkDecision {
 
 export function editDrawerPaletteSplitMode(): EditDrawerChunkDecision {
   return EDIT_DRAWER_PALETTE_SPLIT_DEFERRED ? 'deferred-sync' : 'async-chunk'
+}
+
+export type EditDrawerChunkStrategy = {
+  fitEngine: EditDrawerChunkDecision
+  palette: EditDrawerChunkDecision
+  warmOnOpen: true
+  round35Reeval: 'keep-deferred-sync'
+  round55Reeval: 'keep-deferred-sync'
+}
+
+export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
+  return {
+    fitEngine: editDrawerFitEngineSplitMode(),
+    palette: editDrawerPaletteSplitMode(),
+    warmOnOpen: true,
+    round35Reeval: 'keep-deferred-sync',
+    round55Reeval: 'keep-deferred-sync',
+  }
 }
 
 type FitImport = () => Promise<unknown>

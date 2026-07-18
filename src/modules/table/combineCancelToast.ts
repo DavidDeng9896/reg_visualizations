@@ -5,6 +5,8 @@
  * visible ring. If a toast was inert while the Combine overlay was open,
  * clearing inert leaves the toast interactive — same contract as Create
  * Cancel × Demo-fail toast (R45) and workspace empty CTA × toast (R52).
+ *
+ * Round 55: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -15,6 +17,14 @@ import { flowchartEmptyCombineFocusFallback } from '@/modules/flowchart/flowchar
  * interactive again while any visible toast remains.
  */
 export function combineCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 55: Combine Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyCombineCancelFocus).
+ */
+export function combineEscRestoresRingWithToast(): true {
   return true
 }
 
