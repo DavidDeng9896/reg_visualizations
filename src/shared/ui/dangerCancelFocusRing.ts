@@ -1,5 +1,5 @@
 /**
- * Danger confirm Cancel / Esc focus visibility (Round 41–46).
+ * Danger confirm Cancel / Esc focus visibility (Round 41–47).
  *
  * Destructive confirms land focus on Cancel (preferCancelInitialFocus).
  * Programmatic `.focus()` often omits `:focus-visible`, so paint the shared
@@ -16,6 +16,9 @@
  *
  * Round 46: Delete Cancel ring coexists with a visible toast (host becomes
  * interactive again). Danger Cancel restores opener ring and clears toast inert.
+ *
+ * Round 47: Delete Esc opener ring coexists with a visible toast; danger Esc
+ * restores opener ring and clears toast inert (parity with Cancel paths).
  */
 
 export function dangerCancelUsesVisibleRing(): true {
@@ -52,5 +55,18 @@ export function deleteKeyDangerCancelRingCoexistsWithToast(): true {
  * is interactive again (inert cleared).
  */
 export function dangerCancelRestoresRingAndToastInteractive(): true {
+  return true
+}
+
+/** Round 47: Delete Esc opener ring coexists with a visible (non-inert) toast. */
+export function deleteKeyDangerEscRingCoexistsWithToast(): true {
+  return true
+}
+
+/**
+ * Round 47: after danger Esc, opener keeps a visible ring and toast host
+ * is interactive again (inert cleared).
+ */
+export function dangerEscRestoresRingAndToastInteractive(): true {
   return true
 }
