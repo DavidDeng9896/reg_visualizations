@@ -1,5 +1,5 @@
 /**
- * TableChartWorkspace mount strategy (Round 32–45 assessment).
+ * TableChartWorkspace mount strategy (Round 32–46 assessment).
  *
  * Stays sync inside AnalysisWorkspaceView: it owns the toolbar, grid, chart
  * panel, and Transform dialog entry. Async-splitting it (or peeling toolbar
@@ -7,7 +7,7 @@
  * cold-shell risk as `workspaceViewChunk`). Transform dialog itself remains
  * `defineAsyncComponent`; Round 36 adds pipeline idle-warm on open.
  *
- * Round 42–45: toolbar chunk still deferred — no clean async boundary without
+ * Round 42–46: toolbar chunk still deferred — no clean async boundary without
  * cold-shell flash; keep sync with table/chart.
  */
 
@@ -21,6 +21,7 @@ export type TableChartWorkspaceChunkStrategy = {
   round42Reeval: 'keep-sync'
   round44Reeval: 'keep-sync'
   round45Reeval: 'keep-sync'
+  round46Reeval: 'keep-sync'
 }
 
 export function tableChartWorkspaceMountMode(): TableChartWorkspaceMountMode {
@@ -34,5 +35,6 @@ export function tableChartWorkspaceChunkStrategy(): TableChartWorkspaceChunkStra
     round42Reeval: 'keep-sync',
     round44Reeval: 'keep-sync',
     round45Reeval: 'keep-sync',
+    round46Reeval: 'keep-sync',
   }
 }
