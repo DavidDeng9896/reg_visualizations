@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   STYLE_SECTION_IDS,
   nextStyleSection,
+  styleJumpNavPrecedesSections,
+  styleSectionHeadingTabIndex,
   styleSectionNavLabel,
 } from '@/modules/chart/styleSectionNav'
 
@@ -39,5 +41,10 @@ describe('styleSectionNav', () => {
     expect(styleSectionNavLabel('style-layout')).toBe('Layout')
     expect(styleSectionNavLabel('style-series')).toBe('Series')
     expect(styleSectionNavLabel('style-axes')).toBe('Axes')
+  })
+
+  it('keeps STYLE headings out of sequential Tab order (Round 34)', () => {
+    expect(styleSectionHeadingTabIndex()).toBe(-1)
+    expect(styleJumpNavPrecedesSections()).toBe(true)
   })
 })
