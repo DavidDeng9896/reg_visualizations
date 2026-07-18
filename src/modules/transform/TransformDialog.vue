@@ -149,6 +149,7 @@ import { uid } from '@/shared/utils/id'
 import { runPipeline } from '@/modules/transform/pipeline'
 import { cloneDeep } from '@/shared/utils/clone'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { applyTransformCancelFocus } from '@/modules/transform/transformCancelToast'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { schedulePipelineWarm } from '@/modules/transform/transformChunk'
 
@@ -179,9 +180,8 @@ watch(
 )
 
 function restoreFocusToTrigger() {
-  restoreFocusEl(restoreFocus, () =>
-    document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null,
-  )
+  // Round 54: visible ring × toast coexistence via applyTransformCancelFocus.
+  applyTransformCancelFocus(restoreFocus)
   restoreFocus = null
 }
 

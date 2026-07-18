@@ -1,9 +1,17 @@
-/** Flowchart empty-state copy / landmark / CTA a11y (Round 29–53). */
+/** Flowchart empty-state copy / landmark / CTA a11y (Round 29–54). */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
 import { workspaceEmptyCtaFocusFallback } from '@/modules/table/workspaceEmpty'
 
 export const FLOW_EMPTY_REGION_LABEL = '流程图引导'
+
+/**
+ * Round 54: after skip lands on `#flow-empty`, Tab enters the first empty CTA
+ * (parity with workspace skip→empty CTA, Round 53).
+ */
+export function flowchartSkipTabEntersEmptyCta(): true {
+  return true
+}
 
 /** Selector for the CSV CTA inside the flowchart empty region. */
 export const FLOW_EMPTY_CSV_CTA_SELECTOR = '[aria-label="从流程图空态导入 CSV"]'

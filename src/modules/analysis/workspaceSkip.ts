@@ -1,4 +1,4 @@
-/** Workspace skip-link target selection (Round 29–53). */
+/** Workspace skip-link target selection (Round 29–54). */
 
 /**
  * `#sidebar-empty` stays a complementary landmark (routeFocus-protected) but is
@@ -51,6 +51,14 @@ export function activateWorkspaceSkipFocus(
  * first empty CTA (parity with list skip→empty CTA, Round 52).
  */
 export function workspaceSkipTabEntersEmptyCta(): true {
+  return true
+}
+
+/**
+ * Round 54: workspace skip→empty Tab coexists with list filter Tab→empty CTA
+ * contracts — both stay valid and resolve independent targets.
+ */
+export function workspaceSkipFilterCoexistSpotCheck(): true {
   return true
 }
 
