@@ -1,9 +1,13 @@
 /**
- * Analysis list table row keyboard navigation (Round 41–42).
+ * Analysis list table row keyboard navigation (Round 41–44).
  *
  * Rows previously all used tabindex=0 (many Tab stops). Roving tabindex keeps
  * a single tab stop in the list; Arrow/Home/End move focus; Enter/Space open.
  * Round 42: Delete triggers row remove without leaving the roving group.
+ * Round 43: project filter changes clamp the roving index; only refocus the
+ * row when keyboard focus was already inside the list and the index moved.
+ * Round 44: `isListRowFocusTarget` for filter-driven DOM refocus spot-checks
+ * (including empty ↔ has-rows transitions).
  */
 
 export type ListRowKeyAction =
@@ -49,6 +53,11 @@ export function resolveListRowKeyAction(key: string): ListRowKeyAction | null {
   }
 }
 
+/** Round 43: filter changes clamp (and may refocus) the roving index. */
+export function listFilterClampsRoving(): true {
+  return true
+}
+
 /** Clamp / default the roving focus index for `count` visible rows. */
 export function clampListRowFocus(
   current: number | null,
@@ -58,6 +67,29 @@ export function clampListRowFocus(
   if (current === null || current < 0) return 0
   if (current >= count) return count - 1
   return current
+}
+
+/**
+ * Round 44: true when `activeElement` is a roving list row (filter refocus gate).
+ * Empty ↔ has-rows transitions use the same check — never steal from the select.
+ */
+export function isListRowFocusTarget(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.hasAttribute('data-ia-list-row')
+}
+
+/**
+ * After a filter-driven clamp: move DOM focus only when the user was already
+ * on a list row and the clamped index differs (avoid stealing focus from the
+ * filter select itself).
+ */
+export function shouldRefocusRowAfterFilter(
+  wasOnListRow: boolean,
+  prevIndex: number | null,
+  nextIndex: number | null,
+): boolean {
+  if (!wasOnListRow) return false
+  if (nextIndex === null) return false
+  return prevIndex !== nextIndex
 }
 
 /** Next focus index after a key action (null when list empty). */

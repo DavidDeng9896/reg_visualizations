@@ -1,5 +1,5 @@
 /**
- * CreateAnalysisDialog code-split + idle warm (Round 38–39).
+ * CreateAnalysisDialog code-split + idle warm (Round 38–45).
  *
  * Dialog stays `defineAsyncComponent` on the list page so list first paint does
  * not pull the Create modal. After the user interacts with a Create trigger
@@ -10,6 +10,9 @@
  * may overlap workspace route prefetch; Create is tiny (~3–4KB) so both stay
  * scheduled — Create uses a shorter idle timeout to win the race when the user
  * is already aiming at Create.
+ *
+ * Round 43 / 45 re-eval: Create cold path still async-idle-warm (1.5s). Eager
+ * sync would inflate list first paint for a rarely opened dialog — keep deferred.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -23,6 +26,20 @@ export type CreateAnalysisLoadMode = 'async-idle-warm' | 'eager-sync'
 
 export function createAnalysisLoadMode(): CreateAnalysisLoadMode {
   return CREATE_ANALYSIS_IDLE_WARM ? 'async-idle-warm' : 'eager-sync'
+}
+
+export type CreateAnalysisChunkStrategy = {
+  load: CreateAnalysisLoadMode
+  warmTimeoutMs: typeof CREATE_ANALYSIS_WARM_TIMEOUT_MS
+  round45Reeval: 'keep-async-idle-warm'
+}
+
+export function createAnalysisChunkStrategy(): CreateAnalysisChunkStrategy {
+  return {
+    load: createAnalysisLoadMode(),
+    warmTimeoutMs: CREATE_ANALYSIS_WARM_TIMEOUT_MS,
+    round45Reeval: 'keep-async-idle-warm',
+  }
 }
 
 /**

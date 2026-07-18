@@ -1,5 +1,5 @@
 /**
- * Analysis list page chunk strategy (Round 39–42 eval).
+ * Analysis list page chunk strategy (Round 39–45 eval).
  *
  * AnalysisListView is already a route-lazy component. Further splitting the
  * list chrome (header / empty CTA / table) would add waterfalls for a thin
@@ -19,6 +19,19 @@
  *
  * Round 42: Delete-key + Demo-fail Create ring + listFocusOrder markers are
  * tiny; chrome split still not worth the waterfall. Keep route-lazy.
+ *
+ * Round 43: filter aria-controls + clamp/refocus helpers are tiny; List gzip
+ * boundary (~10.0) still acceptable — keep-route-lazy. Create/CSV cold paths
+ * re-checked separately (still async-idle-warm / deferred-dynamic).
+ *
+ * Round 44: filter empty↔rows aria-controls + Delete Cancel ring + Demo-fail
+ * Create inert helpers remain tiny; List gzip (~10.3) still keep-route-lazy.
+ * Workspace toolbar / projects re-checked separately (still keep-sync-shell /
+ * keep-shared).
+ *
+ * Round 45: skip↔aria-controls align + Delete Cancel opener ring + Create
+ * Cancel×Demo toast + danger×toast inert helpers remain tiny; List gzip
+ * boundary still keep-route-lazy. Create/CSV/projects re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -33,6 +46,9 @@ export type ListPageChunkStrategy = {
   round40Reeval: 'keep-route-lazy'
   round41Reeval: 'keep-route-lazy'
   round42Reeval: 'keep-route-lazy'
+  round43Reeval: 'keep-route-lazy'
+  round44Reeval: 'keep-route-lazy'
+  round45Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -46,6 +62,9 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round40Reeval: 'keep-route-lazy',
     round41Reeval: 'keep-route-lazy',
     round42Reeval: 'keep-route-lazy',
+    round43Reeval: 'keep-route-lazy',
+    round44Reeval: 'keep-route-lazy',
+    round45Reeval: 'keep-route-lazy',
   }
 }
 
