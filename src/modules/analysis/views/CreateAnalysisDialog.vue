@@ -1,16 +1,19 @@
 <template>
+  <!-- Teleport to body so dialog is outside list page chrome (Round 37). -->
+  <Teleport to="body">
   <div
     class="dialog-root"
     role="dialog"
     aria-modal="true"
     aria-labelledby="create-analysis-title"
-    @keydown.esc="close"
+    data-ia-create="1"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
     <div class="dialog-panel" ref="panelRef">
       <header class="dialog-header">
-        <h2 id="create-analysis-title">创建 Analysis</h2>
+        <h2 id="create-analysis-title">Create Analysis</h2>
         <button type="button" class="icon-close" aria-label="关闭" @click="close">×</button>
       </header>
       <form class="dialog-body" @submit.prevent="submit">
@@ -34,16 +37,18 @@
         </label>
         <footer class="dialog-footer">
           <button type="button" class="btn" @click="close">取消</button>
-          <button type="submit" class="btn btn-primary" :disabled="!canSubmit">创建</button>
+          <button type="submit" class="btn btn-primary" :disabled="!canSubmit">Create</button>
         </footer>
       </form>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MOCK_PROJECTS } from '@/shared/mock/projects'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -107,6 +112,11 @@ function onTrapKeydown(e: KeyboardEvent) {
     e.preventDefault()
     first.focus()
   }
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function close() {
@@ -174,6 +184,10 @@ function submit() {
   color: #1f2329;
   background: #f2f3f5;
 }
+.icon-close:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
 .dialog-body {
   display: flex;
   flex-direction: column;
@@ -227,6 +241,10 @@ function submit() {
 .btn:hover {
   border-color: var(--ia-accent);
   color: var(--ia-accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
 }
 .btn:disabled {
   opacity: 0.5;

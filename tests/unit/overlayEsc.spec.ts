@@ -3,7 +3,7 @@ import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { preferCancelInitialFocus } from '@/shared/ui/feedbackA11y'
 
-describe('overlayEsc (Round 36)', () => {
+describe('overlayEsc (Round 36–37)', () => {
   afterEach(() => {
     document.querySelectorAll('[data-ia-feedback]').forEach((el) => el.remove())
   })
@@ -24,6 +24,25 @@ describe('overlayEsc (Round 36)', () => {
     expect(preferCancelInitialFocus(dangerDeleteOptions('删除'))).toBe(true)
 
     root.remove()
+    expect(workspaceOverlayEscAllowed()).toBe(true)
+  })
+
+  it('blocks Esc on New view / Create while danger confirm owns the layer (Round 37)', () => {
+    const newView = document.createElement('div')
+    newView.setAttribute('data-ia-new-view', '1')
+    document.body.appendChild(newView)
+
+    expect(workspaceOverlayEscAllowed()).toBe(true)
+
+    const root = document.createElement('div')
+    root.setAttribute('data-ia-feedback', 'confirm')
+    root.setAttribute('data-ia-danger', '1')
+    document.body.appendChild(root)
+
+    expect(workspaceOverlayEscAllowed()).toBe(false)
+
+    root.remove()
+    newView.remove()
     expect(workspaceOverlayEscAllowed()).toBe(true)
   })
 })
