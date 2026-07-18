@@ -31,7 +31,11 @@
     <div class="toolbar">
       <label class="filter">
         <span class="sr-only">按项目筛选</span>
-        <select v-model="projectFilter" aria-label="按项目筛选">
+        <select
+          v-model="projectFilter"
+          aria-label="按项目筛选"
+          data-ia-list-filter
+        >
           <option value="">全部项目</option>
           <option v-for="p in MOCK_PROJECTS" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
@@ -145,7 +149,7 @@ import {
   nextListRowFocus,
   resolveListRowKeyAction,
 } from '@/modules/analysis/listRowNav'
-import { demoFailToastMessage } from '@/modules/analysis/demoFailToastCreate'
+import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
 import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
 
 const CreateAnalysisDialog = defineAsyncComponent(
@@ -256,6 +260,9 @@ async function createDemo() {
     console.error('[createDemo]', err)
     // Round 40: stable copy; toast may coexist with Create (inert via showCreate watch).
     toast('error', demoFailToastMessage())
+    // Round 42: land keyboard focus on Create with a visible ring after failure.
+    await nextTick()
+    applyDemoFailCreateFocus()
   } finally {
     demoBusy.value = false
   }
@@ -283,6 +290,11 @@ function onRowKeydown(
   ev.preventDefault()
   if (action === 'activate') {
     open(row)
+    return
+  }
+  // Round 42: Delete coexists with roving — trigger the same remove path as the button.
+  if (action === 'delete') {
+    void onRemove(row.id)
     return
   }
   const next = nextListRowFocus(action, index, filtered.value.length)

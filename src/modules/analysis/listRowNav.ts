@@ -1,13 +1,25 @@
 /**
- * Analysis list table row keyboard navigation (Round 41).
+ * Analysis list table row keyboard navigation (Round 41–42).
  *
  * Rows previously all used tabindex=0 (many Tab stops). Roving tabindex keeps
  * a single tab stop in the list; Arrow/Home/End move focus; Enter/Space open.
+ * Round 42: Delete triggers row remove without leaving the roving group.
  */
 
-export type ListRowKeyAction = 'next' | 'prev' | 'first' | 'last' | 'activate'
+export type ListRowKeyAction =
+  | 'next'
+  | 'prev'
+  | 'first'
+  | 'last'
+  | 'activate'
+  | 'delete'
 
 export function listRowRovingEnabled(): true {
+  return true
+}
+
+/** Round 42: Delete key coexists with roving (does not leave the row group). */
+export function listRowDeleteKeyEnabled(): true {
   return true
 }
 
@@ -30,6 +42,8 @@ export function resolveListRowKeyAction(key: string): ListRowKeyAction | null {
     case 'Enter':
     case ' ':
       return 'activate'
+    case 'Delete':
+      return 'delete'
     default:
       return null
   }
@@ -52,7 +66,9 @@ export function nextListRowFocus(
   current: number | null,
   count: number,
 ): number | null {
-  if (count <= 0 || action === 'activate') return clampListRowFocus(current, count)
+  if (count <= 0 || action === 'activate' || action === 'delete') {
+    return clampListRowFocus(current, count)
+  }
   const base = clampListRowFocus(current, count)
   if (base === null) return null
   switch (action) {

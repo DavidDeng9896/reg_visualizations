@@ -19,13 +19,14 @@ describe('listRowNav (Round 41)', () => {
     expect(listRowTabIndex(0, 2)).toBe(-1)
   })
 
-  it('maps Arrow/Home/End/Enter for row navigation', () => {
+  it('maps Arrow/Home/End/Enter/Delete for row navigation', () => {
     expect(resolveListRowKeyAction('ArrowDown')).toBe('next')
     expect(resolveListRowKeyAction('ArrowUp')).toBe('prev')
     expect(resolveListRowKeyAction('Home')).toBe('first')
     expect(resolveListRowKeyAction('End')).toBe('last')
     expect(resolveListRowKeyAction('Enter')).toBe('activate')
     expect(resolveListRowKeyAction(' ')).toBe('activate')
+    expect(resolveListRowKeyAction('Delete')).toBe('delete')
     expect(resolveListRowKeyAction('Tab')).toBe(null)
   })
 
@@ -42,5 +43,6 @@ describe('listRowNav (Round 41)', () => {
     expect(nextListRowFocus('first', 2, 3)).toBe(0)
     expect(nextListRowFocus('last', 0, 3)).toBe(2)
     expect(nextListRowFocus('activate', 1, 3)).toBe(1)
+    expect(nextListRowFocus('delete', 1, 3)).toBe(1)
   })
 })

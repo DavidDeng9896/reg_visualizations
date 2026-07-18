@@ -25,6 +25,9 @@
  *
  * Round 41: list row roving + delete toast/focus ring do not unlock a Dexie /
  * feedback split; keep shared entry.
+ *
+ * Round 42: Delete-key / Demo-fail Create ring / list focus-order markers do
+ * not unlock a Dexie split; keep shared entry.
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -42,6 +45,8 @@ export type ProjectsChunkStrategy = {
   round39Reeval: 'keep-shared'
   /** Round 41 re-eval — still keep shared after list roving / delete toast. */
   round41Reeval: 'keep-shared'
+  /** Round 42 re-eval — still keep shared after Delete-key / Demo-fail ring. */
+  round42Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -54,5 +59,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round38Reeval: 'keep-shared',
     round39Reeval: 'keep-shared',
     round41Reeval: 'keep-shared',
+    round42Reeval: 'keep-shared',
   }
 }

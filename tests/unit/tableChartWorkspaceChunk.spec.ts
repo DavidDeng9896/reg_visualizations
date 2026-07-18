@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TABLE_CHART_WORKSPACE_SYNC,
+  tableChartWorkspaceChunkStrategy,
   tableChartWorkspaceMountMode,
 } from '@/modules/table/tableChartWorkspaceChunk'
 
-describe('tableChartWorkspaceChunk', () => {
-  it('keeps TableChartWorkspace sync in the workspace shell (Round 32–36)', () => {
-    expect(TABLE_CHART_WORKSPACE_SYNC).toBe(true)
+describe('tableChartWorkspaceChunk (Round 42)', () => {
+  it('keeps toolbar sync with grid/chart (no async toolbar chunk)', () => {
     expect(tableChartWorkspaceMountMode()).toBe('sync')
+    expect(tableChartWorkspaceChunkStrategy()).toEqual({
+      mount: 'sync',
+      toolbar: 'sync-with-grid-chart',
+      round42Reeval: 'keep-sync',
+    })
   })
 })

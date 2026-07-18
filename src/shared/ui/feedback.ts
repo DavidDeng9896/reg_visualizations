@@ -15,7 +15,10 @@ import {
   type ToastKind,
 } from './feedbackA11y'
 import { captureFocusEl, paintFocusRestoreRing, restoreFocusEl } from './focusRestore'
-import { dangerCancelUsesVisibleRing } from './dangerCancelFocusRing'
+import {
+  dangerCancelUsesVisibleRing,
+  dangerEscRestoresVisibleRing,
+} from './dangerCancelFocusRing'
 // feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
@@ -279,20 +282,25 @@ function openMessageBox(
     notifyFeedbackDialogListeners()
 
     let settled = false
-    const cleanup = () => {
+    const cleanup = (opts?: { visibleRing?: boolean }) => {
       root.removeEventListener('keydown', onKeydown)
       root.remove()
       openBoxCount = Math.max(0, openBoxCount - 1)
       syncToastHostInert()
       notifyFeedbackDialogListeners()
       document.body.style.overflow = prevOverflow
-      restoreFocusEl(restoreFocus)
+      restoreFocusEl(restoreFocus, undefined, opts)
     }
 
     const settleCancel = () => {
       if (settled) return
       settled = true
-      cleanup()
+      // Round 42: danger Esc/Cancel restores opener with a visible ring.
+      cleanup(
+        danger && dangerEscRestoresVisibleRing()
+          ? { visibleRing: true }
+          : undefined,
+      )
       reject(new FeedbackCancelError())
     }
 
