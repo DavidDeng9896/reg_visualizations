@@ -9,27 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-ba896d11-9037-495f-b81c-cbeab86dfa70-7491`（Round 34） |
-| 阶段 | **优化 Round 34 完成**（周期 **1/3**；`lastMergedRound=33`） |
-| 上次更新 | 2026-07-18 01:05 |
-| 单元 | **196/196 PASS**（+mainBehind / skipHide / STYLE tab / editDrawerChunk / prefetch split） |
+| 分支 | `cursor/bc-a9847189-36b4-48f9-9d58-e4661d4a57ff-3210`（Round 35；含 R34 基线） |
+| 阶段 | **优化 Round 35 完成**（周期 **2/3**；`lastMergedRound=33`） |
+| 上次更新 | 2026-07-18 02:07 |
+| 单元 | **199/199 PASS**（+transform mainBehind / fit warm / flowchart CSV focus / projects R35） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.2 / ~24.3；ChartEditDrawer ~36.3；projects 仍 js-shared） |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.3 / ~24.4；ChartEditDrawer ~36.8；Transform ~8.0；projects 仍 js-shared） |
 
-## 2. Round 34 对齐摘要
+## 2. Round 35 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEditDrawer Teleport 到 body | ✅ `Teleport to="body"` + `data-ia-chart-edit` |
-| 主区 inert：csv/combine/chartEdit（含流程图） | ✅ `mainBehindWorkspaceOverlay` |
-| Transform 不 inert `#workspace-main` | ✅ 仅 `ws-surface` inert |
-| skip-link 在 overlay 打开时隐藏 | ✅ `skipLinkHiddenBehindOverlay` |
-| STYLE jump / Tab：heading tabindex=-1 | ✅ `styleSectionHeadingTabIndex` |
-| EditDrawer fitEngine/色板分包评估 | ✅ `editDrawerChunk`（仍 deferred） |
-| 冷启动仅预取列表；workspace 延后到列表页 | ✅ `scheduleWorkspaceRoutePrefetch` |
-| 合并 | 否（周期 1/3） |
+| TransformDialog Teleport 到 body | ✅ `Teleport` + `data-ia-transform` |
+| transform 纳入 `mainBehindWorkspaceOverlay` | ✅ 与 csv/combine/chartEdit 统一 |
+| 移除 Transform 对 `ws-surface` inert | ✅ 改由 `#workspace-main` inert |
+| EditDrawer 打开后 idle-warm fitEngine | ✅ `scheduleFitRuntimeWarm` |
+| projects / feedback 边界再评估 | ✅ 仍 `keep-shared`（`round35Feedback`） |
+| 流程图空态 + CSV overlay 焦点 | ✅ `flowchartEmptyCsvFocusFallback` + CSV `focusRestore` |
+| Teleport Esc / 焦点陷阱回归 | ✅ Transform 对齐 ChartEdit 关闭钮优先焦点 |
+| 合并 | 否（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -39,10 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 35 计划（下一周期 2/3）
+## 4. Round 36 计划（下一周期 3/3 · 合并）
 
-1. **UX**：TransformDialog Teleport to body → 可纳入 `mainBehindWorkspaceOverlay`
-2. **Perf**：projects / feedback 边界再评估；EditDrawer 打开后再 warm fit 相关 runtime
-3. **A11y**：流程图空态 + CSV overlay 焦点回归；drawer Teleport 后 Esc/焦点陷阱回归
+1. **UX**：CSV / Combine Teleport to body（与 Transform/ChartEdit 对齐）；dialog 统一 `data-ia-*`
+2. **Perf**：AnalysisWorkspaceView 再拆（toolbar vs table/chart）；或 Transform 打开后再 warm pipeline
+3. **A11y**：Combine overlay 焦点恢复；侧栏 + 全 overlay 键盘回归；danger confirm × transform
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3）
+5. **合并**：是（周期 3/3；目标 `lastMergedRound=36`）
