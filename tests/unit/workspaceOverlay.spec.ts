@@ -25,4 +25,13 @@ describe('workspaceOverlay', () => {
     setWorkspaceDialogOpen('transform', false)
     expect(anyWorkspaceDialogOpen()).toBe(false)
   })
+
+  it('tracks ChartEditDrawer open flag for sidebar/main inert (Round 33)', () => {
+    expect(anyWorkspaceDialogOpen()).toBe(false)
+    setWorkspaceDialogOpen('chartEdit', true)
+    expect(workspaceDialogFlags.chartEdit).toBe(true)
+    expect(anyWorkspaceDialogOpen()).toBe(true)
+    setWorkspaceDialogOpen('chartEdit', false)
+    expect(anyWorkspaceDialogOpen()).toBe(false)
+  })
 })

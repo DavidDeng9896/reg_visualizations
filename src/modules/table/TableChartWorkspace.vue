@@ -1,5 +1,6 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
+    <div class="ws-surface" :inert="showChartEdit || undefined">
     <a class="skip-link" data-ia-skip="1" href="#ws-toolbar">跳到工具栏</a>
     <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1" :class="{ 'is-compact': toolbarCompact }">
       <template v-if="store.selectedView">
@@ -201,6 +202,8 @@
       </div>
     </div>
 
+    </div>
+
     <TransformDialog v-if="showTransforms" v-model="showTransforms" />
     <ChartEditDrawer
       v-model="showChartEdit"
@@ -282,6 +285,7 @@ const dragging = ref(false)
 const layoutHintDismissed = ref(isLayoutHintDismissed())
 
 watch(showTransforms, (open) => setWorkspaceDialogOpen('transform', open))
+watch(showChartEdit, (open) => setWorkspaceDialogOpen('chartEdit', open))
 
 const viewTypeOptions: { value: ViewType; label: string }[] = [
   { value: 'table', label: '表格 table' },
@@ -486,6 +490,7 @@ onUnmounted(() => {
   window.removeEventListener('pointermove', onSplitterMove)
   window.removeEventListener('pointerup', onSplitterUp)
   setWorkspaceDialogOpen('transform', false)
+  setWorkspaceDialogOpen('chartEdit', false)
 })
 
 function onDismissLayoutHint() {

@@ -14,6 +14,7 @@ import {
   type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
+import { captureFocusEl, restoreFocusEl } from './focusRestore'
 // feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
@@ -26,6 +27,8 @@ let toastSeq = 0
 let boxSeq = 0
 let openBoxCount = 0
 let docEscBound = false
+/** Workspace overlays (CSV / Combine / Transform / ChartEdit) also block toast (Round 33). */
+let externalToastInert = false
 
 type FeedbackDialogListener = (open: boolean) => void
 const feedbackDialogListeners = new Set<FeedbackDialogListener>()
@@ -47,6 +50,20 @@ export function onFeedbackDialogOpenChange(fn: FeedbackDialogListener): () => vo
   }
 }
 
+/**
+ * Mark toast host inert while a non-feedback overlay owns the layer (Round 33).
+ * CSV / Combine / Transform / ChartEdit should call this so Esc/Tab cannot
+ * reach toast close buttons behind the modal.
+ */
+export function setToastHostExternalInert(active: boolean): void {
+  externalToastInert = Boolean(active)
+  syncToastHostInert()
+}
+
+function toastLayerBlocked(): boolean {
+  return openBoxCount > 0 || isFeedbackDialogOpen() || externalToastInert
+}
+
 function ensureToastHost(): HTMLElement {
   if (toastHost && document.body.contains(toastHost)) return toastHost
   const host = document.createElement('div')
@@ -62,7 +79,7 @@ function ensureToastHost(): HTMLElement {
 function syncToastHostInert() {
   const host = toastHost
   if (!host) return
-  if (openBoxCount > 0 || isFeedbackDialogOpen()) host.setAttribute('inert', '')
+  if (toastLayerBlocked()) host.setAttribute('inert', '')
   else host.removeAttribute('inert')
 }
 
@@ -70,7 +87,7 @@ function syncToastHostInert() {
 function onDocumentEscape(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
   if (e.defaultPrevented) return
-  if (openBoxCount > 0 || isFeedbackDialogOpen()) return
+  if (toastLayerBlocked()) return
   const host = toastHost && document.body.contains(toastHost) ? toastHost : null
   if (!host?.firstElementChild) return
   e.preventDefault()
@@ -179,8 +196,7 @@ function openMessageBox(
   }
 
   return new Promise((resolve, reject) => {
-    const restoreFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const restoreFocus = captureFocusEl()
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
@@ -269,7 +285,7 @@ function openMessageBox(
       syncToastHostInert()
       notifyFeedbackDialogListeners()
       document.body.style.overflow = prevOverflow
-      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+      restoreFocusEl(restoreFocus)
     }
 
     const settleCancel = () => {

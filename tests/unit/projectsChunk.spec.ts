@@ -7,7 +7,7 @@ describe('projectsChunk', () => {
     expect(projectsChunkStrategy()).toEqual({
       mockProjects: 'sync',
       dexieStore: 'shared-entry',
-      feedback: 'css-decoupled',
+      feedback: 'css-decoupled-js-shared',
       splitDeferred: true,
     })
   })

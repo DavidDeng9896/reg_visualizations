@@ -1,7 +1,7 @@
 <template>
   <div v-if="store.current" class="workspace">
     <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到主内容</a>
-    <header class="header">
+    <header class="header" :inert="shellBehindOverlay || undefined">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
         <span>/</span>
@@ -88,6 +88,7 @@
         :aria-valuemax="MAX_SIDEBAR_WIDTH"
         :aria-valuetext="`侧栏宽度 ${sidebarWidth} 像素`"
         tabindex="0"
+        :inert="shellBehindOverlay || undefined"
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
       />
@@ -135,7 +136,7 @@ import { workspaceSkipHref } from '@/modules/analysis/workspaceSkip'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
-import { toast } from '@/shared/ui/feedback'
+import { setToastHostExternalInert, toast } from '@/shared/ui/feedback'
 import {
   enabledMenuIndices,
   handleMenuKeydown,
@@ -147,7 +148,10 @@ import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
-import { setWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
+import {
+  anyWorkspaceDialogOpen,
+  setWorkspaceDialogOpen,
+} from '@/modules/analysis/workspaceOverlay'
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
@@ -198,7 +202,13 @@ const sidebarRef = ref<{
 
 watch(showCsv, (open) => setWorkspaceDialogOpen('csv', open))
 watch(showCombine, (open) => setWorkspaceDialogOpen('combine', open))
+watch(
+  () => anyWorkspaceDialogOpen(),
+  (open) => setToastHostExternalInert(open),
+  { immediate: true },
+)
 
+const shellBehindOverlay = computed(() => anyWorkspaceDialogOpen())
 const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
 const workspaceEmpty = computed(() => !store.workspaceResult)
 const skipHref = computed(() =>
@@ -233,6 +243,7 @@ onUnmounted(() => {
   window.removeEventListener('pointerup', onSidebarUp)
   setWorkspaceDialogOpen('csv', false)
   setWorkspaceDialogOpen('combine', false)
+  setToastHostExternalInert(false)
 })
 
 function stub(name: string) {
