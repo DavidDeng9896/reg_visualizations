@@ -35,6 +35,7 @@
           v-model="projectFilter"
           aria-label="按项目筛选"
           data-ia-list-filter
+          :aria-controls="filterAriaControls"
         >
           <option value="">全部项目</option>
           <option v-for="p in MOCK_PROJECTS" :key="p.id" :value="p.id">{{ p.name }}</option>
@@ -148,7 +149,9 @@ import {
   listRowTabIndex,
   nextListRowFocus,
   resolveListRowKeyAction,
+  shouldRefocusRowAfterFilter,
 } from '@/modules/analysis/listRowNav'
+import { listFilterAriaControls } from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
 import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
 
@@ -171,8 +174,25 @@ const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
 )
 
+const filterAriaControls = computed(() =>
+  listFilterAriaControls({
+    ready: listReady.value,
+    hasRows: filtered.value.length > 0,
+  }),
+)
+
+// Round 43: clamp roving index when the project filter changes the visible set;
+// only move DOM focus when the user was already on a list row (don't steal from the select).
 watch(filtered, (rows) => {
-  rowFocusIndex.value = clampListRowFocus(rowFocusIndex.value, rows.length)
+  const prev = rowFocusIndex.value
+  const next = clampListRowFocus(prev, rows.length)
+  rowFocusIndex.value = next
+  const active = document.activeElement
+  const wasOnListRow =
+    active instanceof HTMLElement && active.hasAttribute('data-ia-list-row')
+  if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
+    focusListRow(next)
+  }
 })
 
 const skipHref = computed(() =>
