@@ -10,11 +10,11 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/bc-ba896d11-9037-495f-b81c-cbeab86dfa70-7491`（Round 34） |
-| 阶段 | **优化 Round 34 进行中**（周期 **1/3**；`lastMergedRound=33`） |
-| 上次更新 | 2026-07-18 01:10 |
+| 阶段 | **优化 Round 34 完成**（周期 **1/3**；`lastMergedRound=33`） |
+| 上次更新 | 2026-07-18 01:05 |
 | 单元 | **196/196 PASS**（+mainBehind / skipHide / STYLE tab / editDrawerChunk / prefetch split） |
-| UI E2E | 待验证 |
-| Build | 待验证 |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.2 / ~24.3；ChartEditDrawer ~36.3；projects 仍 js-shared） |
 
 ## 2. Round 34 对齐摘要
 
