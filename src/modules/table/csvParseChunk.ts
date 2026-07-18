@@ -20,14 +20,14 @@ export function csvPapaLoadMode(): CsvPapaLoadMode {
   return CSV_PAPAPARSE_STATIC_DEFERRED ? 'deferred-dynamic' : 'static-import'
 }
 
-type PapaImport = () => Promise<{ default: typeof import('papaparse').default }>
+export type PapaModule = typeof import('papaparse')
 
-let papaPromise: Promise<{ default: typeof import('papaparse').default }> | null = null
+type PapaImport = () => Promise<PapaModule>
+
+let papaPromise: Promise<PapaModule> | null = null
 
 /** Load (and cache) PapaParse — used by parse + idle warm. */
-export function loadPapa(
-  importPapa: PapaImport = () => import('papaparse'),
-): Promise<{ default: typeof import('papaparse').default }> {
+export function loadPapa(importPapa: PapaImport = () => import('papaparse')): Promise<PapaModule> {
   if (!papaPromise) papaPromise = importPapa()
   return papaPromise
 }

@@ -18,7 +18,7 @@ describe('csvParseChunk (Round 37)', () => {
   })
 
   it('caches PapaParse load across parse + warm', async () => {
-    const importPapa = vi.fn(() => Promise.resolve({ default: { parse: vi.fn() } as never }))
+    const importPapa = vi.fn(() => Promise.resolve({ parse: vi.fn() } as never))
     const a = await loadPapa(importPapa)
     const b = await loadPapa(importPapa)
     expect(importPapa).toHaveBeenCalledTimes(1)
@@ -26,7 +26,7 @@ describe('csvParseChunk (Round 37)', () => {
   })
 
   it('idle-warms PapaParse after CSV dialog opens', () => {
-    const importPapa = vi.fn(() => Promise.resolve({ default: { parse: vi.fn() } as never }))
+    const importPapa = vi.fn(() => Promise.resolve({ parse: vi.fn() } as never))
     const idle = vi.fn((run: () => void) => run())
     schedulePapaWarm(importPapa, idle)
     expect(idle).toHaveBeenCalledTimes(1)
