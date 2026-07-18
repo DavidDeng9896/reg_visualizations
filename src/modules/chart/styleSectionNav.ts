@@ -1,8 +1,11 @@
 /**
- * STYLE panel in-panel section jump navigation (Round 33).
+ * STYLE panel in-panel section jump navigation (Round 33–34).
  * Lets keyboard users move between Title / Layout / Series / Axes without
  * tabbing through every control — headings are focus targets; Arrow/Home/End
  * cycle from a focused heading or the jump nav.
+ *
+ * Round 34 Tab order: jump-nav links are the only sequential tab stops for
+ * section targeting; section headings use tabindex=-1 (programmatic focus).
  */
 
 export const STYLE_SECTION_IDS = [
@@ -23,6 +26,19 @@ const LABELS: Record<StyleSectionId, string> = {
 
 export function styleSectionNavLabel(id: StyleSectionId): string {
   return LABELS[id]
+}
+
+/** Section headings are not sequential tab stops — jump nav + Arrow keys only. */
+export function styleSectionHeadingTabIndex(): -1 {
+  return -1
+}
+
+/**
+ * Document / focus order contract after Teleport: STYLE jump nav precedes
+ * section field controls. Headings remain programmatic focus targets.
+ */
+export function styleJumpNavPrecedesSections(): boolean {
+  return true
 }
 
 export function nextStyleSection(currentId: string, key: string): StyleSectionId {
