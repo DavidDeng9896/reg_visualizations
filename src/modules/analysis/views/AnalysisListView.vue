@@ -152,7 +152,7 @@ import {
   resolveListRowKeyAction,
   shouldRefocusRowAfterFilter,
 } from '@/modules/analysis/listRowNav'
-import { listFilterAriaControls } from '@/modules/analysis/listFocusOrder'
+import { listFilterAriaControls, isListLandmarkFocusTarget, shouldMigrateListLandmarkFocus, migrateListLandmarkFocus } from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
 import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
 
@@ -182,15 +182,30 @@ const filterAriaControls = computed(() =>
   }),
 )
 
-// Round 43–44: clamp roving index when the project filter changes the visible set;
+// Round 43–48: clamp roving index when the project filter changes the visible set;
 // only move DOM focus when the user was already on a list row (don't steal from the select).
-watch(filtered, (rows) => {
+// Round 47–48: if skip/landmark focus was on the old landmark, migrate to the new one after
+// empty ↔ rows; never steal from the filter select (wasOnLandmark gate).
+watch(filtered, (rows, prevRows) => {
+  const before = {
+    ready: listReady.value,
+    hasRows: (prevRows?.length ?? 0) > 0,
+  }
+  const after = {
+    ready: listReady.value,
+    hasRows: rows.length > 0,
+  }
+  const wasOnLandmark = isListLandmarkFocusTarget(document.activeElement)
   const prev = rowFocusIndex.value
   const next = clampListRowFocus(prev, rows.length)
   rowFocusIndex.value = next
   const wasOnListRow = isListRowFocusTarget(document.activeElement)
   if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
     focusListRow(next)
+  } else if (shouldMigrateListLandmarkFocus(wasOnLandmark, before, after)) {
+    void nextTick(() => {
+      migrateListLandmarkFocus(after)
+    })
   }
 })
 

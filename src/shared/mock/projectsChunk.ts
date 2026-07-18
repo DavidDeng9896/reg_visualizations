@@ -1,5 +1,5 @@
 /**
- * Entry-chunk strategy for mock projects vs Dexie/store/feedback (Round 30–39 eval).
+ * Entry-chunk strategy for mock projects vs Dexie/store/feedback (Round 30–48 eval).
  *
  * Build names the shared list/workspace graph after `projects.ts`, but most of
  * the ~100KB+ is Dexie + analysisStore + feedback JS. `MOCK_PROJECTS` itself is
@@ -35,6 +35,12 @@
  *
  * Round 45: skip/aria-controls align + Cancel opener ring + Create Cancel×Demo
  * toast + danger×toast inert do not unlock a Dexie split; keep shared entry.
+ *
+ * Round 46: skip focus landing + Cancel/Esc×toast rings do not unlock a Dexie
+ * split; keep shared entry.
+ *
+ * Round 48: landmark×filter / skip→Tab×filter / Delete Esc×Demo toast do not
+ * unlock a Dexie split; keep shared entry.
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -58,6 +64,10 @@ export type ProjectsChunkStrategy = {
   round44Reeval: 'keep-shared'
   /** Round 45 re-eval — still keep shared after skip/Cancel/toast a11y pass. */
   round45Reeval: 'keep-shared'
+  /** Round 46 re-eval — still keep shared after skip-landing / Cancel×toast pass. */
+  round46Reeval: 'keep-shared'
+  /** Round 48 re-eval — still keep shared after filter/skip/Demo-toast a11y pass. */
+  round48Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -73,5 +83,7 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round42Reeval: 'keep-shared',
     round44Reeval: 'keep-shared',
     round45Reeval: 'keep-shared',
+    round46Reeval: 'keep-shared',
+    round48Reeval: 'keep-shared',
   }
 }
