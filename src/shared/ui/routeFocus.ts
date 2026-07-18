@@ -4,6 +4,9 @@
  * Cooperates with skip-links: never steal focus already on/inside the target,
  * or while a skip-link still holds focus (hash jump in progress).
  * Also respects empty-state skip targets (Round 30).
+ *
+ * Round 46: when skip has landed on `#analysis-list-main` itself, leave focus
+ * alone — do not treat row/button children as protected (Round 31 contract).
  */
 
 /** Landmarks that skip-links / empty CTAs may legitimately hold after a hash jump. */
@@ -13,6 +16,9 @@ export const ROUTE_FOCUS_EMPTY_IDS = [
   'sidebar-empty',
   'analysis-list',
 ] as const
+
+/** List table/skeleton landmark id — protect only the element itself after skip. */
+const LIST_MAIN_SKIP_LANDMARK_ID = 'analysis-list-main'
 
 export function resolveRouteFocusTarget(root: ParentNode = document): HTMLElement | null {
   return (
@@ -31,6 +37,12 @@ function isInsideEmptySkipTarget(el: HTMLElement, doc: Document): boolean {
   return false
 }
 
+/** True when focus is on `#analysis-list-main` itself (not a descendant control). */
+function isListMainSkipLandmarkFocused(el: HTMLElement, doc: Document): boolean {
+  const main = doc.getElementById(LIST_MAIN_SKIP_LANDMARK_ID)
+  return !!main && el === main
+}
+
 /** True when routeFocus should leave the current focus alone. */
 export function shouldSkipRouteFocus(doc: Document = document): boolean {
   const active = doc.activeElement
@@ -39,6 +51,8 @@ export function shouldSkipRouteFocus(doc: Document = document): boolean {
     return true
   }
   if (isInsideEmptySkipTarget(active, doc)) return true
+  // Round 46: skip landed on list-main landmark itself — keep it.
+  if (isListMainSkipLandmarkFocused(active, doc)) return true
   const target = resolveRouteFocusTarget(doc)
   if (target && (active === target || target.contains(active))) return true
   return false
