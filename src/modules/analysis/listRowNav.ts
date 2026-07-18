@@ -1,11 +1,13 @@
 /**
- * Analysis list table row keyboard navigation (Round 41–43).
+ * Analysis list table row keyboard navigation (Round 41–44).
  *
  * Rows previously all used tabindex=0 (many Tab stops). Roving tabindex keeps
  * a single tab stop in the list; Arrow/Home/End move focus; Enter/Space open.
  * Round 42: Delete triggers row remove without leaving the roving group.
  * Round 43: project filter changes clamp the roving index; only refocus the
  * row when keyboard focus was already inside the list and the index moved.
+ * Round 44: `isListRowFocusTarget` for filter-driven DOM refocus spot-checks
+ * (including empty ↔ has-rows transitions).
  */
 
 export type ListRowKeyAction =
@@ -65,6 +67,14 @@ export function clampListRowFocus(
   if (current === null || current < 0) return 0
   if (current >= count) return count - 1
   return current
+}
+
+/**
+ * Round 44: true when `activeElement` is a roving list row (filter refocus gate).
+ * Empty ↔ has-rows transitions use the same check — never steal from the select.
+ */
+export function isListRowFocusTarget(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.hasAttribute('data-ia-list-row')
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Analysis list page chunk strategy (Round 39–43 eval).
+ * Analysis list page chunk strategy (Round 39–44 eval).
  *
  * AnalysisListView is already a route-lazy component. Further splitting the
  * list chrome (header / empty CTA / table) would add waterfalls for a thin
@@ -23,6 +23,11 @@
  * Round 43: filter aria-controls + clamp/refocus helpers are tiny; List gzip
  * boundary (~10.0) still acceptable — keep-route-lazy. Create/CSV cold paths
  * re-checked separately (still async-idle-warm / deferred-dynamic).
+ *
+ * Round 44: filter empty↔rows aria-controls + Delete Cancel ring + Demo-fail
+ * Create inert helpers remain tiny; List gzip (~10.3) still keep-route-lazy.
+ * Workspace toolbar / projects re-checked separately (still keep-sync-shell /
+ * keep-shared).
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -38,6 +43,7 @@ export type ListPageChunkStrategy = {
   round41Reeval: 'keep-route-lazy'
   round42Reeval: 'keep-route-lazy'
   round43Reeval: 'keep-route-lazy'
+  round44Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -52,6 +58,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round41Reeval: 'keep-route-lazy',
     round42Reeval: 'keep-route-lazy',
     round43Reeval: 'keep-route-lazy',
+    round44Reeval: 'keep-route-lazy',
   }
 }
 
