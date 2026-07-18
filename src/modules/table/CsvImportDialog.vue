@@ -91,13 +91,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import Papa from 'papaparse'
 import { toast } from '@/shared/ui/feedback'
 import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { fileSelectedStatus, isCsvFileName } from '@/shared/ui/uploadStatus'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
 import { flowchartEmptyCsvFocusFallback } from '@/modules/flowchart/flowchartEmpty'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
+import { loadPapa, schedulePapaWarm } from '@/modules/table/csvParseChunk'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { buildColumnsFromRows, withRowIds } from '@/shared/utils/schema'
 import { uid } from '@/shared/utils/id'
@@ -133,6 +133,7 @@ function restoreFocusToTrigger() {
 function openDialog() {
   restoreFocus = captureFocusEl()
   document.body.style.overflow = 'hidden'
+  schedulePapaWarm()
   void nextTick(() => {
     const list = focusables()
     const closeBtn = list.find((el) => el.classList.contains('icon-close'))
@@ -247,24 +248,26 @@ function parseFile(file: File) {
   }
   fileName.value = file.name
   tableName.value = file.name.replace(/\.csv$/i, '')
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (res) => {
-      if (res.errors?.length) {
-        toast('error', 'CSV 解析失败：' + res.errors[0].message)
-        rows.value = []
-        columns.value = []
-        previewRows.value = []
-        return
-      }
-      const data = withRowIds(res.data as Record<string, unknown>[])
-      rows.value = data
-      columns.value = buildColumnsFromRows(data)
-      previewRows.value = slicePreviewRows(data, 20)
-    },
-    error: () => toast('error', 'CSV 解析失败'),
-  })
+  void loadPapa().then(({ default: Papa }) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        if (res.errors?.length) {
+          toast('error', 'CSV 解析失败：' + res.errors[0].message)
+          rows.value = []
+          columns.value = []
+          previewRows.value = []
+          return
+        }
+        const data = withRowIds(res.data as Record<string, unknown>[])
+        rows.value = data
+        columns.value = buildColumnsFromRows(data)
+        previewRows.value = slicePreviewRows(data, 20)
+      },
+      error: () => toast('error', 'CSV 解析失败'),
+    })
+  }).catch(() => toast('error', 'CSV 解析失败'))
 }
 
 function add() {

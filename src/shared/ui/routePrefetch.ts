@@ -1,10 +1,14 @@
 /**
- * Cold-start route module prefetch (Round 33–34).
+ * Cold-start route module prefetch (Round 33–37).
  *
  * Round 34: cold start only warms the list route. Prefetching the workspace
  * chunk from `/` pulled AnalysisWorkspaceView (+ sidebar/table shell deps)
  * before the user opened an analysis — wasteful on list-only sessions.
  * Workspace warm is scheduled from the list page after mount instead.
+ *
+ * Round 37: list page schedules workspace warm *after* `loadList` finishes
+ * (listReady), so IndexedDB list paint is not competing with workspace chunk
+ * download on first interactive frame.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -69,7 +73,7 @@ export function scheduleRoutePrefetch(
   schedulePaths(router, analysisRoutePrefetchPaths(), options)
 }
 
-/** Call from AnalysisListView after mount — deferred workspace chunk warm. */
+/** Call from AnalysisListView after listReady — deferred workspace chunk warm. */
 export function scheduleWorkspaceRoutePrefetch(
   router: { resolve: (to: string) => unknown },
   options: RoutePrefetchOptions = {},
