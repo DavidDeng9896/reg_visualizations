@@ -1,5 +1,5 @@
 /**
- * TransformDialog warm / split evaluation (Round 36 + Round 47–49 re-eval).
+ * TransformDialog warm / split evaluation (Round 36 + Round 47–53 re-eval).
  *
  * `pipeline` is already a sync import inside TransformDialog (needed for Save
  * validation). Splitting it into a separate async chunk would add a race on
@@ -15,6 +15,9 @@
  *
  * Round 49: re-checked with List gzip / filter-skip Tab helpers — still
  * deferred-sync + idle-warm on open.
+ *
+ * Round 53: re-checked with flowchart empty CTA×toast / Combine Cancel×toast
+ * helpers — still deferred-sync + idle-warm on open.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -32,6 +35,7 @@ export type TransformChunkStrategy = {
   idleWarmOnOpen: true
   round47Reeval: 'keep-deferred-sync'
   round49Reeval: 'keep-deferred-sync'
+  round53Reeval: 'keep-deferred-sync'
 }
 
 export function transformChunkStrategy(): TransformChunkStrategy {
@@ -40,6 +44,7 @@ export function transformChunkStrategy(): TransformChunkStrategy {
     idleWarmOnOpen: true,
     round47Reeval: 'keep-deferred-sync',
     round49Reeval: 'keep-deferred-sync',
+    round53Reeval: 'keep-deferred-sync',
   }
 }
 

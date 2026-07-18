@@ -95,7 +95,7 @@ import { toast } from '@/shared/ui/feedback'
 import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { fileSelectedStatus, isCsvFileName } from '@/shared/ui/uploadStatus'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
-import { flowchartEmptyCsvFocusFallback } from '@/modules/flowchart/flowchartEmpty'
+import { applyCsvCancelFocus } from '@/modules/table/csvCancelToast'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { loadPapa, schedulePapaWarm } from '@/modules/table/csvParseChunk'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
@@ -125,8 +125,9 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
 function restoreFocusToTrigger() {
-  // Prefer captured opener (flowchart empty CTA / Add data); else empty landmark.
-  restoreFocusEl(restoreFocus, () => flowchartEmptyCsvFocusFallback())
+  // Round 52–54: visible ring for empty CTA × toast;
+  // CSV Cancel × toast coexistence via applyCsvCancelFocus.
+  applyCsvCancelFocus(restoreFocus)
   restoreFocus = null
 }
 

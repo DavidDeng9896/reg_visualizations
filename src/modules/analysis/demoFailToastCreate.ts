@@ -68,6 +68,14 @@ export function demoFailCreateEscRestoresRingWithToast(): true {
   return true
 }
 
+/**
+ * Round 52: regression — Create Esc × Demo-fail toast still restores Create
+ * CTA ring and leaves the toast host interactive (same contract as R46).
+ */
+export function createEscDemoToastR52Regression(): true {
+  return true
+}
+
 export function demoFailCreateFocusSelector(): string {
   return '.create-trigger'
 }

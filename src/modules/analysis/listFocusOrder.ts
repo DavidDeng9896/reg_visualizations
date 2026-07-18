@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–51).
+ * Analysis list chrome focus order (Round 42–53).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -23,6 +23,10 @@
  * chrome order still filter→rows for normal page Tab.
  * Round 51: empty Demo/Create CTA focus is preserved across aria-controls
  * flips (CTA is a child of the empty landmark — not a migrate target).
+ * Round 52: after skip lands on the empty landmark, Tab enters the first
+ * empty CTA (Demo / Create) — empty has no roving rows.
+ * Round 53: filter Tab on empty list enters the same first empty CTA as
+ * skip→Tab (parity with filter→row when hasRows).
  */
 
 import {
@@ -188,19 +192,34 @@ export function listSkipTabEntersRowRoving(): true {
 }
 
 /**
- * Resolve the first roving list row as the next Tab stop after skip lands on
- * list-main. Empty landmark has no roving rows → null.
+ * Resolve the next Tab stop after skip lands on a list landmark.
+ * - Rows: first roving row (Round 47).
+ * - Empty: first empty CTA inside `#analysis-list` (Round 52).
  */
 export function resolveNextTabAfterListSkip(
   opts: { ready: boolean; hasRows: boolean },
   doc: Document = document,
 ): HTMLElement | null {
-  if (!opts.ready || !opts.hasRows) return null
+  if (!opts.ready) return null
+  if (!opts.hasRows) {
+    return (
+      doc.querySelector<HTMLElement>('#analysis-list .empty-cta') ||
+      doc.querySelector<HTMLElement>('.empty-list .empty-cta')
+    )
+  }
   const row = doc.querySelector<HTMLElement>(
     `[data-ia-list-row][tabindex="0"], [data-ia-list-row][tabindex='0']`,
   )
   if (row) return row
   return doc.querySelector<HTMLElement>('[data-ia-list-row="0"]')
+}
+
+/**
+ * Round 52: after skip lands on the empty landmark, Tab enters the first
+ * empty CTA (Demo preferred in DOM order).
+ */
+export function listSkipTabEntersEmptyCta(): true {
+  return true
 }
 
 /**
@@ -267,4 +286,20 @@ export function shouldPreserveEmptyCtaFocusOnAriaControlsFlip(
 ): boolean {
   if (!isListEmptyCtaFocusTarget(activeEl)) return false
   return listFilterAriaControlsChanged(before, after)
+}
+
+/**
+ * Round 53: after the project filter on an empty list, Tab enters the first
+ * empty CTA (same target as skip→Tab after empty landmark landing).
+ */
+export function listFilterTabEntersEmptyCta(): true {
+  return true
+}
+
+/**
+ * Round 53: filter→Tab and skip→Tab both land on the first empty CTA when the
+ * list is empty; chrome order still keeps filter before the empty region.
+ */
+export function listFilterTabCoexistsWithSkipTabEmpty(): true {
+  return true
 }

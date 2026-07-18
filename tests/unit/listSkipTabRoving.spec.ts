@@ -34,7 +34,7 @@ describe('list skip → Tab enters row roving (Round 47)', () => {
     expect(next?.tabIndex).toBe(0)
   })
 
-  it('returns null when skip lands on empty landmark (no roving rows)', () => {
+  it('defers empty-landmark Tab to Round 52 empty-CTA order (no roving rows)', () => {
     document.body.innerHTML = `
       <div id="analysis-list" tabindex="-1" role="region">
         <button type="button" class="empty-cta">一键 Demo</button>
@@ -42,6 +42,8 @@ describe('list skip → Tab enters row roving (Round 47)', () => {
     `
     const state = { ready: true, hasRows: false }
     activateListSkipFocus(state)
-    expect(resolveNextTabAfterListSkip(state)).toBeNull()
+    // Round 47: no roving rows. Round 52: next Tab is the first empty CTA.
+    const next = resolveNextTabAfterListSkip(state)
+    expect(next?.classList.contains('empty-cta')).toBe(true)
   })
 })

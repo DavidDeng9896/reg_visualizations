@@ -165,6 +165,7 @@ import {
   shouldPreserveEmptyCtaFocusOnAriaControlsFlip,
 } from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
+import { demoSuccessToastMessage } from '@/modules/analysis/demoSuccessFocus'
 import {
   listSkipVisibleWhenCreateClosed,
   syncListSkipVisibility,
@@ -312,7 +313,7 @@ async function createDemo() {
       store.selectNode(view.id, 'workspace')
     }
     await store.flushSave()
-    toast('success', '已创建 Demo Analysis')
+    toast('success', demoSuccessToastMessage())
     await router.push(`/analyses/${a.id}`)
   } catch (err) {
     console.error('[createDemo]', err)
