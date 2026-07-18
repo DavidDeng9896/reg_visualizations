@@ -8,7 +8,7 @@
     aria-modal="true"
     aria-labelledby="chart-edit-drawer-title"
     data-ia-chart-edit="1"
-    @keydown.esc="close"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button
@@ -898,6 +898,7 @@ import {
 import { toast } from '@/shared/ui/feedback'
 import { scheduleFitRuntimeWarm } from '@/modules/chart/editDrawerChunk'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 
 const props = defineProps<{
   modelValue: boolean
@@ -1256,6 +1257,11 @@ function focusables(): HTMLElement[] {
       el.getAttribute('aria-hidden') !== 'true' &&
       el.offsetParent !== null,
   )
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function close() {

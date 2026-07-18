@@ -112,6 +112,7 @@
       </div>
     </div>
 
+    <!-- CSV / Combine teleport to body (Round 36); mount stays on workspace shell. -->
     <CsvImportDialog v-if="showCsv" v-model="showCsv" />
     <CombineTablesDialog v-if="showCombine" v-model="showCombine" />
   </div>

@@ -1,5 +1,5 @@
 /**
- * Workspace modal open flags shared across shell / table / sidebar (Round 32–35).
+ * Workspace modal open flags shared across shell / table / sidebar (Round 32–36).
  * Keeps sidebar chrome inert while CSV / Combine / Transform / ChartEdit dialogs
  * are open without prop-drilling through async chunks.
  *
@@ -7,6 +7,8 @@
  * chartEdit (covers flowchart mode).
  * Round 35: TransformDialog also teleports to body → transform joins
  * `mainBehindWorkspaceOverlay` (unified with csv / combine / chartEdit).
+ * Round 36: CSV / Combine also teleport to body; all four overlays share
+ * `data-ia-*` markers and Esc-yields-to-feedback contract.
  */
 
 import { reactive } from 'vue'

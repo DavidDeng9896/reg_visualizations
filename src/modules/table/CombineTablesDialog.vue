@@ -1,11 +1,14 @@
 <template>
+  <!-- Teleport to body so dialog is outside #workspace-main (Round 36). -->
+  <Teleport to="body">
   <div
     v-if="modelValue"
     class="dialog-root"
     role="dialog"
     aria-modal="true"
     aria-labelledby="combine-dialog-title"
-    @keydown.esc="close"
+    data-ia-combine="1"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
@@ -100,6 +103,7 @@
       </footer>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -107,6 +111,9 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { toast } from '@/shared/ui/feedback'
 import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { multiSelectCountStatus } from '@/shared/ui/selectStatus'
+import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { flowchartEmptyCombineFocusFallback } from '@/modules/flowchart/flowchartEmpty'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { combineTables } from '@/modules/table/join'
 import type { JoinType, TableColumn } from '@/shared/types/analysis'
@@ -148,39 +155,52 @@ const canAdd = computed(() => {
 
 watch([leftId, rightId, joinType, leftKeys, rightKeys], rebuild, { deep: true })
 
+function restoreFocusToTrigger() {
+  restoreFocusEl(restoreFocus, () => flowchartEmptyCombineFocusFallback())
+  restoreFocus = null
+}
+
+function openDialog() {
+  restoreFocus = captureFocusEl()
+  document.body.style.overflow = 'hidden'
+  void nextTick(() => {
+    const list = focusables()
+    const closeBtn = list.find((el) => el.classList.contains('icon-close'))
+    ;(closeBtn || list[0])?.focus()
+  })
+}
+
+function closeDialog() {
+  document.body.style.overflow = ''
+  restoreFocusToTrigger()
+}
+
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) {
-      restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
-      void nextTick(() => focusables()[0]?.focus())
-    } else {
-      document.body.style.overflow = ''
-      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
-      restoreFocus = null
-    }
+    if (open) openDialog()
+    else closeDialog()
   },
 )
 
 onMounted(() => {
-  if (props.modelValue) {
-    restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    document.body.style.overflow = 'hidden'
-    void nextTick(() => focusables()[0]?.focus())
-  }
+  if (props.modelValue) openDialog()
 })
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+  restoreFocusEl(restoreFocus)
+  restoreFocus = null
 })
 
 function focusables(): HTMLElement[] {
   const root = panelRef.value
   if (!root) return []
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+    (el) =>
+      !el.hasAttribute('disabled') &&
+      el.getAttribute('aria-hidden') !== 'true' &&
+      el.offsetParent !== null,
   )
 }
 
@@ -200,6 +220,11 @@ function onTrapKeydown(e: KeyboardEvent) {
     e.preventDefault()
     first.focus()
   }
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function rebuild() {

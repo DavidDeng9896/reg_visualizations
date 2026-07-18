@@ -8,7 +8,7 @@
     aria-modal="true"
     aria-labelledby="transform-dialog-title"
     data-ia-transform="1"
-    @keydown.esc="close"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
@@ -149,6 +149,8 @@ import { uid } from '@/shared/utils/id'
 import { runPipeline } from '@/modules/transform/pipeline'
 import { cloneDeep } from '@/shared/utils/clone'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
+import { schedulePipelineWarm } from '@/modules/transform/transformChunk'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
@@ -186,6 +188,7 @@ function restoreFocusToTrigger() {
 function openDialog() {
   restoreFocus = captureFocusEl()
   document.body.style.overflow = 'hidden'
+  schedulePipelineWarm()
   void nextTick(() => {
     const list = focusables()
     const closeBtn = list.find((el) => el.classList.contains('icon-close'))
@@ -243,6 +246,11 @@ function onTrapKeydown(e: KeyboardEvent) {
     e.preventDefault()
     first.focus()
   }
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function close() {

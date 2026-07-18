@@ -5,7 +5,7 @@ import {
 } from '@/modules/table/tableChartWorkspaceChunk'
 
 describe('tableChartWorkspaceChunk', () => {
-  it('keeps TableChartWorkspace sync in the workspace shell (Round 32)', () => {
+  it('keeps TableChartWorkspace sync in the workspace shell (Round 32–36)', () => {
     expect(TABLE_CHART_WORKSPACE_SYNC).toBe(true)
     expect(tableChartWorkspaceMountMode()).toBe('sync')
   })

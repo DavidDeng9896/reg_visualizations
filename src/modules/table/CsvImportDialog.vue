@@ -1,4 +1,6 @@
 <template>
+  <!-- Teleport to body so dialog is outside #workspace-main (Round 36). -->
+  <Teleport to="body">
   <div
     v-if="modelValue"
     class="dialog-root"
@@ -6,7 +8,7 @@
     aria-modal="true"
     aria-labelledby="csv-dialog-title"
     data-ia-csv="1"
-    @keydown.esc="close"
+    @keydown.esc="onEsc"
     @keydown="onTrapKeydown"
   >
     <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="close" />
@@ -84,6 +86,7 @@
       </footer>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -94,6 +97,7 @@ import { formatPreviewCell, slicePreviewRows } from '@/shared/ui/previewTable'
 import { fileSelectedStatus, isCsvFileName } from '@/shared/ui/uploadStatus'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
 import { flowchartEmptyCsvFocusFallback } from '@/modules/flowchart/flowchartEmpty'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { buildColumnsFromRows, withRowIds } from '@/shared/utils/schema'
 import { uid } from '@/shared/utils/id'
@@ -198,6 +202,11 @@ function onTrapKeydown(e: KeyboardEvent) {
     e.preventDefault()
     first.focus()
   }
+}
+
+function onEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  close()
 }
 
 function close() {
