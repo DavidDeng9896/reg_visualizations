@@ -1,10 +1,13 @@
 <template>
+  <!-- Teleport to body so dialog is outside #workspace-main (Round 35). -->
+  <Teleport to="body">
   <div
     v-if="modelValue"
     class="dialog-root"
     role="dialog"
     aria-modal="true"
     aria-labelledby="transform-dialog-title"
+    data-ia-transform="1"
     @keydown.esc="close"
     @keydown="onTrapKeydown"
   >
@@ -134,6 +137,7 @@
       </footer>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -144,6 +148,7 @@ import type { FilterCondition, TransformStep } from '@/shared/types/analysis'
 import { uid } from '@/shared/utils/id'
 import { runPipeline } from '@/modules/transform/pipeline'
 import { cloneDeep } from '@/shared/utils/clone'
+import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
@@ -171,42 +176,54 @@ watch(
   { immediate: true },
 )
 
+function restoreFocusToTrigger() {
+  restoreFocusEl(restoreFocus, () =>
+    document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null,
+  )
+  restoreFocus = null
+}
+
+function openDialog() {
+  restoreFocus = captureFocusEl()
+  document.body.style.overflow = 'hidden'
+  void nextTick(() => {
+    const list = focusables()
+    const closeBtn = list.find((el) => el.classList.contains('icon-close'))
+    ;(closeBtn || list[0])?.focus()
+  })
+}
+
+function closeDialog() {
+  document.body.style.overflow = ''
+  restoreFocusToTrigger()
+}
+
 watch(
   () => props.modelValue,
   (open) => {
-    if (open) {
-      restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
-      void nextTick(() => {
-        const first = focusables()[0]
-        first?.focus()
-      })
-    } else {
-      document.body.style.overflow = ''
-      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
-      restoreFocus = null
-    }
+    if (open) openDialog()
+    else closeDialog()
   },
 )
 
 onMounted(() => {
-  if (props.modelValue) {
-    restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    document.body.style.overflow = 'hidden'
-    void nextTick(() => focusables()[0]?.focus())
-  }
+  if (props.modelValue) openDialog()
 })
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+  restoreFocusEl(restoreFocus)
+  restoreFocus = null
 })
 
 function focusables(): HTMLElement[] {
   const root = panelRef.value
   if (!root) return []
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true',
+    (el) =>
+      !el.hasAttribute('disabled') &&
+      el.getAttribute('aria-hidden') !== 'true' &&
+      el.offsetParent !== null,
   )
 }
 

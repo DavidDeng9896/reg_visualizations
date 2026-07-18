@@ -1,6 +1,9 @@
-/** Flowchart empty-state copy / landmark / CTA a11y (Round 29). */
+/** Flowchart empty-state copy / landmark / CTA a11y (Round 29–35). */
 
 export const FLOW_EMPTY_REGION_LABEL = '流程图引导'
+
+/** Selector for the CSV CTA inside the flowchart empty region. */
+export const FLOW_EMPTY_CSV_CTA_SELECTOR = '[aria-label="从流程图空态导入 CSV"]'
 
 export function flowchartEmptyRegionAttrs() {
   return {
@@ -20,4 +23,17 @@ export function flowchartEmptyCopy(): { title: string; body: string } {
 
 export function flowchartEmptyCtaAria(cmd: 'csv' | 'combine'): string {
   return cmd === 'csv' ? '从流程图空态导入 CSV' : '从流程图空态合并表'
+}
+
+/**
+ * Focus restore target after CSV overlay closes from flowchart empty (Round 35).
+ * Prefer the captured CTA; fall back to the empty region landmark.
+ */
+export function flowchartEmptyCsvFocusFallback(
+  doc: Document = document,
+): HTMLElement | null {
+  return (
+    (doc.querySelector(FLOW_EMPTY_CSV_CTA_SELECTOR) as HTMLElement | null) ||
+    (doc.getElementById('flow-empty') as HTMLElement | null)
+  )
 }
