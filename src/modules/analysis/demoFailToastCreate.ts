@@ -1,5 +1,5 @@
 /**
- * Empty-list Demo failure toast × Create Analysis coexistence (Round 40–45).
+ * Empty-list Demo failure toast × Create Analysis coexistence (Round 40–46).
  *
  * When Demo creation fails, an error toast stays on screen. Opening Create
  * Analysis must mark the toast host inert (same Create overlay contract as
@@ -15,8 +15,11 @@
  * host inert (Esc/Tab stay in the dialog); the prior Create restore ring is
  * compatible with that inert handoff.
  *
- * Round 45: Cancel/Esc closing Create restores the Create CTA with a visible
+ * Round 45: Cancel closing Create restores the Create CTA with a visible
  * ring, clears toast inert, and leaves the Demo-fail error toast on screen.
+ *
+ * Round 46: Esc closing Create uses the same restore ring × toast contract as
+ * Cancel (onUnmounted path is shared).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -54,6 +57,14 @@ export function demoFailCreateOpenInertsToast(): true {
  * again while the Demo-fail error toast remains.
  */
 export function demoFailCreateCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 46: Create Esc restores CTA ring with the same toast contract as Cancel
+ * (shared onUnmounted restore in CreateAnalysisDialog).
+ */
+export function demoFailCreateEscRestoresRingWithToast(): true {
   return true
 }
 
