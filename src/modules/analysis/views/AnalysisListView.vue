@@ -146,6 +146,7 @@ import {
 import { listDeleteSuccessToastMessage } from '@/modules/analysis/listDeleteToastFocus'
 import {
   clampListRowFocus,
+  isListRowFocusTarget,
   listRowTabIndex,
   nextListRowFocus,
   resolveListRowKeyAction,
@@ -181,15 +182,13 @@ const filterAriaControls = computed(() =>
   }),
 )
 
-// Round 43: clamp roving index when the project filter changes the visible set;
+// Round 43–44: clamp roving index when the project filter changes the visible set;
 // only move DOM focus when the user was already on a list row (don't steal from the select).
 watch(filtered, (rows) => {
   const prev = rowFocusIndex.value
   const next = clampListRowFocus(prev, rows.length)
   rowFocusIndex.value = next
-  const active = document.activeElement
-  const wasOnListRow =
-    active instanceof HTMLElement && active.hasAttribute('data-ia-list-row')
+  const wasOnListRow = isListRowFocusTarget(document.activeElement)
   if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
     focusListRow(next)
   }

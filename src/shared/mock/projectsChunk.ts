@@ -28,6 +28,10 @@
  *
  * Round 42: Delete-key / Demo-fail Create ring / list focus-order markers do
  * not unlock a Dexie split; keep shared entry.
+ *
+ * Round 44: filter aria-controls / Delete Cancel ring / Demo-fail Create inert
+ * do not unlock a Dexie split; keep shared entry. Workspace toolbar still
+ * sync with table/chart (see workspaceViewChunk / tableChartWorkspaceChunk).
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -47,6 +51,8 @@ export type ProjectsChunkStrategy = {
   round41Reeval: 'keep-shared'
   /** Round 42 re-eval — still keep shared after Delete-key / Demo-fail ring. */
   round42Reeval: 'keep-shared'
+  /** Round 44 re-eval — still keep shared after filter/Delete/Create a11y pass. */
+  round44Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -60,5 +66,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round39Reeval: 'keep-shared',
     round41Reeval: 'keep-shared',
     round42Reeval: 'keep-shared',
+    round44Reeval: 'keep-shared',
   }
 }
