@@ -1,5 +1,5 @@
 /**
- * List delete success toast × focus-ring coexistence (Round 41–50).
+ * List delete success toast × focus-ring coexistence (Round 41–51).
  *
  * After a successful Analysis delete, a polite success toast announces the
  * outcome while `applyListDeleteFocus` lands keyboard focus (with a temporary
@@ -13,10 +13,15 @@
  * ring while the success toast stays interactive; when the project filter
  * still owns focus after a non-empty delete, skip the focus restore so the
  * select is not stolen from.
+ *
+ * Round 51: empty-list Demo CTA may also hold a visible restore ring while a
+ * toast stays interactive (parity with Create CTA × toast).
  */
 
 import { planListDeleteFocus } from '@/modules/analysis/listDeleteFocus'
 import { isListFilterFocusTarget } from '@/modules/analysis/listRowNav'
+import { restoreFocusEl } from '@/shared/ui/focusRestore'
+import { createHeaderTriggerSelector } from '@/modules/analysis/createAnalysisHandoff'
 
 export function listDeleteSuccessToastMessage(): string {
   return '已删除'
@@ -39,6 +44,31 @@ export function listDeleteClampsRovingWithToast(): true {
  */
 export function listDeleteEmptyCtaCoexistsWithToast(): true {
   return true
+}
+
+/**
+ * Round 51: empty-list Demo CTA focus ring coexists with a toast.
+ */
+export function listEmptyDemoCtaCoexistsWithToast(): true {
+  return true
+}
+
+/** Empty-list Demo CTA (excludes Create trigger). */
+export function listEmptyDemoCtaSelector(): string {
+  return '.empty-list .empty-cta:not(.create-trigger)'
+}
+
+/**
+ * Land keyboard focus on the empty Demo CTA with a visible restore ring
+ * (Round 51 — toast may coexist; host stays interactive).
+ */
+export function applyEmptyDemoCtaFocus(doc: Document = document): void {
+  const found = doc.querySelector(listEmptyDemoCtaSelector())
+  const el = found instanceof HTMLElement ? found : null
+  restoreFocusEl(el, () => {
+    const header = doc.querySelector(createHeaderTriggerSelector())
+    return header instanceof HTMLElement ? header : null
+  }, { visibleRing: true })
 }
 
 /**

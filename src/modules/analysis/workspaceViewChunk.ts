@@ -1,5 +1,5 @@
 /**
- * AnalysisWorkspaceView chunk strategy (Round 32–46).
+ * AnalysisWorkspaceView chunk strategy (Round 32–51).
  *
  * Sync imports (sidebar + table/chart workspace) stay in the main workspace
  * entry — deferring them flashes an empty shell on cold open. Flowchart /
@@ -11,6 +11,9 @@
  * boundary for chart/view actions already owned by TableChartWorkspace, and
  * would risk a cold toolbar flash after Vxe warm. Prefer Transform
  * `schedulePipelineWarm` and overlay Teleport for this cycle.
+ *
+ * Round 51: list Demo CTA / skip→Tab / empty CTA a11y pass does not unlock a
+ * toolbar async split; keep sync-shell.
  */
 
 export const WORKSPACE_VIEW_SPLIT_DEFERRED = true as const
@@ -23,6 +26,7 @@ export type WorkspaceViewChunkStrategy = {
   round44Reeval: 'keep-sync-shell'
   round45Reeval: 'keep-sync-shell'
   round46Reeval: 'keep-sync-shell'
+  round51Reeval: 'keep-sync-shell'
 }
 
 export function workspaceViewSplitDeferred(): boolean {
@@ -38,5 +42,6 @@ export function workspaceViewChunkStrategy(): WorkspaceViewChunkStrategy {
     round44Reeval: 'keep-sync-shell',
     round45Reeval: 'keep-sync-shell',
     round46Reeval: 'keep-sync-shell',
+    round51Reeval: 'keep-sync-shell',
   }
 }

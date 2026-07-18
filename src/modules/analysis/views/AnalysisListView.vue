@@ -157,7 +157,13 @@ import {
   resolveListRowKeyAction,
   shouldRefocusRowAfterFilter,
 } from '@/modules/analysis/listRowNav'
-import { listFilterAriaControls, isListLandmarkFocusTarget, shouldMigrateListLandmarkFocus, migrateListLandmarkFocus } from '@/modules/analysis/listFocusOrder'
+import {
+  listFilterAriaControls,
+  isListLandmarkFocusTarget,
+  shouldMigrateListLandmarkFocus,
+  migrateListLandmarkFocus,
+  shouldPreserveEmptyCtaFocusOnAriaControlsFlip,
+} from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
 import {
   listSkipVisibleWhenCreateClosed,
@@ -196,6 +202,7 @@ const filterAriaControls = computed(() =>
 // only move DOM focus when the user was already on a list row (don't steal from the select).
 // Round 47–48: if skip/landmark focus was on the old landmark, migrate to the new one after
 // empty ↔ rows; never steal from the filter select (wasOnLandmark gate).
+// Round 51: empty Demo/Create CTA focus is preserved across aria-controls flips.
 watch(filtered, (rows, prevRows) => {
   const before = {
     ready: listReady.value,
@@ -205,12 +212,15 @@ watch(filtered, (rows, prevRows) => {
     ready: listReady.value,
     hasRows: rows.length > 0,
   }
-  const wasOnLandmark = isListLandmarkFocusTarget(document.activeElement)
+  const active = document.activeElement
+  const wasOnLandmark = isListLandmarkFocusTarget(active)
   const prev = rowFocusIndex.value
   const next = clampListRowFocus(prev, rows.length)
   rowFocusIndex.value = next
-  const wasOnListRow = isListRowFocusTarget(document.activeElement)
-  if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
+  const wasOnListRow = isListRowFocusTarget(active)
+  if (shouldPreserveEmptyCtaFocusOnAriaControlsFlip(active, before, after)) {
+    // Keep focus on empty Demo/Create CTA; do not migrate landmark.
+  } else if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
     focusListRow(next)
   } else if (shouldMigrateListLandmarkFocus(wasOnLandmark, before, after)) {
     void nextTick(() => {
@@ -226,7 +236,7 @@ const skipHref = computed(() =>
 watch(showCreate, (open) => {
   setToastHostExternalInert(open)
   if (!open) createRestoreFocus.value = null
-  // Round 49–50: keep skip DOM hide/show contract aligned with Create Teleport.
+  // Round 49–51: keep skip DOM hide/show aligned with Create; Cancel restores skip→Tab.
   void nextTick(() => {
     if (skipLinkEl.value) syncListSkipVisibility(skipLinkEl.value, open)
   })

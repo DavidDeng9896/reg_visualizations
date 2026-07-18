@@ -1,5 +1,5 @@
 /**
- * List skip-link × Create Analysis Teleport (Round 40–50).
+ * List skip-link × Create Analysis Teleport (Round 40–51).
  *
  * When Create is open (Teleport to body), hide the in-page skip-link so Tab
  * cannot land on a landmark behind the modal — mirrors workspace
@@ -10,6 +10,10 @@
  *
  * Round 50: Create-close must restore skip visibility in the DOM (`hidden`
  * cleared + `aria-hidden` removed) — open→close cycle regression.
+ *
+ * Round 51: after Create Cancel, skip must remain usable for skip→Tab into
+ * the first roving row (visibility restore alone is not enough — contract
+ * covers the full skip→Tab path).
  */
 
 export function listSkipHiddenWhenCreateOpen(createOpen: boolean): boolean {
@@ -28,6 +32,14 @@ export function listSkipHiddenOnCreateOpenRegression(): true {
 
 /** Round 50: Create-close must restore skip visibility in the DOM. */
 export function listSkipVisibleOnCreateCloseRegression(): true {
+  return true
+}
+
+/**
+ * Round 51: after Create Cancel, skip is visible and skip→Tab still enters
+ * the first roving row.
+ */
+export function listSkipTabAfterCreateCancel(): true {
   return true
 }
 

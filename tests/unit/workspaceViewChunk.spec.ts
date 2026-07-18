@@ -15,6 +15,7 @@ describe('workspaceViewChunk', () => {
       round44Reeval: 'keep-sync-shell',
       round45Reeval: 'keep-sync-shell',
       round46Reeval: 'keep-sync-shell',
+      round51Reeval: 'keep-sync-shell',
     })
   })
 })
