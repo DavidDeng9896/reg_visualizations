@@ -62,6 +62,17 @@ describe('workspaceOverlay', () => {
     expect(skipLinkHiddenBehindOverlay()).toBe(true)
   })
 
+  it('tracks New view open flag for sidebar/main inert (Round 37)', () => {
+    expect(anyWorkspaceDialogOpen()).toBe(false)
+    setWorkspaceDialogOpen('newView', true)
+    expect(workspaceDialogFlags.newView).toBe(true)
+    expect(anyWorkspaceDialogOpen()).toBe(true)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
+    expect(skipLinkHiddenBehindOverlay()).toBe(true)
+    setWorkspaceDialogOpen('newView', false)
+    expect(anyWorkspaceDialogOpen()).toBe(false)
+  })
+
   it('csv overlay inerts flowchart main (empty CTA behind overlay, Round 35)', () => {
     // Contract: flowchart empty lives under #workspace-main; csv → mainBehind.
     setWorkspaceDialogOpen('csv', true)
