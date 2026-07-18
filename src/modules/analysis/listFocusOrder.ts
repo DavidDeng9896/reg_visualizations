@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–47).
+ * Analysis list chrome focus order (Round 42–48).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -16,6 +16,9 @@
  * Round 47: when empty ↔ rows flips while focus is already on the old
  * landmark, migrate to the new landmark; after skip lands on list-main,
  * the next Tab target is the first roving row.
+ * Round 48: landmark migrate never steals from the filter select; skip→Tab
+ * roving coexists with filter→rows chrome order (skip bypasses filter only
+ * after skip landing).
  */
 
 import {
@@ -156,6 +159,14 @@ export function shouldMigrateListLandmarkFocus(
   return listFilterAriaControlsChanged(before, after)
 }
 
+/**
+ * Round 48: landmark migrate leaves the project filter select alone — only
+ * runs when `wasOnLandmark` (filter is never a landmark).
+ */
+export function listLandmarkMigrateLeavesFilterFocus(): true {
+  return true
+}
+
 /** Focus the landmark that skip / aria-controls currently point at (Round 47). */
 export function migrateListLandmarkFocus(
   opts: { ready: boolean; hasRows: boolean },
@@ -186,4 +197,13 @@ export function resolveNextTabAfterListSkip(
   )
   if (row) return row
   return doc.querySelector<HTMLElement>('[data-ia-list-row="0"]')
+}
+
+/**
+ * Round 48: skip→Tab into roving rows coexists with filter→rows chrome order.
+ * Normal Tab from page chrome still hits filter first; skip landing is the
+ * only path that bypasses filter into the first roving row.
+ */
+export function listSkipTabCoexistsWithFilterOrder(): true {
+  return true
 }

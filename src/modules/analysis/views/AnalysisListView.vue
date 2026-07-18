@@ -182,9 +182,10 @@ const filterAriaControls = computed(() =>
   }),
 )
 
-// Round 43–47: clamp roving index when the project filter changes the visible set;
+// Round 43–48: clamp roving index when the project filter changes the visible set;
 // only move DOM focus when the user was already on a list row (don't steal from the select).
-// Round 47: if skip/landmark focus was on the old landmark, migrate to the new one after empty ↔ rows.
+// Round 47–48: if skip/landmark focus was on the old landmark, migrate to the new one after
+// empty ↔ rows; never steal from the filter select (wasOnLandmark gate).
 watch(filtered, (rows, prevRows) => {
   const before = {
     ready: listReady.value,
