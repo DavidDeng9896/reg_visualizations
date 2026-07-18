@@ -41,6 +41,10 @@
  *
  * Round 48: landmark×filter / skip→Tab×filter / Delete Esc×Demo toast do not
  * unlock a Dexie split; keep shared entry.
+ *
+ * Round 51: empty Demo CTA×toast / Create Cancel skip→Tab / empty CTA
+ * aria-controls preserve do not unlock a Dexie split; keep shared entry.
+ * Workspace toolbar still sync with table/chart (see workspaceViewChunk).
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -68,6 +72,8 @@ export type ProjectsChunkStrategy = {
   round46Reeval: 'keep-shared'
   /** Round 48 re-eval — still keep shared after filter/skip/Demo-toast a11y pass. */
   round48Reeval: 'keep-shared'
+  /** Round 51 re-eval — still keep shared after Demo CTA / skip→Tab / empty CTA pass. */
+  round51Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -85,5 +91,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round45Reeval: 'keep-shared',
     round46Reeval: 'keep-shared',
     round48Reeval: 'keep-shared',
+    round51Reeval: 'keep-shared',
   }
 }

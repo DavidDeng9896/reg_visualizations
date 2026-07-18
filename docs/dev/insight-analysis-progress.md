@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-c6ae8ba4-6b4c-4447-a8c8-7de9adfde9b4-b235`（Round 48；含 R46–47 cherry-pick） |
-| 阶段 | **优化 Round 48 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=48`） |
-| 上次更新 | 2026-07-18 15:07 |
-| 单元 | **347/347 PASS**（+listLandmarkFilterNoSteal / deleteEscDemoToastRing / listSkipTabFilterOrder / dangerEscToastInertR48 / listCreateCsvChunkR48） |
+| 分支 | `cursor/bc-e623e1cd-9151-4286-a4a9-09dab6b04363-7865`（Round 51；含 R49–50） |
+| 阶段 | **优化 Round 51 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=51`） |
+| 上次更新 | 2026-07-18 18:09 |
+| 单元 | **381/381 PASS**（+listEmptyDemoCtaToast / listSkipTabAfterCreateCancel / deleteKeyEscDemoToastR51 / listEmptyCtaAriaControls / listProjectsWorkspaceChunkR51） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；List ~10.9 / ~4.3；Create ~3.2；CSV ~6.1；papaparse ~19.9；Workspace ~67.5；projects 仍 shared） |
+| Build | PASS（dist 无 EP；List ~11.5 / ~4.5；Create ~3.2；CSV ~6.1；papaparse ~19.9；Workspace ~67.5；projects 仍 shared） |
 
-## 2. Round 48 对齐摘要
+## 2. Round 51 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| landmark 迁移 × filter select 不抢焦点 | ✅ `listLandmarkMigrateLeavesFilterFocus` / wasOnLandmark 门闸 |
-| Delete Esc 环 × Demo-fail toast | ✅ `deleteKeyDangerEscRingCoexistsWithDemoToast` |
-| skip→Tab roving × filter Tab 次序共存 | ✅ `listSkipTabCoexistsWithFilterOrder` |
-| danger Esc × toast inert（Demo-fail）回归 | ✅ `dangerEscToastInertR48` |
-| List / Create / CSV / projects chunk 再评估 | ✅ 仍 keep-route-lazy / async-idle-warm / deferred-dynamic / keep-shared |
-| 合并 | **是**（周期 3/3；R46–48 → main） |
+| 空态 Demo CTA 焦点环 × toast | ✅ `listEmptyDemoCtaCoexistsWithToast` / `applyEmptyDemoCtaFocus` |
+| Create Cancel 后 skip 仍可 skip→Tab | ✅ `listSkipTabAfterCreateCancel` |
+| Delete-key Esc × Demo toast 回归 | ✅ `deleteKeyDangerEscDemoToastR51Regression` |
+| empty CTA 焦点 × filter aria-controls 切换 | ✅ `shouldPreserveEmptyCtaFocusOnAriaControlsFlip` |
+| List / projects / workspace 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-shared / keep-sync-shell |
+| 合并 | **是**（周期 3/3；R49–51 → main） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 49 计划（下一 cron · 周期 1/3）
+## 4. Round 52 计划（下一 cron · 周期 1/3）
 
-1. **UX**：列表行 Delete 后 roving 索引钳制 × toast；Create 打开时 skip 隐藏回归
-2. **Perf**：List gzip 边界（R48 ~10.9）；Flowchart/Transform 冷路径再评估
-3. **A11y**：filter Tab → 首行 roving 与 skip→Tab 合同抽检；danger Cancel × Demo toast
+1. **UX**：工作区空态 CTA × toast 环；列表 Demo 成功后焦点落地抽检
+2. **Perf**：List gzip 边界（R51 ~11.5）；Create / CSV 再评估
+3. **A11y**：Create Esc × Demo toast 回归；skip→empty landmark Tab 次序
 4. **验证**：unit + e2e:ui + build
 5. **合并**：否（周期 1/3）

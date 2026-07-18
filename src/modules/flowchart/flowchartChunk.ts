@@ -1,5 +1,5 @@
 /**
- * FlowchartCanvas cold-path chunk strategy (Round 47 eval).
+ * FlowchartCanvas cold-path chunk strategy (Round 47–49 eval).
  *
  * FlowchartCanvas is already `defineAsyncComponent` on the workspace shell
  * with a short loading delay (avoid skeleton flash when warm). After the
@@ -8,6 +8,9 @@
  *
  * Further splitting Flowchart internals would add waterfalls for a thin
  * canvas whose heavy cost is @vue-flow. Keep async-idle-warm.
+ *
+ * Round 49: re-checked after list delete-roving / filter-skip Tab helpers —
+ * still no cleaner split; keep async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -23,6 +26,7 @@ export type FlowchartChunkStrategy = {
   warmAfterWorkspaceMount: true
   splitDeferred: true
   round47Reeval: 'keep-async-idle-warm'
+  round49Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -31,5 +35,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     warmAfterWorkspaceMount: true,
     splitDeferred: true,
     round47Reeval: 'keep-async-idle-warm',
+    round49Reeval: 'keep-async-idle-warm',
   }
 }

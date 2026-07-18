@@ -1,6 +1,7 @@
 <template>
   <div class="list-page">
     <a
+      ref="skipLinkEl"
       class="skip-link"
       data-ia-skip="1"
       :href="skipHref"
@@ -143,7 +144,11 @@ import {
   applyListDeleteFocus,
   planListDeleteFocus,
 } from '@/modules/analysis/listDeleteFocus'
-import { listDeleteSuccessToastMessage } from '@/modules/analysis/listDeleteToastFocus'
+import {
+  listDeleteRovingIndex,
+  listDeleteSuccessToastMessage,
+  shouldApplyListDeleteFocusAfterSuccess,
+} from '@/modules/analysis/listDeleteToastFocus'
 import {
   clampListRowFocus,
   isListRowFocusTarget,
@@ -152,9 +157,18 @@ import {
   resolveListRowKeyAction,
   shouldRefocusRowAfterFilter,
 } from '@/modules/analysis/listRowNav'
-import { listFilterAriaControls, isListLandmarkFocusTarget, shouldMigrateListLandmarkFocus, migrateListLandmarkFocus } from '@/modules/analysis/listFocusOrder'
+import {
+  listFilterAriaControls,
+  isListLandmarkFocusTarget,
+  shouldMigrateListLandmarkFocus,
+  migrateListLandmarkFocus,
+  shouldPreserveEmptyCtaFocusOnAriaControlsFlip,
+} from '@/modules/analysis/listFocusOrder'
 import { demoFailToastMessage, applyDemoFailCreateFocus } from '@/modules/analysis/demoFailToastCreate'
-import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
+import {
+  listSkipVisibleWhenCreateClosed,
+  syncListSkipVisibility,
+} from '@/modules/analysis/listSkipCreate'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -169,6 +183,8 @@ const listReady = ref(false)
 const createRestoreFocus = ref<HTMLElement | null>(null)
 /** Round 41: single Tab stop in the analysis table (roving tabindex). */
 const rowFocusIndex = ref<number | null>(null)
+/** Round 49: skip-link el for Create-open hide regression (`hidden` + aria-hidden). */
+const skipLinkEl = ref<HTMLElement | null>(null)
 let createWarmed = false
 
 const filtered = computed(() =>
@@ -186,6 +202,7 @@ const filterAriaControls = computed(() =>
 // only move DOM focus when the user was already on a list row (don't steal from the select).
 // Round 47–48: if skip/landmark focus was on the old landmark, migrate to the new one after
 // empty ↔ rows; never steal from the filter select (wasOnLandmark gate).
+// Round 51: empty Demo/Create CTA focus is preserved across aria-controls flips.
 watch(filtered, (rows, prevRows) => {
   const before = {
     ready: listReady.value,
@@ -195,12 +212,15 @@ watch(filtered, (rows, prevRows) => {
     ready: listReady.value,
     hasRows: rows.length > 0,
   }
-  const wasOnLandmark = isListLandmarkFocusTarget(document.activeElement)
+  const active = document.activeElement
+  const wasOnLandmark = isListLandmarkFocusTarget(active)
   const prev = rowFocusIndex.value
   const next = clampListRowFocus(prev, rows.length)
   rowFocusIndex.value = next
-  const wasOnListRow = isListRowFocusTarget(document.activeElement)
-  if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
+  const wasOnListRow = isListRowFocusTarget(active)
+  if (shouldPreserveEmptyCtaFocusOnAriaControlsFlip(active, before, after)) {
+    // Keep focus on empty Demo/Create CTA; do not migrate landmark.
+  } else if (shouldRefocusRowAfterFilter(wasOnListRow, prev, next) && next !== null) {
     focusListRow(next)
   } else if (shouldMigrateListLandmarkFocus(wasOnLandmark, before, after)) {
     void nextTick(() => {
@@ -216,6 +236,10 @@ const skipHref = computed(() =>
 watch(showCreate, (open) => {
   setToastHostExternalInert(open)
   if (!open) createRestoreFocus.value = null
+  // Round 49–51: keep skip DOM hide/show aligned with Create; Cancel restores skip→Tab.
+  void nextTick(() => {
+    if (skipLinkEl.value) syncListSkipVisibility(skipLinkEl.value, open)
+  })
 }, { immediate: true })
 
 onUnmounted(() => {
@@ -349,12 +373,17 @@ async function onRemove(id: string) {
   }
   await store.removeAnalysis(id)
   // Round 41: toast + focus ring coexist; focus after toast so ring wins.
+  // Round 49: roving index clamped via listDeleteRovingIndex (= plan bounds).
+  // Round 50: empty CTA × toast; preserve filter focus when select still owns focus.
   toast('success', listDeleteSuccessToastMessage())
   await nextTick()
-  const plan = planListDeleteFocus(deletedIndex, filtered.value.length)
-  if (plan.kind === 'row') rowFocusIndex.value = plan.index
-  else rowFocusIndex.value = null
-  applyListDeleteFocus(plan)
+  const remaining = filtered.value.length
+  const roving = listDeleteRovingIndex(deletedIndex, remaining)
+  const plan = planListDeleteFocus(deletedIndex, remaining)
+  rowFocusIndex.value = roving
+  if (shouldApplyListDeleteFocusAfterSuccess(document.activeElement, remaining)) {
+    applyListDeleteFocus(plan)
+  }
 }
 </script>
 

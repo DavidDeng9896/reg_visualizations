@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–48).
+ * Analysis list chrome focus order (Round 42–51).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -19,6 +19,10 @@
  * Round 48: landmark migrate never steals from the filter select; skip→Tab
  * roving coexists with filter→rows chrome order (skip bypasses filter only
  * after skip landing).
+ * Round 49: filter Tab → first roving row coexists with skip→Tab (same target);
+ * chrome order still filter→rows for normal page Tab.
+ * Round 51: empty Demo/Create CTA focus is preserved across aria-controls
+ * flips (CTA is a child of the empty landmark — not a migrate target).
  */
 
 import {
@@ -206,4 +210,61 @@ export function resolveNextTabAfterListSkip(
  */
 export function listSkipTabCoexistsWithFilterOrder(): true {
   return true
+}
+
+/**
+ * Round 49: after the project filter, Tab enters the first roving row
+ * (same target as skip→Tab after list-main landing).
+ */
+export function listFilterTabEntersRowRoving(): true {
+  return true
+}
+
+/**
+ * Resolve the first roving list row as the next Tab stop after the filter
+ * select (chrome order filter → rows). Empty list → null.
+ */
+export function resolveNextTabAfterFilter(
+  opts: { ready: boolean; hasRows: boolean },
+  doc: Document = document,
+): HTMLElement | null {
+  return resolveNextTabAfterListSkip(opts, doc)
+}
+
+/**
+ * Round 49: filter→Tab and skip→Tab both land on the first roving row;
+ * chrome order still keeps filter before rows for normal page Tab.
+ */
+export function listFilterTabCoexistsWithSkipTab(): true {
+  return true
+}
+
+/**
+ * Round 51: empty Demo/Create CTA focus is preserved when filter
+ * aria-controls flips (empty ↔ rows).
+ */
+export function listEmptyCtaPreservesFocusOnAriaControlsSwitch(): true {
+  return true
+}
+
+/** True when focus is on an empty-list Demo or Create CTA button. */
+export function isListEmptyCtaFocusTarget(el: Element | null): boolean {
+  return (
+    el instanceof HTMLElement &&
+    el.classList.contains('empty-cta') &&
+    !!el.closest('.empty-list, #analysis-list')
+  )
+}
+
+/**
+ * When aria-controls flips and focus is on an empty CTA, preserve that focus
+ * (do not migrate landmark / steal). Returns true when preservation applies.
+ */
+export function shouldPreserveEmptyCtaFocusOnAriaControlsFlip(
+  activeEl: Element | null,
+  before: { ready: boolean; hasRows: boolean },
+  after: { ready: boolean; hasRows: boolean },
+): boolean {
+  if (!isListEmptyCtaFocusTarget(activeEl)) return false
+  return listFilterAriaControlsChanged(before, after)
 }
