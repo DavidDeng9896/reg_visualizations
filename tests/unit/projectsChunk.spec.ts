@@ -9,6 +9,7 @@ describe('projectsChunk', () => {
       dexieStore: 'shared-entry',
       feedback: 'css-decoupled-js-shared',
       splitDeferred: true,
+      round35Feedback: 'keep-shared',
     })
   })
 })

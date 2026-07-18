@@ -896,6 +896,7 @@ import {
   parseOptionalNumber,
 } from '@/modules/chart/nativeNumber'
 import { toast } from '@/shared/ui/feedback'
+import { scheduleFitRuntimeWarm } from '@/modules/chart/editDrawerChunk'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
 
 const props = defineProps<{
@@ -1272,6 +1273,8 @@ function openDrawer() {
   restoreFocus = captureFocusEl()
   document.body.style.overflow = 'hidden'
   numberStatus.value = ''
+  // Warm fitEngine after drawer is open so MODEL / fit paths stay snappy (R35).
+  scheduleFitRuntimeWarm()
   void nextTick(() => {
     const list = focusables()
     const closeBtn = list.find((el) => el.classList.contains('icon-close'))
