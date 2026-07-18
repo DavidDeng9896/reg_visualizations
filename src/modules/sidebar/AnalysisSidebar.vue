@@ -1,133 +1,171 @@
 <template>
   <aside class="sidebar" :style="{ width: `${width}px` }" aria-label="Analysis 侧栏">
-    <input
-      ref="searchRef"
-      v-model="q"
-      type="search"
-      class="search"
-      placeholder="搜索表 / 视图"
-      aria-label="搜索表或视图"
-      aria-controls="sidebar-tree"
-      autocomplete="off"
-      @keydown="onSearchKeydown"
-    />
-    <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
-    <div class="section-head">
-      <span id="analysis-data-heading">ANALYSIS DATA</span>
-      <div class="menu-anchor" ref="addRoot">
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label="添加数据"
-          aria-haspopup="menu"
-          :aria-expanded="addOpen"
-          aria-controls="sidebar-add-data-menu"
-          @click="toggleAdd"
-          @keydown="onAddTriggerKey"
-        >
-          +
-        </button>
+    <div class="sidebar-chrome" :inert="chromeInert || undefined">
+      <input
+        ref="searchRef"
+        v-model="q"
+        type="search"
+        class="search"
+        placeholder="搜索表 / 视图"
+        aria-label="搜索表或视图"
+        aria-controls="sidebar-tree"
+        autocomplete="off"
+        @keydown="onSearchKeydown"
+      />
+      <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
+      <div class="section-head">
+        <span id="analysis-data-heading">ANALYSIS DATA</span>
+        <div class="menu-anchor" ref="addRoot">
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="添加数据"
+            aria-haspopup="menu"
+            :aria-expanded="addOpen"
+            aria-controls="sidebar-add-data-menu"
+            @click="toggleAdd"
+            @keydown="onAddTriggerKey"
+          >
+            +
+          </button>
+          <ul
+            v-if="addOpen"
+            id="sidebar-add-data-menu"
+            class="native-menu"
+            role="menu"
+            aria-label="添加数据"
+            @keydown="onAddMenuKey"
+          >
+            <li
+              v-for="(item, i) in addItems"
+              :key="item.cmd"
+              role="menuitem"
+              :tabindex="addActive === i ? 0 : -1"
+              :aria-disabled="item.disabled || undefined"
+              :class="{ 'is-disabled': item.disabled, 'is-active': addActive === i }"
+              @click="!item.disabled && pickAdd(item.cmd)"
+            >
+              {{ item.label }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <nav class="tree-nav" aria-labelledby="analysis-data-heading">
         <ul
-          v-if="addOpen"
-          id="sidebar-add-data-menu"
-          class="native-menu"
-          role="menu"
-          aria-label="添加数据"
-          @keydown="onAddMenuKey"
+          id="sidebar-tree"
+          class="sidebar-tree"
+          role="tree"
+          aria-label="表与视图树"
         >
           <li
-            v-for="(item, i) in addItems"
-            :key="item.cmd"
-            role="menuitem"
-            :tabindex="addActive === i ? 0 : -1"
-            :aria-disabled="item.disabled || undefined"
-            :class="{ 'is-disabled': item.disabled, 'is-active': addActive === i }"
-            @click="!item.disabled && pickAdd(item.cmd)"
+            v-for="(node, index) in flatNodes"
+            :key="node.id"
+            class="tree-node"
+            role="none"
+            :style="{ '--tree-depth': node.depth }"
           >
-            {{ item.label }}
+            <div
+              class="tree-node-content"
+              role="treeitem"
+              :aria-selected="store.selectedNodeId === node.id"
+              :aria-level="node.depth + 1"
+              :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
+              :class="{ 'is-current': store.selectedNodeId === node.id }"
+              :tabindex="treeItemTabIndex(index, treeFocusIndex)"
+              :data-tree-index="index"
+              @click="onTreeActivate(node, index)"
+              @focus="treeFocusIndex = index"
+              @keydown="(e) => onTreeItemKeydown(e, node, index)"
+            >
+              <span class="label">{{ node.label }}</span>
+              <span class="ops" @click.stop>
+                <div class="menu-anchor" :ref="(el) => setOpsRoot(node.id, el)">
+                  <button
+                    type="button"
+                    class="icon-btn ops-btn"
+                    :aria-label="`${node.label} 更多操作`"
+                    aria-haspopup="menu"
+                    :aria-expanded="opsOpenId === node.id"
+                    :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
+                    tabindex="-1"
+                    @click="toggleOps(node)"
+                    @keydown="(e) => onOpsTriggerKey(e, node, index)"
+                  >
+                    ⋯
+                  </button>
+                  <ul
+                    v-if="opsOpenId === node.id"
+                    :id="`node-ops-menu-${node.id}`"
+                    class="native-menu native-menu-end"
+                    role="menu"
+                    :aria-label="`${node.label} 更多操作`"
+                    @keydown="onOpsMenuKey"
+                  >
+                    <li
+                      v-for="(item, i) in opsItemsFor(node)"
+                      :key="item.cmd"
+                      role="menuitem"
+                      :tabindex="opsActive === i ? 0 : -1"
+                      :class="{
+                        'is-active': opsActive === i,
+                        'is-danger': item.cmd === 'delete',
+                        'has-divider': item.cmd === 'delete',
+                      }"
+                      @click="pickOps(item.cmd, node)"
+                    >
+                      {{ item.label }}
+                    </li>
+                  </ul>
+                </div>
+              </span>
+            </div>
           </li>
         </ul>
-      </div>
-    </div>
-
-    <nav class="tree-nav" aria-labelledby="analysis-data-heading">
-      <ul
-        id="sidebar-tree"
-        class="sidebar-tree"
-        role="tree"
-        aria-label="表与视图树"
-      >
-        <li
-          v-for="(node, index) in flatNodes"
-          :key="node.id"
-          class="tree-node"
-          role="none"
-          :style="{ '--tree-depth': node.depth }"
+        <div
+          v-if="emptyKind"
+          class="tree-empty"
+          v-bind="sidebarEmptyRegionAttrs()"
         >
-          <div
-            class="tree-node-content"
-            role="treeitem"
-            :aria-selected="store.selectedNodeId === node.id"
-            :aria-level="node.depth + 1"
-            :aria-label="`${node.kind === 'table' ? '表' : '视图'} ${node.label}`"
-            :class="{ 'is-current': store.selectedNodeId === node.id }"
-            :tabindex="treeItemTabIndex(index, treeFocusIndex)"
-            :data-tree-index="index"
-            @click="onTreeActivate(node, index)"
-            @focus="treeFocusIndex = index"
-            @keydown="(e) => onTreeItemKeydown(e, node, index)"
-          >
-            <span class="label">{{ node.label }}</span>
-            <span class="ops" @click.stop>
-              <div class="menu-anchor" :ref="(el) => setOpsRoot(node.id, el)">
-                <button
-                  type="button"
-                  class="icon-btn ops-btn"
-                  :aria-label="`${node.label} 更多操作`"
-                  aria-haspopup="menu"
-                  :aria-expanded="opsOpenId === node.id"
-                  :aria-controls="opsOpenId === node.id ? `node-ops-menu-${node.id}` : undefined"
-                  tabindex="-1"
-                  @click="toggleOps(node)"
-                  @keydown="(e) => onOpsTriggerKey(e, node, index)"
-                >
-                  ⋯
-                </button>
-                <ul
-                  v-if="opsOpenId === node.id"
-                  :id="`node-ops-menu-${node.id}`"
-                  class="native-menu native-menu-end"
-                  role="menu"
-                  :aria-label="`${node.label} 更多操作`"
-                  @keydown="onOpsMenuKey"
-                >
-                  <li
-                    v-for="(item, i) in opsItemsFor(node)"
-                    :key="item.cmd"
-                    role="menuitem"
-                    :tabindex="opsActive === i ? 0 : -1"
-                    :class="{
-                      'is-active': opsActive === i,
-                      'is-danger': item.cmd === 'delete',
-                      'has-divider': item.cmd === 'delete',
-                    }"
-                    @click="pickOps(item.cmd, node)"
-                  >
-                    {{ item.label }}
-                  </li>
-                </ul>
-              </div>
-            </span>
+          <strong class="tree-empty__title">{{ emptyCopy.title }}</strong>
+          <p class="tree-empty__body">{{ emptyCopy.body }}</p>
+          <div class="tree-empty__cta">
+            <template v-if="emptyKind === 'no-data'">
+              <button
+                type="button"
+                class="btn btn-primary empty-cta"
+                :aria-label="sidebarEmptyCtaAria('csv')"
+                @click="emit('add-data', 'csv')"
+              >
+                导入 CSV
+              </button>
+              <button
+                type="button"
+                class="btn empty-cta"
+                :aria-label="sidebarEmptyCtaAria('combine')"
+                @click="emit('add-data', 'combine')"
+              >
+                合并表
+              </button>
+            </template>
+            <button
+              v-else
+              type="button"
+              class="btn empty-cta"
+              :aria-label="sidebarEmptyCtaAria('clear')"
+              @click="clearSearch"
+            >
+              清除搜索
+            </button>
           </div>
-        </li>
-      </ul>
-      <p v-if="!flatNodes.length" class="tree-empty">无匹配的表或视图</p>
-    </nav>
+        </div>
+      </nav>
 
-    <div class="footer">
-      <button type="button" class="ext-btn" @click="toast('info', 'Connect with external tool：后续版本')">
-        Connect with external tool
-      </button>
+      <div class="footer">
+        <button type="button" class="ext-btn" @click="toast('info', 'Connect with external tool：后续版本')">
+          Connect with external tool
+        </button>
+      </div>
     </div>
 
     <div
@@ -175,7 +213,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
-import { confirm, isFeedbackCancel, prompt, toast } from '@/shared/ui/feedback'
+import { confirm, isFeedbackCancel, onFeedbackDialogOpenChange, prompt, toast } from '@/shared/ui/feedback'
+import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { enabledMenuIndices, handleMenuKeydown } from '@/shared/ui/menuNav'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import type { ViewType } from '@/shared/types/analysis'
@@ -186,13 +225,29 @@ import {
 } from '@/modules/sidebar/sidebarTree'
 import {
   clampTreeFocusIndex,
+  formatSearchNoMatchStatus,
   nextSearchClearedStatus,
+  nextSearchMatchStatus,
+  shouldRevealSearchAfterClear,
   nextTreeIndex,
   prevTreeIndex,
   resolveSearchKeyAction,
   resolveTreeKeyAction,
   treeItemTabIndex,
 } from '@/modules/sidebar/treeNav'
+import {
+  sidebarEmptyCopy,
+  sidebarEmptyCtaAria,
+  sidebarEmptyKind,
+  sidebarEmptyRegionAttrs,
+} from '@/modules/sidebar/sidebarEmpty'
+import {
+  newViewDialogDefaults,
+  resolveAfterCreateFocus,
+  resolveNewViewRestoreFocus,
+} from '@/modules/sidebar/newViewHandoff'
+import { sidebarChromeInert } from '@/modules/sidebar/sidebarDialogInert'
+import { anyWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -203,6 +258,7 @@ const store = useAnalysisStore()
 const q = ref('')
 const searchRef = ref<HTMLInputElement | null>(null)
 const searchStatus = ref('')
+const feedbackDialogOpen = ref(false)
 const showNewView = ref(false)
 const newViewName = ref('New view')
 const newViewType = ref<ViewType>('table')
@@ -210,6 +266,8 @@ const newViewParent = ref<{ tableId: string; parentId: string } | null>(null)
 const newViewNameRef = ref<HTMLInputElement | null>(null)
 const newViewPanelRef = ref<HTMLElement | null>(null)
 let newViewRestoreFocus: HTMLElement | null = null
+let pendingRestoreFocus: HTMLElement | null = null
+let stopFeedbackDialogListen: (() => void) | null = null
 const viewTypes: ViewType[] = ['table', 'bar', 'line', 'scatter', 'box', 'pie', 'heatmap']
 
 const FOCUSABLE =
@@ -257,6 +315,19 @@ const rawTree = computed((): SidebarTreeNode[] => {
 const treeData = computed(() => filterSidebarTree(rawTree.value, q.value))
 const flatNodes = computed(() => flattenSidebarTree(treeData.value))
 const treeFocusIndex = ref<number | null>(null)
+const emptyKind = computed(() =>
+  sidebarEmptyKind({
+    tableCount: store.current?.tables.length ?? 0,
+    query: q.value,
+    visibleCount: flatNodes.value.length,
+  }),
+)
+const emptyCopy = computed(() =>
+  emptyKind.value ? sidebarEmptyCopy(emptyKind.value) : { title: '', body: '' },
+)
+const chromeInert = computed(() =>
+  sidebarChromeInert(showNewView.value, anyWorkspaceDialogOpen(), feedbackDialogOpen.value),
+)
 
 watch(
   flatNodes,
@@ -264,6 +335,18 @@ watch(
     treeFocusIndex.value = clampTreeFocusIndex(nodes.length, treeFocusIndex.value)
   },
   { immediate: true },
+)
+
+watch(
+  [emptyKind, q, () => flatNodes.value.length],
+  ([kind, query, count]) => {
+    if (kind === 'no-match') {
+      searchStatus.value = formatSearchNoMatchStatus(query)
+      return
+    }
+    const next = nextSearchMatchStatus(searchStatus.value, query, count)
+    if (next !== null) searchStatus.value = next
+  },
 )
 
 watch(
@@ -277,15 +360,21 @@ watch(
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer, true)
+  stopFeedbackDialogListen = onFeedbackDialogOpenChange((open) => {
+    feedbackDialogOpen.value = open
+  })
 })
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
+  stopFeedbackDialogListen?.()
+  stopFeedbackDialogListen = null
 })
 
 watch(showNewView, (open) => {
   if (open) {
-    newViewRestoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    newViewRestoreFocus = resolveNewViewRestoreFocus(pendingRestoreFocus)
+    pendingRestoreFocus = null
     document.body.style.overflow = 'hidden'
     void nextTick(() => newViewNameRef.value?.focus())
   } else {
@@ -442,12 +531,14 @@ function onSearchKeydown(e: KeyboardEvent) {
   if (!action) return
   e.preventDefault()
   if (action === 'clear') {
+    const reveal = shouldRevealSearchAfterClear(emptyKind.value)
     q.value = ''
     // Announce after clear so the live region reflects the unfiltered tree;
     // skip when the message would duplicate the previous live status.
     void nextTick(() => {
       const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length)
       if (next !== null) searchStatus.value = next
+      if (reveal) focusSearch({ reveal: true })
     })
     return
   }
@@ -458,9 +549,12 @@ function onSearchKeydown(e: KeyboardEvent) {
   focusTreeItem(target)
 }
 
-function focusSearch() {
+function focusSearch(opts?: { reveal?: boolean }) {
   void nextTick(() => {
-    searchRef.value?.focus()
+    const el = searchRef.value
+    if (!el) return
+    el.focus()
+    if (opts?.reveal) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
 }
 
@@ -556,12 +650,37 @@ function onDocPointer(e: PointerEvent) {
   }
 }
 
+function clearSearch() {
+  const reveal = shouldRevealSearchAfterClear(emptyKind.value)
+  q.value = ''
+  void nextTick(() => {
+    // Empty-CTA clear always announces so users hear confirmation after no-match.
+    const next = nextSearchClearedStatus(searchStatus.value, flatNodes.value.length, {
+      force: true,
+    })
+    if (next !== null) searchStatus.value = next
+    focusSearch({ reveal })
+  })
+}
+
+function openNewViewDialog(opts: {
+  tableId: string
+  parentId: string
+  restoreFocus?: HTMLElement | null
+}) {
+  const defaults = newViewDialogDefaults({ tableId: opts.tableId, parentId: opts.parentId })
+  newViewParent.value = { tableId: defaults.tableId, parentId: defaults.parentId }
+  newViewName.value = defaults.name
+  newViewType.value = defaults.viewType
+  pendingRestoreFocus = opts.restoreFocus ?? null
+  showNewView.value = true
+}
+
+defineExpose({ openNewViewDialog })
+
 function onMenu(cmd: string, data: SidebarTreeNode) {
   if (cmd === 'new-view') {
-    newViewParent.value = { tableId: data.tableId, parentId: data.id }
-    newViewName.value = 'New view'
-    newViewType.value = 'table'
-    showNewView.value = true
+    openNewViewDialog({ tableId: data.tableId, parentId: data.id })
   } else if (cmd === 'rename') {
     void prompt('新名称', '重命名', { inputValue: data.label.replace(/ \(.*\)$/, '') })
       .then(({ value }) => {
@@ -577,10 +696,11 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
     store.promoteViewToTable(data.id)
     toast('success', '已提升为 Analysis 表')
   } else if (cmd === 'delete') {
-    void confirm('确定删除？子视图将一并删除。此操作不可撤销。', '删除节点', {
-      danger: true,
-      confirmButtonText: '删除',
-    })
+    void confirm(
+      '确定删除？子视图将一并删除。此操作不可撤销。',
+      '删除节点',
+      dangerDeleteOptions('删除'),
+    )
       .then(() => {
         const r = store.deleteNode(data.id)
         if (!r.ok) toast('error', r.reason || '删除失败')
@@ -626,13 +746,27 @@ function createView() {
   if (!newViewParent.value) return
   const name = newViewName.value.trim()
   if (!name) return
-  store.addView(
+  const view = store.addView(
     newViewParent.value.tableId,
     newViewParent.value.parentId,
     name,
     newViewType.value,
   )
+  const createdId = view?.id ?? null
+  // Opener CTA (e.g. no-views hint) may unmount — never restore it after create.
+  newViewRestoreFocus = null
   showNewView.value = false
+  const target = resolveAfterCreateFocus({ createdNodeId: createdId })
+  void nextTick(() => {
+    if (target === 'tree-node' && createdId) {
+      const idx = flatNodes.value.findIndex((n) => n.id === createdId)
+      if (idx >= 0) {
+        focusTreeItem(idx)
+        return
+      }
+    }
+    document.getElementById('workspace-main')?.focus({ preventScroll: true })
+  })
 }
 </script>
 
@@ -645,6 +779,13 @@ function createView() {
   display: flex;
   flex-direction: column;
   padding: 10px;
+  min-width: 0;
+}
+.sidebar-chrome {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
 }
 .search {
@@ -710,8 +851,55 @@ function createView() {
 }
 .tree-empty {
   margin: 8px 4px;
+  padding: 10px 8px;
   font-size: 12px;
   color: #8f959e;
+  border-radius: 6px;
+  background: #f7f8fa;
+}
+.tree-empty:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.tree-empty__title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2329;
+  margin-bottom: 4px;
+}
+.tree-empty__body {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.tree-empty__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tree-empty .btn {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ia-border);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.tree-empty .btn:hover {
+  border-color: var(--ia-accent);
+  color: var(--ia-accent);
+}
+.tree-empty .btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.tree-empty .btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
 }
 .section-head {
   display: flex;

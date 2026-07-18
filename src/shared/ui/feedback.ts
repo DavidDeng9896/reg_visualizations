@@ -5,6 +5,8 @@
 
 import {
   FeedbackCancelError,
+  dismissNewestToastElement,
+  isFeedbackDialogOpen,
   listFocusable,
   preferCancelInitialFocus,
   toastLivePoliteness,
@@ -12,7 +14,8 @@ import {
   type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
-import './feedback.css'
+import { captureFocusEl, restoreFocusEl } from './focusRestore'
+// feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
 
@@ -22,6 +25,44 @@ const TOAST_MAX = 5
 let toastHost: HTMLElement | null = null
 let toastSeq = 0
 let boxSeq = 0
+let openBoxCount = 0
+let docEscBound = false
+/** Workspace overlays (CSV / Combine / Transform / ChartEdit) also block toast (Round 33). */
+let externalToastInert = false
+
+type FeedbackDialogListener = (open: boolean) => void
+const feedbackDialogListeners = new Set<FeedbackDialogListener>()
+
+function notifyFeedbackDialogListeners() {
+  const open = openBoxCount > 0
+  feedbackDialogListeners.forEach((fn) => fn(open))
+}
+
+/**
+ * Subscribe to native confirm/prompt open state (Round 32).
+ * Invokes immediately with the current open flag; returns an unsubscribe.
+ */
+export function onFeedbackDialogOpenChange(fn: FeedbackDialogListener): () => void {
+  feedbackDialogListeners.add(fn)
+  fn(openBoxCount > 0)
+  return () => {
+    feedbackDialogListeners.delete(fn)
+  }
+}
+
+/**
+ * Mark toast host inert while a non-feedback overlay owns the layer (Round 33).
+ * CSV / Combine / Transform / ChartEdit should call this so Esc/Tab cannot
+ * reach toast close buttons behind the modal.
+ */
+export function setToastHostExternalInert(active: boolean): void {
+  externalToastInert = Boolean(active)
+  syncToastHostInert()
+}
+
+function toastLayerBlocked(): boolean {
+  return openBoxCount > 0 || isFeedbackDialogOpen() || externalToastInert
+}
 
 function ensureToastHost(): HTMLElement {
   if (toastHost && document.body.contains(toastHost)) return toastHost
@@ -30,7 +71,34 @@ function ensureToastHost(): HTMLElement {
   host.setAttribute('data-ia-toast-host', '1')
   document.body.appendChild(host)
   toastHost = host
+  bindDocumentEscape()
+  syncToastHostInert()
   return host
+}
+
+function syncToastHostInert() {
+  const host = toastHost
+  if (!host) return
+  if (toastLayerBlocked()) host.setAttribute('inert', '')
+  else host.removeAttribute('inert')
+}
+
+/** Document Escape closes the newest toast when no dialog owns the layer (Round 27). */
+function onDocumentEscape(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (e.defaultPrevented) return
+  if (toastLayerBlocked()) return
+  const host = toastHost && document.body.contains(toastHost) ? toastHost : null
+  if (!host?.firstElementChild) return
+  e.preventDefault()
+  e.stopPropagation()
+  dismissNewestToastElement(host)
+}
+
+function bindDocumentEscape() {
+  if (docEscBound || typeof document === 'undefined') return
+  document.addEventListener('keydown', onDocumentEscape, true)
+  docEscBound = true
 }
 
 export function toast(type: MessageType, message: string) {
@@ -58,6 +126,7 @@ export function toast(type: MessageType, message: string) {
   close.className = 'ia-toast__close'
   close.setAttribute('aria-label', '关闭通知')
   close.textContent = '×'
+  el.appendChild(close)
 
   let ttl = window.setTimeout(() => {
     if (el.isConnected) el.remove()
@@ -72,10 +141,17 @@ export function toast(type: MessageType, message: string) {
       if (el.isConnected) el.remove()
     }, TOAST_TTL_MS)
   }
-
-  close.addEventListener('click', () => {
+  const dismiss = () => {
     clearTtl()
     el.remove()
+  }
+
+  close.addEventListener('click', dismiss)
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      dismiss()
+    }
   })
   el.addEventListener('mouseenter', clearTtl)
   el.addEventListener('mouseleave', restartTtl)
@@ -84,7 +160,16 @@ export function toast(type: MessageType, message: string) {
     if (!el.contains(e.relatedTarget as Node | null)) restartTtl()
   })
 
-  host.appendChild(el)
+  // Newest first in DOM → Tab reaches the latest close button before older ones (Round 26).
+  host.insertBefore(el, host.firstChild)
+  bindDocumentEscape()
+}
+
+/** Close buttons in Tab order (newest toast first). */
+export function listToastCloseButtons(doc: Document = document): HTMLButtonElement[] {
+  const host = doc.querySelector('[data-ia-toast-host]')
+  if (!host) return []
+  return [...host.querySelectorAll<HTMLButtonElement>('button.ia-toast__close')]
 }
 
 type ConfirmOptions = {
@@ -111,8 +196,7 @@ function openMessageBox(
   }
 
   return new Promise((resolve, reject) => {
-    const restoreFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const restoreFocus = captureFocusEl()
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
@@ -189,12 +273,19 @@ function openMessageBox(
     root.appendChild(panel)
     document.body.appendChild(root)
 
+    openBoxCount += 1
+    syncToastHostInert()
+    notifyFeedbackDialogListeners()
+
     let settled = false
     const cleanup = () => {
       root.removeEventListener('keydown', onKeydown)
       root.remove()
+      openBoxCount = Math.max(0, openBoxCount - 1)
+      syncToastHostInert()
+      notifyFeedbackDialogListeners()
       document.body.style.overflow = prevOverflow
-      if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+      restoreFocusEl(restoreFocus)
     }
 
     const settleCancel = () => {
@@ -269,4 +360,10 @@ export async function prompt(
   return result as { value: string }
 }
 
-export { FeedbackCancelError, isFeedbackCancel, preferCancelInitialFocus } from './feedbackA11y'
+export {
+  FeedbackCancelError,
+  dismissNewestToastElement,
+  isFeedbackCancel,
+  isFeedbackDialogOpen,
+  preferCancelInitialFocus,
+} from './feedbackA11y'

@@ -4,9 +4,27 @@
       使用 Tab 聚焦节点，Enter 或 Space 选择并跳转到工作区；画布仅支持拖拽布局。
     </p>
     <div class="banner" role="note">修改分析结构请从侧栏进行；画布仅支持拖拽布局</div>
-    <div v-if="!graph.nodes.length" class="flow-empty" role="status">
-      <h3>流程图为空</h3>
-      <p>请先通过「+ Add data」导入 CSV 或合并表，侧栏会出现节点后此处同步展示。</p>
+    <div v-if="!graph.nodes.length" class="flow-empty" v-bind="flowchartEmptyRegionAttrs()">
+      <h3>{{ emptyCopy.title }}</h3>
+      <p>{{ emptyCopy.body }}</p>
+      <div class="flow-empty__cta">
+        <button
+          type="button"
+          class="btn btn-primary empty-cta"
+          :aria-label="flowchartEmptyCtaAria('csv')"
+          @click="emit('add-data', 'csv')"
+        >
+          导入 CSV
+        </button>
+        <button
+          type="button"
+          class="btn empty-cta"
+          :aria-label="flowchartEmptyCtaAria('combine')"
+          @click="emit('add-data', 'combine')"
+        >
+          合并表
+        </button>
+      </div>
     </div>
     <VueFlow
       v-model:nodes="nodes"
@@ -35,9 +53,16 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
 import { flattenViews } from '@/modules/analysis/viewTree'
+import {
+  flowchartEmptyCopy,
+  flowchartEmptyCtaAria,
+  flowchartEmptyRegionAttrs,
+} from './flowchartEmpty'
 
 const props = defineProps<{ focusId?: string | null }>()
+const emit = defineEmits<{ 'add-data': [cmd: string] }>()
 const store = useAnalysisStore()
+const emptyCopy = flowchartEmptyCopy()
 const { setCenter, findNode, getSelectedNodes } = useVueFlow()
 
 const nodes = ref<Node[]>([])
@@ -193,6 +218,41 @@ function onCanvasKeydown(ev: KeyboardEvent) {
   max-width: 420px;
   font-size: 14px;
   line-height: 1.5;
+}
+.flow-empty__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ia-border, #d0d3d9);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2329;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--ia-accent, #2f6fed);
+  color: var(--ia-accent, #2f6fed);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent, #2f6fed);
+  outline-offset: 2px;
+}
+.btn-primary {
+  background: var(--ia-accent, #2f6fed);
+  border-color: var(--ia-accent, #2f6fed);
+  color: #fff;
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  color: #fff;
 }
 /* Keyboard focus ring — stronger than selected shadow for a11y contrast */
 :deep(.vue-flow__node:focus),

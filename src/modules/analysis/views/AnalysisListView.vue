@@ -1,8 +1,9 @@
 <template>
   <div class="list-page">
+    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到列表</a>
     <header class="top">
       <div>
-        <h1>Insight Analysis</h1>
+        <h1 tabindex="-1">Insight Analysis</h1>
         <p class="sub">本地数据工作空间 · 导入 · 转换 · 可视化</p>
       </div>
       <div class="top-actions">
@@ -23,7 +24,22 @@
       </label>
     </div>
 
-    <table v-if="filtered.length" class="analysis-table" aria-label="Analysis 列表">
+    <div
+      v-if="!listReady"
+      class="list-skel ia-skel"
+      v-bind="{ ...listMainRegionAttrs(), ...listSkeletonAttrs() }"
+    >
+      <div class="list-skel__rows" aria-hidden="true">
+        <div v-for="n in 4" :key="n" class="ia-skel__pulse list-skel__row" />
+      </div>
+      <span class="sr-only">加载中…</span>
+    </div>
+    <table
+      v-else-if="filtered.length"
+      class="analysis-table"
+      aria-label="Analysis 列表"
+      v-bind="listMainRegionAttrs()"
+    >
       <thead>
         <tr>
           <th scope="col">名称</th>
@@ -49,8 +65,28 @@
         </tr>
       </tbody>
     </table>
-    <div v-else class="empty-list">
-      <p>还没有 Analysis。使用上方「一键 Demo」快速体验，或「+ 创建 Analysis」后导入 CSV。</p>
+    <div v-else class="empty-list" v-bind="listEmptyRegionAttrs()">
+      <div class="empty-list__pulse ia-skel__pulse" aria-hidden="true" />
+      <p>还没有 Analysis。使用下方按钮快速体验，或创建后导入 CSV。</p>
+      <div class="empty-list__cta">
+        <button
+          type="button"
+          class="btn empty-cta"
+          :aria-label="listEmptyCtaAria('demo')"
+          :disabled="demoBusy"
+          @click="createDemo"
+        >
+          {{ demoBusy ? '创建中…' : '一键 Demo' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary empty-cta"
+          :aria-label="listEmptyCtaAria('create')"
+          @click="showCreate = true"
+        >
+          + 创建 Analysis
+        </button>
+      </div>
     </div>
 
     <CreateAnalysisDialog v-if="showCreate" v-model="showCreate" @create="onCreate" />
@@ -61,7 +97,15 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirm, isFeedbackCancel, toast } from '@/shared/ui/feedback'
+import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
+import { listSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
+import {
+  listEmptyRegionAttrs,
+  listEmptyCtaAria,
+  listMainRegionAttrs,
+  listSkipHref,
+} from '@/modules/analysis/listEmpty'
 import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 
@@ -74,12 +118,23 @@ const router = useRouter()
 const showCreate = ref(false)
 const projectFilter = ref('')
 const demoBusy = ref(false)
+const listReady = ref(false)
 
 const filtered = computed(() =>
   store.list.filter((a) => !projectFilter.value || a.projectId === projectFilter.value),
 )
 
-onMounted(() => store.loadList())
+const skipHref = computed(() =>
+  listSkipHref({ ready: listReady.value, hasRows: filtered.value.length > 0 }),
+)
+
+onMounted(async () => {
+  try {
+    await store.loadList()
+  } finally {
+    listReady.value = true
+  }
+})
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString()
@@ -136,10 +191,11 @@ function open(row: { id: string }) {
 
 async function onRemove(id: string) {
   try {
-    await confirm('确定删除该 Analysis？此操作不可撤销。', '删除 Analysis', {
-      danger: true,
-      confirmButtonText: '删除',
-    })
+    await confirm(
+      '确定删除该 Analysis？此操作不可撤销。',
+      '删除 Analysis',
+      dangerDeleteOptions('删除'),
+    )
   } catch (err) {
     if (isFeedbackCancel(err)) return
     throw err
@@ -151,9 +207,25 @@ async function onRemove(id: string) {
 
 <style scoped>
 .list-page {
+  position: relative;
   max-width: 960px;
   margin: 0 auto;
   padding: 32px 20px;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 30;
+  padding: 8px 12px;
+  background: var(--ia-accent);
+  color: #fff;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  left: 0;
 }
 .top {
   display: flex;
@@ -210,6 +282,18 @@ h1 {
   filter: brightness(1.05);
   color: #fff;
 }
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.btn-primary:focus-visible {
+  outline-offset: 2px;
+}
+.link-danger:focus-visible {
+  outline: 2px solid var(--ia-danger, #d92d20);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .analysis-table {
   width: 100%;
   border-collapse: collapse;
@@ -265,17 +349,48 @@ h1 {
   white-space: nowrap;
   border: 0;
 }
+.list-skel {
+  margin-top: 8px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+}
+.list-skel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.list-skel__row {
+  width: 100%;
+  height: 14px;
+}
 .empty-list {
-  margin-top: 48px;
+  margin-top: 24px;
   text-align: center;
   color: #646a73;
-  padding: 32px 16px;
+  padding: 40px 16px 32px;
   background: linear-gradient(180deg, #fff 0%, #f7f8fa 100%);
   border: 1px dashed var(--ia-border);
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.empty-list__pulse {
+  width: min(200px, 50%);
+  height: 10px;
 }
 .empty-list p {
   margin: 0;
+  max-width: 36em;
+}
+.empty-list__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 @media (max-width: 640px) {
   .top {

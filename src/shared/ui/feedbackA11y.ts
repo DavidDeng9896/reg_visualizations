@@ -71,3 +71,19 @@ export function isFeedbackCancel(err: unknown): boolean {
       (err as { action?: string }).action === 'cancel')
   )
 }
+
+/** True when a native confirm/prompt dialog is mounted. */
+export function isFeedbackDialogOpen(doc: Document = document): boolean {
+  return Boolean(doc.querySelector('[data-ia-feedback]'))
+}
+
+/**
+ * Remove the newest toast (first child of host). Returns true when one was dismissed.
+ * Used by document-level Escape (Round 27).
+ */
+export function dismissNewestToastElement(host: Element | null | undefined): boolean {
+  const newest = host?.firstElementChild
+  if (!newest) return false
+  newest.remove()
+  return true
+}

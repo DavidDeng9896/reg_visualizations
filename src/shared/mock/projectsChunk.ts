@@ -1,0 +1,33 @@
+/**
+ * Entry-chunk strategy for mock projects vs Dexie/store/feedback (Round 30–33 eval).
+ *
+ * Build names the shared list/workspace graph after `projects.ts`, but most of
+ * the ~100KB+ is Dexie + analysisStore + feedback JS. `MOCK_PROJECTS` itself is
+ * tiny. Splitting Dexie into a separate async chunk would delay first open of
+ * every Analysis and complicate the store bootstrap.
+ *
+ * Round 33 re-eval of the feedback boundary: feedback CSS stays decoupled via
+ * `main.css` (R25). feedback JS remains on the shared entry because toast /
+ * confirm are used from list + sidebar + workspace paths; extracting it to a
+ * dedicated async chunk would add a race on first toast and does not shrink the
+ * critical list→workspace path meaningfully. Keep mock projects sync; leave
+ * Dexie/store/feedback JS co-located.
+ */
+
+export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
+
+export type ProjectsChunkStrategy = {
+  mockProjects: 'sync'
+  dexieStore: 'shared-entry'
+  feedback: 'css-decoupled-js-shared'
+  splitDeferred: true
+}
+
+export function projectsChunkStrategy(): ProjectsChunkStrategy {
+  return {
+    mockProjects: 'sync',
+    dexieStore: 'shared-entry',
+    feedback: 'css-decoupled-js-shared',
+    splitDeferred: true,
+  }
+}

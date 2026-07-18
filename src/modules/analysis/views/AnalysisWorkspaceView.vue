@@ -1,7 +1,7 @@
 <template>
   <div v-if="store.current" class="workspace">
-    <a class="skip-link" href="#workspace-main">跳到主内容</a>
-    <header class="header">
+    <a class="skip-link" data-ia-skip="1" :href="skipHref">跳到主内容</a>
+    <header class="header" :inert="shellBehindOverlay || undefined">
       <div class="crumbs">
         <router-link to="/">Analyses</router-link>
         <span>/</span>
@@ -63,9 +63,20 @@
     -->
     <div class="body">
       <main id="workspace-main" class="main" tabindex="-1">
-        <FlowchartCanvas v-if="store.mainMode === 'flowchart'" :focus-id="focusId" />
-        <TableChartWorkspace v-else-if="vxeReady" />
-        <div v-else class="loading">加载表格引擎…</div>
+        <FlowchartCanvas
+          v-if="store.mainMode === 'flowchart'"
+          :focus-id="focusId"
+          @add-data="onAddData"
+        />
+        <TableChartWorkspace
+          v-else-if="vxeReady"
+          @add-data="onAddData"
+          @request-new-view="onRequestNewView"
+        />
+        <div v-else class="workspace-skel workspace-skel--main ia-skel" v-bind="workspaceSkeletonAttrs()">
+          <div class="ia-skel__pulse" aria-hidden="true" />
+          <span class="sr-only">加载表格引擎…</span>
+        </div>
       </main>
       <div
         class="sidebar-splitter"
@@ -77,22 +88,38 @@
         :aria-valuemax="MAX_SIDEBAR_WIDTH"
         :aria-valuetext="`侧栏宽度 ${sidebarWidth} 像素`"
         tabindex="0"
+        :inert="shellBehindOverlay || undefined"
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
       />
       <div class="sidebar-slot" :style="{ width: `${sidebarWidth}px` }">
-        <AnalysisSidebar :width="sidebarWidth" @add-data="onAddData" @jump-flowchart="onJump" />
+        <AnalysisSidebar
+          ref="sidebarRef"
+          :width="sidebarWidth"
+          @add-data="onAddData"
+          @jump-flowchart="onJump"
+        />
       </div>
     </div>
 
     <CsvImportDialog v-if="showCsv" v-model="showCsv" />
     <CombineTablesDialog v-if="showCombine" v-model="showCombine" />
   </div>
-  <div v-else class="loading">加载中…</div>
+  <div v-else class="workspace-skel ia-skel" v-bind="workspaceSkeletonAttrs()">
+    <div class="workspace-skel__header ia-skel__block" aria-hidden="true" />
+    <div class="workspace-skel__body" aria-hidden="true">
+      <div class="workspace-skel__sidebar" />
+      <div class="workspace-skel__main">
+        <div class="ia-skel__pulse" />
+      </div>
+    </div>
+    <span class="sr-only">加载中…</span>
+  </div>
 </template>
 
 <script setup lang="ts">
 import {
+  computed,
   defineAsyncComponent,
   getCurrentInstance,
   h,
@@ -101,12 +128,15 @@ import {
   onUnmounted,
   ref,
   shallowRef,
+  watch,
 } from 'vue'
 import { useAnalysisStore } from '@/modules/analysis/stores/analysisStore'
+import { workspaceSkeletonAttrs } from '@/modules/analysis/workspaceLoading'
+import { workspaceSkipHref } from '@/modules/analysis/workspaceSkip'
 import { getProjectName } from '@/shared/mock/projects'
 import AnalysisSidebar from '@/modules/sidebar/AnalysisSidebar.vue'
 import TableChartWorkspace from '@/modules/table/TableChartWorkspace.vue'
-import { toast } from '@/shared/ui/feedback'
+import { setToastHostExternalInert, toast } from '@/shared/ui/feedback'
 import {
   enabledMenuIndices,
   handleMenuKeydown,
@@ -118,15 +148,26 @@ import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
 } from '@/modules/sidebar/sidebarPrefs'
+import {
+  anyWorkspaceDialogOpen,
+  setWorkspaceDialogOpen,
+} from '@/modules/analysis/workspaceOverlay'
 
 const CsvImportDialog = defineAsyncComponent(() => import('@/modules/table/CsvImportDialog.vue'))
 const CombineTablesDialog = defineAsyncComponent(() => import('@/modules/table/CombineTablesDialog.vue'))
+/** Delay avoids skeleton flash when Flowchart chunk is already warm (Round 26). */
+const FLOWCHART_LOADING_DELAY_MS = 200
+
 const FlowchartCanvas = defineAsyncComponent({
   loader: () => import('@/modules/flowchart/FlowchartCanvas.vue'),
-  delay: 0,
+  delay: FLOWCHART_LOADING_DELAY_MS,
   loadingComponent: {
     setup() {
-      return () => h('div', { class: 'loading', role: 'status' }, '加载流程图…')
+      return () =>
+        h('div', { class: 'workspace-skel workspace-skel--main ia-skel', ...workspaceSkeletonAttrs() }, [
+          h('div', { class: 'ia-skel__pulse', 'aria-hidden': 'true' }),
+          h('span', { class: 'sr-only' }, '加载流程图…'),
+        ])
     },
   },
 })
@@ -151,6 +192,32 @@ const draggingSidebar = ref(false)
 const addDataOpen = ref(false)
 const addDataRoot = ref<HTMLElement | null>(null)
 const addDataActive = ref<number | null>(null)
+const sidebarRef = ref<{
+  openNewViewDialog: (opts: {
+    tableId: string
+    parentId: string
+    restoreFocus?: HTMLElement | null
+  }) => void
+} | null>(null)
+
+watch(showCsv, (open) => setWorkspaceDialogOpen('csv', open))
+watch(showCombine, (open) => setWorkspaceDialogOpen('combine', open))
+watch(
+  () => anyWorkspaceDialogOpen(),
+  (open) => setToastHostExternalInert(open),
+  { immediate: true },
+)
+
+const shellBehindOverlay = computed(() => anyWorkspaceDialogOpen())
+const flowchartEmpty = computed(() => (store.current?.tables.length ?? 0) === 0)
+const workspaceEmpty = computed(() => !store.workspaceResult)
+const skipHref = computed(() =>
+  workspaceSkipHref({
+    mode: store.mainMode,
+    flowchartEmpty: flowchartEmpty.value,
+    workspaceEmpty: workspaceEmpty.value,
+  }),
+)
 
 onMounted(async () => {
   document.addEventListener('pointerdown', onDocPointer, true)
@@ -174,6 +241,9 @@ onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
+  setWorkspaceDialogOpen('csv', false)
+  setWorkspaceDialogOpen('combine', false)
+  setToastHostExternalInert(false)
 })
 
 function stub(name: string) {
@@ -258,6 +328,19 @@ function onAddData(cmd: string) {
   if (cmd === 'csv') showCsv.value = true
   else if (cmd === 'combine') showCombine.value = true
   else if (cmd === 'registry' || cmd === 'plate') stub(cmd)
+}
+
+/** Workspace New view CTA → sidebar dialog (name/type + focus restore). */
+function onRequestNewView() {
+  const table = store.selectedTable
+  if (!table) return
+  const restore =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
+  sidebarRef.value?.openNewViewDialog({
+    tableId: table.id,
+    parentId: table.id,
+    restoreFocus: restore,
+  })
 }
 
 function onJump(id: string) {
@@ -458,8 +541,52 @@ function onSidebarKey(e: KeyboardEvent) {
   min-width: 0;
   background: #f0f2f5;
 }
-.loading {
-  padding: 40px;
-  text-align: center;
+.workspace-skel {
+  height: 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ia-bg);
+}
+.workspace-skel--main {
+  height: 100%;
+  padding: 16px;
+  justify-content: center;
+}
+.workspace-skel__header {
+  height: 52px;
+  margin: 0;
+  border-bottom: 1px solid var(--ia-border);
+}
+.workspace-skel__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.workspace-skel__sidebar {
+  width: 220px;
+  background: linear-gradient(180deg, #fff 0%, #f5f6f8 100%);
+  border-right: 1px solid var(--ia-border);
+}
+.workspace-skel__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.workspace-skel__main .ia-skel__pulse {
+  width: min(320px, 70%);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

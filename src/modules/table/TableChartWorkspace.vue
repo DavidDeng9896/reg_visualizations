@@ -1,6 +1,7 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
-    <a class="skip-link" href="#ws-toolbar">跳到工具栏</a>
+    <div class="ws-surface" :inert="showChartEdit || undefined">
+    <a class="skip-link" data-ia-skip="1" href="#ws-toolbar">跳到工具栏</a>
     <div id="ws-toolbar" class="ws-toolbar" role="toolbar" aria-label="视图与数据工具栏" tabindex="-1" :class="{ 'is-compact': toolbarCompact }">
       <template v-if="store.selectedView">
         <div class="tb-group" role="group" aria-label="视图">
@@ -89,19 +90,34 @@
             @toggle="onMoreToggle"
             @keydown="onMoreKeydown"
           >
-            <summary class="btn tb-more-summary" aria-label="更多数据操作">更多</summary>
+            <summary
+              class="btn tb-more-summary"
+              aria-label="更多数据操作"
+              :style="moreTouchStyle"
+            >
+              更多
+            </summary>
             <div class="tb-more-menu" role="menu" aria-label="更多数据操作">
               <button
                 type="button"
-                class="btn"
+                class="btn tb-more-item"
                 role="menuitem"
+                :style="moreTouchStyle"
                 @click="openTransforms"
                 @pointerenter="warmTransformChunk"
                 @focus="warmTransformChunk"
               >
                 过滤 / 转换
               </button>
-              <button type="button" class="btn" role="menuitem" @click="exportCsv">导出 CSV</button>
+              <button
+                type="button"
+                class="btn tb-more-item"
+                role="menuitem"
+                :style="moreTouchStyle"
+                @click="exportCsv"
+              >
+                导出 CSV
+              </button>
             </div>
           </details>
         </div>
@@ -114,6 +130,26 @@
         </div>
       </template>
       <span class="row-count" aria-label="行列数">{{ rowCountLabel }}</span>
+    </div>
+
+    <div
+      v-if="noViewsHint"
+      class="no-views-hint"
+      role="region"
+      aria-label="新建视图引导"
+    >
+      <div class="no-views-hint__text">
+        <strong>{{ noViewsHint.title }}</strong>
+        <p>{{ noViewsHint.body }}</p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary empty-cta"
+        :aria-label="tableNoViewsCtaAria()"
+        @click="quickView"
+      >
+        New view
+      </button>
     </div>
 
     <div v-if="showLayoutHint" class="layout-hint" role="status">
@@ -166,6 +202,8 @@
       </div>
     </div>
 
+    </div>
+
     <TransformDialog v-if="showTransforms" v-model="showTransforms" />
     <ChartEditDrawer
       v-model="showChartEdit"
@@ -177,9 +215,27 @@
       @save="onChartSave"
     />
   </div>
-  <div v-else class="empty">
-    <h3>开始分析</h3>
-    <p>从侧栏选择表或视图，或使用「+ Add data」导入 CSV / 合并表。</p>
+  <div v-else class="empty" v-bind="workspaceEmptyRegionAttrs()">
+    <h3>{{ emptyCopy.title }}</h3>
+    <p>{{ emptyCopy.body }}</p>
+    <div class="empty__cta">
+      <button
+        type="button"
+        class="btn btn-primary empty-cta"
+        :aria-label="workspaceEmptyCtaAria('csv')"
+        @click="emit('add-data', 'csv')"
+      >
+        导入 CSV
+      </button>
+      <button
+        type="button"
+        class="btn empty-cta"
+        :aria-label="workspaceEmptyCtaAria('combine')"
+        @click="emit('add-data', 'combine')"
+      >
+        合并表
+      </button>
+    </div>
   </div>
 </template>
 
@@ -200,10 +256,22 @@ import {
   effectiveChartPosition,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
-import { isToolbarCompact, toolbarViewTypeSelectWidth } from './toolbarLayout'
+import {
+  isToolbarCompact,
+  toolbarMoreTouchMinPx,
+  toolbarViewTypeSelectWidth,
+} from './toolbarLayout'
+import {
+  workspaceEmptyCopy,
+  workspaceEmptyCtaAria,
+  workspaceEmptyRegionAttrs,
+} from './workspaceEmpty'
+import { tableNoViewsCtaAria, tableNoViewsHint } from './tableNoViewsHint'
 import { warmIdle } from '@/shared/ui/warmIdle'
 import { handleMenuKeydown } from '@/shared/ui/menuNav'
+import { setWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
 
+const emit = defineEmits<{ 'add-data': [cmd: string]; 'request-new-view': [] }>()
 const store = useAnalysisStore()
 const showTransforms = ref(false)
 const showChartEdit = ref(false)
@@ -215,6 +283,9 @@ const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 12
 const splitRatio = ref(DEFAULT_SPLIT_RATIO)
 const dragging = ref(false)
 const layoutHintDismissed = ref(isLayoutHintDismissed())
+
+watch(showTransforms, (open) => setWorkspaceDialogOpen('transform', open))
+watch(showChartEdit, (open) => setWorkspaceDialogOpen('chartEdit', open))
 
 const viewTypeOptions: { value: ViewType; label: string }[] = [
   { value: 'table', label: '表格 table' },
@@ -246,6 +317,19 @@ const chartPosCurrentLabel = computed(
 )
 const toolbarCompact = computed(() => isToolbarCompact(viewportWidth.value))
 const viewTypeSelectWidth = computed(() => toolbarViewTypeSelectWidth(toolbarCompact.value))
+const moreTouchMin = computed(() => toolbarMoreTouchMinPx(toolbarCompact.value))
+const moreTouchStyle = computed(() => {
+  const px = moreTouchMin.value
+  return px == null ? undefined : { minHeight: `${px}px` }
+})
+const emptyCopy = computed(() =>
+  workspaceEmptyCopy({ hasTables: (store.current?.tables.length ?? 0) > 0 }),
+)
+const noViewsHint = computed(() => {
+  const table = store.selectedTable
+  if (!table) return null
+  return tableNoViewsHint({ viewCount: table.views.length })
+})
 const moreDetailsRef = ref<HTMLDetailsElement | null>(null)
 const moreMenuIndex = ref<number | null>(null)
 const moreMenuItems = [{ disabled: false }, { disabled: false }]
@@ -405,6 +489,8 @@ onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
   window.removeEventListener('pointermove', onSplitterMove)
   window.removeEventListener('pointerup', onSplitterUp)
+  setWorkspaceDialogOpen('transform', false)
+  setWorkspaceDialogOpen('chartEdit', false)
 })
 
 function onDismissLayoutHint() {
@@ -529,7 +615,8 @@ function onRows(rows: Record<string, unknown>[]) {
 
 function quickView() {
   if (!store.selectedTable) return
-  store.addView(store.selectedTable.id, store.selectedTable.id, 'New view', 'table')
+  // Handoff to sidebar native New view dialog (Round 30) so naming/type + focus restore stay consistent.
+  emit('request-new-view')
 }
 
 function exportCsv() {
@@ -786,6 +873,15 @@ function exportCsv() {
   background: color-mix(in srgb, var(--ia-accent) 14%, #fff);
   color: var(--ia-accent);
 }
+.btn-primary {
+  background: var(--ia-accent);
+  border-color: var(--ia-accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
+}
 .layout-hint {
   display: flex;
   align-items: center;
@@ -899,14 +995,63 @@ function exportCsv() {
   padding: 48px 24px;
   color: #646a73;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  outline: none;
 }
 .empty h3 {
-  margin: 0 0 8px;
+  margin: 0;
   color: #1f2329;
   font-size: 18px;
 }
 .empty p {
   margin: 0;
   font-size: 14px;
+  max-width: 36em;
+}
+.empty__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.no-views-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: 0 12px 8px;
+  padding: 12px 14px;
+  background: #f0f7ff;
+  border: 1px solid #b3d0ff;
+  border-radius: 8px;
+  color: #1f2329;
+}
+.no-views-hint__text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.no-views-hint__text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.no-views-hint__text p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #646a73;
+}
+.tb-more-summary,
+.tb-more-item {
+  box-sizing: border-box;
+}
+.ws-toolbar.is-compact .tb-more-summary,
+.ws-toolbar.is-compact .tb-more-item {
+  min-height: 44px;
 }
 </style>

@@ -50,17 +50,54 @@ export function formatSearchClearedStatus(visibleCount: number): string {
   return `已清空搜索，显示 ${visibleCount} 个节点`
 }
 
+/** Live-region copy when the sidebar filter yields zero nodes (Round 31). */
+export function formatSearchNoMatchStatus(query: string): string {
+  const q = query.trim()
+  return q ? `无匹配结果：${q}` : '无匹配结果'
+}
+
+/** Live-region copy when the sidebar filter yields one or more nodes (Round 32). */
+export function formatSearchMatchStatus(query: string, matchCount: number): string {
+  const q = query.trim()
+  if (!q || matchCount <= 0) return ''
+  return matchCount === 1 ? `找到 1 个匹配：${q}` : `找到 ${matchCount} 个匹配：${q}`
+}
+
 /**
  * Next live-region status after clearing search.
  * Returns `null` when the message would duplicate the previous announcement
  * (consecutive Esc / identical visible count), so the region is not re-spammed.
+ * Empty-CTA clear may pass `{ force: true }` so the user always hears confirmation.
  */
 export function nextSearchClearedStatus(
   previous: string,
   visibleCount: number,
+  opts?: { force?: boolean },
 ): string | null {
   const next = formatSearchClearedStatus(visibleCount)
+  if (opts?.force) return next
   return previous === next ? null : next
+}
+
+/**
+ * Next live-region status for a non-empty search with matches.
+ * Returns `null` when empty query / zero matches, or when identical to previous.
+ */
+export function nextSearchMatchStatus(
+  previous: string,
+  query: string,
+  matchCount: number,
+): string | null {
+  const next = formatSearchMatchStatus(query, matchCount)
+  if (!next) return null
+  return previous === next ? null : next
+}
+
+/** After clearing from the no-match empty CTA, reveal/focus the search box (Round 32). */
+export function shouldRevealSearchAfterClear(
+  emptyKind: 'no-match' | 'no-data' | null,
+): boolean {
+  return emptyKind === 'no-match'
 }
 
 export function nextTreeIndex(count: number, current: number): number | null {

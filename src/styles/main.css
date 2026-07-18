@@ -1,3 +1,5 @@
+@import '../shared/ui/feedback.css';
+
 :root {
   --ia-bg: #f5f6f8;
   --ia-sidebar: #ffffff;
@@ -31,6 +33,12 @@ button {
   outline-offset: 2px;
 }
 
+/* Shared empty-state CTA focus ring (list / workspace / flowchart / sidebar) — Round 30 */
+.empty-cta:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -38,6 +46,35 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shared loading skeleton pulse (list + workspace, Round 26) */
+.ia-skel__pulse,
+.ia-skel__block {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e4e7ed 0%, #f2f3f5 50%, #e4e7ed 100%);
+  background-size: 200% 100%;
+  animation: ia-skel-shimmer 1.2s ease-in-out infinite;
+}
+.ia-skel__pulse {
+  height: 12px;
+}
+.ia-skel__block {
+  border-radius: 0;
+}
+@keyframes ia-skel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ia-skel__pulse,
+  .ia-skel__block {
+    animation: none;
   }
 }
 

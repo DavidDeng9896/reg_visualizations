@@ -1,0 +1,40 @@
+/**
+ * STYLE panel in-panel section jump navigation (Round 33).
+ * Lets keyboard users move between Title / Layout / Series / Axes without
+ * tabbing through every control — headings are focus targets; Arrow/Home/End
+ * cycle from a focused heading or the jump nav.
+ */
+
+export const STYLE_SECTION_IDS = [
+  'style-title',
+  'style-layout',
+  'style-series',
+  'style-axes',
+] as const
+
+export type StyleSectionId = (typeof STYLE_SECTION_IDS)[number]
+
+const LABELS: Record<StyleSectionId, string> = {
+  'style-title': 'Title',
+  'style-layout': 'Layout',
+  'style-series': 'Series',
+  'style-axes': 'Axes',
+}
+
+export function styleSectionNavLabel(id: StyleSectionId): string {
+  return LABELS[id]
+}
+
+export function nextStyleSection(currentId: string, key: string): StyleSectionId {
+  const idx = STYLE_SECTION_IDS.indexOf(currentId as StyleSectionId)
+  const safeIdx = idx >= 0 ? idx : 0
+  if (key === 'Home') return STYLE_SECTION_IDS[0]
+  if (key === 'End') return STYLE_SECTION_IDS[STYLE_SECTION_IDS.length - 1]
+  if (key === 'ArrowDown' || key === 'ArrowRight') {
+    return STYLE_SECTION_IDS[(safeIdx + 1) % STYLE_SECTION_IDS.length]
+  }
+  if (key === 'ArrowUp' || key === 'ArrowLeft') {
+    return STYLE_SECTION_IDS[(safeIdx - 1 + STYLE_SECTION_IDS.length) % STYLE_SECTION_IDS.length]
+  }
+  return STYLE_SECTION_IDS[safeIdx]
+}

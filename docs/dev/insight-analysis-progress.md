@@ -9,27 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-198e1b4a-9c04-4a9e-9e9e-f728405a210c-f0db`（Round 24） |
-| 阶段 | **优化 Round 24 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=24`） |
-| 上次更新 | 2026-07-17 14:25 |
-| 单元 | **122/122 PASS**（+preferCancelInitialFocus / danger confirm） |
+| 分支 | `cursor/bc-2c9e87b7-1166-4474-afd8-b65cd5fdbb7f-99ee`（Round 33；含 R25–32 基线） |
+| 阶段 | **优化 Round 33 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=33`） |
+| 上次更新 | 2026-07-18 00:10 |
+| 单元 | **190/190 PASS**（+STYLE nav / focusRestore / toast overlay / routePrefetch / chartEdit overlay） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP） |
+| Build | PASS（dist 无 EP；AnalysisWorkspaceView ~67.0 / ~24.3；ChartEditDrawer ~36.2；projects feedback 仍 js-shared） |
 
-## 2. Round 24 对齐摘要
+## 2. Round 33 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| toast 窄屏边距 + safe-area + reduced-motion | ✅ Round 24 |
-| toast 悬停/焦点暂停自动关闭 | ✅ |
-| confirm 危险操作默认焦点 → Cancel | ✅ `preferCancelInitialFocus` |
-| 删除文案强化 + `danger` / `btn-danger` | ✅ 列表 / 侧栏 |
-| prompt 取消路径（Cancel / backdrop / Esc） | ✅ 单测覆盖 |
-| dialog 唯一 aria id | ✅ |
-| dist 无 Element Plus | ✅ 复核 |
-| 合并 | **Round 22–24 → main** |
+| ChartEditDrawer 打开 → 主区 surface / 顶栏 / 侧栏 chrome inert | ✅ `chartEdit` + `ws-surface` + `shellBehindOverlay` |
+| STYLE 分区键盘跳转（Title/Layout/Series/Axes） | ✅ `styleSectionNav` + jump nav |
+| CSV/Combine/Transform/ChartEdit → toast host inert | ✅ `setToastHostExternalInert` |
+| dialog 焦点恢复统一 | ✅ `focusRestore`（feedback + ChartEditDrawer） |
+| projects/feedback 边界再评估 | ✅ 仍 defer；`css-decoupled-js-shared` |
+| 冷启动路由预取 | ✅ `scheduleRoutePrefetch` |
+| 合并 | **是**（周期 3/3；R25–33 → main） |
 
 ## 3. 验证命令
 
@@ -39,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 25 计划（下一周期 1/3）
+## 4. Round 34 计划（下一周期 1/3）
 
-1. **UX**：工作区冷启动骨架 / 加载占位；toast 队列可达性（关闭按钮键盘）
-2. **Perf**：`projects` chunk（含 feedback）体积细分；可选把 feedback.css 与 Dexie 图解耦
-3. **A11y**：危险确认 Enter 行为文档化；侧栏删除 danger 回归；焦点恢复在路由跳转场景
+1. **UX**：ChartEditDrawer Teleport 到 body（彻底脱离主区 DOM）；STYLE jump 与 Tab 顺序回归
+2. **Perf**：EditDrawer 分包评估（fitEngine / series 色板）；列表页预取是否过早拉 workspace
+3. **A11y**：流程图模式下 overlay inert 覆盖；skip-link 在 drawer 打开时隐藏
 4. **验证**：unit + e2e:ui + build
 5. **合并**：否（周期 1/3）

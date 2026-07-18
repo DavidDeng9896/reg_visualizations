@@ -409,15 +409,38 @@
           </div>
         </div>
         <div
-          v-show="tab === 'style'"
+          v-if="tab === 'style'"
           id="chart-tab-style"
           class="drawer-tabpanel"
           role="tabpanel"
           aria-labelledby="chart-tab-style-btn"
         >
+          <nav
+            class="style-jump"
+            aria-label="STYLE 分区"
+            @keydown="onStyleSectionNavKey"
+          >
+            <a
+              v-for="id in STYLE_SECTION_IDS"
+              :key="id"
+              class="style-jump__link"
+              :href="`#${id}`"
+              @click.prevent="focusStyleSection(id)"
+            >
+              {{ styleSectionNavLabel(id) }}
+            </a>
+          </nav>
           <div class="field-form">
             <section class="style-block" aria-labelledby="style-title">
-              <h3 class="style-section" id="style-title">Title</h3>
+              <h3
+                class="style-section"
+                id="style-title"
+                tabindex="-1"
+                data-style-section="1"
+                @keydown="onStyleSectionHeadingKey"
+              >
+                Title
+              </h3>
               <div class="field-row">
                 <span class="field-label">Title</span>
                 <div class="field-control">
@@ -456,7 +479,15 @@
             </section>
 
             <section class="style-block" aria-labelledby="style-layout">
-              <h3 class="style-section" id="style-layout">Layout</h3>
+              <h3
+                class="style-section"
+                id="style-layout"
+                tabindex="-1"
+                data-style-section="1"
+                @keydown="onStyleSectionHeadingKey"
+              >
+                Layout
+              </h3>
               <div class="field-row">
                 <span class="field-label">Width (px)</span>
                 <div class="field-control">
@@ -626,7 +657,15 @@
             </section>
 
             <section class="style-block" aria-labelledby="style-series">
-              <h3 class="style-section" id="style-series">Series</h3>
+              <h3
+                class="style-section"
+                id="style-series"
+                tabindex="-1"
+                data-style-section="1"
+                @keydown="onStyleSectionHeadingKey"
+              >
+                Series
+              </h3>
               <div v-if="seriesKeys.length" class="field-row">
                 <span class="field-label">系列取色</span>
                 <div class="field-control">
@@ -681,7 +720,15 @@
             </section>
 
             <section class="style-block" aria-labelledby="style-axes">
-              <h3 class="style-section" id="style-axes">Axes</h3>
+              <h3
+                class="style-section"
+                id="style-axes"
+                tabindex="-1"
+                data-style-section="1"
+                @keydown="onStyleSectionHeadingKey"
+              >
+                Axes
+              </h3>
               <div class="field-row">
                 <span class="field-label">X Range</span>
                 <div class="field-control">
@@ -830,6 +877,12 @@ import {
 } from '@/modules/chart/fieldSelect'
 import { nextDrawerTab, type DrawerTab } from '@/modules/chart/drawerA11y'
 import {
+  STYLE_SECTION_IDS,
+  nextStyleSection,
+  styleSectionNavLabel,
+  type StyleSectionId,
+} from '@/modules/chart/styleSectionNav'
+import {
   clampNumber,
   formatOptionalNumber,
   numberOutOfRangeStatus,
@@ -838,6 +891,7 @@ import {
   parseOptionalNumber,
 } from '@/modules/chart/nativeNumber'
 import { toast } from '@/shared/ui/feedback'
+import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
 
 const props = defineProps<{
   modelValue: boolean
@@ -1203,16 +1257,14 @@ function close() {
 }
 
 function restoreFocusToTrigger() {
-  const target =
-    restoreFocus && document.contains(restoreFocus)
-      ? restoreFocus
-      : (document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null)
-  target?.focus?.()
+  restoreFocusEl(restoreFocus, () =>
+    document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null,
+  )
   restoreFocus = null
 }
 
 function openDrawer() {
-  restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  restoreFocus = captureFocusEl()
   document.body.style.overflow = 'hidden'
   numberStatus.value = ''
   void nextTick(() => {
@@ -1241,8 +1293,39 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+  restoreFocusEl(restoreFocus)
+  restoreFocus = null
 })
+
+function focusStyleSection(id: StyleSectionId) {
+  void nextTick(() => {
+    const el = document.getElementById(id)
+    el?.focus({ preventScroll: false })
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+}
+
+function onStyleSectionNavKey(e: KeyboardEvent) {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Home' && e.key !== 'End') return
+  const links = [...(e.currentTarget as HTMLElement).querySelectorAll<HTMLAnchorElement>('a.style-jump__link')]
+  if (!links.length) return
+  const idx = links.findIndex((a) => a === document.activeElement)
+  const currentId = STYLE_SECTION_IDS[Math.max(0, idx)]
+  const next = nextStyleSection(currentId, e.key)
+  e.preventDefault()
+  focusStyleSection(next)
+  const link = links.find((a) => a.getAttribute('href') === `#${next}`)
+  link?.focus()
+}
+
+function onStyleSectionHeadingKey(e: KeyboardEvent) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
+  const id = (e.currentTarget as HTMLElement).id
+  const next = nextStyleSection(id, e.key)
+  if (next === id && e.key !== 'Home' && e.key !== 'End') return
+  e.preventDefault()
+  focusStyleSection(next)
+}
 
 function onTabListKeydown(e: KeyboardEvent) {
   if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Home' && e.key !== 'End') return
@@ -1675,6 +1758,27 @@ function save() {
   outline: 2px solid var(--ia-accent, #2f6fed);
   outline-offset: 2px;
 }
+.style-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 0 12px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+.style-jump__link {
+  font-size: 12px;
+  color: var(--ia-accent, #3370ff);
+  text-decoration: none;
+  border-radius: 2px;
+  outline-offset: 2px;
+}
+.style-jump__link:hover {
+  text-decoration: underline;
+}
+.style-jump__link:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+}
 .style-block {
   display: flex;
   flex-direction: column;
@@ -1691,6 +1795,10 @@ function save() {
   letter-spacing: 0.02em;
   color: #646a73;
   border-bottom: 1px solid #ebeef5;
+}
+.style-section:focus-visible {
+  outline: 2px solid var(--ia-accent, #3370ff);
+  outline-offset: 2px;
 }
 .palette-preview {
   display: flex;
