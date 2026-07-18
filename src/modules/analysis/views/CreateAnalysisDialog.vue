@@ -49,8 +49,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MOCK_PROJECTS } from '@/shared/mock/projects'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
+import { resolveCreateRestoreFocus } from '@/modules/analysis/createAnalysisHandoff'
+import { restoreFocusEl } from '@/shared/ui/focusRestore'
 
-const props = defineProps<{ modelValue: boolean }>()
+const props = defineProps<{
+  modelValue: boolean
+  /** Prefer empty-list Create CTA (or header Create) when canceling after Teleport. */
+  restoreTarget?: HTMLElement | null
+}>()
 const emit = defineEmits<{
   'update:modelValue': [boolean]
   create: [{ name: string; projectId: string }]
@@ -78,14 +84,15 @@ watch(
 )
 
 onMounted(() => {
-  restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  // Round 38: prefer explicit opener (empty CTA) so Teleport cancel returns focus.
+  restoreFocus = resolveCreateRestoreFocus(props.restoreTarget ?? null)
   document.body.style.overflow = 'hidden'
   void nextTick(() => nameRef.value?.focus())
 })
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  if (restoreFocus && document.contains(restoreFocus)) restoreFocus.focus()
+  restoreFocusEl(restoreFocus, () => resolveCreateRestoreFocus(null))
 })
 
 function focusables(): HTMLElement[] {
