@@ -50,7 +50,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MOCK_PROJECTS } from '@/shared/mock/projects'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 import { resolveCreateRestoreFocus } from '@/modules/analysis/createAnalysisHandoff'
-import { restoreFocusEl } from '@/shared/ui/focusRestore'
+import { applyCreateCancelFocus } from '@/modules/analysis/createCancelToast'
 
 const props = defineProps<{
   modelValue: boolean
@@ -92,8 +92,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.body.style.overflow = ''
-  // Round 39: paint a temporary ring — browsers often skip :focus-visible on scripted focus.
-  restoreFocusEl(restoreFocus, () => resolveCreateRestoreFocus(null), { visibleRing: true })
+  // Round 39 / 56: visible ring × toast coexistence via applyCreateCancelFocus.
+  applyCreateCancelFocus(restoreFocus)
+  restoreFocus = null
 })
 
 function focusables(): HTMLElement[] {

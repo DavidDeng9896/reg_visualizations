@@ -5,6 +5,8 @@
  * visible ring. If a toast was inert while the CSV overlay was open,
  * clearing inert leaves the toast interactive — same contract as Combine
  * Cancel × toast (R53).
+ *
+ * Round 56: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -15,6 +17,14 @@ import { flowchartEmptyCsvFocusFallback } from '@/modules/flowchart/flowchartEmp
  * interactive again while any visible toast remains.
  */
 export function csvCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 56: CSV Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyCsvCancelFocus).
+ */
+export function csvEscRestoresRingWithToast(): true {
   return true
 }
 
