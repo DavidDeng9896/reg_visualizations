@@ -1,6 +1,7 @@
 <template>
   <div v-if="store.workspaceResult" class="ws">
-    <div class="ws-surface" :inert="showTransforms || undefined">
+    <!-- Transform teleports to body (R35); mainBehind inerts #workspace-main. -->
+    <div class="ws-surface">
     <a
       v-show="!showChartEdit && !showTransforms"
       class="skip-link"

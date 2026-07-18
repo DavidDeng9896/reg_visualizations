@@ -37,10 +37,10 @@ describe('workspaceOverlay', () => {
     expect(anyWorkspaceDialogOpen()).toBe(false)
   })
 
-  it('inerts main for csv / combine / chartEdit but not transform (Round 34)', () => {
+  it('inerts main for all workspace overlays including transform (Round 35)', () => {
     expect(mainBehindWorkspaceOverlay()).toBe(false)
     setWorkspaceDialogOpen('transform', true)
-    expect(mainBehindWorkspaceOverlay()).toBe(false)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
     expect(anyWorkspaceDialogOpen()).toBe(true)
     setWorkspaceDialogOpen('transform', false)
     setWorkspaceDialogOpen('csv', true)
@@ -59,6 +59,13 @@ describe('workspaceOverlay', () => {
     expect(skipLinkHiddenBehindOverlay()).toBe(true)
     setWorkspaceDialogOpen('chartEdit', false)
     setWorkspaceDialogOpen('transform', true)
+    expect(skipLinkHiddenBehindOverlay()).toBe(true)
+  })
+
+  it('csv overlay inerts flowchart main (empty CTA behind overlay, Round 35)', () => {
+    // Contract: flowchart empty lives under #workspace-main; csv → mainBehind.
+    setWorkspaceDialogOpen('csv', true)
+    expect(mainBehindWorkspaceOverlay()).toBe(true)
     expect(skipLinkHiddenBehindOverlay()).toBe(true)
   })
 })
