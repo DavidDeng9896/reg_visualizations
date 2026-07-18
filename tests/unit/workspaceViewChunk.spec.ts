@@ -5,7 +5,7 @@ import {
 } from '@/modules/analysis/workspaceViewChunk'
 
 describe('workspaceViewChunk', () => {
-  it('keeps AnalysisWorkspaceView sync-shell split deferred (Round 32–44)', () => {
+  it('keeps AnalysisWorkspaceView sync-shell split deferred (Round 32–45)', () => {
     expect(workspaceViewSplitDeferred()).toBe(true)
     expect(workspaceViewChunkStrategy()).toEqual({
       splitDeferred: true,
@@ -13,6 +13,7 @@ describe('workspaceViewChunk', () => {
       round36Reeval: 'keep-sync-shell',
       round42Reeval: 'keep-sync-shell',
       round44Reeval: 'keep-sync-shell',
+      round45Reeval: 'keep-sync-shell',
     })
   })
 })

@@ -4,7 +4,7 @@ import {
   tableChartWorkspaceMountMode,
 } from '@/modules/table/tableChartWorkspaceChunk'
 
-describe('tableChartWorkspaceChunk (Round 42–44)', () => {
+describe('tableChartWorkspaceChunk (Round 42–45)', () => {
   it('keeps toolbar sync with grid/chart (no async toolbar chunk)', () => {
     expect(tableChartWorkspaceMountMode()).toBe('sync')
     expect(tableChartWorkspaceChunkStrategy()).toEqual({
@@ -12,6 +12,7 @@ describe('tableChartWorkspaceChunk (Round 42–44)', () => {
       toolbar: 'sync-with-grid-chart',
       round42Reeval: 'keep-sync',
       round44Reeval: 'keep-sync',
+      round45Reeval: 'keep-sync',
     })
   })
 })

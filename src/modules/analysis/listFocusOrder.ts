@@ -1,5 +1,5 @@
 /**
- * Analysis list chrome focus order (Round 42–44).
+ * Analysis list chrome focus order (Round 42–45).
  *
  * Project filter sits above the table in the DOM so Tab reaches it before the
  * roving row group. Arrow/Home/End/Delete stay inside rows; they never steal
@@ -8,9 +8,15 @@
  * Round 43: filter `aria-controls` points at the list landmark (table or empty
  * region) so AT users know which region the project filter affects.
  * Round 44: `aria-controls` flips dynamically when the list goes empty ↔ rows.
+ * Round 45: skip-link `href` hash stays aligned with `aria-controls` across
+ * those empty ↔ rows flips (same landmark id).
  */
 
-import { listEmptyRegionAttrs, listMainRegionAttrs } from '@/modules/analysis/listEmpty'
+import {
+  listEmptyRegionAttrs,
+  listMainRegionAttrs,
+  listSkipHref,
+} from '@/modules/analysis/listEmpty'
 
 export function listFilterBeforeRows(): true {
   return true
@@ -53,4 +59,17 @@ export function listFilterAriaControlsChanged(
   after: { ready: boolean; hasRows: boolean },
 ): boolean {
   return listFilterAriaControls(before) !== listFilterAriaControls(after)
+}
+
+/** Round 45: skip-link and filter aria-controls share one landmark contract. */
+export function listSkipAriaControlsAligned(): true {
+  return true
+}
+
+/** True when skip href is `#` + the same id as filter aria-controls. */
+export function listSkipMatchesFilterAriaControls(opts: {
+  ready: boolean
+  hasRows: boolean
+}): boolean {
+  return listSkipHref(opts) === `#${listFilterAriaControls(opts)}`
 }

@@ -32,6 +32,9 @@
  * Round 44: filter aria-controls / Delete Cancel ring / Demo-fail Create inert
  * do not unlock a Dexie split; keep shared entry. Workspace toolbar still
  * sync with table/chart (see workspaceViewChunk / tableChartWorkspaceChunk).
+ *
+ * Round 45: skip/aria-controls align + Cancel opener ring + Create Cancel×Demo
+ * toast + danger×toast inert do not unlock a Dexie split; keep shared entry.
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -53,6 +56,8 @@ export type ProjectsChunkStrategy = {
   round42Reeval: 'keep-shared'
   /** Round 44 re-eval — still keep shared after filter/Delete/Create a11y pass. */
   round44Reeval: 'keep-shared'
+  /** Round 45 re-eval — still keep shared after skip/Cancel/toast a11y pass. */
+  round45Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -67,5 +72,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round41Reeval: 'keep-shared',
     round42Reeval: 'keep-shared',
     round44Reeval: 'keep-shared',
+    round45Reeval: 'keep-shared',
   }
 }

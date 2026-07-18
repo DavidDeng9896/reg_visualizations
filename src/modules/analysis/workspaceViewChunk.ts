@@ -1,12 +1,12 @@
 /**
- * AnalysisWorkspaceView chunk strategy (Round 32–44).
+ * AnalysisWorkspaceView chunk strategy (Round 32–45).
  *
  * Sync imports (sidebar + table/chart workspace) stay in the main workspace
  * entry — deferring them flashes an empty shell on cold open. Flowchart /
  * CSV / Combine remain `defineAsyncComponent`. TableChartWorkspace itself is
  * documented as sync in `tableChartWorkspaceChunk` (owns toolbar/grid/chart).
  *
- * Round 36–44 re-eval (toolbar vs table/chart split): still deferred. Splitting
+ * Round 36–45 re-eval (toolbar vs table/chart split): still deferred. Splitting
  * the toolbar into a separate async chunk would require a shared store
  * boundary for chart/view actions already owned by TableChartWorkspace, and
  * would risk a cold toolbar flash after Vxe warm. Prefer Transform
@@ -21,6 +21,7 @@ export type WorkspaceViewChunkStrategy = {
   round36Reeval: 'keep-sync-shell'
   round42Reeval: 'keep-sync-shell'
   round44Reeval: 'keep-sync-shell'
+  round45Reeval: 'keep-sync-shell'
 }
 
 export function workspaceViewSplitDeferred(): boolean {
@@ -34,5 +35,6 @@ export function workspaceViewChunkStrategy(): WorkspaceViewChunkStrategy {
     round36Reeval: 'keep-sync-shell',
     round42Reeval: 'keep-sync-shell',
     round44Reeval: 'keep-sync-shell',
+    round45Reeval: 'keep-sync-shell',
   }
 }
