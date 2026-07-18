@@ -6,4 +6,14 @@ describe('stylePanelChunk', () => {
     expect(STYLE_PANEL_CHUNK_DEFERRED).toBe(true)
     expect(stylePanelMountMode()).toBe('sync-vif')
   })
+
+  it('Round 38 re-eval still defers async STYLE chunk (draft binding)', async () => {
+    const { stylePanelRound38Decision } = await import('@/modules/chart/stylePanelChunk')
+    expect(stylePanelRound38Decision()).toBe('keep-sync-vif')
+  })
+
+  it('Round 39 re-eval still keeps STYLE sync-vif after Teleport jump audit', async () => {
+    const { stylePanelRound39Decision } = await import('@/modules/chart/stylePanelChunk')
+    expect(stylePanelRound39Decision()).toBe('keep-sync-vif')
+  })
 })

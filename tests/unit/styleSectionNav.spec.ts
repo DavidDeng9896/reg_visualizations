@@ -47,4 +47,12 @@ describe('styleSectionNav', () => {
     expect(styleSectionHeadingTabIndex()).toBe(-1)
     expect(styleJumpNavPrecedesSections()).toBe(true)
   })
+
+  it('STYLE jump nav remains valid after ChartEdit Teleport (Round 39)', async () => {
+    const { styleJumpNavWorksWithChartEditTeleport } = await import('@/modules/chart/styleSectionNav')
+    const { iaOverlaySelector } = await import('@/modules/analysis/dialogMarkers')
+    expect(styleJumpNavWorksWithChartEditTeleport()).toBe(true)
+    expect(iaOverlaySelector('chartEdit')).toBe('[data-ia-chart-edit]')
+    expect(styleJumpNavPrecedesSections()).toBe(true)
+  })
 })

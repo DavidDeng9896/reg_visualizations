@@ -14,7 +14,11 @@ import {
   type ConfirmTone,
   type ToastKind,
 } from './feedbackA11y'
-import { captureFocusEl, restoreFocusEl } from './focusRestore'
+import { captureFocusEl, paintFocusRestoreRing, restoreFocusEl } from './focusRestore'
+import {
+  dangerCancelUsesVisibleRing,
+  dangerEscRestoresVisibleRing,
+} from './dangerCancelFocusRing'
 // feedback.css is loaded via main.css (Round 25) so Dexie/list chunks stay CSS-decoupled
 
 export type MessageType = ToastKind
@@ -278,20 +282,25 @@ function openMessageBox(
     notifyFeedbackDialogListeners()
 
     let settled = false
-    const cleanup = () => {
+    const cleanup = (opts?: { visibleRing?: boolean }) => {
       root.removeEventListener('keydown', onKeydown)
       root.remove()
       openBoxCount = Math.max(0, openBoxCount - 1)
       syncToastHostInert()
       notifyFeedbackDialogListeners()
       document.body.style.overflow = prevOverflow
-      restoreFocusEl(restoreFocus)
+      restoreFocusEl(restoreFocus, undefined, opts)
     }
 
     const settleCancel = () => {
       if (settled) return
       settled = true
-      cleanup()
+      // Round 42: danger Esc/Cancel restores opener with a visible ring.
+      cleanup(
+        danger && dangerEscRestoresVisibleRing()
+          ? { visibleRing: true }
+          : undefined,
+      )
       reject(new FeedbackCancelError())
     }
 
@@ -325,6 +334,7 @@ function openMessageBox(
     root.addEventListener('keydown', onKeydown)
 
     // Focus: prompt → input; destructive confirm → Cancel; else → Confirm.
+    // Round 41: danger Cancel gets a visible restore ring (scripted focus).
     requestAnimationFrame(() => {
       if (input) {
         input.focus()
@@ -338,6 +348,14 @@ function openMessageBox(
           ? items.find((el) => el === cancelBtn)
           : items.find((el) => el === confirmBtn)) || items[0]
       prefer?.focus()
+      if (
+        prefer === cancelBtn &&
+        wantCancel &&
+        danger &&
+        dangerCancelUsesVisibleRing()
+      ) {
+        paintFocusRestoreRing(cancelBtn)
+      }
     })
   })
 }

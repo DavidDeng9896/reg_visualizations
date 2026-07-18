@@ -108,9 +108,11 @@ async function createDemo(page: Page) {
 async function newViewOfType(page: Page, type: string) {
   await page.locator('.ops-btn').first().click()
   await page.getByRole('menuitem', { name: 'New view' }).click()
-  await page.waitForSelector('text=新建视图')
-  await page.getByLabel('View Type').selectOption(type)
-  await page.getByRole('button', { name: '创建', exact: true }).click()
+  // Round 37: New view teleports to body — scope to data-ia-new-view marker.
+  const dialog = page.locator('[data-ia-new-view="1"]')
+  await dialog.waitFor({ state: 'visible', timeout: 10000 })
+  await dialog.getByLabel('View Type').selectOption(type)
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
   // Round 31: after create, focus lands on the new tree node (not body / opener CTA).
   await page.waitForFunction(
     () => document.activeElement?.getAttribute('role') === 'treeitem',

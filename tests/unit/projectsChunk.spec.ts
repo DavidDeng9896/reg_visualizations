@@ -10,6 +10,10 @@ describe('projectsChunk', () => {
       feedback: 'css-decoupled-js-shared',
       splitDeferred: true,
       round35Feedback: 'keep-shared',
+      round38Reeval: 'keep-shared',
+      round39Reeval: 'keep-shared',
+      round41Reeval: 'keep-shared',
+      round42Reeval: 'keep-shared',
     })
   })
 })

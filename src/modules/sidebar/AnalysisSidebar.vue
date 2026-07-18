@@ -168,13 +168,16 @@
       </div>
     </div>
 
+    <!-- Teleport to body so New view is outside sidebar chrome (Round 37). -->
+    <Teleport to="body">
     <div
       v-if="showNewView"
       class="dialog-root"
       role="dialog"
       aria-modal="true"
       aria-labelledby="new-view-title"
-      @keydown.esc="closeNewView"
+      data-ia-new-view="1"
+      @keydown.esc="onNewViewEsc"
       @keydown="onNewViewTrapKeydown"
     >
       <button type="button" class="dialog-backdrop" tabindex="-1" aria-label="关闭对话框" @click="closeNewView" />
@@ -208,6 +211,7 @@
         </form>
       </div>
     </div>
+    </Teleport>
   </aside>
 </template>
 
@@ -247,7 +251,11 @@ import {
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
 import { sidebarChromeInert } from '@/modules/sidebar/sidebarDialogInert'
-import { anyWorkspaceDialogOpen } from '@/modules/analysis/workspaceOverlay'
+import {
+  anyWorkspaceDialogOpen,
+  setWorkspaceDialogOpen,
+} from '@/modules/analysis/workspaceOverlay'
+import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 
 const emit = defineEmits<{ 'add-data': [string]; 'jump-flowchart': [string] }>()
 withDefaults(
@@ -369,9 +377,11 @@ onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
   stopFeedbackDialogListen?.()
   stopFeedbackDialogListen = null
+  setWorkspaceDialogOpen('newView', false)
 })
 
 watch(showNewView, (open) => {
+  setWorkspaceDialogOpen('newView', open)
   if (open) {
     newViewRestoreFocus = resolveNewViewRestoreFocus(pendingRestoreFocus)
     pendingRestoreFocus = null
@@ -710,6 +720,11 @@ function onMenu(cmd: string, data: SidebarTreeNode) {
         if (!isFeedbackCancel(err)) throw err
       })
   }
+}
+
+function onNewViewEsc() {
+  if (!workspaceOverlayEscAllowed()) return
+  closeNewView()
 }
 
 function closeNewView() {
@@ -1066,6 +1081,14 @@ function createView() {
 .icon-close:hover {
   color: #1f2329;
   background: #f2f3f5;
+}
+.icon-close:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--ia-accent);
+  outline-offset: 2px;
 }
 .dialog-body {
   display: flex;
