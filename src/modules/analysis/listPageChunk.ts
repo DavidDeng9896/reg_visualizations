@@ -1,5 +1,5 @@
 /**
- * Analysis list page chunk strategy (Round 39 eval).
+ * Analysis list page chunk strategy (Round 39–40 eval).
  *
  * AnalysisListView is already a route-lazy component. Further splitting the
  * list chrome (header / empty CTA / table) would add waterfalls for a thin
@@ -10,6 +10,9 @@
  * both may overlap if the user focuses Create immediately; Create is ~3–4KB
  * gzip so contention is acceptable — prefer shorter Create timeout over
  * cancelling workspace warm (Demo / row open still need workspace).
+ *
+ * Round 40: re-checked CSS/JS boundary — still defer chrome split; vxe/echarts
+ * remain workspace/chart-only (see `listHeavyDeps`).
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -21,6 +24,7 @@ export type ListPageChunkStrategy = {
   createWarmTimeoutMs: 1500
   splitDeferred: true
   round39Reeval: 'keep-route-lazy'
+  round40Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -31,6 +35,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     createWarmTimeoutMs: 1500,
     splitDeferred: true,
     round39Reeval: 'keep-route-lazy',
+    round40Reeval: 'keep-route-lazy',
   }
 }
 

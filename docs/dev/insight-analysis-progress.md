@@ -9,28 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-7a5569d7-8725-414a-bbd1-bdede03b06f0-69ad`（Round 39；含 R37–38 cherry-pick） |
-| 阶段 | **优化 Round 39 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=39`） |
-| 上次更新 | 2026-07-18 06:07 |
-| 单元 | **233/233 PASS**（+focusRestore ring / listPageChunk / createToastInert / Create Esc） |
+| 分支 | `cursor/bc-34fc67e5-58ec-4e36-af2c-50f757de5c07-c1ee`（Round 40；含 R37–39 sync） |
+| 阶段 | **优化 Round 40 完成**（周期 **1/3**；上一合并点 R39 / PR #39） |
+| 上次更新 | 2026-07-18 07:05 |
+| 单元 | **246/246 PASS**（+listDeleteFocus / demoFailToastCreate / createTriggerFocus / listSkipCreate / listHeavyDeps） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；CreateAnalysisDialog ~3.4；CsvImportDialog ~6.1；papaparse ~19.9；AnalysisListView ~7.5；AnalysisWorkspaceView ~67.5；projects 仍 js-shared） |
+| Build | PASS（dist 无 EP；List ~8.7 / ~3.5；Create ~3.2；CSV ~6.1；papaparse ~19.9；Workspace ~67.5；vxe/echarts 仍独立 chunk） |
 
-## 2. Round 39 对齐摘要
+## 2. Round 40 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Create 取消后焦点可见环 | ✅ `ia-restore-focus` + `restoreFocusEl({ visibleRing })` |
-| Demo CTA × Create warm 并存 | ✅ Demo 不触发 Create warm；Create warm 独立 |
-| ChartEdit STYLE jump × Teleport | ✅ `styleJumpNavWorksWithChartEditTeleport` |
-| list / Create warm × workspace prefetch | ✅ `listPageChunk`；Create timeout 1.5s < workspace 4s |
-| confirm × Create Esc | ✅ `workspaceOverlayEscAllowed` + Create 标记抽检 |
-| toast inert × Create | ✅ `createToastInert` + list `setToastHostExternalInert` |
-| 键盘-only Create→cancel→CTA | ✅ handoff + visible ring |
-| projects / STYLE chunk | ✅ 仍 deferred（`round39Reeval`） |
-| 合并 | **是**（周期 3/3；R37–39 → main） |
+| 列表删除 confirm 后焦点回归 | ✅ `listDeleteFocus` → 剩余行 / 空态 Create + 可见环 |
+| Demo 失败 toast × Create 并存 | ✅ `demoFailToastCreate` + Create toast inert |
+| header Create ↔ empty CTA 环 | ✅ `create-trigger` 共享类 + main.css |
+| skip-link × Create Teleport | ✅ `listSkipCreate` / `listSkipVisibleWhenCreateClosed` |
+| List CSS/JS 边界再压 | ✅ `listPageChunk.round40Reeval=keep-route-lazy` |
+| vxe / echarts lazy 抽检 | ✅ `listHeavyDeps`；build 仍独立 chunk |
+| 合并 | **否**（周期 1/3） |
 
 ## 3. 验证命令
 
@@ -40,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 40 计划（下一 cron · 周期 1/3）
+## 4. Round 41 计划（下一 cron · 周期 2/3）
 
-1. **UX**：列表行删除 confirm 后焦点回归；空态 Demo 失败 toast × Create 并存
-2. **Perf**：AnalysisListView CSS/JS 边界再压；vxe/echarts 仍 lazy 抽检
-3. **A11y**：header Create 与 empty CTA 环一致性；skip-link × Create Teleport
+1. **UX**：删除后 toast × 焦点环并存；空态 Demo 成功路径不误 warm Create
+2. **Perf**：AnalysisListView gzip 回看（R40 +1.2KB）；projects shared 仍 defer
+3. **A11y**：删除 confirm Cancel 焦点环；列表行 roving tabindex 抽检
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：否（周期 2/3；下一合并点 Round 42）

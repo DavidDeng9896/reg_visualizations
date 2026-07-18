@@ -16,6 +16,7 @@ describe('listPageChunk (Round 39)', () => {
       createWarmTimeoutMs: 1500,
       splitDeferred: true,
       round39Reeval: 'keep-route-lazy',
+      round40Reeval: 'keep-route-lazy',
     })
   })
 

@@ -16,7 +16,7 @@ export function resolveCreateRestoreFocus(
 
 /** Empty-list Create CTA selector used when the opener unmounted during cancel. */
 export function createEmptyCtaFallbackSelector(): string {
-  return '.empty-list .empty-cta.btn-primary'
+  return '.empty-list .empty-cta.btn-primary.create-trigger'
 }
 
 /**
@@ -29,5 +29,5 @@ export function createKeyboardCancelRestoresCta(): true {
 
 /** Header Create button selector (non-empty list / top actions). */
 export function createHeaderTriggerSelector(): string {
-  return '.top-actions .btn-primary'
+  return '.top-actions .btn-primary.create-trigger'
 }

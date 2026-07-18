@@ -1,6 +1,11 @@
 <template>
   <div class="list-page">
-    <a class="skip-link" data-ia-skip="1" :href="skipHref" v-show="!showCreate">跳到列表</a>
+    <a
+      class="skip-link"
+      data-ia-skip="1"
+      :href="skipHref"
+      v-show="listSkipVisibleWhenCreateClosed(showCreate)"
+    >跳到列表</a>
     <div class="list-shell" :inert="showCreate || undefined">
     <header class="top">
       <div>
@@ -13,7 +18,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-primary"
+          class="btn btn-primary create-trigger"
           @pointerenter="warmCreateOnce"
           @focus="warmCreateOnce"
           @click="openCreate"
@@ -89,7 +94,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-primary empty-cta"
+          class="btn btn-primary empty-cta create-trigger"
           :aria-label="listEmptyCtaAria('create')"
           @pointerenter="warmCreateOnce"
           @focus="warmCreateOnce"
@@ -111,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirm, isFeedbackCancel, setToastHostExternalInert, toast } from '@/shared/ui/feedback'
 import { dangerDeleteOptions } from '@/shared/ui/dangerConfirm'
@@ -127,6 +132,12 @@ import { MOCK_PROJECTS, getProjectName } from '@/shared/mock/projects'
 import { createDemoTable } from '@/shared/mock/demoData'
 import { scheduleWorkspaceRoutePrefetch } from '@/shared/ui/routePrefetch'
 import { scheduleCreateAnalysisWarm } from '@/modules/analysis/createAnalysisChunk'
+import {
+  applyListDeleteFocus,
+  planListDeleteFocus,
+} from '@/modules/analysis/listDeleteFocus'
+import { demoFailToastMessage } from '@/modules/analysis/demoFailToastCreate'
+import { listSkipVisibleWhenCreateClosed } from '@/modules/analysis/listSkipCreate'
 
 const CreateAnalysisDialog = defineAsyncComponent(
   () => import('@/modules/analysis/views/CreateAnalysisDialog.vue'),
@@ -226,7 +237,8 @@ async function createDemo() {
     await router.push(`/analyses/${a.id}`)
   } catch (err) {
     console.error('[createDemo]', err)
-    toast('error', 'Demo 创建失败，请刷新后重试')
+    // Round 40: stable copy; toast may coexist with Create (inert via showCreate watch).
+    toast('error', demoFailToastMessage())
   } finally {
     demoBusy.value = false
   }
@@ -237,6 +249,7 @@ function open(row: { id: string }) {
 }
 
 async function onRemove(id: string) {
+  const deletedIndex = filtered.value.findIndex((row) => row.id === id)
   try {
     await confirm(
       '确定删除该 Analysis？此操作不可撤销。',
@@ -249,6 +262,9 @@ async function onRemove(id: string) {
   }
   await store.removeAnalysis(id)
   toast('success', '已删除')
+  // Round 40: delete control is gone — land on remaining row or empty Create CTA.
+  await nextTick()
+  applyListDeleteFocus(planListDeleteFocus(deletedIndex, filtered.value.length))
 }
 </script>
 
