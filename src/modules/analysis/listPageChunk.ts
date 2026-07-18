@@ -48,6 +48,10 @@
  * skip hide regression remain tiny; List gzip still keep-route-lazy.
  * Flowchart / Transform cold paths re-checked separately (still
  * async-idle-warm / deferred-sync).
+ *
+ * Round 50: empty CTA×toast + Create-close skip restore + Delete Cancel×Demo
+ * + filter-focus preserve helpers remain tiny; List gzip still keep-route-lazy.
+ * Create/CSV cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -69,6 +73,7 @@ export type ListPageChunkStrategy = {
   round47Reeval: 'keep-route-lazy'
   round48Reeval: 'keep-route-lazy'
   round49Reeval: 'keep-route-lazy'
+  round50Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -89,6 +94,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round47Reeval: 'keep-route-lazy',
     round48Reeval: 'keep-route-lazy',
     round49Reeval: 'keep-route-lazy',
+    round50Reeval: 'keep-route-lazy',
   }
 }
 

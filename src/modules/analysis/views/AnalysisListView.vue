@@ -147,6 +147,7 @@ import {
 import {
   listDeleteRovingIndex,
   listDeleteSuccessToastMessage,
+  shouldApplyListDeleteFocusAfterSuccess,
 } from '@/modules/analysis/listDeleteToastFocus'
 import {
   clampListRowFocus,
@@ -225,7 +226,7 @@ const skipHref = computed(() =>
 watch(showCreate, (open) => {
   setToastHostExternalInert(open)
   if (!open) createRestoreFocus.value = null
-  // Round 49: keep skip DOM hide contract aligned with Create Teleport.
+  // Round 49–50: keep skip DOM hide/show contract aligned with Create Teleport.
   void nextTick(() => {
     if (skipLinkEl.value) syncListSkipVisibility(skipLinkEl.value, open)
   })
@@ -363,13 +364,16 @@ async function onRemove(id: string) {
   await store.removeAnalysis(id)
   // Round 41: toast + focus ring coexist; focus after toast so ring wins.
   // Round 49: roving index clamped via listDeleteRovingIndex (= plan bounds).
+  // Round 50: empty CTA × toast; preserve filter focus when select still owns focus.
   toast('success', listDeleteSuccessToastMessage())
   await nextTick()
   const remaining = filtered.value.length
   const roving = listDeleteRovingIndex(deletedIndex, remaining)
   const plan = planListDeleteFocus(deletedIndex, remaining)
   rowFocusIndex.value = roving
-  applyListDeleteFocus(plan)
+  if (shouldApplyListDeleteFocusAfterSuccess(document.activeElement, remaining)) {
+    applyListDeleteFocus(plan)
+  }
 }
 </script>
 

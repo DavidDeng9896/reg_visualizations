@@ -78,6 +78,14 @@ export function isListRowFocusTarget(el: Element | null): boolean {
 }
 
 /**
+ * Round 50: true when `activeElement` is the project filter select.
+ * Delete-success focus restore must not steal from the filter.
+ */
+export function isListFilterFocusTarget(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.hasAttribute('data-ia-list-filter')
+}
+
+/**
  * After a filter-driven clamp: move DOM focus only when the user was already
  * on a list row and the clamped index differs (avoid stealing focus from the
  * filter select itself).
