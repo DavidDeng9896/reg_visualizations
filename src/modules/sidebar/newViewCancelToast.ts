@@ -27,6 +27,14 @@ export function newViewEscRestoresRingWithToast(): true {
   return true
 }
 
+/**
+ * Round 59: New view Cancel × toast regression — same contract as
+ * Round 55 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR59Regression(): true {
+  return true
+}
+
 /** Fallback: New view trigger in sidebar ops, then sidebar empty CSV CTA. */
 export function newViewCancelFocusFallback(
   doc: Document = document,

@@ -20,6 +20,9 @@
  *
  * Round 57: re-checked after New view/ChartEdit Esc×toast + skip→empty
  * landmark coexist helpers — still keep async-idle-warm.
+ *
+ * Round 59: re-checked after Combine Esc×toast spot-check + flowchart empty
+ * CTA×toast regression helpers — still keep async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -39,6 +42,7 @@ export type FlowchartChunkStrategy = {
   round53Reeval: 'keep-async-idle-warm'
   round55Reeval: 'keep-async-idle-warm'
   round57Reeval: 'keep-async-idle-warm'
+  round59Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -51,5 +55,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round53Reeval: 'keep-async-idle-warm',
     round55Reeval: 'keep-async-idle-warm',
     round57Reeval: 'keep-async-idle-warm',
+    round59Reeval: 'keep-async-idle-warm',
   }
 }

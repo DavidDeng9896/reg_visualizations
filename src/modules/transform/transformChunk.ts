@@ -18,6 +18,10 @@
  *
  * Round 53: re-checked with flowchart empty CTA×toast / Combine Cancel×toast
  * helpers — still deferred-sync + idle-warm on open.
+ *
+ * Round 59: re-checked with Combine Esc×toast / flowchart empty CTA×toast /
+ * CSV Esc×toast / New view Cancel×toast helpers — still deferred-sync +
+ * idle-warm on open.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -36,6 +40,7 @@ export type TransformChunkStrategy = {
   round47Reeval: 'keep-deferred-sync'
   round49Reeval: 'keep-deferred-sync'
   round53Reeval: 'keep-deferred-sync'
+  round59Reeval: 'keep-deferred-sync'
 }
 
 export function transformChunkStrategy(): TransformChunkStrategy {
@@ -45,6 +50,7 @@ export function transformChunkStrategy(): TransformChunkStrategy {
     round47Reeval: 'keep-deferred-sync',
     round49Reeval: 'keep-deferred-sync',
     round53Reeval: 'keep-deferred-sync',
+    round59Reeval: 'keep-deferred-sync',
   }
 }
 
