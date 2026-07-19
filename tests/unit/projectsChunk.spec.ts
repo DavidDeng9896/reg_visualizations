@@ -23,6 +23,8 @@ describe('projectsChunk', () => {
       round60Reeval: 'keep-shared',
       round63Reeval: 'keep-shared',
       round69Reeval: 'keep-shared',
+      round72Reeval: 'keep-shared',
+      round75Reeval: 'keep-shared',
     })
   })
 })
