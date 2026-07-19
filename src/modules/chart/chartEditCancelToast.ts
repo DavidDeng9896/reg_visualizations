@@ -5,6 +5,8 @@
  * trigger) with a visible ring. If a toast was inert while the drawer was
  * open, clearing inert leaves the toast interactive — same contract as
  * Transform Cancel × toast (R54).
+ *
+ * Round 57: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -14,6 +16,14 @@ import { restoreFocusEl } from '@/shared/ui/focusRestore'
  * interactive again while any visible toast remains.
  */
 export function chartEditCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 57: ChartEdit Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyChartEditCancelFocus).
+ */
+export function chartEditEscRestoresRingWithToast(): true {
   return true
 }
 

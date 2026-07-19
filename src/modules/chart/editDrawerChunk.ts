@@ -20,6 +20,9 @@
  *
  * Round 55: Cancel×toast restore helpers are tiny; fitEngine/palette still
  * deferred-sync (no cleaner split).
+ *
+ * Round 57: Esc×toast regression markers are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -43,6 +46,7 @@ export type EditDrawerChunkStrategy = {
   warmOnOpen: true
   round35Reeval: 'keep-deferred-sync'
   round55Reeval: 'keep-deferred-sync'
+  round57Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -52,6 +56,7 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     warmOnOpen: true,
     round35Reeval: 'keep-deferred-sync',
     round55Reeval: 'keep-deferred-sync',
+    round57Reeval: 'keep-deferred-sync',
   }
 }
 

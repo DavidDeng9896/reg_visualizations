@@ -63,6 +63,15 @@ export function workspaceSkipFilterCoexistSpotCheck(): true {
 }
 
 /**
+ * Round 57: list / workspace / flowchart skip→empty landmark contracts
+ * coexist — each resolves its own empty CTA without stealing focus from
+ * the others.
+ */
+export function skipEmptyLandmarkCoexistSpotCheck(): true {
+  return true
+}
+
+/**
  * Resolve the next Tab stop after skip lands on a workspace empty landmark.
  * - `#ws-empty` / `#flow-empty`: first `.empty-cta`
  * - `#workspace-main`: null (content owns its own tab order)

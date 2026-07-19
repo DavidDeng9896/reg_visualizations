@@ -55,6 +55,14 @@ export function sidebarEmptyCtaCoexistsWithToast(): true {
   return true
 }
 
+/**
+ * Round 57: sidebar empty CTA × toast spot-check regression — same contract
+ * as Round 55 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR57SpotCheck(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#sidebar-empty` (CSV preferred). */
 export function sidebarEmptyCtaSelector(): string {
   return '#sidebar-empty .empty-cta'

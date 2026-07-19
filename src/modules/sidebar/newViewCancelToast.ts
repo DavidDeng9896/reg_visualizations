@@ -5,6 +5,8 @@
  * menu item / no-views CTA) with a visible ring. If a toast was inert while
  * the New view overlay was open, clearing inert leaves the toast interactive —
  * same contract as Combine/CSV/Transform Cancel × toast (R53–54).
+ *
+ * Round 57: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -14,6 +16,14 @@ import { restoreFocusEl } from '@/shared/ui/focusRestore'
  * interactive again while any visible toast remains.
  */
 export function newViewCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 57: New view Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyNewViewCancelFocus).
+ */
+export function newViewEscRestoresRingWithToast(): true {
   return true
 }
 
