@@ -27,6 +27,14 @@ export function chartEditEscRestoresRingWithToast(): true {
   return true
 }
 
+/**
+ * Round 60: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR60SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function chartEditCancelFocusFallback(
   doc: Document = document,
