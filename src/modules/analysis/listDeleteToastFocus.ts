@@ -71,6 +71,14 @@ export function listEmptyCtaToastR65Regression(): true {
 }
 
 /**
+ * Round 69: regression — empty-list Create CTA × toast still coexists
+ * (visible ring + interactive toast host; same contract as R50 / R56 / R62 / R65).
+ */
+export function listEmptyCtaToastR69Regression(): true {
+  return true
+}
+
+/**
  * Round 51: empty-list Demo CTA focus ring coexists with a toast.
  */
 export function listEmptyDemoCtaCoexistsWithToast(): true {

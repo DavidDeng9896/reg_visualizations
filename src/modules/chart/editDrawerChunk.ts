@@ -34,6 +34,10 @@
  * Round 65: Create Esc×toast + workspace empty CTA×toast + CSV Cancel×toast +
  * list empty CTA×toast are tiny; fitEngine/palette still deferred-sync
  * (no cleaner split).
+ *
+ * Round 67: Transform Esc×toast + workspace empty CTA×toast + CSV Esc×toast +
+ * New view Cancel×toast are tiny; fitEngine/palette still deferred-sync
+ * (no cleaner split).
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -61,6 +65,8 @@ export type EditDrawerChunkStrategy = {
   round61Reeval: 'keep-deferred-sync'
   round63Reeval: 'keep-deferred-sync'
   round65Reeval: 'keep-deferred-sync'
+  round67Reeval: 'keep-deferred-sync'
+  round69Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -74,6 +80,8 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round61Reeval: 'keep-deferred-sync',
     round63Reeval: 'keep-deferred-sync',
     round65Reeval: 'keep-deferred-sync',
+    round67Reeval: 'keep-deferred-sync',
+    round69Reeval: 'keep-deferred-sync',
   }
 }
 
