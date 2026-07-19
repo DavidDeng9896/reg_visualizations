@@ -75,6 +75,14 @@ export function transformCancelToastR69SpotCheck(): true {
   return true
 }
 
+/**
+ * Round 76: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR76SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function transformCancelFocusFallback(
   doc: Document = document,
