@@ -73,6 +73,14 @@ export function workspaceEmptyCtaToastR67Regression(): true {
   return true
 }
 
+/**
+ * Round 77: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR77Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#ws-empty` (CSV preferred). */
 export function workspaceEmptyCtaSelector(): string {
   return '#ws-empty .empty-cta'

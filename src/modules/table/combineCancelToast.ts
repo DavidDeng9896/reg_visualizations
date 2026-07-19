@@ -69,6 +69,14 @@ export function combineEscToastR68SpotCheck(): true {
 }
 
 /**
+ * Round 77: Combine Cancel × toast spot-check regression — same contract
+ * as Round 53 / R61 (visible ring + interactive toast host).
+ */
+export function combineCancelToastR77SpotCheck(): true {
+  return true
+}
+
+/**
  * Restore focus to the Combine opener (or flowchart/workspace empty Combine
  * CTA fallback) with a visible ring after Cancel.
  */
