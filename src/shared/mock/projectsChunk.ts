@@ -54,6 +54,9 @@
  *
  * Round 63: CSV Esc×toast / workspace skip→empty Tab / Combine Esc×toast /
  * sidebar empty CTA×toast do not unlock a Dexie split; keep shared entry.
+ *
+ * Round 69: ChartEdit Esc×toast / workspace skip→empty Tab / Transform
+ * Cancel×toast / list empty CTA×toast do not unlock a Dexie split; keep shared entry.
  */
 
 export const PROJECTS_CHUNK_SPLIT_DEFERRED = true
@@ -89,6 +92,8 @@ export type ProjectsChunkStrategy = {
   round60Reeval: 'keep-shared'
   /** Round 63 re-eval — still keep shared after CSV Esc / Combine Esc×toast pass. */
   round63Reeval: 'keep-shared'
+  /** Round 69 re-eval — still keep shared after ChartEdit Esc / Transform Cancel×toast pass. */
+  round69Reeval: 'keep-shared'
 }
 
 export function projectsChunkStrategy(): ProjectsChunkStrategy {
@@ -110,5 +115,6 @@ export function projectsChunkStrategy(): ProjectsChunkStrategy {
     round54Reeval: 'keep-shared',
     round60Reeval: 'keep-shared',
     round63Reeval: 'keep-shared',
+    round69Reeval: 'keep-shared',
   }
 }

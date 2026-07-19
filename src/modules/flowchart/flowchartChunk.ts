@@ -63,6 +63,7 @@ export type FlowchartChunkStrategy = {
   round63Reeval: 'keep-async-idle-warm'
   round65Reeval: 'keep-async-idle-warm'
   round67Reeval: 'keep-async-idle-warm'
+  round69Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -80,5 +81,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round63Reeval: 'keep-async-idle-warm',
     round65Reeval: 'keep-async-idle-warm',
     round67Reeval: 'keep-async-idle-warm',
+    round69Reeval: 'keep-async-idle-warm',
   }
 }
