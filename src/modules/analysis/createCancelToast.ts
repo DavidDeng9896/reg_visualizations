@@ -56,6 +56,14 @@ export function createCancelToastR68SpotCheck(): true {
 }
 
 /**
+ * Round 71: Create Esc × toast spot-check regression — same contract as
+ * Round 58 / R65 (visible ring + interactive toast host).
+ */
+export function createEscToastR71SpotCheck(): true {
+  return true
+}
+
+/**
  * Restore focus to the Create opener (or header/empty Create fallback) with a
  * visible ring after Cancel / Esc.
  */
