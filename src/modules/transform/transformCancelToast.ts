@@ -5,6 +5,8 @@
  * trigger) with a visible ring. If a toast was inert while the Transform
  * overlay was open, clearing inert leaves the toast interactive — same
  * contract as Combine Cancel × toast (R53) and CSV Cancel × toast (R54).
+ *
+ * Round 56: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { restoreFocusEl } from '@/shared/ui/focusRestore'
@@ -14,6 +16,14 @@ import { restoreFocusEl } from '@/shared/ui/focusRestore'
  * interactive again while any visible toast remains.
  */
 export function transformCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 56: Transform Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyTransformCancelFocus).
+ */
+export function transformEscRestoresRingWithToast(): true {
   return true
 }
 

@@ -1,8 +1,13 @@
-/** Sidebar empty-state copy / landmark / CTA a11y (Round 30). */
+/** Sidebar empty-state copy / landmark / CTA a11y (Round 30–55). */
+
+import { restoreFocusEl } from '@/shared/ui/focusRestore'
 
 export type SidebarEmptyKind = 'no-data' | 'no-match'
 
 export const SIDEBAR_EMPTY_REGION_LABEL = '侧栏数据引导'
+
+/** Prefer primary CSV CTA inside the sidebar empty landmark. */
+export const SIDEBAR_EMPTY_CSV_CTA_SELECTOR = '#sidebar-empty .empty-cta.btn-primary'
 
 export function sidebarEmptyKind(opts: {
   tableCount: number
@@ -40,4 +45,51 @@ export function sidebarEmptyCtaAria(cmd: 'csv' | 'combine' | 'clear'): string {
   if (cmd === 'csv') return '从侧栏空态导入 CSV'
   if (cmd === 'combine') return '从侧栏空态合并表'
   return '清除侧栏搜索以显示全部'
+}
+
+/**
+ * Round 55: sidebar empty CTA focus ring coexists with a toast (parity with
+ * workspace / flowchart empty CTA × toast — toast stays interactive).
+ */
+export function sidebarEmptyCtaCoexistsWithToast(): true {
+  return true
+}
+
+/** First focusable empty CTA inside `#sidebar-empty` (CSV preferred). */
+export function sidebarEmptyCtaSelector(): string {
+  return '#sidebar-empty .empty-cta'
+}
+
+/**
+ * Land keyboard focus on the sidebar empty CSV CTA with a visible restore
+ * ring (Round 55 — toast may coexist; host stays interactive).
+ */
+export function applySidebarEmptyCtaFocus(doc: Document = document): void {
+  const found =
+    doc.querySelector(SIDEBAR_EMPTY_CSV_CTA_SELECTOR) ||
+    doc.querySelector(sidebarEmptyCtaSelector())
+  const el = found instanceof HTMLElement ? found : null
+  restoreFocusEl(el, () => {
+    const region = doc.getElementById('sidebar-empty')
+    return region instanceof HTMLElement ? region : null
+  }, { visibleRing: true })
+}
+
+/**
+ * Focus restore fallback after CSV/Combine closes from sidebar empty
+ * (Round 55 — prefer CTA, then landmark).
+ */
+export function sidebarEmptyCtaFocusFallback(
+  cmd: 'csv' | 'combine' | 'clear' = 'csv',
+  doc: Document = document,
+): HTMLElement | null {
+  const aria = sidebarEmptyCtaAria(cmd)
+  const byAria = doc.querySelector(`#sidebar-empty [aria-label="${aria}"]`)
+  if (byAria instanceof HTMLElement) return byAria
+  const primary = doc.querySelector(SIDEBAR_EMPTY_CSV_CTA_SELECTOR)
+  if (primary instanceof HTMLElement) return primary
+  const any = doc.querySelector(sidebarEmptyCtaSelector())
+  if (any instanceof HTMLElement) return any
+  const region = doc.getElementById('sidebar-empty')
+  return region instanceof HTMLElement ? region : null
 }
