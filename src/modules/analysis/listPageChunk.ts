@@ -89,6 +89,16 @@
  * + CSV Esc×toast spot-check + New view Cancel×toast regression remain tiny;
  * List gzip still keep-route-lazy. Flowchart / Transform cold paths re-checked
  * below.
+ *
+ * Round 60: ChartEdit Esc×toast + sidebar empty CTA×toast + Transform Cancel×toast
+ * + workspace skip→empty Tab remain tiny; List gzip still keep-route-lazy.
+ *
+ * Round 61: CSV/Combine Cancel×toast + workspace empty CTA×toast + flowchart
+ * skip→empty Tab remain tiny; List gzip still keep-route-lazy.
+ *
+ * Round 62: Create Cancel×toast spot-check + empty CTA×toast regression +
+ * Transform Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Create / CSV / Transform cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -121,6 +131,8 @@ export type ListPageChunkStrategy = {
   round58Reeval: 'keep-route-lazy'
   round59Reeval: 'keep-route-lazy'
   round60Reeval: 'keep-route-lazy'
+  round61Reeval: 'keep-route-lazy'
+  round62Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -152,6 +164,8 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round58Reeval: 'keep-route-lazy',
     round59Reeval: 'keep-route-lazy',
     round60Reeval: 'keep-route-lazy',
+    round61Reeval: 'keep-route-lazy',
+    round62Reeval: 'keep-route-lazy',
   }
 }
 
