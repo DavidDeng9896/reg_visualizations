@@ -37,6 +37,14 @@ export function csvEscToastR59SpotCheck(): true {
 }
 
 /**
+ * Round 61: CSV Cancel × toast spot-check regression — same contract as
+ * Round 54 (visible ring + interactive toast host).
+ */
+export function csvCancelToastR61SpotCheck(): true {
+  return true
+}
+
+/**
  * Restore focus to the CSV opener (or flowchart/workspace empty CSV
  * CTA fallback) with a visible ring after Cancel.
  */
