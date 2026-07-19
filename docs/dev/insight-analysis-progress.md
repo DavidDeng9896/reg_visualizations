@@ -9,25 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-306f5894-a5bd-4acb-b014-2d31bd05a613-4e93`（Round 78；含 R76–78 合并周期） |
-| 阶段 | **优化 Round 78 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=78`） |
-| 上次更新 | 2026-07-19 21:01 |
-| 单元 | **586/586 PASS**（+csvEscToastRingR78 / workspaceSkipTabEmptyCtaR78 / combineEscToastRingR78 / listEmptyCtaToastR78 / listFlowchartChartEditProjectsChunkR78） |
+| 分支 | `cursor/bc-f2c4dae8-5d18-4fb6-ab98-948e69e4f78f-b8f0`（Round 80；周期 2/3） |
+| 阶段 | **优化 Round 80 完成**（周期 **2/3**；不合并） |
+| 上次更新 | 2026-07-19 23:08 |
+| 单元 | **600/600 PASS**（+csvCancelToastR80 / combineCancelToastR80 / workspaceEmptyCtaToastR80 / sidebarEmptyCtaToastR80 / createEscToastR80 / workspaceSkipTabEmptyCtaR80 / listCreateCsvTransformChunkR80） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
+| Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；Transform ~8.4 / ~3.1；无 EP） |
 
-## 2. Round 78 对齐摘要
+## 2. Round 80 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| CSV Esc × toast 抽检 | ✅ `csvEscToastR78SpotCheck` |
-| 工作区 skip→empty Tab 回归 | ✅ `workspaceSkipTabEmptyCtaR78Regression` |
-| Combine Esc × toast 抽检 | ✅ `combineEscToastR78SpotCheck` |
-| 列表空态 CTA × toast 回归 | ✅ `listEmptyCtaToastR78Regression` |
-| List / Flowchart / ChartEdit / projects 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync / keep-shared |
-| 合并 | **是**（周期 3/3；R76–78 → 目标 lastMergedRound=78；PR #72–#77 仍 OPEN 时一并带上 R70–75 意图） |
+| CSV Cancel × toast 抽检 | ✅ `csvCancelToastR80SpotCheck` |
+| Combine Cancel × toast 抽检 | ✅ `combineCancelToastR80SpotCheck` |
+| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR80Regression` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR80Regression` |
+| Create Esc × toast 抽检 | ✅ `createEscToastR80SpotCheck` |
+| 工作区 skip→empty Tab 回归 | ✅ `workspaceSkipTabEmptyCtaR80Regression` |
+| List / Create / CSV / Transform 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic / keep-deferred-sync |
+| 合并 | **否**（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -37,10 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 79 计划（下一 cron · 周期 1/3）
+## 4. Round 81 计划（下一 cron · 周期 3/3 · 合并）
 
-1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R78 ~11.5）；Flowchart / ChartEdit 再评估
-3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
+1. **UX**：Transform Esc × toast 抽检；流程图空态 CTA × toast 回归
+2. **Perf**：List gzip 再测；Flowchart / ChartEdit / projects 再评估
+3. **A11y**：ChartEdit Cancel × toast 抽检；列表空态 CTA × toast 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：**是**（周期 3/3；目标 lastMergedRound=81，含 R79–81 意图 / 本分支 R80 + R81）
