@@ -51,6 +51,10 @@
  * Round 72: re-checked after CSV Esc×toast + workspace skip→empty Tab +
  * Combine Esc×toast + list empty CTA×toast helpers — still keep
  * async-idle-warm.
+ *
+ * Round 74: re-checked after CSV Cancel×toast + workspace empty CTA×toast +
+ * Combine Cancel×toast + sidebar empty CTA×toast helpers — still keep
+ * async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -78,6 +82,7 @@ export type FlowchartChunkStrategy = {
   round69Reeval: 'keep-async-idle-warm'
   round70Reeval: 'keep-async-idle-warm'
   round72Reeval: 'keep-async-idle-warm'
+  round74Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -98,5 +103,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round69Reeval: 'keep-async-idle-warm',
     round70Reeval: 'keep-async-idle-warm',
     round72Reeval: 'keep-async-idle-warm',
+    round74Reeval: 'keep-async-idle-warm',
   }
 }
