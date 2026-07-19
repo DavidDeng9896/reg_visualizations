@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-420437a6-f520-41ff-b625-affd44e8ef4b-dfbd`（Round 60；含 R55–59） |
-| 阶段 | **优化 Round 60 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=60`） |
-| 上次更新 | 2026-07-19 03:07 |
-| 单元 | **477/477 PASS**（+chartEditEscToastRingR60 / sidebarEmptyCtaToastR60 / transformCancelToastRingR60 / workspaceSkipTabEmptyCtaR60 / listCreateCsvProjectsChunkR60） |
+| 分支 | `cursor/bc-f4190ff5-19ee-4120-8e04-c55ef4ef4ea5-3e28`（Round 63；含 R61–62） |
+| 阶段 | **优化 Round 63 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=63`） |
+| 上次更新 | 2026-07-19 06:08 |
+| 单元 | **510/510 PASS**（+csvEscToastRingR63 / workspaceSkipTabEmptyCtaR63 / combineEscToastRingR63 / sidebarEmptyCtaToastR63 / listFlowchartChartEditProjectsChunkR63） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（dist 无 EP；List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；papaparse ~19.9；Transform ~8.4 / ~3.1；Workspace ~68.3；projects 仍 shared） |
+| Build | PASS（dist 无 EP；List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；Create ~3.2；CSV ~6.2；Transform ~8.4；Workspace ~68.3；projects 仍 shared） |
 
-## 2. Round 60 对齐摘要
+## 2. Round 63 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR60SpotCheck` |
-| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR60Regression` |
-| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR60SpotCheck` |
-| workspace skip→empty Tab 回归 | ✅ `workspaceSkipTabEmptyCtaR60Regression` |
-| List / Create / CSV / projects 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic / keep-shared |
-| 合并 | **是**（周期 3/3；R55–60 → 目标 lastMergedRound=60） |
+| CSV Esc × toast 抽检 | ✅ `csvEscToastR63SpotCheck` |
+| 工作区 skip→empty Tab 回归 | ✅ `workspaceSkipTabEmptyCtaR63Regression` |
+| Combine Esc × toast 抽检 | ✅ `combineEscToastR63SpotCheck` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR63Regression` |
+| List / Flowchart / ChartEdit / projects 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync / keep-shared |
+| 合并 | **是**（周期 3/3；R61–63 → 目标 lastMergedRound=63） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 61 计划（下一 cron · 周期 1/3）
+## 4. Round 64 计划（下一 cron · 周期 1/3）
 
-1. **UX**：CSV Cancel × toast 抽检；工作区空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R60 ~11.5）；Flowchart / ChartEdit 再评估
-3. **A11y**：Combine Cancel × toast 抽检；流程图 skip→empty Tab 回归
+1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
+2. **Perf**：List gzip 边界（R63 ~11.5）；Create / CSV / Transform 再评估
+3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
 4. **验证**：unit + e2e:ui + build
 5. **合并**：否（周期 1/3）

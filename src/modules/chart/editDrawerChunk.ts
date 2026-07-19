@@ -23,6 +23,13 @@
  *
  * Round 57: Esc×toast regression markers are tiny; fitEngine/palette still
  * deferred-sync (no cleaner split).
+ *
+ * Round 61: CSV/Combine Cancel×toast + empty CTA / skip→Tab regressions are
+ * tiny; fitEngine/palette still deferred-sync (no cleaner split).
+ *
+ * Round 63: CSV Esc×toast + workspace skip→empty Tab + Combine Esc×toast +
+ * sidebar empty CTA×toast are tiny; fitEngine/palette still deferred-sync
+ * (no cleaner split).
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -47,6 +54,8 @@ export type EditDrawerChunkStrategy = {
   round35Reeval: 'keep-deferred-sync'
   round55Reeval: 'keep-deferred-sync'
   round57Reeval: 'keep-deferred-sync'
+  round61Reeval: 'keep-deferred-sync'
+  round63Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -57,6 +66,8 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round35Reeval: 'keep-deferred-sync',
     round55Reeval: 'keep-deferred-sync',
     round57Reeval: 'keep-deferred-sync',
+    round61Reeval: 'keep-deferred-sync',
+    round63Reeval: 'keep-deferred-sync',
   }
 }
 
