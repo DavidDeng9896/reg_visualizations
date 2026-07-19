@@ -23,6 +23,10 @@
  *
  * Round 59: re-checked after Combine Esc×toast spot-check + flowchart empty
  * CTA×toast regression helpers — still keep async-idle-warm.
+ *
+ * Round 61: re-checked after CSV/Combine Cancel×toast spot-checks + workspace
+ * empty CTA×toast + flowchart skip→empty Tab regressions — still keep
+ * async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -43,6 +47,7 @@ export type FlowchartChunkStrategy = {
   round55Reeval: 'keep-async-idle-warm'
   round57Reeval: 'keep-async-idle-warm'
   round59Reeval: 'keep-async-idle-warm'
+  round61Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -56,5 +61,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round55Reeval: 'keep-async-idle-warm',
     round57Reeval: 'keep-async-idle-warm',
     round59Reeval: 'keep-async-idle-warm',
+    round61Reeval: 'keep-async-idle-warm',
   }
 }
