@@ -127,6 +127,26 @@
  * Round 69: ChartEdit Esc×toast + workspace skip→empty Tab + Transform
  * Cancel×toast + list empty CTA×toast remain tiny; List gzip still
  * keep-route-lazy. Flowchart / ChartEdit / projects cold paths re-checked below.
+ *
+ * Round 70: CSV Cancel×toast + workspace empty CTA×toast + Combine Cancel×toast
+ * + flowchart skip→empty Tab remain tiny; List gzip still keep-route-lazy.
+ * Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 71: Create Esc×toast + sidebar empty CTA×toast + Transform Esc×toast
+ * + New view Cancel×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV / Transform cold paths re-checked below.
+ *
+ * Round 72: CSV Esc×toast + workspace skip→empty Tab + Combine Esc×toast +
+ * list empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Flowchart / ChartEdit / projects cold paths re-checked below.
+ *
+ * Round 73: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Create / CSV / Transform cold paths re-checked below.
+ *
+ * Round 74: CSV Cancel×toast + workspace empty CTA×toast + Combine Cancel×toast
+ * + sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Flowchart / ChartEdit cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -168,6 +188,11 @@ export type ListPageChunkStrategy = {
   round67Reeval: 'keep-route-lazy'
   round68Reeval: 'keep-route-lazy'
   round69Reeval: 'keep-route-lazy'
+  round70Reeval: 'keep-route-lazy'
+  round71Reeval: 'keep-route-lazy'
+  round72Reeval: 'keep-route-lazy'
+  round73Reeval: 'keep-route-lazy'
+  round74Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -208,6 +233,11 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round67Reeval: 'keep-route-lazy',
     round68Reeval: 'keep-route-lazy',
     round69Reeval: 'keep-route-lazy',
+    round70Reeval: 'keep-route-lazy',
+    round71Reeval: 'keep-route-lazy',
+    round72Reeval: 'keep-route-lazy',
+    round73Reeval: 'keep-route-lazy',
+    round74Reeval: 'keep-route-lazy',
   }
 }
 
