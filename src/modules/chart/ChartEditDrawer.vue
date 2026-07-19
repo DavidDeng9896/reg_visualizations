@@ -898,6 +898,7 @@ import {
 import { toast } from '@/shared/ui/feedback'
 import { scheduleFitRuntimeWarm } from '@/modules/chart/editDrawerChunk'
 import { captureFocusEl, restoreFocusEl } from '@/shared/ui/focusRestore'
+import { applyChartEditCancelFocus } from '@/modules/chart/chartEditCancelToast'
 import { workspaceOverlayEscAllowed } from '@/modules/analysis/overlayEsc'
 
 const props = defineProps<{
@@ -1269,9 +1270,8 @@ function close() {
 }
 
 function restoreFocusToTrigger() {
-  restoreFocusEl(restoreFocus, () =>
-    document.querySelector('#ws-toolbar button, #ws-toolbar [tabindex]') as HTMLElement | null,
-  )
+  // Round 55: visible ring × toast coexistence via applyChartEditCancelFocus.
+  applyChartEditCancelFocus(restoreFocus)
   restoreFocus = null
 }
 

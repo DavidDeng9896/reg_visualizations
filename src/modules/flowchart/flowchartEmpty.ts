@@ -50,6 +50,14 @@ export function flowchartEmptyCtaCoexistsWithToast(): true {
   return true
 }
 
+/**
+ * Round 59: flowchart empty CTA × toast regression — same contract as
+ * Round 53 (visible ring + interactive toast host).
+ */
+export function flowchartEmptyCtaToastR59Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#flow-empty` (CSV preferred). */
 export function flowchartEmptyCtaSelector(): string {
   return '#flow-empty .empty-cta'

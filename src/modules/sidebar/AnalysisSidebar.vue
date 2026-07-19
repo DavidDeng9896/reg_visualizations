@@ -250,6 +250,7 @@ import {
   resolveAfterCreateFocus,
   resolveNewViewRestoreFocus,
 } from '@/modules/sidebar/newViewHandoff'
+import { applyNewViewCancelFocus } from '@/modules/sidebar/newViewCancelToast'
 import { sidebarChromeInert } from '@/modules/sidebar/sidebarDialogInert'
 import {
   anyWorkspaceDialogOpen,
@@ -391,7 +392,8 @@ watch(showNewView, (open) => {
     document.body.style.overflow = ''
     const el = newViewRestoreFocus
     newViewRestoreFocus = null
-    if (el && document.contains(el)) void nextTick(() => el.focus())
+    // Round 55: visible ring × toast coexistence via applyNewViewCancelFocus.
+    if (el) void nextTick(() => applyNewViewCancelFocus(el))
   }
 })
 
