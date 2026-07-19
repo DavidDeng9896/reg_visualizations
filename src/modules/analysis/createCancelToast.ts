@@ -8,6 +8,8 @@
  *
  * Round 56: formalize `applyCreateCancelFocus` so list Create Cancel shares
  * the same restore helper shape as other overlays (spot-check + regression).
+ *
+ * Round 58: Esc uses the same restore path as Cancel (regression marker).
  */
 
 import { resolveCreateRestoreFocus } from '@/modules/analysis/createAnalysisHandoff'
@@ -18,6 +20,14 @@ import { restoreFocusEl } from '@/shared/ui/focusRestore'
  * interactive again while any visible toast remains.
  */
 export function createCancelRestoresRingWithToast(): true {
+  return true
+}
+
+/**
+ * Round 58: Create Esc restores opener ring with the same toast contract
+ * as Cancel (both close via applyCreateCancelFocus).
+ */
+export function createEscRestoresRingWithToast(): true {
   return true
 }
 

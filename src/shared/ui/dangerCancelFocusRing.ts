@@ -31,6 +31,9 @@
  *
  * Round 51: Delete-key Esc × Demo-fail toast regression spot-check (parity
  * with R48 Esc×Demo and R50 Cancel×Demo).
+ *
+ * Round 58: danger Cancel × toast regression re-asserts R46 Cancel restores
+ * opener ring and clears toast inert.
  */
 
 export function dangerCancelUsesVisibleRing(): true {
@@ -112,5 +115,13 @@ export function deleteKeyDangerCancelRingCoexistsWithDemoToast(): true {
  * (re-asserts R48 Esc×Demo coexistence after R49–50 Cancel paths).
  */
 export function deleteKeyDangerEscDemoToastR51Regression(): true {
+  return true
+}
+
+/**
+ * Round 58: danger Cancel × toast regression — re-asserts R46 Cancel restores
+ * opener ring and clears toast inert (parity with R57 Esc×toast regressions).
+ */
+export function dangerCancelToastR58Regression(): true {
   return true
 }

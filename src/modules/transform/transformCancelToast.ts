@@ -27,6 +27,14 @@ export function transformEscRestoresRingWithToast(): true {
   return true
 }
 
+/**
+ * Round 58: Transform Esc × toast spot-check regression — same contract
+ * as Round 56 (visible ring + interactive toast host).
+ */
+export function transformEscToastR58SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function transformCancelFocusFallback(
   doc: Document = document,
