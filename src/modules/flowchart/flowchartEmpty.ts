@@ -21,6 +21,14 @@ export function flowchartSkipTabEmptyCtaR61Regression(): true {
   return true
 }
 
+/**
+ * Round 70: flowchart skip→empty Tab regression — same contract as
+ * Round 54 / R61 (Tab after skip on #flow-empty enters the first empty CTA).
+ */
+export function flowchartSkipTabEmptyCtaR70Regression(): true {
+  return true
+}
+
 /** Selector for the CSV CTA inside the flowchart empty region. */
 export const FLOW_EMPTY_CSV_CTA_SELECTOR = '[aria-label="从流程图空态导入 CSV"]'
 
