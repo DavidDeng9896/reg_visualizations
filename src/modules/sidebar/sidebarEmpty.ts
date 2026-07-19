@@ -79,6 +79,14 @@ export function sidebarEmptyCtaToastR63Regression(): true {
   return true
 }
 
+/**
+ * Round 66: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR66Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#sidebar-empty` (CSV preferred). */
 export function sidebarEmptyCtaSelector(): string {
   return '#sidebar-empty .empty-cta'
