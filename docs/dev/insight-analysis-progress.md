@@ -10,11 +10,11 @@
 | 字段 | 值 |
 | --- | --- |
 | 分支 | `cursor/bc-b45647a8-2ad9-4ced-b3dc-c1762333ca4d-1362`（Round 79；周期 1/3） |
-| 阶段 | **优化 Round 79 进行中**（周期 **1/3**；不合并；基于 main lastMergedRound=78） |
+| 阶段 | **优化 Round 79 完成**（周期 **1/3**；不合并；基于 main lastMergedRound=78） |
 | 上次更新 | 2026-07-19 22:10 |
-| 单元 | 待验证（+transformCancelToastRingR79 / flowchartEmptyCtaToastR79 / chartEditEscToastRingR79 / newViewCancelToastR79 / listFlowchartChartEditChunkR79） |
-| UI E2E | 待验证 |
-| Build | 待验证 |
+| 单元 | **597/597 PASS**（+transformCancelToastRingR79 / flowchartEmptyCtaToastR79 / chartEditEscToastRingR79 / newViewCancelToastR79 / listFlowchartChartEditChunkR79） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
 
 ## 2. Round 79 对齐摘要
 
