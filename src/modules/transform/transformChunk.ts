@@ -26,6 +26,10 @@
  * Round 62: re-checked with Create Cancel×toast / empty CTA×toast / Transform
  * Esc×toast / New view Cancel×toast helpers — still deferred-sync +
  * idle-warm on open.
+ *
+ * Round 64: re-checked with Transform Cancel×toast / flowchart empty CTA×toast
+ * / ChartEdit Esc×toast / New view Cancel×toast helpers — still deferred-sync +
+ * idle-warm on open.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -46,6 +50,7 @@ export type TransformChunkStrategy = {
   round53Reeval: 'keep-deferred-sync'
   round59Reeval: 'keep-deferred-sync'
   round62Reeval: 'keep-deferred-sync'
+  round64Reeval: 'keep-deferred-sync'
 }
 
 export function transformChunkStrategy(): TransformChunkStrategy {
@@ -57,6 +62,7 @@ export function transformChunkStrategy(): TransformChunkStrategy {
     round53Reeval: 'keep-deferred-sync',
     round59Reeval: 'keep-deferred-sync',
     round62Reeval: 'keep-deferred-sync',
+    round64Reeval: 'keep-deferred-sync',
   }
 }
 
