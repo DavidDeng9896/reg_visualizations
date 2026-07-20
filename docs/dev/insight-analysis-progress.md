@@ -12,9 +12,9 @@
 | 分支 | `cursor/bc-af63d5e0-f5d2-4e16-8515-d3a51d709307-1127`（Round 101） |
 | 阶段 | **优化 Round 101 完成**（周期 **2/3**；不合并） |
 | 上次更新 | 2026-07-20 21:01 |
-| 单元 | **822/822 PASS**（+transformCancelToastRingR101 / flowchartEmptyCtaToastR101 / chartEditEscToastRingR101 / newViewCancelToastR101 / listFlowchartChartEditChunkR101；含 R99） |
-| UI E2E | **待验证** |
-| Build | **待验证** |
+| 单元 | **823/823 PASS**（+transformCancelToastRingR101 / flowchartEmptyCtaToastR101 / chartEditEscToastRingR101 / newViewCancelToastR101 / listFlowchartChartEditChunkR101；含 R99） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；Create ~3.2 / ~1.6；无 EP） |
 
 ## 2. Round 101 对齐摘要
 
