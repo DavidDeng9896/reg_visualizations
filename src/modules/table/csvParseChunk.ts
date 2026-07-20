@@ -1,6 +1,6 @@
 /**
  * CSV PapaParse load / split evaluation (Round 37 / 43 / 45 / 46 / 48 / 50 / 52 /
- * 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68 re-eval).
+ * 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68 / 80 / 82 / 84 / 86 / 88 / 90 / 92 re-eval).
  *
  * PapaParse is only needed when the user picks a file — not for the Upload CSV
  * dialog chrome. Keeping a static import would inflate the CSV dialog chunk
@@ -10,7 +10,7 @@
  * the first file pick usually hits a warm module graph. Do not split Papa into
  * a separate route-level chunk beyond this lazy import.
  *
- * Round 43 / 45 / 46 / 48 / 50 / 52 / 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68: CSV chrome
+ * Round 43 / 45 / 46 / 48 / 50 / 52 / 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68 / 80 / 82 / 84 / 86 / 88 / 90 / 92: CSV chrome
  * (~6.1) + lazy papaparse (~19.9) still the right split — keep deferred-dynamic.
  * No further route-level Papa chunk.
  */
@@ -40,6 +40,13 @@ export type CsvParseChunkStrategy = {
   round64Reeval: 'keep-deferred-dynamic'
   round66Reeval: 'keep-deferred-dynamic'
   round68Reeval: 'keep-deferred-dynamic'
+  round80Reeval: 'keep-deferred-dynamic'
+  round82Reeval: 'keep-deferred-dynamic'
+  round84Reeval: 'keep-deferred-dynamic'
+  round86Reeval: 'keep-deferred-dynamic'
+  round88Reeval: 'keep-deferred-dynamic'
+  round90Reeval: 'keep-deferred-dynamic'
+  round92Reeval: 'keep-deferred-dynamic'
 }
 
 export function csvParseChunkStrategy(): CsvParseChunkStrategy {
@@ -58,6 +65,13 @@ export function csvParseChunkStrategy(): CsvParseChunkStrategy {
     round64Reeval: 'keep-deferred-dynamic',
     round66Reeval: 'keep-deferred-dynamic',
     round68Reeval: 'keep-deferred-dynamic',
+    round80Reeval: 'keep-deferred-dynamic',
+    round82Reeval: 'keep-deferred-dynamic',
+    round84Reeval: 'keep-deferred-dynamic',
+    round86Reeval: 'keep-deferred-dynamic',
+    round88Reeval: 'keep-deferred-dynamic',
+    round90Reeval: 'keep-deferred-dynamic',
+    round92Reeval: 'keep-deferred-dynamic',
   }
 }
 

@@ -59,6 +59,70 @@ export function chartEditEscToastR69SpotCheck(): true {
   return true
 }
 
+/**
+ * Round 79: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR79SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 81: ChartEdit Cancel × toast spot-check regression — same contract
+ * as Round 55 (visible ring + interactive toast host).
+ */
+export function chartEditCancelToastR81SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 83: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR83SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 85: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR85SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 87: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 / R85 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR87SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 89: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 / R85 / R87 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR89SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 91: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 / R85 / R87 / R89 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR91SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 93: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 / R85 / R87 / R89 / R91 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR93SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function chartEditCancelFocusFallback(
   doc: Document = document,

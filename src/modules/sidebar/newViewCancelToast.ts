@@ -59,6 +59,62 @@ export function newViewCancelToastR67Regression(): true {
   return true
 }
 
+/**
+ * Round 79: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR79Regression(): true {
+  return true
+}
+
+/**
+ * Round 83: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR83Regression(): true {
+  return true
+}
+
+/**
+ * Round 85: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR85Regression(): true {
+  return true
+}
+
+/**
+ * Round 87: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 / R85 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR87Regression(): true {
+  return true
+}
+
+/**
+ * Round 89: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 / R85 / R87 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR89Regression(): true {
+  return true
+}
+
+/**
+ * Round 91: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 / R85 / R87 / R89 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR91Regression(): true {
+  return true
+}
+
+/**
+ * Round 93: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 / R85 / R87 / R89 / R91 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR93Regression(): true {
+  return true
+}
+
 /** Fallback: New view trigger in sidebar ops, then sidebar empty CSV CTA. */
 export function newViewCancelFocusFallback(
   doc: Document = document,

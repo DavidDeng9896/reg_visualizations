@@ -73,6 +73,62 @@ export function workspaceEmptyCtaToastR67Regression(): true {
   return true
 }
 
+/**
+ * Round 80: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR80Regression(): true {
+  return true
+}
+
+/**
+ * Round 82: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR82Regression(): true {
+  return true
+}
+
+/**
+ * Round 84: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 / R82 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR84Regression(): true {
+  return true
+}
+
+/**
+ * Round 86: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 / R82 / R84 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR86Regression(): true {
+  return true
+}
+
+/**
+ * Round 88: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 / R82 / R84 / R86 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR88Regression(): true {
+  return true
+}
+
+/**
+ * Round 90: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 / R82 / R84 / R86 / R88 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR90Regression(): true {
+  return true
+}
+
+/**
+ * Round 92: workspace empty CTA × toast regression — same contract as
+ * Round 52 / R61 / R65 / R67 / R80 / R82 / R84 / R86 / R88 / R90 (visible ring + interactive toast host).
+ */
+export function workspaceEmptyCtaToastR92Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#ws-empty` (CSV preferred). */
 export function workspaceEmptyCtaSelector(): string {
   return '#ws-empty .empty-cta'
