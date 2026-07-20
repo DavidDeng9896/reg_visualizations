@@ -215,6 +215,10 @@
  * Round 99: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
  * Esc×toast + New view Cancel×toast remain tiny; List gzip still
  * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 101: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -278,6 +282,7 @@ export type ListPageChunkStrategy = {
   round97Reeval: 'keep-route-lazy'
   round98Reeval: 'keep-route-lazy'
   round99Reeval: 'keep-route-lazy'
+  round101Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -340,6 +345,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round97Reeval: 'keep-route-lazy',
     round98Reeval: 'keep-route-lazy',
     round99Reeval: 'keep-route-lazy',
+    round101Reeval: 'keep-route-lazy',
   }
 }
 
