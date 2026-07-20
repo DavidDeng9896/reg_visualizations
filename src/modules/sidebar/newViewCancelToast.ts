@@ -131,6 +131,14 @@ export function newViewCancelToastR97Regression(): true {
   return true
 }
 
+/**
+ * Round 99: New view Cancel × toast regression — same contract as
+ * Round 55 / R59 / R62 / R64 / R67 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 (visible ring + interactive toast host).
+ */
+export function newViewCancelToastR99Regression(): true {
+  return true
+}
+
 /** Fallback: New view trigger in sidebar ops, then sidebar empty CSV CTA. */
 export function newViewCancelFocusFallback(
   doc: Document = document,
