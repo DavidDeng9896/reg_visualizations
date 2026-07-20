@@ -11,10 +11,10 @@
 | --- | --- |
 | 分支 | `cursor/bc-75356c35-d4d8-4184-8d44-9b43600619fe-2c2d`（Round 90；含 R88–90 合并周期） |
 | 阶段 | **优化 Round 90 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=90`） |
-| 上次更新 | 2026-07-20 10:15 |
+| 上次更新 | 2026-07-20 10:10 |
 | 单元 | **717/717 PASS**（+csvEscToastRingR90 / workspaceEmptyCtaToastR90 / combineEscToastRingR90 / sidebarEmptyCtaToastR90 / listCreateCsvChunkR90） |
-| UI E2E | **10/10 PASS**（待跑） |
-| Build | PASS（待测 List gzip） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；无 EP） |
 
 ## 2. Round 90 对齐摘要
 
@@ -40,7 +40,7 @@ npm run test:e2e:ui
 ## 4. Round 91 计划（下一 cron · 周期 1/3）
 
 1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
-2. **Perf**：List gzip 边界；Flowchart / ChartEdit 再评估
+2. **Perf**：List gzip 边界（R90 ~11.5）；Flowchart / ChartEdit 再评估
 3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
 4. **验证**：unit + e2e:ui + build
 5. **合并**：否（周期 1/3）
