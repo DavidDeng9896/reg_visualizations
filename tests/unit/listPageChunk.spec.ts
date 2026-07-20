@@ -53,6 +53,7 @@ describe('listPageChunk (Round 39)', () => {
       round82Reeval: 'keep-route-lazy',
       round83Reeval: 'keep-route-lazy',
       round84Reeval: 'keep-route-lazy',
+      round85Reeval: 'keep-route-lazy',
     })
   })
 

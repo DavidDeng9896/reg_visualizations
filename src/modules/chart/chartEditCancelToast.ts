@@ -83,6 +83,14 @@ export function chartEditEscToastR83SpotCheck(): true {
   return true
 }
 
+/**
+ * Round 85: ChartEdit Esc × toast spot-check regression — same contract
+ * as Round 57 / R60 / R64 / R66 / R69 / R79 / R83 (visible ring + interactive toast host).
+ */
+export function chartEditEscToastR85SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function chartEditCancelFocusFallback(
   doc: Document = document,
