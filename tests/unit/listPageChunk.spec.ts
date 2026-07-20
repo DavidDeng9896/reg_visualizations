@@ -68,7 +68,10 @@ describe('listPageChunk (Round 39)', () => {
       round97Reeval: 'keep-route-lazy',
       round98Reeval: 'keep-route-lazy',
       round99Reeval: 'keep-route-lazy',
+<<<<<<< HEAD
       round100Reeval: 'keep-route-lazy',
+=======
+>>>>>>> c94e9a4 (docs: Round 101 — progress + UI E2E report; fix listPageChunk expectation)
       round101Reeval: 'keep-route-lazy',
     })
   })
