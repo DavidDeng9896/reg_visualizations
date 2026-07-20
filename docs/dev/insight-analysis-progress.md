@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-8be8a1d2-6142-44e5-b5aa-aa7a0d481699-8326`（Round 93；基于 R92 基线） |
-| 阶段 | **优化 Round 93 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=93`） |
-| 上次更新 | 2026-07-20 13:10 |
-| 单元 | **749/749 PASS**（+transformCancelToastRingR93 / flowchartEmptyCtaToastR93 / chartEditEscToastRingR93 / newViewCancelToastR93 / listFlowchartChartEditChunkR93） |
+| 分支 | `cursor/bc-9224fc34-24f2-421a-bbdf-bc1025c1fb3d-83ab`（Round 95；基于 main@R93） |
+| 阶段 | **优化 Round 95 完成**（周期 **2/3**；下一合并点 Round 96） |
+| 上次更新 | 2026-07-20 15:08 |
+| 单元 | **760/760 PASS**（+transformCancelToastRingR95 / flowchartEmptyCtaToastR95 / chartEditEscToastRingR95 / newViewCancelToastR95 / listFlowchartChartEditChunkR95） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
 
-## 2. Round 93 对齐摘要
+## 2. Round 95 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR93SpotCheck` |
-| 流程图空态 CTA × toast 回归 | ✅ `flowchartEmptyCtaToastR93Regression` |
-| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR93SpotCheck` |
-| New view Cancel × toast 回归 | ✅ `newViewCancelToastR93Regression` |
+| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR95SpotCheck` |
+| 流程图空态 CTA × toast 回归 | ✅ `flowchartEmptyCtaToastR95Regression` |
+| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR95SpotCheck` |
+| New view Cancel × toast 回归 | ✅ `newViewCancelToastR95Regression` |
 | List / Flowchart / ChartEdit 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync |
-| 合并 | **是**（周期 3/3；合入 R91–93 → 目标 lastMergedRound=93） |
+| 合并 | **否**（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 94 计划（下一 cron · 周期 1/3）
+## 4. Round 96 计划（下一 cron · 周期 3/3 · 合并）
 
 1. **UX**：CSV Esc × toast 抽检；工作区空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R93 ~11.5）；Create / CSV 再评估
+2. **Perf**：List gzip 边界（R95 ~11.5）；Create / CSV 再评估
 3. **A11y**：Combine Esc × toast 抽检；侧栏空态 CTA × toast 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：**是**（周期 3/3；合入 R94–96 → 目标 lastMergedRound=96）
