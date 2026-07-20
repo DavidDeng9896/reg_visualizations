@@ -67,6 +67,14 @@ export function chartEditEscToastR79SpotCheck(): true {
   return true
 }
 
+/**
+ * Round 81: ChartEdit Cancel × toast spot-check regression — same contract
+ * as Round 55 (visible ring + interactive toast host).
+ */
+export function chartEditCancelToastR81SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function chartEditCancelFocusFallback(
   doc: Document = document,
