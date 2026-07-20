@@ -12,7 +12,7 @@
 | 分支 | `cursor/bc-f50adb1f-2285-4732-8c1e-090997a579da-e9bb`（Round 89；基于 R88 基线） |
 | 阶段 | **优化 Round 89 完成**（周期 **2/3**；不合并） |
 | 上次更新 | 2026-07-20 09:10 |
-| 单元 | **706/706 PASS**（+transformCancelToastRingR89 / flowchartEmptyCtaToastR89 / chartEditEscToastRingR89 / newViewCancelToastR89 / listFlowchartChartEditChunkR89） |
+| 单元 | **707/707 PASS**（+transformCancelToastRingR89 / flowchartEmptyCtaToastR89 / chartEditEscToastRingR89 / newViewCancelToastR89 / listFlowchartChartEditChunkR89） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
 
