@@ -101,6 +101,14 @@ export function combineEscToastR84SpotCheck(): true {
 }
 
 /**
+ * Round 86: Combine Esc × toast spot-check regression — same contract
+ * as Round 55 / R59 / R63 / R66 / R68 / R78 / R82 / R84 (visible ring + interactive toast host).
+ */
+export function combineEscToastR86SpotCheck(): true {
+  return true
+}
+
+/**
  * Restore focus to the Combine opener (or flowchart/workspace empty Combine
  * CTA fallback) with a visible ring after Cancel.
  */

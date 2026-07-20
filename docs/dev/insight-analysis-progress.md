@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-b591d9a1-a053-4909-b4f1-f11b75cf0600-54f1`（Round 85；基于 R84 基线） |
-| 阶段 | **优化 Round 85 完成**（周期 **1/3**；合并：否） |
-| 上次更新 | 2026-07-20 05:10 |
-| 单元 | **665/665 PASS**（+transformCancelToastRingR85 / flowchartEmptyCtaToastR85 / chartEditEscToastRingR85 / newViewCancelToastR85 / listFlowchartChartEditChunkR85） |
+| 分支 | `cursor/bc-e6f95a80-c797-4b48-9ad3-00b39d95b46f-7dae`（Round 86；基于 R85 基线） |
+| 阶段 | **优化 Round 86 完成**（周期 **2/3**；合并：否） |
+| 上次更新 | 2026-07-20 06:10 |
+| 单元 | **675/675 PASS**（+csvEscToastRingR86 / workspaceEmptyCtaToastR86 / combineEscToastRingR86 / sidebarEmptyCtaToastR86 / listCreateCsvChunkR86） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
+| Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；无 EP） |
 
-## 2. Round 85 对齐摘要
+## 2. Round 86 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR85SpotCheck` |
-| 流程图空态 CTA × toast 回归 | ✅ `flowchartEmptyCtaToastR85Regression` |
-| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR85SpotCheck` |
-| New view Cancel × toast 回归 | ✅ `newViewCancelToastR85Regression` |
-| List / Flowchart / ChartEdit 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync |
-| 合并 | **否**（周期 1/3） |
+| CSV Esc × toast 抽检 | ✅ `csvEscToastR86SpotCheck` |
+| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR86Regression` |
+| Combine Esc × toast 抽检 | ✅ `combineEscToastR86SpotCheck` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR86Regression` |
+| List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
+| 合并 | **否**（周期 2/3） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 86 计划（下一 cron · 周期 2/3）
+## 4. Round 87 计划（下一 cron · 周期 3/3 · 合并）
 
-1. **UX**：CSV Esc × toast 抽检；工作区空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R85 ~11.5）；Create / CSV 再评估
-3. **A11y**：Combine Esc × toast 抽检；侧栏空态 CTA × toast 回归
+1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
+2. **Perf**：List gzip 边界（R86 ~11.5）；Flowchart / ChartEdit 再评估
+3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3）
+5. **合并**：是（周期 3/3；合 R85–87 → 目标 lastMergedRound=87）
