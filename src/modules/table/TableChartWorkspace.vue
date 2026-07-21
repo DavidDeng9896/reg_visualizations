@@ -277,6 +277,8 @@ import {
   splitRatioLiveText,
   splitterAriaControls,
   TABLE_PANE_ID,
+  type SplitLiveOpts,
+  type SplitterOrientation,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
 import {
@@ -427,7 +429,9 @@ const showChartPane = computed(() => store.selectedView && viewType.value !== 't
 const layoutInfo = computed(() =>
   effectiveChartPosition(chartPos.value, viewportWidth.value),
 )
-const layoutDegraded = computed(() => showChartPane.value && layoutInfo.value.degraded)
+const layoutDegraded = computed(
+  () => Boolean(showChartPane.value) && layoutInfo.value.degraded,
+)
 const showLayoutHint = computed(() => layoutDegraded.value && !layoutHintDismissed.value)
 const effectivePos = computed(() => layoutInfo.value.position)
 
@@ -436,12 +440,12 @@ const layoutClass = computed(() => {
   return `pos-${effectivePos.value}`
 })
 
-const splitterOrientation = computed(() =>
+const splitterOrientation = computed<SplitterOrientation>(() =>
   effectivePos.value === 'left' || effectivePos.value === 'right' ? 'vertical' : 'horizontal',
 )
 
 /** Round 107: valuetext / aria-label reflect L-05 stacked orientation. */
-const splitterLiveOpts = computed(() => ({
+const splitterLiveOpts = computed<SplitLiveOpts>(() => ({
   orientation: splitterOrientation.value,
   degraded: layoutDegraded.value,
 }))
