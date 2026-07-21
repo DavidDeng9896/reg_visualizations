@@ -648,6 +648,15 @@ function exportCsv() {
   display: flex;
   flex-direction: column;
   position: relative;
+  min-height: 0;
+}
+/* Fill remaining workspace height so table/chart split can grow (was content-sized ~350px). */
+.ws-surface {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .skip-link {
   position: absolute;
@@ -969,15 +978,24 @@ function exportCsv() {
   order: 0;
 }
 .chart-pane {
-  min-height: 160px;
   min-width: 240px;
+  /* Floor comes from inline minHeight; 0 lets flex share space instead of content-size. */
+  min-height: 0;
   background: #fff;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.chart-pane > :deep(.chart) {
+  flex: 1;
+  min-height: 0;
 }
 .table-pane {
-  min-height: 140px;
   min-width: 240px;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .splitter {
   flex: 0 0 6px;
