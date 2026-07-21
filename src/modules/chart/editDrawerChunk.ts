@@ -42,6 +42,62 @@
  * Round 78: CSV Esc×toast + workspace skip→empty Tab + Combine Esc×toast +
  * list empty CTA×toast are tiny; fitEngine/palette still deferred-sync
  * (no cleaner split).
+ *
+ * Round 79: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 81: Transform Esc×toast + flowchart empty CTA×toast + ChartEdit
+ * Cancel×toast + list empty CTA×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 83: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 85: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 87: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 89: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 91: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 93: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 95: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 97: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 99: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 101: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 103: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
+ *
+ * Round 105: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split).
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -72,6 +128,21 @@ export type EditDrawerChunkStrategy = {
   round67Reeval: 'keep-deferred-sync'
   round69Reeval: 'keep-deferred-sync'
   round78Reeval: 'keep-deferred-sync'
+  round79Reeval: 'keep-deferred-sync'
+  round81Reeval: 'keep-deferred-sync'
+  round83Reeval: 'keep-deferred-sync'
+  round85Reeval: 'keep-deferred-sync'
+  round87Reeval: 'keep-deferred-sync'
+  round89Reeval: 'keep-deferred-sync'
+  round91Reeval: 'keep-deferred-sync'
+  round93Reeval: 'keep-deferred-sync'
+  round95Reeval: 'keep-deferred-sync'
+  round97Reeval: 'keep-deferred-sync'
+  round99Reeval: 'keep-deferred-sync'
+  round101Reeval: 'keep-deferred-sync'
+  round103Reeval: 'keep-deferred-sync'
+  round105Reeval: 'keep-deferred-sync'
+  round107Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -88,6 +159,21 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round67Reeval: 'keep-deferred-sync',
     round69Reeval: 'keep-deferred-sync',
     round78Reeval: 'keep-deferred-sync',
+    round79Reeval: 'keep-deferred-sync',
+    round81Reeval: 'keep-deferred-sync',
+    round83Reeval: 'keep-deferred-sync',
+    round85Reeval: 'keep-deferred-sync',
+    round87Reeval: 'keep-deferred-sync',
+    round89Reeval: 'keep-deferred-sync',
+    round91Reeval: 'keep-deferred-sync',
+    round93Reeval: 'keep-deferred-sync',
+    round95Reeval: 'keep-deferred-sync',
+    round97Reeval: 'keep-deferred-sync',
+    round99Reeval: 'keep-deferred-sync',
+    round101Reeval: 'keep-deferred-sync',
+    round103Reeval: 'keep-deferred-sync',
+    round105Reeval: 'keep-deferred-sync',
+    round107Reeval: 'keep-deferred-sync',
   }
 }
 

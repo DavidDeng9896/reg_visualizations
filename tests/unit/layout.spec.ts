@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CHART_PANE_ID,
+  chartSplitterAriaLabel,
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
+  LAYOUT_HINT_VISUAL_ONLY,
+  layoutDegradedLiveText,
+  layoutHintUsesStatusRole,
+  layoutHintVisualAttrs,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
+  resetSplitRatio,
+  splitRatioLiveText,
+  splitterAriaControls,
+  TABLE_PANE_ID,
 } from '@/modules/table/layout'
 
 describe('workspace layout helpers', () => {
@@ -21,4 +32,50 @@ describe('workspace layout helpers', () => {
     expect(effectiveChartPosition('bottom', 800)).toEqual({ position: 'bottom', degraded: false })
     expect(effectiveChartPosition('left', 1200)).toEqual({ position: 'left', degraded: false })
   })
+
+  it('exposes stable pane ids and live text for splitter a11y (Round 120)', () => {
+    expect(CHART_PANE_ID).toBe('ws-chart-pane')
+    expect(TABLE_PANE_ID).toBe('ws-table-pane')
+    expect(splitterAriaControls()).toBe('ws-chart-pane ws-table-pane')
+    expect(splitRatioLiveText(0.45)).toBe('图表区占比 45%')
+    expect(splitRatioLiveText(0.01)).toBe('图表区占比 20%')
+    expect(splitRatioLiveText(0.99)).toBe('图表区占比 80%')
+  })
+
+  it('prefixes live text with orientation / L-05 degrade context (Round 107–108)', () => {
+    expect(splitRatioLiveText(0.45, { orientation: 'horizontal' })).toBe('上下分割，图表区占比 45%')
+    expect(splitRatioLiveText(0.45, { orientation: 'vertical' })).toBe('左右分割，图表区占比 45%')
+    // Round 108: degraded reuses horizontal phrasing (no repeated 「窄屏」 on resize)
+    expect(splitRatioLiveText(0.45, { degraded: true, orientation: 'horizontal' })).toBe(
+      '上下分割，图表区占比 45%',
+    )
+    expect(layoutDegradedLiveText('left')).toContain('图在上')
+    expect(layoutDegradedLiveText('right')).toContain('图在下')
+    expect(layoutDegradedLiveText('left')).toContain('上下方向键')
+    expect(chartSplitterAriaLabel({ orientation: 'horizontal' })).toContain('上下表图占比')
+    expect(chartSplitterAriaLabel({ orientation: 'vertical' })).toContain('左右表图占比')
+    expect(chartSplitterAriaLabel({ degraded: true })).toContain('上下表图占比')
+  })
+
+  it('keeps L-05 hint visual-only so live region is the sole SR announce (Round 108)', () => {
+    expect(LAYOUT_HINT_VISUAL_ONLY).toBe(true)
+    expect(layoutHintUsesStatusRole()).toBe(false)
+    expect(layoutHintVisualAttrs()).toEqual({ class: 'layout-hint' })
+    expect(layoutHintVisualAttrs()).not.toHaveProperty('role')
+    expect(layoutHintVisualAttrs()).not.toHaveProperty('aria-live')
+  })
+
+  it('resets split ratio to default for double-click UX (Round 122)', () => {
+    expect(resetSplitRatio()).toBe(DEFAULT_SPLIT_RATIO)
+    expect(resetSplitRatio()).toBe(0.45)
+  })
+
+  it('treats 0 as keyboard reset key for splitter default (Round 123)', () => {
+    expect(isSplitterResetKey('0')).toBe(true)
+    expect(isSplitterResetKey('Home')).toBe(false)
+    expect(isSplitterResetKey('End')).toBe(false)
+    expect(isSplitterResetKey('ArrowLeft')).toBe(false)
+    expect(chartSplitterAriaLabel()).toContain('按 0 恢复默认')
+  })
 })
+

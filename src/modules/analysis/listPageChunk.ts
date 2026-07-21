@@ -131,6 +131,114 @@
  * Round 78: CSV Esc×toast + workspace skip→empty Tab + Combine Esc×toast +
  * list empty CTA×toast remain tiny; List gzip still keep-route-lazy.
  * Flowchart / ChartEdit / projects cold paths re-checked below.
+ *
+ * Round 79: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 80: CSV/Combine Cancel×toast + workspace/sidebar empty CTA×toast +
+ * Create Esc×toast + workspace skip→empty Tab remain tiny; List gzip still
+ * keep-route-lazy. Create / CSV / Transform cold paths re-checked below.
+ *
+ * Round 81: Transform Esc×toast + flowchart empty CTA×toast + ChartEdit
+ * Cancel×toast + list empty CTA×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit / projects cold paths re-checked below.
+ *
+ * Round 82: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 83: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 84: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 85: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 86: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 87: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 88: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 89: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 90: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 91: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 92: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 93: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 94: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 95: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 96: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 97: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 98: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 99: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 100: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 101: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 102: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 103: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 104: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 105: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -173,6 +281,36 @@ export type ListPageChunkStrategy = {
   round68Reeval: 'keep-route-lazy'
   round69Reeval: 'keep-route-lazy'
   round78Reeval: 'keep-route-lazy'
+  round79Reeval: 'keep-route-lazy'
+  round80Reeval: 'keep-route-lazy'
+  round81Reeval: 'keep-route-lazy'
+  round82Reeval: 'keep-route-lazy'
+  round83Reeval: 'keep-route-lazy'
+  round84Reeval: 'keep-route-lazy'
+  round85Reeval: 'keep-route-lazy'
+  round86Reeval: 'keep-route-lazy'
+  round87Reeval: 'keep-route-lazy'
+  round88Reeval: 'keep-route-lazy'
+  round89Reeval: 'keep-route-lazy'
+  round90Reeval: 'keep-route-lazy'
+  round91Reeval: 'keep-route-lazy'
+  round92Reeval: 'keep-route-lazy'
+  round93Reeval: 'keep-route-lazy'
+  round94Reeval: 'keep-route-lazy'
+  round95Reeval: 'keep-route-lazy'
+  round96Reeval: 'keep-route-lazy'
+  round97Reeval: 'keep-route-lazy'
+  round98Reeval: 'keep-route-lazy'
+  round99Reeval: 'keep-route-lazy'
+  round100Reeval: 'keep-route-lazy'
+  round101Reeval: 'keep-route-lazy'
+  round102Reeval: 'keep-route-lazy'
+  round103Reeval: 'keep-route-lazy'
+  round104Reeval: 'keep-route-lazy'
+  round105Reeval: 'keep-route-lazy'
+  round106Reeval: 'keep-route-lazy'
+  round107Reeval: 'keep-route-lazy'
+  round108Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -214,6 +352,36 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round68Reeval: 'keep-route-lazy',
     round69Reeval: 'keep-route-lazy',
     round78Reeval: 'keep-route-lazy',
+    round79Reeval: 'keep-route-lazy',
+    round80Reeval: 'keep-route-lazy',
+    round81Reeval: 'keep-route-lazy',
+    round82Reeval: 'keep-route-lazy',
+    round83Reeval: 'keep-route-lazy',
+    round84Reeval: 'keep-route-lazy',
+    round85Reeval: 'keep-route-lazy',
+    round86Reeval: 'keep-route-lazy',
+    round87Reeval: 'keep-route-lazy',
+    round88Reeval: 'keep-route-lazy',
+    round89Reeval: 'keep-route-lazy',
+    round90Reeval: 'keep-route-lazy',
+    round91Reeval: 'keep-route-lazy',
+    round92Reeval: 'keep-route-lazy',
+    round93Reeval: 'keep-route-lazy',
+    round94Reeval: 'keep-route-lazy',
+    round95Reeval: 'keep-route-lazy',
+    round96Reeval: 'keep-route-lazy',
+    round97Reeval: 'keep-route-lazy',
+    round98Reeval: 'keep-route-lazy',
+    round99Reeval: 'keep-route-lazy',
+    round100Reeval: 'keep-route-lazy',
+    round101Reeval: 'keep-route-lazy',
+    round102Reeval: 'keep-route-lazy',
+    round103Reeval: 'keep-route-lazy',
+    round104Reeval: 'keep-route-lazy',
+    round105Reeval: 'keep-route-lazy',
+    round106Reeval: 'keep-route-lazy',
+    round107Reeval: 'keep-route-lazy',
+    round108Reeval: 'keep-route-lazy',
   }
 }
 

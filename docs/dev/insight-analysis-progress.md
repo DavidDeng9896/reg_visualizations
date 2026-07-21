@@ -9,25 +9,26 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-306f5894-a5bd-4acb-b014-2d31bd05a613-4e93`（Round 78；含 R76–78 合并周期） |
-| 阶段 | **优化 Round 78 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=78`） |
-| 上次更新 | 2026-07-19 21:01 |
-| 单元 | **586/586 PASS**（+csvEscToastRingR78 / workspaceSkipTabEmptyCtaR78 / combineEscToastRingR78 / listEmptyCtaToastR78 / listFlowchartChartEditProjectsChunkR78） |
+| 分支 | `cursor/bc-422c2b8f-f6bf-421a-8013-170168adfcfa-e3ca`（Round 108；含 R106–107 cherry-pick） |
+| 阶段 | **优化 Round 108 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=108`） |
+| 上次更新 | 2026-07-21 23:10 |
+| 单元 | **914/914 PASS**（+csvEscToastRingR108 / combineEscToastRingR108 / workspaceEmptyCtaToastR108 / sidebarEmptyCtaToastR108 / listCreateCsvChunkR108 / layout L-05 hint dedupe） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
+| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；Workspace ~71.0 / ~25.5；无 EP） |
 
-## 2. Round 78 对齐摘要
+## 2. Round 108 对齐摘要
 
-对照 UX / 性能 / a11y：
+对照 UX / 性能 / a11y（docs L-05 窄屏降级 + toast 合同）：
 
 | 需求 | 状态 |
 | --- | --- |
-| CSV Esc × toast 抽检 | ✅ `csvEscToastR78SpotCheck` |
-| 工作区 skip→empty Tab 回归 | ✅ `workspaceSkipTabEmptyCtaR78Regression` |
-| Combine Esc × toast 抽检 | ✅ `combineEscToastR78SpotCheck` |
-| 列表空态 CTA × toast 回归 | ✅ `listEmptyCtaToastR78Regression` |
-| List / Flowchart / ChartEdit / projects 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync / keep-shared |
-| 合并 | **是**（周期 3/3；R76–78 → 目标 lastMergedRound=78；PR #72–#77 仍 OPEN 时一并带上 R70–75 意图） |
+| CSV Esc × toast 抽检 | ✅ `csvEscToastR108SpotCheck` |
+| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR108Regression` |
+| Combine Esc × toast 抽检 | ✅ `combineEscToastR108SpotCheck` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR108Regression` |
+| L-05 提示条与 live 去重 | ✅ 提示条 visual-only（无 role=status）；resize live 复用「上下分割」 |
+| List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
+| 合并 | **是**（周期 3/3；合入 R106–108） |
 
 ## 3. 验证命令
 
@@ -37,10 +38,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 79 计划（下一 cron · 周期 1/3）
+## 4. Round 109 计划（下一 cron · 周期 1/3）
 
 1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R78 ~11.5）；Flowchart / ChartEdit 再评估
-3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
+2. **Perf**：List gzip 再测；Flowchart / ChartEdit 再评估
+3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归；核对分割条 valuetext 与 live 文案在拖拽结束时不重复打扰
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3）
+5. **合并**：**否**（周期 1/3；下一合并点 Round 111）

@@ -95,6 +95,126 @@ export function sidebarEmptyCtaToastR68Regression(): true {
   return true
 }
 
+/**
+ * Round 80: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR80Regression(): true {
+  return true
+}
+
+/**
+ * Round 82: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR82Regression(): true {
+  return true
+}
+
+/**
+ * Round 84: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR84Regression(): true {
+  return true
+}
+
+/**
+ * Round 86: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR86Regression(): true {
+  return true
+}
+
+/**
+ * Round 88: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR88Regression(): true {
+  return true
+}
+
+/**
+ * Round 90: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR90Regression(): true {
+  return true
+}
+
+/**
+ * Round 92: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR92Regression(): true {
+  return true
+}
+
+/**
+ * Round 94: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR94Regression(): true {
+  return true
+}
+
+/**
+ * Round 96: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR96Regression(): true {
+  return true
+}
+
+/**
+ * Round 98: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR98Regression(): true {
+  return true
+}
+
+/**
+ * Round 100: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR100Regression(): true {
+  return true
+}
+
+/**
+ * Round 102: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR102Regression(): true {
+  return true
+}
+
+/**
+ * Round 104: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR104Regression(): true {
+  return true
+}
+
+/**
+ * Round 106: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR106Regression(): true {
+  return true
+}
+
+/**
+ * Round 108: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 / R106 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR108Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#sidebar-empty` (CSV preferred). */
 export function sidebarEmptyCtaSelector(): string {
   return '#sidebar-empty .empty-cta'

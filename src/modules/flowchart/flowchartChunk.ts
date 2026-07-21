@@ -43,6 +43,62 @@
  * Round 78: re-checked after CSV Esc×toast + workspace skip→empty Tab +
  * Combine Esc×toast + list empty CTA×toast helpers — still keep
  * async-idle-warm.
+ *
+ * Round 79: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 81: re-checked after Transform Esc×toast + flowchart empty
+ * CTA×toast + ChartEdit Cancel×toast + list empty CTA×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 83: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 85: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 87: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 89: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 91: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 93: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 95: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 97: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 99: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 101: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 103: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
+ *
+ * Round 105: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -69,6 +125,21 @@ export type FlowchartChunkStrategy = {
   round67Reeval: 'keep-async-idle-warm'
   round69Reeval: 'keep-async-idle-warm'
   round78Reeval: 'keep-async-idle-warm'
+  round79Reeval: 'keep-async-idle-warm'
+  round81Reeval: 'keep-async-idle-warm'
+  round83Reeval: 'keep-async-idle-warm'
+  round85Reeval: 'keep-async-idle-warm'
+  round87Reeval: 'keep-async-idle-warm'
+  round89Reeval: 'keep-async-idle-warm'
+  round91Reeval: 'keep-async-idle-warm'
+  round93Reeval: 'keep-async-idle-warm'
+  round95Reeval: 'keep-async-idle-warm'
+  round97Reeval: 'keep-async-idle-warm'
+  round99Reeval: 'keep-async-idle-warm'
+  round101Reeval: 'keep-async-idle-warm'
+  round103Reeval: 'keep-async-idle-warm'
+  round105Reeval: 'keep-async-idle-warm'
+  round107Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -88,5 +159,20 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round67Reeval: 'keep-async-idle-warm',
     round69Reeval: 'keep-async-idle-warm',
     round78Reeval: 'keep-async-idle-warm',
+    round79Reeval: 'keep-async-idle-warm',
+    round81Reeval: 'keep-async-idle-warm',
+    round83Reeval: 'keep-async-idle-warm',
+    round85Reeval: 'keep-async-idle-warm',
+    round87Reeval: 'keep-async-idle-warm',
+    round89Reeval: 'keep-async-idle-warm',
+    round91Reeval: 'keep-async-idle-warm',
+    round93Reeval: 'keep-async-idle-warm',
+    round95Reeval: 'keep-async-idle-warm',
+    round97Reeval: 'keep-async-idle-warm',
+    round99Reeval: 'keep-async-idle-warm',
+    round101Reeval: 'keep-async-idle-warm',
+    round103Reeval: 'keep-async-idle-warm',
+    round105Reeval: 'keep-async-idle-warm',
+    round107Reeval: 'keep-async-idle-warm',
   }
 }

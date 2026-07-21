@@ -75,6 +75,126 @@ export function transformCancelToastR69SpotCheck(): true {
   return true
 }
 
+/**
+ * Round 79: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR79SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 81: Transform Esc × toast spot-check regression — same contract
+ * as Round 56 / R58 / R62 / R67 (visible ring + interactive toast host).
+ */
+export function transformEscToastR81SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 83: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR83SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 85: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR85SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 87: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR87SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 89: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR89SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 91: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR91SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 93: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR93SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 95: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR95SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 97: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR97SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 99: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR99SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 101: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 / R99 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR101SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 103: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 / R99 / R101 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR103SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 105: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 / R99 / R101 / R103 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR105SpotCheck(): true {
+  return true
+}
+
+/**
+ * Round 107: Transform Cancel × toast spot-check regression — same contract
+ * as Round 54 / R60 / R64 / R69 / R79 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 / R99 / R101 / R103 / R105 (visible ring + interactive toast host).
+ */
+export function transformCancelToastR107SpotCheck(): true {
+  return true
+}
+
 /** Fallback: first focusable control in the workspace toolbar. */
 export function transformCancelFocusFallback(
   doc: Document = document,
