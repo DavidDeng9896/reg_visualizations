@@ -1,0 +1,77 @@
+/* Insight Studio — 设计令牌（DESIGN.md §2 视觉语言） */
+:root {
+  /* 颜色 */
+  --is-primary: #1e2a78;
+  --is-primary-hover: #27359a;
+  --is-primary-active: #182160;
+  --is-accent: #2e5bff;
+  --is-accent-hover: #1f49e0;
+  --is-accent-soft: #eef2ff;
+  --is-success: #1f9d66;
+  --is-success-soft: #eefaf3;
+  --is-danger: #d92d20;
+  --is-danger-hover: #b42318;
+  --is-danger-soft: #fef3f2;
+  --is-warning-bg: #fdf3d7;
+  --is-warning-text: #8a6d1a;
+  --is-info: #2e5bff;
+
+  --is-bg: #f7f8fa;
+  --is-surface: #ffffff;
+  --is-surface-hover: #f2f4f7;
+  --is-border: #e4e7ec;
+  --is-border-strong: #d0d5dd;
+
+  --is-text: #1d2939;
+  --is-text-secondary: #667085;
+  --is-text-tertiary: #98a2b3;
+  --is-text-inverse: #ffffff;
+
+  --is-node-bg: #eefaf3;
+
+  /* 间距 */
+  --is-space-1: 4px;
+  --is-space-2: 8px;
+  --is-space-3: 12px;
+  --is-space-4: 16px;
+  --is-space-5: 20px;
+  --is-space-6: 24px;
+  --is-space-8: 32px;
+  --is-space-10: 40px;
+
+  /* 圆角 */
+  --is-radius-sm: 6px;
+  --is-radius: 8px;
+  --is-radius-lg: 12px;
+  --is-radius-full: 999px;
+
+  /* 阴影 */
+  --is-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --is-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
+  --is-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+  --is-ring: 0 0 0 3px rgba(46, 91, 255, 0.22);
+
+  /* 字号 */
+  --is-text-xs: 12px;
+  --is-text-sm: 13px;
+  --is-text-md: 14px;
+  --is-text-lg: 16px;
+
+  /* 动效 */
+  --is-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --is-dur-fast: 150ms;
+  --is-dur: 200ms;
+  --is-dur-slow: 250ms;
+
+  /* 层级 */
+  --is-z-dropdown: 100;
+  --is-z-popover: 200;
+  --is-z-modal: 300;
+  --is-z-toast: 400;
+
+  /* 字体 */
+  --is-font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --is-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}

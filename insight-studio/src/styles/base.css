@@ -1,0 +1,89 @@
+/* reset + 基础排版 + 滚动条美化 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--is-font);
+  font-size: var(--is-text-sm);
+  line-height: 1.5;
+  color: var(--is-text);
+  background: var(--is-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+a {
+  color: var(--is-accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* 键盘焦点环（全局兜底，组件内部可覆盖） */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--is-ring);
+  border-radius: var(--is-radius-sm);
+}
+
+/* 滚动条美化 */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(16, 24, 40, 0.18);
+  border-radius: var(--is-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 24, 40, 0.3);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* 通用文本截断 */
+.is-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
