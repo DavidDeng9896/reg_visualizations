@@ -188,12 +188,12 @@
         :class="splitterOrientation"
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
-        :aria-label="chartSplitterAriaLabel()"
+        :aria-label="splitterAriaLabelText"
         :aria-controls="splitterAriaControls()"
         :aria-valuenow="Math.round(splitRatio * 100)"
         :aria-valuemin="20"
         :aria-valuemax="80"
-        :aria-valuetext="splitRatioLiveText(splitRatio)"
+        :aria-valuetext="splitterValueText"
         tabindex="0"
         @pointerdown="onSplitterDown"
         @keydown="onSplitterKey"
@@ -272,6 +272,7 @@ import {
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
   isSplitterResetKey,
+  layoutDegradedLiveText,
   resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
@@ -439,6 +440,20 @@ const splitterOrientation = computed(() =>
   effectivePos.value === 'left' || effectivePos.value === 'right' ? 'vertical' : 'horizontal',
 )
 
+/** Round 107: valuetext / aria-label reflect L-05 stacked orientation. */
+const splitterLiveOpts = computed(() => ({
+  orientation: splitterOrientation.value,
+  degraded: layoutDegraded.value,
+}))
+
+const splitterValueText = computed(() =>
+  splitRatioLiveText(splitRatio.value, splitterLiveOpts.value),
+)
+
+const splitterAriaLabelText = computed(() =>
+  chartSplitterAriaLabel(splitterLiveOpts.value),
+)
+
 const chartPaneStyle = computed(() => {
   if (!showChartPane.value) return {}
   const r = splitRatio.value
@@ -532,9 +547,8 @@ function focusSplitter() {
   })
 }
 
-function announceSplitRatio(ratio: number) {
-  const text = splitRatioLiveText(ratio)
-  // Retrigger polite live region when the same percentage repeats.
+function announceLive(text: string) {
+  // Retrigger polite live region when the same string repeats.
   splitLiveAnnounce.value = ''
   void nextTick(() => {
     splitLiveAnnounce.value = text
@@ -545,6 +559,17 @@ function announceSplitRatio(ratio: number) {
     splitLiveClearTimer = null
   }, 1500)
 }
+
+function announceSplitRatio(ratio: number) {
+  announceLive(splitRatioLiveText(ratio, splitterLiveOpts.value))
+}
+
+/** Round 107: announce L-05 stack once when left/right degrades on narrow viewports. */
+watch(layoutDegraded, (degraded, wasDegraded) => {
+  if (degraded && !wasDegraded && showChartPane.value) {
+    announceLive(layoutDegradedLiveText(chartPos.value))
+  }
+})
 
 function persistSplitRatio(ratio: number, opts?: { announce?: boolean }) {
   splitRatio.value = clampSplitRatio(ratio)

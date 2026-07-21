@@ -6,6 +6,7 @@ import {
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
   isSplitterResetKey,
+  layoutDegradedLiveText,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
   resetSplitRatio,
@@ -36,6 +37,20 @@ describe('workspace layout helpers', () => {
     expect(splitRatioLiveText(0.45)).toBe('图表区占比 45%')
     expect(splitRatioLiveText(0.01)).toBe('图表区占比 20%')
     expect(splitRatioLiveText(0.99)).toBe('图表区占比 80%')
+  })
+
+  it('prefixes live text with orientation / L-05 degrade context (Round 107)', () => {
+    expect(splitRatioLiveText(0.45, { orientation: 'horizontal' })).toBe('上下分割，图表区占比 45%')
+    expect(splitRatioLiveText(0.45, { orientation: 'vertical' })).toBe('左右分割，图表区占比 45%')
+    expect(splitRatioLiveText(0.45, { degraded: true, orientation: 'horizontal' })).toBe(
+      '窄屏上下排列，图表区占比 45%',
+    )
+    expect(layoutDegradedLiveText('left')).toContain('图在上')
+    expect(layoutDegradedLiveText('right')).toContain('图在下')
+    expect(layoutDegradedLiveText('left')).toContain('上下方向键')
+    expect(chartSplitterAriaLabel({ orientation: 'horizontal' })).toContain('上下表图占比')
+    expect(chartSplitterAriaLabel({ orientation: 'vertical' })).toContain('左右表图占比')
+    expect(chartSplitterAriaLabel({ degraded: true })).toContain('上下表图占比')
   })
 
   it('resets split ratio to default for double-click UX (Round 122)', () => {
