@@ -158,9 +158,17 @@
       </button>
     </div>
 
-    <div v-if="showLayoutHint" class="layout-hint" role="status">
+    <!-- Round 108: visual-only L-05 banner — no role=status (SR uses split live region). -->
+    <div v-if="showLayoutHint" v-bind="layoutHintVisualAttrs()">
       <span>窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。</span>
-      <button type="button" class="hint-dismiss" @click="onDismissLayoutHint">不再提示</button>
+      <button
+        type="button"
+        class="hint-dismiss"
+        aria-label="关闭窄屏布局提示"
+        @click="onDismissLayoutHint"
+      >
+        不再提示
+      </button>
     </div>
 
     <div
@@ -171,7 +179,7 @@
       :style="splitStyle"
       tabindex="-1"
     >
-      <div v-if="showChartPane" class="chart-pane" :style="chartPaneStyle">
+      <div v-if="showChartPane" :id="CHART_PANE_ID" class="chart-pane" :style="chartPaneStyle">
         <ChartPanel
           :view-type="viewType"
           :columns="store.workspaceResult.columns"
@@ -188,16 +196,18 @@
         :class="splitterOrientation"
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
-        aria-label="拖拽调整表图占比"
+        :aria-label="splitterAriaLabelText"
+        :aria-controls="splitterAriaControls()"
         :aria-valuenow="Math.round(splitRatio * 100)"
         :aria-valuemin="20"
         :aria-valuemax="80"
-        :aria-valuetext="`图表区占比 ${Math.round(splitRatio * 100)}%`"
+        :aria-valuetext="splitterValueText"
         tabindex="0"
         @pointerdown="onSplitterDown"
         @keydown="onSplitterKey"
+        @dblclick="onSplitterDblClick"
       />
-      <div class="table-pane" :style="tablePaneStyle">
+      <div :id="TABLE_PANE_ID" class="table-pane" :style="tablePaneStyle">
         <EditableGrid
           :columns="store.workspaceResult.columns"
           :model-value="store.workspaceResult.rows"
@@ -207,6 +217,13 @@
         />
       </div>
     </div>
+
+    <p
+      v-if="showChartPane && splitLiveAnnounce"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+    >{{ splitLiveAnnounce }}</p>
 
     </div>
 
@@ -257,9 +274,20 @@ const ChartEditDrawer = defineAsyncComponent(() => import('@/modules/chart/Chart
 import { cloneDeep } from '@/shared/utils/clone'
 import { guessConfigure } from '@/modules/chart/guessMapping'
 import {
+  CHART_PANE_ID,
+  chartSplitterAriaLabel,
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
+  layoutDegradedLiveText,
+  layoutHintVisualAttrs,
+  resetSplitRatio,
+  splitRatioLiveText,
+  splitterAriaControls,
+  TABLE_PANE_ID,
+  type SplitLiveOpts,
+  type SplitterOrientation,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
 import {
@@ -288,6 +316,8 @@ const splitterRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const splitRatio = ref(DEFAULT_SPLIT_RATIO)
 const dragging = ref(false)
+const splitLiveAnnounce = ref('')
+let splitLiveClearTimer: ReturnType<typeof setTimeout> | null = null
 const layoutHintDismissed = ref(isLayoutHintDismissed())
 
 watch(showTransforms, (open) => setWorkspaceDialogOpen('transform', open))
@@ -408,7 +438,9 @@ const showChartPane = computed(() => store.selectedView && viewType.value !== 't
 const layoutInfo = computed(() =>
   effectiveChartPosition(chartPos.value, viewportWidth.value),
 )
-const layoutDegraded = computed(() => showChartPane.value && layoutInfo.value.degraded)
+const layoutDegraded = computed(
+  () => Boolean(showChartPane.value) && layoutInfo.value.degraded,
+)
 const showLayoutHint = computed(() => layoutDegraded.value && !layoutHintDismissed.value)
 const effectivePos = computed(() => layoutInfo.value.position)
 
@@ -417,8 +449,22 @@ const layoutClass = computed(() => {
   return `pos-${effectivePos.value}`
 })
 
-const splitterOrientation = computed(() =>
+const splitterOrientation = computed<SplitterOrientation>(() =>
   effectivePos.value === 'left' || effectivePos.value === 'right' ? 'vertical' : 'horizontal',
+)
+
+/** Round 107: valuetext / aria-label reflect L-05 stacked orientation. */
+const splitterLiveOpts = computed<SplitLiveOpts>(() => ({
+  orientation: splitterOrientation.value,
+  degraded: layoutDegraded.value,
+}))
+
+const splitterValueText = computed(() =>
+  splitRatioLiveText(splitRatio.value, splitterLiveOpts.value),
+)
+
+const splitterAriaLabelText = computed(() =>
+  chartSplitterAriaLabel(splitterLiveOpts.value),
 )
 
 const chartPaneStyle = computed(() => {
@@ -495,6 +541,10 @@ onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
   window.removeEventListener('pointermove', onSplitterMove)
   window.removeEventListener('pointerup', onSplitterUp)
+  if (splitLiveClearTimer) {
+    clearTimeout(splitLiveClearTimer)
+    splitLiveClearTimer = null
+  }
   setWorkspaceDialogOpen('transform', false)
   setWorkspaceDialogOpen('chartEdit', false)
 })
@@ -510,8 +560,33 @@ function focusSplitter() {
   })
 }
 
-function persistSplitRatio(ratio: number) {
+function announceLive(text: string) {
+  // Retrigger polite live region when the same string repeats.
+  splitLiveAnnounce.value = ''
+  void nextTick(() => {
+    splitLiveAnnounce.value = text
+  })
+  if (splitLiveClearTimer) clearTimeout(splitLiveClearTimer)
+  splitLiveClearTimer = setTimeout(() => {
+    splitLiveAnnounce.value = ''
+    splitLiveClearTimer = null
+  }, 1500)
+}
+
+function announceSplitRatio(ratio: number) {
+  announceLive(splitRatioLiveText(ratio, splitterLiveOpts.value))
+}
+
+/** Round 107: announce L-05 stack once when left/right degrades on narrow viewports. */
+watch(layoutDegraded, (degraded, wasDegraded) => {
+  if (degraded && !wasDegraded && showChartPane.value) {
+    announceLive(layoutDegradedLiveText(chartPos.value))
+  }
+})
+
+function persistSplitRatio(ratio: number, opts?: { announce?: boolean }) {
   splitRatio.value = clampSplitRatio(ratio)
+  if (opts?.announce) announceSplitRatio(splitRatio.value)
   if (!store.selectedView) return
   const next = { ...chartConfig.value, splitRatio: splitRatio.value }
   chartConfig.value = next
@@ -545,20 +620,25 @@ function onSplitterUp() {
   dragging.value = false
   window.removeEventListener('pointermove', onSplitterMove)
   window.removeEventListener('pointerup', onSplitterUp)
-  persistSplitRatio(splitRatio.value)
+  persistSplitRatio(splitRatio.value, { announce: true })
 }
 
 function onSplitterKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 0.08 : 0.03
   let next = splitRatio.value
+  if (isSplitterResetKey(e.key)) {
+    e.preventDefault()
+    persistSplitRatio(resetSplitRatio(), { announce: true })
+    return
+  }
   if (e.key === 'Home') {
     e.preventDefault()
-    persistSplitRatio(0.2)
+    persistSplitRatio(0.2, { announce: true })
     return
   }
   if (e.key === 'End') {
     e.preventDefault()
-    persistSplitRatio(0.8)
+    persistSplitRatio(0.8, { announce: true })
     return
   }
   if (splitterOrientation.value === 'horizontal') {
@@ -571,7 +651,13 @@ function onSplitterKey(e: KeyboardEvent) {
     else return
   }
   e.preventDefault()
-  persistSplitRatio(next)
+  persistSplitRatio(next, { announce: true })
+}
+
+/** Round 122: double-click resets chart/table split to default and announces. */
+function onSplitterDblClick(e: MouseEvent) {
+  e.preventDefault()
+  persistSplitRatio(resetSplitRatio(), { announce: true })
 }
 
 function onRename() {
@@ -648,6 +734,15 @@ function exportCsv() {
   display: flex;
   flex-direction: column;
   position: relative;
+  min-height: 0;
+}
+/* Fill remaining workspace height so table/chart split can grow (was content-sized ~350px). */
+.ws-surface {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .skip-link {
   position: absolute;
@@ -969,15 +1064,24 @@ function exportCsv() {
   order: 0;
 }
 .chart-pane {
-  min-height: 160px;
   min-width: 240px;
+  /* Floor comes from inline minHeight; 0 lets flex share space instead of content-size. */
+  min-height: 0;
   background: #fff;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.chart-pane > :deep(.chart) {
+  flex: 1;
+  min-height: 0;
 }
 .table-pane {
-  min-height: 140px;
   min-width: 240px;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .splitter {
   flex: 0 0 6px;
@@ -1023,6 +1127,17 @@ function exportCsv() {
   justify-content: center;
   gap: 10px;
   margin-top: 8px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .no-views-hint {
   display: flex;
