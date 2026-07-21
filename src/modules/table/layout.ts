@@ -12,6 +12,24 @@ export function clampSplitRatio(ratio: number | undefined): number {
   return Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, r))
 }
 
+/** Stable pane ids for splitter `aria-controls` (Round 120 — flex-fill follow-up). */
+export const CHART_PANE_ID = 'ws-chart-pane' as const
+export const TABLE_PANE_ID = 'ws-table-pane' as const
+
+/** Space-separated ids for the separator's `aria-controls`. */
+export function splitterAriaControls(): string {
+  return `${CHART_PANE_ID} ${TABLE_PANE_ID}`
+}
+
+/**
+ * Polite live-region copy when the chart/table split ratio changes via
+ * keyboard (or after drag). Keeps SR users in sync with flex-fill panes.
+ */
+export function splitRatioLiveText(ratio: number): string {
+  const pct = Math.round(clampSplitRatio(ratio) * 100)
+  return `图表区占比 ${pct}%`
+}
+
 /**
  * 窄屏下将 left/right 降级为 top/bottom，避免表/图不可用。
  * left → top，right → bottom，保持「图相对表」的主次关系。

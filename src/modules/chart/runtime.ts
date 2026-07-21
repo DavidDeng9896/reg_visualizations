@@ -344,10 +344,23 @@ export function buildChartOption(input: ChartBuildInput): ChartBuildResult {
     option = {
       title,
       color: colors,
-      brush: { toolbox: ['rect', 'polygon', 'clear'], xAxisIndex: 0 },
       legend,
       tooltip: { trigger: 'item' },
       grid: buildGridOption(style, { right: 80 }),
+      toolbox: {
+        right: 12,
+        top: 28,
+        feature: {
+          brush: { type: ['rect', 'polygon', 'clear'] },
+        },
+      },
+      brush: {
+        xAxisIndex: 0,
+        throttleType: 'debounce',
+        throttleDelay: 100,
+        // Keep inactive until user picks a brush tool — avoids a white selection overlay covering the plot.
+        toolbox: ['rect', 'polygon', 'clear'],
+      },
       xAxis: {
         type: xAxisType,
         name: cfg.xLabel || x,
