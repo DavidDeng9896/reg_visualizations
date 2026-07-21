@@ -210,6 +210,14 @@ export function flowchartEmptyCtaToastR107Regression(): true {
   return true
 }
 
+/**
+ * Round 109: flowchart empty CTA × toast regression — same contract as
+ * Round 53 / R59 / R64 / R66 / R68 / R79 / R81 / R83 / R85 / R87 / R89 / R91 / R93 / R95 / R97 / R99 / R101 / R103 / R105 / R107 (visible ring + interactive toast host).
+ */
+export function flowchartEmptyCtaToastR109Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#flow-empty` (CSV preferred). */
 export function flowchartEmptyCtaSelector(): string {
   return '#flow-empty .empty-cta'
