@@ -23,7 +23,7 @@ function defaultChartConfig(): ChartConfig {
       legendShow: true,
       legendPosition: 'right',
       opacity: 0.85,
-      height: 360,
+      // Do not pin height — canvas fills the chart pane via flex (fixed 360 clipped the plot).
     },
     flags: { pointIds: [], comments: {} },
     chartPosition: 'bottom',
