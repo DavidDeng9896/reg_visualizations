@@ -11,7 +11,7 @@
  * scheduled — Create uses a shorter idle timeout to win the race when the user
  * is already aiming at Create.
  *
- * Round 43 / 45 / 46 / 48 / 50 / 52 / 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68 / 80 / 82 / 84 / 86 / 88 / 90 / 92 / 94 / 96 / 98 / 100 / 102 / 104 re-eval:
+ * Round 43 / 45 / 46 / 48 / 50 / 52 / 54 / 56 / 58 / 60 / 62 / 64 / 66 / 68 / 80 / 82 / 84 / 86 / 88 / 90 / 92 / 94 / 96 / 98 / 100 / 102 / 104 / 106 re-eval:
  * Create cold path still async-idle-warm (1.5s). Eager sync would inflate list
  * first paint for a rarely opened dialog — keep deferred.
  */
@@ -58,6 +58,7 @@ export type CreateAnalysisChunkStrategy = {
   round100Reeval: 'keep-async-idle-warm'
   round102Reeval: 'keep-async-idle-warm'
   round104Reeval: 'keep-async-idle-warm'
+  round106Reeval: 'keep-async-idle-warm'
 }
 
 export function createAnalysisChunkStrategy(): CreateAnalysisChunkStrategy {
@@ -90,6 +91,7 @@ export function createAnalysisChunkStrategy(): CreateAnalysisChunkStrategy {
     round100Reeval: 'keep-async-idle-warm',
     round102Reeval: 'keep-async-idle-warm',
     round104Reeval: 'keep-async-idle-warm',
+    round106Reeval: 'keep-async-idle-warm',
   }
 }
 
