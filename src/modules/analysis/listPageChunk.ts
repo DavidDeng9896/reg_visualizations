@@ -239,6 +239,30 @@
  * Round 105: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
  * Esc×toast + New view Cancel×toast remain tiny; List gzip still
  * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 106: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 107: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 108: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 109: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ *
+ * Round 110: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below.
+ *
+ * Round 111: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -308,6 +332,12 @@ export type ListPageChunkStrategy = {
   round103Reeval: 'keep-route-lazy'
   round104Reeval: 'keep-route-lazy'
   round105Reeval: 'keep-route-lazy'
+  round106Reeval: 'keep-route-lazy'
+  round107Reeval: 'keep-route-lazy'
+  round108Reeval: 'keep-route-lazy'
+  round109Reeval: 'keep-route-lazy'
+  round110Reeval: 'keep-route-lazy'
+  round111Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -376,6 +406,12 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round103Reeval: 'keep-route-lazy',
     round104Reeval: 'keep-route-lazy',
     round105Reeval: 'keep-route-lazy',
+    round106Reeval: 'keep-route-lazy',
+    round107Reeval: 'keep-route-lazy',
+    round108Reeval: 'keep-route-lazy',
+    round109Reeval: 'keep-route-lazy',
+    round110Reeval: 'keep-route-lazy',
+    round111Reeval: 'keep-route-lazy',
   }
 }
 
