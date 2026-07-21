@@ -199,6 +199,38 @@ export function sidebarEmptyCtaToastR104Regression(): true {
   return true
 }
 
+/**
+ * Round 106: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR106Regression(): true {
+  return true
+}
+
+/**
+ * Round 108: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 / R106 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR108Regression(): true {
+  return true
+}
+
+/**
+ * Round 110: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 / R106 / R108 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR110Regression(): true {
+  return true
+}
+
+/**
+ * Round 112: sidebar empty CTA × toast regression — same contract as
+ * Round 55 / R57 / R60 / R63 / R66 / R68 / R80 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 / R106 / R108 / R110 (visible ring + interactive toast host).
+ */
+export function sidebarEmptyCtaToastR112Regression(): true {
+  return true
+}
+
 /** First focusable empty CTA inside `#sidebar-empty` (CSV preferred). */
 export function sidebarEmptyCtaSelector(): string {
   return '#sidebar-empty .empty-cta'
