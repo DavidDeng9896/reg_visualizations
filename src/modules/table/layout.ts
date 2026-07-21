@@ -21,13 +21,43 @@ export function splitterAriaControls(): string {
   return `${CHART_PANE_ID} ${TABLE_PANE_ID}`
 }
 
+export type SplitterOrientation = 'horizontal' | 'vertical'
+
+export type SplitLiveOpts = {
+  /** Effective splitter orientation after L-05 may have stacked left/right. */
+  orientation?: SplitterOrientation
+  /** True when left/right was degraded to top/bottom (需求 L-05). */
+  degraded?: boolean
+}
+
 /**
  * Polite live-region copy when the chart/table split ratio changes via
  * keyboard (or after drag). Keeps SR users in sync with flex-fill panes.
+ *
+ * Round 107: when L-05 has stacked a side-by-side layout, prefix the
+ * percentage so SR users know Up/Down (not Left/Right) now resize.
  */
-export function splitRatioLiveText(ratio: number): string {
+export function splitRatioLiveText(ratio: number, opts?: SplitLiveOpts): string {
   const pct = Math.round(clampSplitRatio(ratio) * 100)
-  return `图表区占比 ${pct}%`
+  const base = `图表区占比 ${pct}%`
+  if (opts?.degraded) return `窄屏上下排列，${base}`
+  if (opts?.orientation === 'horizontal') return `上下分割，${base}`
+  if (opts?.orientation === 'vertical') return `左右分割，${base}`
+  return base
+}
+
+/**
+ * Round 107: polite live copy when the viewport crosses the L-05
+ * breakpoint and left/right is temporarily stacked.
+ */
+export function layoutDegradedLiveText(configured: ChartPosition): string {
+  if (configured === 'left') {
+    return '窄屏下左右布局已改为上下排列（图在上），分割条可用上下方向键调整'
+  }
+  if (configured === 'right') {
+    return '窄屏下左右布局已改为上下排列（图在下），分割条可用上下方向键调整'
+  }
+  return '窄屏下布局已改为上下排列，分割条可用上下方向键调整'
 }
 
 /**
@@ -46,8 +76,17 @@ export function isSplitterResetKey(key: string): boolean {
   return key === '0'
 }
 
-/** Accessible label for the chart/table splitter (Round 122–123). */
-export function chartSplitterAriaLabel(): string {
+/**
+ * Accessible label for the chart/table splitter (Round 122–123).
+ * Round 107: orientation-aware wording after L-05 stacks left/right.
+ */
+export function chartSplitterAriaLabel(opts?: SplitLiveOpts): string {
+  if (opts?.degraded || opts?.orientation === 'horizontal') {
+    return '拖拽调整上下表图占比，双击或按 0 恢复默认'
+  }
+  if (opts?.orientation === 'vertical') {
+    return '拖拽调整左右表图占比，双击或按 0 恢复默认'
+  }
   return '拖拽调整表图占比，双击或按 0 恢复默认'
 }
 
