@@ -39,6 +39,19 @@ export function resetSplitRatio(): number {
 }
 
 /**
+ * Round 123: Enter resets to default — keyboard parity for double-click (R122).
+ * Home/End remain min/max; Enter restores the product default.
+ */
+export function isSplitterResetKey(key: string): boolean {
+  return key === 'Enter'
+}
+
+/** Accessible name for the chart/table splitter (includes reset hints). */
+export function splitterAriaLabel(): string {
+  return '拖拽调整表图占比，双击或按 Enter 恢复默认'
+}
+
+/**
  * 窄屏下将 left/right 降级为 top/bottom，避免表/图不可用。
  * left → top，right → bottom，保持「图相对表」的主次关系。
  */

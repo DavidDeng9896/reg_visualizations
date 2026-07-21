@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import {
   clampSidebarWidth,
   DEFAULT_SIDEBAR_WIDTH,
+  isSidebarSplitterResetKey,
   loadSidebarWidth,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
@@ -10,6 +11,7 @@ import {
   SIDEBAR_PANE_ID,
   WORKSPACE_MAIN_ID,
   sidebarSplitterAriaControls,
+  sidebarSplitterAriaLabel,
   sidebarWidthLiveText,
 } from '@/modules/sidebar/sidebarPrefs'
 
@@ -41,5 +43,12 @@ describe('sidebarPrefs', () => {
   it('resets sidebar width to default for double-click UX (Round 122)', () => {
     expect(resetSidebarWidth()).toBe(DEFAULT_SIDEBAR_WIDTH)
     expect(resetSidebarWidth()).toBe(280)
+  })
+
+  it('treats Enter as keyboard reset key and documents aria-label (Round 123)', () => {
+    expect(isSidebarSplitterResetKey('Enter')).toBe(true)
+    expect(isSidebarSplitterResetKey('Home')).toBe(false)
+    expect(isSidebarSplitterResetKey(' ')).toBe(false)
+    expect(sidebarSplitterAriaLabel()).toBe('拖拽调整侧栏宽度，双击或按 Enter 恢复默认')
   })
 })

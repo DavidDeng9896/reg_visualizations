@@ -29,6 +29,19 @@ export function resetSidebarWidth(): number {
   return DEFAULT_SIDEBAR_WIDTH
 }
 
+/**
+ * Round 123: Enter resets to default — keyboard parity for double-click (R122).
+ * Home/End remain min/max; Enter restores the product default.
+ */
+export function isSidebarSplitterResetKey(key: string): boolean {
+  return key === 'Enter'
+}
+
+/** Accessible name for the sidebar splitter (includes reset hints). */
+export function sidebarSplitterAriaLabel(): string {
+  return '拖拽调整侧栏宽度，双击或按 Enter 恢复默认'
+}
+
 export function clampSidebarWidth(width: number | undefined): number {
   const w = typeof width === 'number' && Number.isFinite(width) ? width : DEFAULT_SIDEBAR_WIDTH
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(w)))

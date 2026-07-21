@@ -393,6 +393,7 @@ export type ListPageChunkStrategy = {
   round120Reeval: 'keep-route-lazy'
   round121Reeval: 'keep-route-lazy'
   round122Reeval: 'keep-route-lazy'
+  round123Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -478,6 +479,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round120Reeval: 'keep-route-lazy',
     round121Reeval: 'keep-route-lazy',
     round122Reeval: 'keep-route-lazy',
+    round123Reeval: 'keep-route-lazy',
   }
 }
 

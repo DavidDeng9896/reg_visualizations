@@ -188,7 +188,7 @@
         :class="splitterOrientation"
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
-        aria-label="拖拽调整表图占比，双击恢复默认"
+        :aria-label="splitterAriaLabel()"
         :aria-controls="splitterAriaControls()"
         :aria-valuenow="Math.round(splitRatio * 100)"
         :aria-valuemin="20"
@@ -270,9 +270,11 @@ import {
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
   resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
+  splitterAriaLabel,
   TABLE_PANE_ID,
 } from './layout'
 import { dismissLayoutHint, isLayoutHintDismissed } from './layoutPrefs'
@@ -586,6 +588,11 @@ function onSplitterUp() {
 function onSplitterKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 0.08 : 0.03
   let next = splitRatio.value
+  if (isSplitterResetKey(e.key)) {
+    e.preventDefault()
+    persistSplitRatio(resetSplitRatio(), { announce: true })
+    return
+  }
   if (e.key === 'Home') {
     e.preventDefault()
     persistSplitRatio(0.2, { announce: true })
@@ -610,6 +617,7 @@ function onSplitterKey(e: KeyboardEvent) {
 }
 
 /** Round 122: double-click resets chart/table split to default and announces. */
+/** Round 123: Enter (via isSplitterResetKey) provides keyboard parity. */
 function onSplitterDblClick(e: MouseEvent) {
   e.preventDefault()
   persistSplitRatio(resetSplitRatio(), { announce: true })

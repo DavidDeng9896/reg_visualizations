@@ -4,11 +4,13 @@ import {
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
   resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
+  splitterAriaLabel,
   TABLE_PANE_ID,
 } from '@/modules/table/layout'
 
@@ -39,5 +41,12 @@ describe('workspace layout helpers', () => {
   it('resets split ratio to default for double-click UX (Round 122)', () => {
     expect(resetSplitRatio()).toBe(DEFAULT_SPLIT_RATIO)
     expect(resetSplitRatio()).toBe(0.45)
+  })
+
+  it('treats Enter as keyboard reset key and documents aria-label (Round 123)', () => {
+    expect(isSplitterResetKey('Enter')).toBe(true)
+    expect(isSplitterResetKey('Home')).toBe(false)
+    expect(isSplitterResetKey(' ')).toBe(false)
+    expect(splitterAriaLabel()).toBe('拖拽调整表图占比，双击或按 Enter 恢复默认')
   })
 })
