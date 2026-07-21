@@ -11,10 +11,10 @@
 | --- | --- |
 | 分支 | `cursor/bc-3854be3b-34a4-441f-a1e5-6626e46de0f4-6273`（Round 106） |
 | 阶段 | **优化 Round 106 完成**（周期 **1/3**；下一合并点 Round 108） |
-| 上次更新 | 2026-07-21 02:05 |
-| 单元 | **（验证中）**（+csvEscToastRingR106 / workspaceEmptyCtaToastR106 / combineEscToastRingR106 / sidebarEmptyCtaToastR106 / listCreateCsvChunkR106） |
-| UI E2E | **（验证中）** |
-| Build | **（验证中）** |
+| 上次更新 | 2026-07-21 02:09 |
+| 单元 | **885/885 PASS**（+csvEscToastRingR106 / workspaceEmptyCtaToastR106 / combineEscToastRingR106 / sidebarEmptyCtaToastR106 / listCreateCsvChunkR106） |
+| UI E2E | **10/10 PASS** |
+| Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；Papa ~19.9 / ~7.5；无 EP） |
 
 ## 2. Round 106 对齐摘要
 
