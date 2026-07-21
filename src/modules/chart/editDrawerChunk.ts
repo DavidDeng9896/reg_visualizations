@@ -162,6 +162,7 @@ export type EditDrawerChunkStrategy = {
   round109Reeval: 'keep-deferred-sync'
   round111Reeval: 'keep-deferred-sync'
   round113Reeval: 'keep-deferred-sync'
+  round115Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -196,6 +197,7 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round109Reeval: 'keep-deferred-sync',
     round111Reeval: 'keep-deferred-sync',
     round113Reeval: 'keep-deferred-sync',
+    round115Reeval: 'keep-deferred-sync',
   }
 }
 
