@@ -131,6 +131,10 @@
  * Round 121: re-checked after Transform Cancel×toast + flowchart empty
  * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
  * keep async-idle-warm. Sidebar splitter a11y does not touch flowchart chunks.
+ *
+ * Round 123: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm. Splitter keyboard reset does not touch flowchart chunks.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -179,6 +183,7 @@ export type FlowchartChunkStrategy = {
   round117Reeval: 'keep-async-idle-warm'
   round119Reeval: 'keep-async-idle-warm'
   round121Reeval: 'keep-async-idle-warm'
+  round123Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -220,5 +225,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round117Reeval: 'keep-async-idle-warm',
     round119Reeval: 'keep-async-idle-warm',
     round121Reeval: 'keep-async-idle-warm',
+    round123Reeval: 'keep-async-idle-warm',
   }
 }

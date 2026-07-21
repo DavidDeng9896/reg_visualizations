@@ -10,8 +10,10 @@ import {
   SIDEBAR_PANE_ID,
   WORKSPACE_MAIN_ID,
   sidebarSplitterAriaControls,
+  sidebarSplitterAriaLabel,
   sidebarWidthLiveText,
 } from '@/modules/sidebar/sidebarPrefs'
+import { isSplitterResetKey } from '@/modules/table/layout'
 
 describe('sidebarPrefs', () => {
   beforeEach(() => {
@@ -42,4 +44,11 @@ describe('sidebarPrefs', () => {
     expect(resetSidebarWidth()).toBe(DEFAULT_SIDEBAR_WIDTH)
     expect(resetSidebarWidth()).toBe(280)
   })
+
+  it('exposes keyboard reset (0) parity with double-click in aria-label (Round 123)', () => {
+    expect(isSplitterResetKey('0')).toBe(true)
+    expect(sidebarSplitterAriaLabel()).toContain('按 0 恢复默认')
+    expect(sidebarSplitterAriaLabel()).toContain('双击')
+  })
 })
+

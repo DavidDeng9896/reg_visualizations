@@ -39,6 +39,19 @@ export function resetSplitRatio(): number {
 }
 
 /**
+ * Round 123: keyboard parity with double-click reset — pressing `0` on a
+ * focused splitter restores the default size (Home/End remain min/max).
+ */
+export function isSplitterResetKey(key: string): boolean {
+  return key === '0'
+}
+
+/** Accessible label for the chart/table splitter (Round 122–123). */
+export function chartSplitterAriaLabel(): string {
+  return '拖拽调整表图占比，双击或按 0 恢复默认'
+}
+
+/**
  * 窄屏下将 left/right 降级为 top/bottom，避免表/图不可用。
  * left → top，right → bottom，保持「图相对表」的主次关系。
  */

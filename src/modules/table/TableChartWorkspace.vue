@@ -188,7 +188,7 @@
         :class="splitterOrientation"
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
-        aria-label="拖拽调整表图占比，双击恢复默认"
+        :aria-label="chartSplitterAriaLabel()"
         :aria-controls="splitterAriaControls()"
         :aria-valuenow="Math.round(splitRatio * 100)"
         :aria-valuemin="20"
@@ -267,9 +267,11 @@ import { cloneDeep } from '@/shared/utils/clone'
 import { guessConfigure } from '@/modules/chart/guessMapping'
 import {
   CHART_PANE_ID,
+  chartSplitterAriaLabel,
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
   resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
@@ -586,6 +588,11 @@ function onSplitterUp() {
 function onSplitterKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 0.08 : 0.03
   let next = splitRatio.value
+  if (isSplitterResetKey(e.key)) {
+    e.preventDefault()
+    persistSplitRatio(resetSplitRatio(), { announce: true })
+    return
+  }
   if (e.key === 'Home') {
     e.preventDefault()
     persistSplitRatio(0.2, { announce: true })

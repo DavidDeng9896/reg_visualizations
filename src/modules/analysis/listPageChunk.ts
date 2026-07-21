@@ -307,6 +307,16 @@
  * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
  * Sidebar splitter aria-controls + live announce are CSS/DOM-only and do
  * not change list chunks.
+ *
+ * Round 122: CSV Esc×toast + workspace empty CTA×toast + Combine Esc×toast +
+ * sidebar empty CTA×toast remain tiny; List gzip still keep-route-lazy.
+ * Create / CSV cold paths re-checked below. Splitter double-click reset is
+ * CSS/DOM-only and does not change list chunks.
+ *
+ * Round 123: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast remain tiny; List gzip still
+ * keep-route-lazy. Flowchart / ChartEdit cold paths re-checked below.
+ * Splitter keyboard `0` reset mirrors double-click and does not change list chunks.
  */
 
 export const LIST_PAGE_CHUNK_SPLIT_DEFERRED = true as const
@@ -393,6 +403,7 @@ export type ListPageChunkStrategy = {
   round120Reeval: 'keep-route-lazy'
   round121Reeval: 'keep-route-lazy'
   round122Reeval: 'keep-route-lazy'
+  round123Reeval: 'keep-route-lazy'
 }
 
 export function listPageChunkStrategy(): ListPageChunkStrategy {
@@ -478,6 +489,7 @@ export function listPageChunkStrategy(): ListPageChunkStrategy {
     round120Reeval: 'keep-route-lazy',
     round121Reeval: 'keep-route-lazy',
     round122Reeval: 'keep-route-lazy',
+    round123Reeval: 'keep-route-lazy',
   }
 }
 

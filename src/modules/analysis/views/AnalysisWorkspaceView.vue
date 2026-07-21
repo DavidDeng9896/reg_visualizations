@@ -92,7 +92,7 @@
         class="sidebar-splitter"
         role="separator"
         aria-orientation="vertical"
-        aria-label="拖拽调整侧栏宽度，双击恢复默认"
+        :aria-label="sidebarSplitterAriaLabel()"
         :aria-controls="sidebarSplitterAriaControls()"
         :aria-valuenow="sidebarWidth"
         :aria-valuemin="MIN_SIDEBAR_WIDTH"
@@ -173,9 +173,11 @@ import {
   MAX_SIDEBAR_WIDTH,
   SIDEBAR_PANE_ID,
   sidebarSplitterAriaControls,
+  sidebarSplitterAriaLabel,
   sidebarWidthLiveText,
   resetSidebarWidth,
 } from '@/modules/sidebar/sidebarPrefs'
+import { isSplitterResetKey } from '@/modules/table/layout'
 import {
   anyWorkspaceDialogOpen,
   mainBehindWorkspaceOverlay,
@@ -429,6 +431,11 @@ function onSidebarUp() {
 
 function onSidebarKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 24 : 12
+  if (isSplitterResetKey(e.key)) {
+    e.preventDefault()
+    persistSidebar(resetSidebarWidth(), { announce: true })
+    return
+  }
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
     persistSidebar(sidebarWidth.value - step, { announce: true })

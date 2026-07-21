@@ -130,6 +130,10 @@
  * Round 121: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
  * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
  * deferred-sync (no cleaner split). Sidebar splitter a11y does not touch drawer chunks.
+ *
+ * Round 123: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split). Splitter keyboard reset does not touch drawer chunks.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -182,6 +186,7 @@ export type EditDrawerChunkStrategy = {
   round117Reeval: 'keep-deferred-sync'
   round119Reeval: 'keep-deferred-sync'
   round121Reeval: 'keep-deferred-sync'
+  round123Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -220,6 +225,7 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round117Reeval: 'keep-deferred-sync',
     round119Reeval: 'keep-deferred-sync',
     round121Reeval: 'keep-deferred-sync',
+    round123Reeval: 'keep-deferred-sync',
   }
 }
 

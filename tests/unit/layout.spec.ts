@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHART_PANE_ID,
+  chartSplitterAriaLabel,
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  isSplitterResetKey,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
   resetSplitRatio,
@@ -40,4 +42,13 @@ describe('workspace layout helpers', () => {
     expect(resetSplitRatio()).toBe(DEFAULT_SPLIT_RATIO)
     expect(resetSplitRatio()).toBe(0.45)
   })
+
+  it('treats 0 as keyboard reset key for splitter default (Round 123)', () => {
+    expect(isSplitterResetKey('0')).toBe(true)
+    expect(isSplitterResetKey('Home')).toBe(false)
+    expect(isSplitterResetKey('End')).toBe(false)
+    expect(isSplitterResetKey('ArrowLeft')).toBe(false)
+    expect(chartSplitterAriaLabel()).toContain('按 0 恢复默认')
+  })
 })
+
