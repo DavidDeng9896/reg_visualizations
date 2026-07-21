@@ -92,17 +92,23 @@
         class="sidebar-splitter"
         role="separator"
         aria-orientation="vertical"
-        aria-label="拖拽调整侧栏宽度"
+        aria-label="拖拽调整侧栏宽度，双击恢复默认"
+        :aria-controls="sidebarSplitterAriaControls()"
         :aria-valuenow="sidebarWidth"
         :aria-valuemin="MIN_SIDEBAR_WIDTH"
         :aria-valuemax="MAX_SIDEBAR_WIDTH"
-        :aria-valuetext="`侧栏宽度 ${sidebarWidth} 像素`"
+        :aria-valuetext="sidebarWidthLiveText(sidebarWidth)"
         tabindex="0"
         :inert="shellBehindOverlay || undefined"
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
+        @dblclick="onSidebarDblClick"
       />
-      <div class="sidebar-slot" :style="{ width: `${sidebarWidth}px` }">
+      <div
+        :id="SIDEBAR_PANE_ID"
+        class="sidebar-slot"
+        :style="{ width: `${sidebarWidth}px` }"
+      >
         <AnalysisSidebar
           ref="sidebarRef"
           :width="sidebarWidth"
@@ -111,6 +117,13 @@
         />
       </div>
     </div>
+
+    <p
+      v-if="sidebarLiveAnnounce"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+    >{{ sidebarLiveAnnounce }}</p>
 
     <!-- CSV / Combine teleport to body (Round 36); mount stays on workspace shell. -->
     <CsvImportDialog v-if="showCsv" v-model="showCsv" />
@@ -158,6 +171,10 @@ import {
   saveSidebarWidth,
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
+  SIDEBAR_PANE_ID,
+  sidebarSplitterAriaControls,
+  sidebarWidthLiveText,
+  resetSidebarWidth,
 } from '@/modules/sidebar/sidebarPrefs'
 import {
   anyWorkspaceDialogOpen,
@@ -202,6 +219,8 @@ const showCombine = ref(false)
 const focusId = ref<string | null>(null)
 const sidebarWidth = ref(loadSidebarWidth())
 const draggingSidebar = ref(false)
+const sidebarLiveAnnounce = ref('')
+let sidebarLiveClearTimer: ReturnType<typeof setTimeout> | null = null
 const addDataOpen = ref(false)
 const addDataRoot = ref<HTMLElement | null>(null)
 const addDataActive = ref<number | null>(null)
@@ -256,6 +275,10 @@ onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
+  if (sidebarLiveClearTimer) {
+    clearTimeout(sidebarLiveClearTimer)
+    sidebarLiveClearTimer = null
+  }
   setWorkspaceDialogOpen('csv', false)
   setWorkspaceDialogOpen('combine', false)
   setToastHostExternalInert(false)
@@ -363,9 +386,24 @@ function onJump(id: string) {
   store.mainMode = 'flowchart'
 }
 
-function persistSidebar(width: number) {
+function announceSidebarWidth(width: number) {
+  const text = sidebarWidthLiveText(width)
+  // Retrigger polite live region when the same width is announced again.
+  sidebarLiveAnnounce.value = ''
+  void nextTick(() => {
+    sidebarLiveAnnounce.value = text
+  })
+  if (sidebarLiveClearTimer) clearTimeout(sidebarLiveClearTimer)
+  sidebarLiveClearTimer = setTimeout(() => {
+    sidebarLiveAnnounce.value = ''
+    sidebarLiveClearTimer = null
+  }, 1500)
+}
+
+function persistSidebar(width: number, opts?: { announce?: boolean }) {
   sidebarWidth.value = clampSidebarWidth(width)
   saveSidebarWidth(sidebarWidth.value)
+  if (opts?.announce) announceSidebarWidth(sidebarWidth.value)
 }
 
 function onSidebarDown(e: PointerEvent) {
@@ -386,24 +424,30 @@ function onSidebarUp() {
   draggingSidebar.value = false
   window.removeEventListener('pointermove', onSidebarMove)
   window.removeEventListener('pointerup', onSidebarUp)
-  persistSidebar(sidebarWidth.value)
+  persistSidebar(sidebarWidth.value, { announce: true })
 }
 
 function onSidebarKey(e: KeyboardEvent) {
   const step = e.shiftKey ? 24 : 12
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
-    persistSidebar(sidebarWidth.value - step)
+    persistSidebar(sidebarWidth.value - step, { announce: true })
   } else if (e.key === 'ArrowRight') {
     e.preventDefault()
-    persistSidebar(sidebarWidth.value + step)
+    persistSidebar(sidebarWidth.value + step, { announce: true })
   } else if (e.key === 'Home') {
     e.preventDefault()
-    persistSidebar(MIN_SIDEBAR_WIDTH)
+    persistSidebar(MIN_SIDEBAR_WIDTH, { announce: true })
   } else if (e.key === 'End') {
     e.preventDefault()
-    persistSidebar(MAX_SIDEBAR_WIDTH)
+    persistSidebar(MAX_SIDEBAR_WIDTH, { announce: true })
   }
+}
+
+/** Round 122: double-click resets sidebar width to default and announces. */
+function onSidebarDblClick(e: MouseEvent) {
+  e.preventDefault()
+  persistSidebar(resetSidebarWidth(), { announce: true })
 }
 </script>
 
