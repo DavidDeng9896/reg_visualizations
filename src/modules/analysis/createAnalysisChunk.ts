@@ -61,6 +61,7 @@ export type CreateAnalysisChunkStrategy = {
   round106Reeval: 'keep-async-idle-warm'
   round108Reeval: 'keep-async-idle-warm'
   round110Reeval: 'keep-async-idle-warm'
+  round112Reeval: 'keep-async-idle-warm'
 }
 
 export function createAnalysisChunkStrategy(): CreateAnalysisChunkStrategy {
@@ -96,6 +97,7 @@ export function createAnalysisChunkStrategy(): CreateAnalysisChunkStrategy {
     round106Reeval: 'keep-async-idle-warm',
     round108Reeval: 'keep-async-idle-warm',
     round110Reeval: 'keep-async-idle-warm',
+    round112Reeval: 'keep-async-idle-warm',
   }
 }
 
