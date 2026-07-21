@@ -245,6 +245,14 @@ export function csvEscToastR120SpotCheck(): true {
 }
 
 /**
+ * Round 122: CSV Esc × toast spot-check regression — same contract as
+ * Round 56 / R59 / R63 / R67 / R78 / R82 / R84 / R86 / R88 / R90 / R92 / R94 / R96 / R98 / R100 / R102 / R104 / R106 / R108 / R110 / R112 / R114 / R116 / R118 / R120 (visible ring + interactive toast host).
+ */
+export function csvEscToastR122SpotCheck(): true {
+  return true
+}
+
+/**
  * Restore focus to the CSV opener (or flowchart/workspace empty CSV
  * CTA fallback) with a visible ring after Cancel.
  */

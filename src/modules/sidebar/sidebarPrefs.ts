@@ -21,6 +21,14 @@ export function sidebarWidthLiveText(width: number): string {
   return `侧栏宽度 ${clampSidebarWidth(width)} 像素`
 }
 
+/**
+ * Round 122: double-click (or explicit reset) returns the sidebar to the
+ * default width — mirrors chart/table splitter reset UX.
+ */
+export function resetSidebarWidth(): number {
+  return DEFAULT_SIDEBAR_WIDTH
+}
+
 export function clampSidebarWidth(width: number | undefined): number {
   const w = typeof width === 'number' && Number.isFinite(width) ? width : DEFAULT_SIDEBAR_WIDTH
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(w)))

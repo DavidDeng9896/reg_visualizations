@@ -31,6 +31,14 @@ export function splitRatioLiveText(ratio: number): string {
 }
 
 /**
+ * Round 122: double-click (or explicit reset) returns the chart/table
+ * split to the default ratio — pairs with sidebar splitter reset UX.
+ */
+export function resetSplitRatio(): number {
+  return DEFAULT_SPLIT_RATIO
+}
+
+/**
  * 窄屏下将 left/right 降级为 top/bottom，避免表/图不可用。
  * left → top，right → bottom，保持「图相对表」的主次关系。
  */

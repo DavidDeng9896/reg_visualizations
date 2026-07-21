@@ -188,7 +188,7 @@
         :class="splitterOrientation"
         role="separator"
         :aria-orientation="splitterOrientation === 'vertical' ? 'vertical' : 'horizontal'"
-        aria-label="拖拽调整表图占比"
+        aria-label="拖拽调整表图占比，双击恢复默认"
         :aria-controls="splitterAriaControls()"
         :aria-valuenow="Math.round(splitRatio * 100)"
         :aria-valuemin="20"
@@ -197,6 +197,7 @@
         tabindex="0"
         @pointerdown="onSplitterDown"
         @keydown="onSplitterKey"
+        @dblclick="onSplitterDblClick"
       />
       <div :id="TABLE_PANE_ID" class="table-pane" :style="tablePaneStyle">
         <EditableGrid
@@ -269,6 +270,7 @@ import {
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
+  resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
   TABLE_PANE_ID,
@@ -605,6 +607,12 @@ function onSplitterKey(e: KeyboardEvent) {
   }
   e.preventDefault()
   persistSplitRatio(next, { announce: true })
+}
+
+/** Round 122: double-click resets chart/table split to default and announces. */
+function onSplitterDblClick(e: MouseEvent) {
+  e.preventDefault()
+  persistSplitRatio(resetSplitRatio(), { announce: true })
 }
 
 function onRename() {

@@ -5,6 +5,7 @@ import {
   loadSidebarWidth,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
+  resetSidebarWidth,
   saveSidebarWidth,
   SIDEBAR_PANE_ID,
   WORKSPACE_MAIN_ID,
@@ -35,5 +36,10 @@ describe('sidebarPrefs', () => {
     expect(sidebarWidthLiveText(280)).toBe('侧栏宽度 280 像素')
     expect(sidebarWidthLiveText(10)).toBe(`侧栏宽度 ${MIN_SIDEBAR_WIDTH} 像素`)
     expect(sidebarWidthLiveText(9999)).toBe(`侧栏宽度 ${MAX_SIDEBAR_WIDTH} 像素`)
+  })
+
+  it('resets sidebar width to default for double-click UX (Round 122)', () => {
+    expect(resetSidebarWidth()).toBe(DEFAULT_SIDEBAR_WIDTH)
+    expect(resetSidebarWidth()).toBe(280)
   })
 })

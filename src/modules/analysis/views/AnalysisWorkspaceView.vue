@@ -92,7 +92,7 @@
         class="sidebar-splitter"
         role="separator"
         aria-orientation="vertical"
-        aria-label="拖拽调整侧栏宽度"
+        aria-label="拖拽调整侧栏宽度，双击恢复默认"
         :aria-controls="sidebarSplitterAriaControls()"
         :aria-valuenow="sidebarWidth"
         :aria-valuemin="MIN_SIDEBAR_WIDTH"
@@ -102,6 +102,7 @@
         :inert="shellBehindOverlay || undefined"
         @pointerdown="onSidebarDown"
         @keydown="onSidebarKey"
+        @dblclick="onSidebarDblClick"
       />
       <div
         :id="SIDEBAR_PANE_ID"
@@ -173,6 +174,7 @@ import {
   SIDEBAR_PANE_ID,
   sidebarSplitterAriaControls,
   sidebarWidthLiveText,
+  resetSidebarWidth,
 } from '@/modules/sidebar/sidebarPrefs'
 import {
   anyWorkspaceDialogOpen,
@@ -440,6 +442,12 @@ function onSidebarKey(e: KeyboardEvent) {
     e.preventDefault()
     persistSidebar(MAX_SIDEBAR_WIDTH, { announce: true })
   }
+}
+
+/** Round 122: double-click resets sidebar width to default and announces. */
+function onSidebarDblClick(e: MouseEvent) {
+  e.preventDefault()
+  persistSidebar(resetSidebarWidth(), { announce: true })
 }
 </script>
 

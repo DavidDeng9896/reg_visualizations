@@ -6,6 +6,7 @@ import {
   effectiveChartPosition,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
+  resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,
   TABLE_PANE_ID,
@@ -33,5 +34,10 @@ describe('workspace layout helpers', () => {
     expect(splitRatioLiveText(0.45)).toBe('图表区占比 45%')
     expect(splitRatioLiveText(0.01)).toBe('图表区占比 20%')
     expect(splitRatioLiveText(0.99)).toBe('图表区占比 80%')
+  })
+
+  it('resets split ratio to default for double-click UX (Round 122)', () => {
+    expect(resetSplitRatio()).toBe(DEFAULT_SPLIT_RATIO)
+    expect(resetSplitRatio()).toBe(0.45)
   })
 })

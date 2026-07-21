@@ -61,6 +61,7 @@ export type CsvParseChunkStrategy = {
   round116Reeval: 'keep-deferred-dynamic'
   round118Reeval: 'keep-deferred-dynamic'
   round120Reeval: 'keep-deferred-dynamic'
+  round122Reeval: 'keep-deferred-dynamic'
 }
 
 export function csvParseChunkStrategy(): CsvParseChunkStrategy {
@@ -100,6 +101,7 @@ export function csvParseChunkStrategy(): CsvParseChunkStrategy {
     round116Reeval: 'keep-deferred-dynamic',
     round118Reeval: 'keep-deferred-dynamic',
     round120Reeval: 'keep-deferred-dynamic',
+    round122Reeval: 'keep-deferred-dynamic',
   }
 }
 
