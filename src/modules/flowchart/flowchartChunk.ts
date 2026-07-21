@@ -123,6 +123,10 @@
  * Round 117: re-checked after Transform Cancel×toast + flowchart empty
  * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
  * keep async-idle-warm.
+ *
+ * Round 119: re-checked after Transform Cancel×toast + flowchart empty
+ * CTA×toast + ChartEdit Esc×toast + New view Cancel×toast helpers — still
+ * keep async-idle-warm.
  */
 
 export const FLOWCHART_COLD_WARM_DEFERRED = true as const
@@ -169,6 +173,7 @@ export type FlowchartChunkStrategy = {
   round113Reeval: 'keep-async-idle-warm'
   round115Reeval: 'keep-async-idle-warm'
   round117Reeval: 'keep-async-idle-warm'
+  round119Reeval: 'keep-async-idle-warm'
 }
 
 export function flowchartChunkStrategy(): FlowchartChunkStrategy {
@@ -208,5 +213,6 @@ export function flowchartChunkStrategy(): FlowchartChunkStrategy {
     round113Reeval: 'keep-async-idle-warm',
     round115Reeval: 'keep-async-idle-warm',
     round117Reeval: 'keep-async-idle-warm',
+    round119Reeval: 'keep-async-idle-warm',
   }
 }

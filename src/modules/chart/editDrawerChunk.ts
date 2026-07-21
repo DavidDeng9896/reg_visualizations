@@ -122,6 +122,10 @@
  * Round 117: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
  * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
  * deferred-sync (no cleaner split).
+ *
+ * Round 119: Transform Cancel×toast + flowchart empty CTA×toast + ChartEdit
+ * Esc×toast + New view Cancel×toast are tiny; fitEngine/palette still
+ * deferred-sync (no cleaner split). Chart pane flex-fill does not touch drawer chunks.
  */
 
 import { warmIdle } from '@/shared/ui/warmIdle'
@@ -172,6 +176,7 @@ export type EditDrawerChunkStrategy = {
   round113Reeval: 'keep-deferred-sync'
   round115Reeval: 'keep-deferred-sync'
   round117Reeval: 'keep-deferred-sync'
+  round119Reeval: 'keep-deferred-sync'
 }
 
 export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
@@ -208,6 +213,7 @@ export function editDrawerChunkStrategy(): EditDrawerChunkStrategy {
     round113Reeval: 'keep-deferred-sync',
     round115Reeval: 'keep-deferred-sync',
     round117Reeval: 'keep-deferred-sync',
+    round119Reeval: 'keep-deferred-sync',
   }
 }
 
