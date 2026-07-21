@@ -9,28 +9,27 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-264dd2d2-d5a8-4e02-80ee-473989435f2b-ee30`（Round 106） |
-| 阶段 | **优化 Round 106 完成**（周期 **1/3**；`lastMergedRound=105`） |
-| 上次更新 | 2026-07-21 21:09 |
-| 单元 | **891/891 PASS**（+csvEscToastRingR106 / workspaceEmptyCtaToastR106 / combineEscToastRingR106 / sidebarEmptyCtaToastR106 / listCreateCsvChunkR106 / layout+sidebarPrefs splitter a11y） |
+| 分支 | `cursor/bc-bc67b056-9a29-48b2-a469-2ee48a9ab629-4cdf`（Round 107；含 R106 cherry-pick） |
+| 阶段 | **优化 Round 107 完成**（周期 **2/3**；`lastMergedRound=105`） |
+| 上次更新 | 2026-07-21 22:07 |
+| 单元 | **903/903 PASS**（+transformCancelToastRingR107 / flowchartEmptyCtaToastR107 / chartEditEscToastRingR107 / newViewCancelToastR107 / listFlowchartChartEditChunkR107 / layout L-05 live） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（List ~11.5 / ~4.5；Workspace ~70.0 / ~25.2；ChartEdit ~36.9 / ~9.9；无 EP） |
+| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；Workspace ~71.0 / ~25.5；无 EP） |
 
-## 2. Round 106 对齐摘要
+## 2. Round 107 对齐摘要
 
-对照 UX / 性能 / a11y（docs L-04 分隔与尺寸）：
+对照 UX / 性能 / a11y（docs L-05 窄屏降级 + toast 合同）：
 
 | 需求 | 状态 |
 | --- | --- |
-| CSV Esc × toast 抽检 | ✅ `csvEscToastR106SpotCheck` |
-| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR106Regression` |
-| Combine Esc × toast 抽检 | ✅ `combineEscToastR106SpotCheck` |
-| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR106Regression` |
-| 图表区 flex-fill（防裁切白块） | ✅ `.ws-surface` 占满剩余高度 |
-| 表图分割条 a11y + 重置 | ✅ `aria-controls` / live 播报 / 双击与按 `0` 恢复默认 |
-| 侧栏分割条 a11y + 重置 | ✅ 同上 |
-| List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
-| 合并 | **否**（周期 1/3；下一合并点 Round 108） |
+| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR107SpotCheck` |
+| 流程图空态 CTA × toast 回归 | ✅ `flowchartEmptyCtaToastR107Regression` |
+| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR107SpotCheck` |
+| New view Cancel × toast 回归 | ✅ `newViewCancelToastR107Regression` |
+| L-05 分割条 live / aria-label 方位感知 | ✅ `splitRatioLiveText` / `chartSplitterAriaLabel` 带 orientation+degraded |
+| L-05 降级瞬间 polite 播报 | ✅ `layoutDegradedLiveText` + watch 播报 |
+| List / Flowchart / ChartEdit 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync |
+| 合并 | **否**（周期 2/3；下一合并点 Round 108） |
 
 ## 3. 验证命令
 
@@ -40,10 +39,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 107 计划（下一 cron · 周期 2/3）
+## 4. Round 108 计划（下一 cron · 周期 3/3 · 合并）
 
-1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
-2. **Perf**：List gzip 再测；Flowchart / ChartEdit 再评估
-3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归；核对分割条 live 播报在窄屏降级（L-05）下是否仍正确
+1. **UX**：CSV Esc × toast 抽检；工作区空态 CTA × toast 回归
+2. **Perf**：List gzip 再测；Create / CSV 再评估
+3. **A11y**：Combine Esc × toast 抽检；侧栏空态 CTA × toast 回归；核对 L-05 提示条与 live 播报不重复打扰
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 2/3；下一合并点 Round 108）
+5. **合并**：**是**（周期 3/3；合入 R106–108 → 目标 lastMergedRound=108）
