@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-5ba3d75c-c40b-4540-b4ae-1faf6c7d8d2d-0e97`（Round 102；含 R100–R101） |
-| 阶段 | **优化 Round 102 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=102`） |
-| 上次更新 | 2026-07-20 22:07 |
-| 单元 | **843/843 PASS**（+csvEscToastRingR102 / workspaceEmptyCtaToastR102 / combineEscToastRingR102 / sidebarEmptyCtaToastR102 / listCreateCsvChunkR102；含 R100/R101） |
+| 分支 | `cursor/bc-8eecae77-da7d-4773-879e-ae71db61a57d-ff09`（Round 104） |
+| 阶段 | **优化 Round 104 完成**（周期 **2/3**；不合并） |
+| 上次更新 | 2026-07-21 00:08 |
+| 单元 | **853/853 PASS**（+csvEscToastRingR104 / workspaceEmptyCtaToastR104 / combineEscToastRingR104 / sidebarEmptyCtaToastR104 / listCreateCsvChunkR104） |
 | UI E2E | **10/10 PASS** |
 | Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；papaparse ~19.9 / ~7.5；无 EP） |
 
-## 2. Round 102 对齐摘要
+## 2. Round 104 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| CSV Esc × toast 抽检 | ✅ `csvEscToastR102SpotCheck` |
-| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR102Regression` |
-| Combine Esc × toast 抽检 | ✅ `combineEscToastR102SpotCheck` |
-| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR102Regression` |
+| CSV Esc × toast 抽检 | ✅ `csvEscToastR104SpotCheck` |
+| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR104Regression` |
+| Combine Esc × toast 抽检 | ✅ `combineEscToastR104SpotCheck` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR104Regression` |
 | List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
-| 合并 | **是**（周期 3/3；合入 R100–102 → 目标 lastMergedRound=102） |
+| 合并 | **否**（周期 2/3；下一合并点 Round 105 → 目标 lastMergedRound=105） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 103 计划（下一 cron · 周期 1/3）
+## 4. Round 105 计划（下一 cron · 周期 3/3 · 合并）
 
 1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R102 ~11.5）；Flowchart / ChartEdit 再评估
+2. **Perf**：List gzip 边界（R104 ~11.5）；Flowchart / ChartEdit 再评估
 3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：否（周期 1/3；下一合并点 Round 105）
+5. **合并**：**是**（周期 3/3；合入 R103–105 → 目标 lastMergedRound=105）
