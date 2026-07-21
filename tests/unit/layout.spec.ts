@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CHART_PANE_ID,
   clampSplitRatio,
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
+  splitRatioLiveText,
+  splitterAriaControls,
+  TABLE_PANE_ID,
 } from '@/modules/table/layout'
 
 describe('workspace layout helpers', () => {
@@ -20,5 +24,14 @@ describe('workspace layout helpers', () => {
     expect(effectiveChartPosition('right', 800)).toEqual({ position: 'bottom', degraded: true })
     expect(effectiveChartPosition('bottom', 800)).toEqual({ position: 'bottom', degraded: false })
     expect(effectiveChartPosition('left', 1200)).toEqual({ position: 'left', degraded: false })
+  })
+
+  it('exposes stable pane ids and live text for splitter a11y (Round 120)', () => {
+    expect(CHART_PANE_ID).toBe('ws-chart-pane')
+    expect(TABLE_PANE_ID).toBe('ws-table-pane')
+    expect(splitterAriaControls()).toBe('ws-chart-pane ws-table-pane')
+    expect(splitRatioLiveText(0.45)).toBe('图表区占比 45%')
+    expect(splitRatioLiveText(0.01)).toBe('图表区占比 20%')
+    expect(splitRatioLiveText(0.99)).toBe('图表区占比 80%')
   })
 })
