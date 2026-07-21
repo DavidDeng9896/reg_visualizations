@@ -158,9 +158,17 @@
       </button>
     </div>
 
-    <div v-if="showLayoutHint" class="layout-hint" role="status">
+    <!-- Round 108: visual-only L-05 banner — no role=status (SR uses split live region). -->
+    <div v-if="showLayoutHint" v-bind="layoutHintVisualAttrs()">
       <span>窄屏下左右布局已临时改为上下排列，保证表与图均可操作；加宽窗口后恢复。</span>
-      <button type="button" class="hint-dismiss" @click="onDismissLayoutHint">不再提示</button>
+      <button
+        type="button"
+        class="hint-dismiss"
+        aria-label="关闭窄屏布局提示"
+        @click="onDismissLayoutHint"
+      >
+        不再提示
+      </button>
     </div>
 
     <div
@@ -273,6 +281,7 @@ import {
   effectiveChartPosition,
   isSplitterResetKey,
   layoutDegradedLiveText,
+  layoutHintVisualAttrs,
   resetSplitRatio,
   splitRatioLiveText,
   splitterAriaControls,

@@ -34,14 +34,16 @@ export type SplitLiveOpts = {
  * Polite live-region copy when the chart/table split ratio changes via
  * keyboard (or after drag). Keeps SR users in sync with flex-fill panes.
  *
- * Round 107: when L-05 has stacked a side-by-side layout, prefix the
- * percentage so SR users know Up/Down (not Left/Right) now resize.
+ * Round 107: orientation-aware prefix so SR users know Up/Down vs Left/Right.
+ * Round 108: when L-05 has stacked left/right, reuse the horizontal phrasing
+ * (`上下分割`) instead of repeating 「窄屏上下排列」 on every resize —
+ * the one-shot degrade announcement (`layoutDegradedLiveText`) already
+ * covered the narrow-viewport context.
  */
 export function splitRatioLiveText(ratio: number, opts?: SplitLiveOpts): string {
   const pct = Math.round(clampSplitRatio(ratio) * 100)
   const base = `图表区占比 ${pct}%`
-  if (opts?.degraded) return `窄屏上下排列，${base}`
-  if (opts?.orientation === 'horizontal') return `上下分割，${base}`
+  if (opts?.degraded || opts?.orientation === 'horizontal') return `上下分割，${base}`
   if (opts?.orientation === 'vertical') return `左右分割，${base}`
   return base
 }
@@ -58,6 +60,27 @@ export function layoutDegradedLiveText(configured: ChartPosition): string {
     return '窄屏下左右布局已改为上下排列（图在下），分割条可用上下方向键调整'
   }
   return '窄屏下布局已改为上下排列，分割条可用上下方向键调整'
+}
+
+/**
+ * Round 108: the visible L-05 banner is for sighted users only.
+ * Screen readers get a single polite announcement via
+ * `layoutDegradedLiveText` — do not also put `role="status"` on the banner
+ * (that would double-announce the same degrade).
+ */
+export const LAYOUT_HINT_VISUAL_ONLY = true as const
+
+/** Round 108 regression marker — hint bar must not use status/live roles. */
+export function layoutHintUsesStatusRole(): false {
+  return false
+}
+
+/**
+ * Round 108: attrs for the visible L-05 banner (no status/live — SR uses
+ * the dedicated split live region for the one-shot degrade message).
+ */
+export function layoutHintVisualAttrs(): { class: string } {
+  return { class: 'layout-hint' }
 }
 
 /**

@@ -6,7 +6,10 @@ import {
   DEFAULT_SPLIT_RATIO,
   effectiveChartPosition,
   isSplitterResetKey,
+  LAYOUT_HINT_VISUAL_ONLY,
   layoutDegradedLiveText,
+  layoutHintUsesStatusRole,
+  layoutHintVisualAttrs,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
   resetSplitRatio,
@@ -39,11 +42,12 @@ describe('workspace layout helpers', () => {
     expect(splitRatioLiveText(0.99)).toBe('图表区占比 80%')
   })
 
-  it('prefixes live text with orientation / L-05 degrade context (Round 107)', () => {
+  it('prefixes live text with orientation / L-05 degrade context (Round 107–108)', () => {
     expect(splitRatioLiveText(0.45, { orientation: 'horizontal' })).toBe('上下分割，图表区占比 45%')
     expect(splitRatioLiveText(0.45, { orientation: 'vertical' })).toBe('左右分割，图表区占比 45%')
+    // Round 108: degraded reuses horizontal phrasing (no repeated 「窄屏」 on resize)
     expect(splitRatioLiveText(0.45, { degraded: true, orientation: 'horizontal' })).toBe(
-      '窄屏上下排列，图表区占比 45%',
+      '上下分割，图表区占比 45%',
     )
     expect(layoutDegradedLiveText('left')).toContain('图在上')
     expect(layoutDegradedLiveText('right')).toContain('图在下')
@@ -51,6 +55,14 @@ describe('workspace layout helpers', () => {
     expect(chartSplitterAriaLabel({ orientation: 'horizontal' })).toContain('上下表图占比')
     expect(chartSplitterAriaLabel({ orientation: 'vertical' })).toContain('左右表图占比')
     expect(chartSplitterAriaLabel({ degraded: true })).toContain('上下表图占比')
+  })
+
+  it('keeps L-05 hint visual-only so live region is the sole SR announce (Round 108)', () => {
+    expect(LAYOUT_HINT_VISUAL_ONLY).toBe(true)
+    expect(layoutHintUsesStatusRole()).toBe(false)
+    expect(layoutHintVisualAttrs()).toEqual({ class: 'layout-hint' })
+    expect(layoutHintVisualAttrs()).not.toHaveProperty('role')
+    expect(layoutHintVisualAttrs()).not.toHaveProperty('aria-live')
   })
 
   it('resets split ratio to default for double-click UX (Round 122)', () => {
