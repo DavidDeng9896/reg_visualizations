@@ -9,25 +9,25 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 分支 | `cursor/bc-e77296e6-b29b-4410-ab5a-3147176bb6e0-2e76`（Round 107；含 R106） |
-| 阶段 | **优化 Round 107 完成**（周期 **2/3**；下一合并点 Round 108） |
-| 上次更新 | 2026-07-21 03:07 |
-| 单元 | **896/896 PASS**（+transformCancelToastRingR107 / flowchartEmptyCtaToastR107 / chartEditEscToastRingR107 / newViewCancelToastR107 / listFlowchartChartEditChunkR107；含 R106） |
+| 分支 | `cursor/bc-ca734242-ca51-4c1a-bd84-bc4d1d746275-cf63`（Round 108；含 R106–R107） |
+| 阶段 | **优化 Round 108 完成**（周期 **3/3 · 合并**；目标 `lastMergedRound=108`） |
+| 上次更新 | 2026-07-21 04:08 |
+| 单元 | **906/906 PASS**（+csvEscToastRingR108 / workspaceEmptyCtaToastR108 / combineEscToastRingR108 / sidebarEmptyCtaToastR108 / listCreateCsvChunkR108；含 R106/R107） |
 | UI E2E | **10/10 PASS** |
-| Build | PASS（List ~11.5 / ~4.5；Flowchart ~3.8 / ~2.1；ChartEdit ~36.9 / ~9.9；无 EP） |
+| Build | PASS（List ~11.5 / ~4.5；Create ~3.2 / ~1.6；CSV ~6.2 / ~2.9；无 EP） |
 
-## 2. Round 107 对齐摘要
+## 2. Round 108 对齐摘要
 
 对照 UX / 性能 / a11y：
 
 | 需求 | 状态 |
 | --- | --- |
-| Transform Cancel × toast 抽检 | ✅ `transformCancelToastR107SpotCheck` |
-| 流程图空态 CTA × toast 回归 | ✅ `flowchartEmptyCtaToastR107Regression` |
-| ChartEdit Esc × toast 抽检 | ✅ `chartEditEscToastR107SpotCheck` |
-| New view Cancel × toast 回归 | ✅ `newViewCancelToastR107Regression` |
-| List / Flowchart / ChartEdit 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-sync |
-| 合并 | **否**（周期 2/3；下一合并点 Round 108 → 目标 lastMergedRound=108） |
+| CSV Esc × toast 抽检 | ✅ `csvEscToastR108SpotCheck` |
+| 工作区空态 CTA × toast 回归 | ✅ `workspaceEmptyCtaToastR108Regression` |
+| Combine Esc × toast 抽检 | ✅ `combineEscToastR108SpotCheck` |
+| 侧栏空态 CTA × toast 回归 | ✅ `sidebarEmptyCtaToastR108Regression` |
+| List / Create / CSV 冷路径再评估 | ✅ 仍 keep-route-lazy / keep-async-idle-warm / keep-deferred-dynamic |
+| 合并 | **是**（周期 3/3；合入 R106–108 → 目标 lastMergedRound=108） |
 
 ## 3. 验证命令
 
@@ -37,10 +37,10 @@ npm run build
 npm run test:e2e:ui
 ```
 
-## 4. Round 108 计划（下一 cron · 周期 3/3 · 合并）
+## 4. Round 109 计划（下一 cron · 周期 1/3）
 
-1. **UX**：CSV Esc × toast 抽检；工作区空态 CTA × toast 回归
-2. **Perf**：List gzip 边界（R107 ~11.5）；Create / CSV 再评估
-3. **A11y**：Combine Esc × toast 抽检；侧栏空态 CTA × toast 回归
+1. **UX**：Transform Cancel × toast 抽检；流程图空态 CTA × toast 回归
+2. **Perf**：List gzip 边界（R108 ~11.5）；Flowchart / ChartEdit 再评估
+3. **A11y**：ChartEdit Esc × toast 抽检；New view Cancel × toast 回归
 4. **验证**：unit + e2e:ui + build
-5. **合并**：**是**（周期 3/3；合入 R106–108 → 目标 lastMergedRound=108）
+5. **合并**：否（周期 1/3；下一合并点 Round 111）
