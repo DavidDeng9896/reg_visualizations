@@ -63,11 +63,11 @@
   --is-dur: 200ms;
   --is-dur-slow: 250ms;
 
-  /* 层级 */
-  --is-z-dropdown: 100;
-  --is-z-popover: 200;
-  --is-z-modal: 300;
-  --is-z-toast: 400;
+  /* 层级（teleport 到 body 后仍保持相对顺序；dropdown 高于 popover/modal 以便嵌套） */
+  --is-z-popover: 1200;
+  --is-z-modal: 1300;
+  --is-z-dropdown: 1350;
+  --is-z-toast: 1400;
 
   /* 字体 */
   --is-font:

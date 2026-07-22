@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useFloatingPanel, type FloatingPlacement } from './floating'
 import { useClickOutside, useEscape } from './utils'
 
-export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
+export type PopoverPlacement = Extract<
+  FloatingPlacement,
+  'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
+>
 
 const props = withDefaults(
   defineProps<{
@@ -20,13 +24,27 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const rootEl = ref<HTMLElement>()
+const panelEl = ref<HTMLElement>()
+const openRef = computed(() => props.open)
+const placementRef = computed(() => props.placement)
+
+const { style: panelStyle } = useFloatingPanel(openRef, rootEl, panelEl, placementRef, {
+  zIndex: 'var(--is-z-popover)',
+  minWidth: 160,
+})
 
 function close() {
   emit('update:open', false)
 }
 
-useClickOutside([rootEl], () => {
-  if (props.closeOnOutside) close()
+useClickOutside([rootEl, panelEl], (e) => {
+  if (!props.closeOnOutside || !props.open) return
+  // Nested teleported selects/tooltips live outside panelEl; keep popover open while they are used.
+  const target = e.target as HTMLElement | null
+  if (target?.closest?.('[data-is-floating="1"]') && panelEl.value?.querySelector('.is-select--open')) {
+    return
+  }
+  close()
 })
 useEscape(close, () => props.open)
 
@@ -38,18 +56,23 @@ defineExpose({ close })
     <div class="is-popover__anchor" @click.stop>
       <slot name="anchor" :open="open" :close="close" />
     </div>
-    <Transition name="is-popover-panel">
-      <div
-        v-if="open"
-        class="is-popover__panel"
-        :class="[`is-popover__panel--${placement}`, panelClass]"
-        role="dialog"
-        @click.stop
-      >
-        <span v-if="arrow" class="is-popover__arrow" aria-hidden="true" />
-        <slot :close="close" />
-      </div>
-    </Transition>
+    <Teleport to="body">
+      <Transition name="is-popover-panel">
+        <div
+          v-if="open"
+          ref="panelEl"
+          class="is-popover__panel"
+          :class="[`is-popover__panel--${placement}`, panelClass]"
+          :style="panelStyle"
+          data-is-floating="1"
+          role="dialog"
+          @click.stop
+        >
+          <span v-if="arrow" class="is-popover__arrow" aria-hidden="true" />
+          <slot :close="close" />
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -59,31 +82,13 @@ defineExpose({ close })
   display: inline-block;
 }
 .is-popover__panel {
-  position: absolute;
-  z-index: var(--is-z-popover);
+  /* position/top/left come from teleported fixed style */
   background: var(--is-surface);
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
   box-shadow: var(--is-shadow-md);
   min-width: 160px;
 }
-.is-popover__panel--bottom-start {
-  top: calc(100% + 8px);
-  left: 0;
-}
-.is-popover__panel--bottom-end {
-  top: calc(100% + 8px);
-  right: 0;
-}
-.is-popover__panel--top-start {
-  bottom: calc(100% + 8px);
-  left: 0;
-}
-.is-popover__panel--right-start {
-  left: calc(100% + 8px);
-  top: 0;
-}
-
 .is-popover__arrow {
   position: absolute;
   width: 10px;
