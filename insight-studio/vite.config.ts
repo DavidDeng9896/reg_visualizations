@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  server: { port: 7100, host: true },
+  server: { port: 7100, host: true, allowedHosts: true },
   build: {
     rollupOptions: {
       output: {
