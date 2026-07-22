@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useFloatingPanel } from './floating'
 import IIcon from './IIcon.vue'
 import type { IconName } from './icons'
 import { useClickOutside, useEscape } from './utils'
@@ -29,11 +30,25 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'update:modelValue', v: string | number): void; (e: 'change', v: string | number): void }>()
 
 const rootEl = ref<HTMLElement>()
+const panelEl = ref<HTMLElement>()
 const searchEl = ref<HTMLInputElement>()
 const listEl = ref<HTMLElement>()
 const open = ref(false)
 const query = ref('')
 const activeIndex = ref(-1)
+
+const { style: panelStyle, update: reposition } = useFloatingPanel(
+  open,
+  rootEl,
+  panelEl,
+  () => 'bottom-start',
+  {
+    matchAnchorWidth: true,
+    minWidth: 120,
+    // Above popover + modal so nested selects in filters/dialogs stay visible
+    zIndex: 'var(--is-z-dropdown)',
+  },
+)
 
 const selected = computed(() => props.options.find((o) => o.value === props.modelValue))
 
@@ -55,6 +70,7 @@ function openPanel() {
   const selIdx = filtered.value.findIndex((o) => o.value === props.modelValue && !o.disabled)
   activeIndex.value = selIdx >= 0 ? selIdx : (enabledIndexes.value[0] ?? -1)
   nextTick(() => {
+    reposition()
     if (props.searchable) searchEl.value?.focus()
     scrollActiveIntoView()
   })
@@ -120,7 +136,7 @@ function onListKeydown(e: KeyboardEvent) {
   }
 }
 
-useClickOutside([rootEl], () => closePanel())
+useClickOutside([rootEl, panelEl], () => closePanel())
 useEscape(() => closePanel(), () => open.value)
 
 watch(
@@ -158,41 +174,51 @@ function showGroupHeader(i: number): string | null {
       <IIcon name="chevron-down" :size="13" class="is-select__chevron" />
     </button>
 
-    <Transition name="is-select-panel">
-      <div v-if="open" class="is-select__panel" role="presentation">
-        <div v-if="searchable" class="is-select__search">
-          <input
-            ref="searchEl"
-            v-model="query"
-            class="is-select__search-input"
-            type="text"
-            placeholder="搜索…"
-            aria-label="搜索选项"
-            @keydown="onListKeydown"
-          />
+    <Teleport to="body">
+      <Transition name="is-select-panel">
+        <div
+          v-if="open"
+          ref="panelEl"
+          class="is-select__panel"
+          :style="panelStyle"
+          data-is-floating="1"
+          role="presentation"
+          @click.stop
+        >
+          <div v-if="searchable" class="is-select__search">
+            <input
+              ref="searchEl"
+              v-model="query"
+              class="is-select__search-input"
+              type="text"
+              placeholder="搜索…"
+              aria-label="搜索选项"
+              @keydown="onListKeydown"
+            />
+          </div>
+          <div ref="listEl" class="is-select__list" role="listbox" :aria-activedescendant="undefined">
+            <template v-for="(opt, i) in filtered" :key="String(opt.value)">
+              <div v-if="showGroupHeader(i)" class="is-select__group">{{ opt.group }}</div>
+              <button
+                type="button"
+                class="is-select__option"
+                :class="{ 'is-select__option--active': i === activeIndex, 'is-select__option--selected': opt.value === modelValue }"
+                role="option"
+                :aria-selected="opt.value === modelValue"
+                :disabled="opt.disabled"
+                @click="selectAt(i)"
+                @mousemove="activeIndex = i"
+              >
+                <IIcon v-if="opt.icon" :name="opt.icon" :size="14" />
+                <span class="is-ellipsis">{{ opt.label }}</span>
+                <IIcon v-if="opt.value === modelValue" name="check" :size="13" class="is-select__check" />
+              </button>
+            </template>
+            <div v-if="!filtered.length" class="is-select__empty">无匹配选项</div>
+          </div>
         </div>
-        <div ref="listEl" class="is-select__list" role="listbox" :aria-activedescendant="undefined">
-          <template v-for="(opt, i) in filtered" :key="String(opt.value)">
-            <div v-if="showGroupHeader(i)" class="is-select__group">{{ opt.group }}</div>
-            <button
-              type="button"
-              class="is-select__option"
-              :class="{ 'is-select__option--active': i === activeIndex, 'is-select__option--selected': opt.value === modelValue }"
-              role="option"
-              :aria-selected="opt.value === modelValue"
-              :disabled="opt.disabled"
-              @click="selectAt(i)"
-              @mousemove="activeIndex = i"
-            >
-              <IIcon v-if="opt.icon" :name="opt.icon" :size="14" />
-              <span class="is-ellipsis">{{ opt.label }}</span>
-              <IIcon v-if="opt.value === modelValue" name="check" :size="13" class="is-select__check" />
-            </button>
-          </template>
-          <div v-if="!filtered.length" class="is-select__empty">无匹配选项</div>
-        </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -255,17 +281,13 @@ function showGroupHeader(i: number): string | null {
 }
 
 .is-select__panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 100%;
+  /* position/top/left from teleported fixed style */
   width: max-content;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 16px));
   background: var(--is-surface);
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
   box-shadow: var(--is-shadow-md);
-  z-index: var(--is-z-dropdown);
   overflow: hidden;
 }
 .is-select__search {

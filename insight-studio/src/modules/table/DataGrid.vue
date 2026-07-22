@@ -11,6 +11,8 @@ import { findTable, findView, findViewPath } from '../../shared/tree'
 import { createTransform, createViewNode, defaultViewName } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, ITooltip, IBadge, toast, type SelectOption } from '../../ui'
+import { useFloatingPanel } from '../../ui/floating'
+import { useClickOutside, useEscape } from '../../ui/utils'
 import { downloadCsv, toCsv } from './csv'
 import {
   buildPasteRect,
@@ -324,18 +326,25 @@ function onTransformApply(t: Transform) {
 const transformPickerOpen = ref(false)
 const TRANSFORM_TYPES = Object.keys(TRANSFORM_TYPE_LABELS) as TransformType[]
 
-/* ------------------------------ 列筛选漏斗 ------------------------------ */
+/* ------------------------------ 列筛选漏斗（单一弹层，避免 vxe 表头克隆导致双层遮挡） ------------------------------ */
 
 const colFilterFor = ref<string | null>(null)
 const cfOp = ref('')
 const cfValue = ref('')
 const cfValue2 = ref('')
+const filterAnchorEl = ref<HTMLElement>()
+const filterPanelEl = ref<HTMLElement>()
+const filterOpen = computed(() => !!colFilterFor.value)
+const { style: filterPanelStyle } = useFloatingPanel(filterOpen, filterAnchorEl, filterPanelEl, () => 'bottom-start', {
+  zIndex: 'var(--is-z-popover)',
+  minWidth: 220,
+})
 
 function columnFilterOf(field: string): Filter | undefined {
   return targetFilters.value.find((f) => f.conditions.length === 1 && f.conditions[0].column === field)
 }
 
-function openColumnFilter(field: string) {
+function openColumnFilter(field: string, ev?: Event) {
   const existing = columnFilterOf(field)
   const col = props.result.columns.find((c) => c.field === field)
   const ops = col ? operatorsFor(col.dataType) : []
@@ -343,9 +352,23 @@ function openColumnFilter(field: string) {
   const c = existing?.conditions[0]
   cfValue.value = c?.value === undefined ? '' : Array.isArray(c.value) ? c.value.map(String).join(', ') : String(c.value ?? '')
   cfValue2.value = c?.value2 === undefined ? '' : String(c.value2 ?? '')
+  const btn = (ev?.currentTarget as HTMLElement | undefined) || undefined
+  if (btn) filterAnchorEl.value = btn
   colFilterFor.value = field
   colMenuFor.value = null
 }
+
+function closeColumnFilter() {
+  colFilterFor.value = null
+}
+
+useClickOutside([filterAnchorEl, filterPanelEl], (e) => {
+  if (!colFilterFor.value) return
+  const t = e.target as HTMLElement | null
+  if (t?.closest?.('[data-is-floating="1"]') && filterPanelEl.value?.querySelector('.is-select--open')) return
+  closeColumnFilter()
+})
+useEscape(closeColumnFilter, () => !!colFilterFor.value)
 
 const cfOperatorOptions = computed<SelectOption[]>(() => {
   const col = props.result.columns.find((c) => c.field === colFilterFor.value)
@@ -381,7 +404,7 @@ function applyColumnFilter() {
     { id: existing?.id ?? uuid(), combinator: 'and', conditions: [cond as never] },
     `筛选 ${col.title}`,
   )
-  colFilterFor.value = null
+  closeColumnFilter()
 }
 
 function clearColumnFilter() {
@@ -389,12 +412,52 @@ function clearColumnFilter() {
   if (!field) return
   const existing = columnFilterOf(field)
   if (existing) removeFilterCommit(existing.id)
-  colFilterFor.value = null
+  closeColumnFilter()
 }
 
-/* ------------------------------ 列菜单 ------------------------------ */
+/* ------------------------------ 列菜单（单一弹层） ------------------------------ */
 
 const colMenuFor = ref<string | null>(null)
+const menuAnchorEl = ref<HTMLElement>()
+const menuPanelEl = ref<HTMLElement>()
+const menuOpen = computed(() => !!colMenuFor.value)
+const { style: menuPanelStyle } = useFloatingPanel(menuOpen, menuAnchorEl, menuPanelEl, () => 'bottom-end', {
+  zIndex: 'var(--is-z-popover)',
+  minWidth: 180,
+})
+
+function openColumnMenu(field: string, ev?: Event) {
+  const btn = (ev?.currentTarget as HTMLElement | undefined) || undefined
+  if (colMenuFor.value === field) {
+    colMenuFor.value = null
+    return
+  }
+  menuAnchorEl.value = btn
+  colMenuFor.value = field
+  colFilterFor.value = null
+}
+function closeColumnMenu() {
+  colMenuFor.value = null
+}
+function openColumnFilterFromMenu() {
+  const f = colMenuFor.value
+  const anchor = menuAnchorEl.value
+  closeColumnMenu()
+  if (!f) return
+  filterAnchorEl.value = anchor
+  openColumnFilter(f)
+}
+/** 先记下字段再关菜单，避免 close 后 colMenuFor 已清空 */
+function runColumnMenu(action: (field: string) => void) {
+  const f = colMenuFor.value
+  closeColumnMenu()
+  if (f) action(f)
+}
+useClickOutside([menuAnchorEl, menuPanelEl], () => {
+  if (colMenuFor.value) closeColumnMenu()
+})
+useEscape(closeColumnMenu, () => !!colMenuFor.value)
+
 const renameCol = reactive<{ open: boolean; field: string; title: string }>({ open: false, field: '', title: '' })
 const deleteColField = ref<string | null>(null)
 const colVisibilityOpen = ref(false)
@@ -410,7 +473,7 @@ function openRenameColumn(field: string) {
   renameCol.field = field
   renameCol.title = col?.title ?? field
   renameCol.open = true
-  colMenuFor.value = null
+  closeColumnMenu()
 }
 
 function submitRenameColumn() {
@@ -889,7 +952,7 @@ function promote() {
           :edit-render="editable ? {} : undefined"
         >
           <template #header>
-            <div class="dg__th" @contextmenu.prevent="colMenuFor = col.field">
+            <div class="dg__th" @contextmenu.prevent="openColumnMenu(col.field, $event)">
               <IIcon
                 :name="col.dataType === 'number' ? 'type-number' : col.dataType === 'date' || col.dataType === 'datetime' ? 'calendar' : 'type-text'"
                 :size="13"
@@ -902,104 +965,27 @@ function promote() {
                 :size="12"
                 class="dg__th-sort"
               />
-              <!-- 列筛选漏斗 -->
-              <IPopover
-                :open="colFilterFor === col.field"
-                placement="bottom-start"
-                :arrow="false"
-                @update:open="!$event && (colFilterFor = null)"
+              <!-- 列筛选漏斗（弹层为全局单例，见下方 Teleport） -->
+              <button
+                type="button"
+                class="dg__th-btn"
+                :class="{ 'dg__th-btn--active': !!columnFilterOf(col.field) || colFilterFor === col.field }"
+                :aria-label="`筛选 ${col.title}`"
+                title="筛选此列"
+                @click.stop="openColumnFilter(col.field, $event)"
               >
-                <template #anchor>
-                  <button
-                    type="button"
-                    class="dg__th-btn"
-                    :class="{ 'dg__th-btn--active': !!columnFilterOf(col.field) }"
-                    :aria-label="`筛选 ${col.title}`"
-                    title="筛选此列"
-                    @click.stop="openColumnFilter(col.field)"
-                  >
-                    <IIcon name="filter" :size="12" />
-                  </button>
-                </template>
-                <template #default>
-                  <div class="dg__cf">
-                    <ISelect v-model="cfOp" :options="cfOperatorOptions" size="sm" />
-                    <ITextField v-if="cfArity === 'one'" v-model="cfValue" size="sm" placeholder="值" @enter="applyColumnFilter" />
-                    <template v-else-if="cfArity === 'two'">
-                      <div class="dg__cf-range">
-                        <ITextField v-model="cfValue" size="sm" placeholder="下界" @enter="applyColumnFilter" />
-                        <ITextField v-model="cfValue2" size="sm" placeholder="上界" @enter="applyColumnFilter" />
-                      </div>
-                    </template>
-                    <ITextField v-else-if="cfArity === 'list'" v-model="cfValue" size="sm" placeholder="值1, 值2（逗号分隔）" @enter="applyColumnFilter" />
-                    <div class="dg__cf-actions">
-                      <IButton size="sm" variant="ghost" :disabled="!columnFilterOf(col.field)" @click="clearColumnFilter">清除</IButton>
-                      <IButton size="sm" variant="primary" @click="applyColumnFilter">Apply</IButton>
-                    </div>
-                  </div>
-                </template>
-              </IPopover>
-              <!-- 列菜单 -->
-              <IPopover
-                :open="colMenuFor === col.field"
-                placement="bottom-end"
-                :arrow="false"
-                @update:open="!$event && (colMenuFor = null)"
+                <IIcon name="filter" :size="12" />
+              </button>
+              <!-- 列菜单触发 -->
+              <button
+                type="button"
+                class="dg__th-btn dg__th-btn--menu"
+                :class="{ 'dg__th-btn--active': colMenuFor === col.field }"
+                :aria-label="`${col.title} 列菜单`"
+                @click.stop="openColumnMenu(col.field, $event)"
               >
-                <template #anchor>
-                  <button
-                    type="button"
-                    class="dg__th-btn dg__th-btn--menu"
-                    :aria-label="`${col.title} 列菜单`"
-                    @click.stop="colMenuFor = colMenuFor === col.field ? null : col.field"
-                  >
-                    <IIcon name="more" :size="12" />
-                  </button>
-                </template>
-                <template #default="{ close }">
-                  <div class="dg__menu" role="menu">
-                    <button type="button" class="dg__menu-item" role="menuitem" @click="close(); setSort(col.field, 'asc')">
-                      <IIcon name="sort-asc" :size="13" /> 升序
-                    </button>
-                    <button type="button" class="dg__menu-item" role="menuitem" @click="close(); setSort(col.field, 'desc')">
-                      <IIcon name="sort-desc" :size="13" /> 降序
-                    </button>
-                    <button
-                      v-if="sortInfo?.field === col.field"
-                      type="button"
-                      class="dg__menu-item"
-                      role="menuitem"
-                      @click="close(); setSort(col.field, null)"
-                    >
-                      <IIcon name="close" :size="13" /> 清除排序
-                    </button>
-                    <div class="dg__menu-sep" />
-                    <button type="button" class="dg__menu-item" role="menuitem" @click="close(); openColumnFilter(col.field)">
-                      <IIcon name="filter" :size="13" /> 筛选此列
-                    </button>
-                    <button type="button" class="dg__menu-item" role="menuitem" @click="close(); toggleColumn(col.field)">
-                      <IIcon name="eye-off" :size="13" /> 隐藏列
-                    </button>
-                    <div class="dg__menu-sep" />
-                    <button type="button" class="dg__menu-item" role="menuitem" @click="close(); openTransformDialog(null, 'derived')">
-                      <IIcon name="plus" :size="13" /> 在右侧插入派生列
-                    </button>
-                    <template v-if="editable">
-                      <button type="button" class="dg__menu-item" role="menuitem" @click="close(); openRenameColumn(col.field)">
-                        <IIcon name="edit" :size="13" /> 重命名列
-                      </button>
-                      <button
-                        type="button"
-                        class="dg__menu-item dg__menu-item--danger"
-                        role="menuitem"
-                        @click="close(); deleteColField = col.field"
-                      >
-                        <IIcon name="trash" :size="13" /> 删除列
-                      </button>
-                    </template>
-                  </div>
-                </template>
-              </IPopover>
+                <IIcon name="more" :size="12" />
+              </button>
             </div>
           </template>
 
@@ -1034,6 +1020,96 @@ function promote() {
     <button v-if="editable && result.columns.length" type="button" class="dg__addrow" @click="addRow">
       <IIcon name="plus" :size="13" /> 添加行
     </button>
+
+    <!-- 列筛选单例弹层（避开 vxe 表头克隆双开） -->
+    <Teleport to="body">
+      <div
+        v-if="colFilterFor"
+        ref="filterPanelEl"
+        class="dg__cf-panel"
+        :style="filterPanelStyle"
+        data-is-floating="1"
+        role="dialog"
+        aria-label="列筛选"
+        @mousedown.stop
+      >
+        <div class="dg__cf">
+          <ISelect v-model="cfOp" :options="cfOperatorOptions" size="sm" />
+          <ITextField v-if="cfArity === 'one'" v-model="cfValue" size="sm" placeholder="值" @enter="applyColumnFilter" />
+          <template v-else-if="cfArity === 'two'">
+            <div class="dg__cf-range">
+              <ITextField v-model="cfValue" size="sm" placeholder="下界" @enter="applyColumnFilter" />
+              <ITextField v-model="cfValue2" size="sm" placeholder="上界" @enter="applyColumnFilter" />
+            </div>
+          </template>
+          <ITextField v-else-if="cfArity === 'list'" v-model="cfValue" size="sm" placeholder="值1, 值2（逗号分隔）" @enter="applyColumnFilter" />
+          <div class="dg__cf-actions">
+            <IButton size="sm" variant="ghost" :disabled="!columnFilterOf(colFilterFor)" @click="clearColumnFilter">清除</IButton>
+            <IButton size="sm" variant="primary" @click="applyColumnFilter">Apply</IButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 列菜单单例弹层 -->
+    <Teleport to="body">
+      <div
+        v-if="colMenuFor"
+        ref="menuPanelEl"
+        class="dg__menu-panel"
+        :style="menuPanelStyle"
+        data-is-floating="1"
+        role="menu"
+        @mousedown.stop
+      >
+        <div class="dg__menu">
+          <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => setSort(f, 'asc'))">
+            <IIcon name="sort-asc" :size="13" /> 升序
+          </button>
+          <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => setSort(f, 'desc'))">
+            <IIcon name="sort-desc" :size="13" /> 降序
+          </button>
+          <button
+            v-if="sortInfo?.field === colMenuFor"
+            type="button"
+            class="dg__menu-item"
+            role="menuitem"
+            @click="runColumnMenu((f) => setSort(f, null))"
+          >
+            <IIcon name="close" :size="13" /> 清除排序
+          </button>
+          <div class="dg__menu-sep" />
+          <button
+            type="button"
+            class="dg__menu-item"
+            role="menuitem"
+            @click="openColumnFilterFromMenu()"
+          >
+            <IIcon name="filter" :size="13" /> 筛选此列
+          </button>
+          <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => toggleColumn(f))">
+            <IIcon name="eye-off" :size="13" /> 隐藏列
+          </button>
+          <div class="dg__menu-sep" />
+          <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu(() => openTransformDialog(null, 'derived'))">
+            <IIcon name="plus" :size="13" /> 在右侧插入派生列
+          </button>
+          <template v-if="editable">
+            <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => openRenameColumn(f))">
+              <IIcon name="edit" :size="13" /> 重命名列
+            </button>
+            <button
+              type="button"
+              class="dg__menu-item dg__menu-item--danger"
+              role="menuitem"
+              @click="runColumnMenu((f) => { deleteColField = f })"
+            >
+              <IIcon name="trash" :size="13" /> 删除列
+            </button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 行上下文菜单 -->
     <Teleport to="body">
@@ -1334,6 +1410,13 @@ function promote() {
   margin: 4px 6px;
 }
 
+.dg__cf-panel,
+.dg__menu-panel {
+  background: var(--is-surface);
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius);
+  box-shadow: var(--is-shadow-md);
+}
 .dg__cf {
   padding: 10px;
   display: flex;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useFloatingPanel } from './floating'
 
 const props = withDefaults(
   defineProps<{
@@ -11,8 +12,18 @@ const props = withDefaults(
   { placement: 'top', delay: 300 },
 )
 
+const rootEl = ref<HTMLElement>()
+const bubbleEl = ref<HTMLElement>()
 const visible = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
+
+const { style: bubbleStyle } = useFloatingPanel(
+  visible,
+  rootEl,
+  bubbleEl,
+  computed(() => props.placement),
+  { zIndex: 'var(--is-z-popover)' },
+)
 
 function show() {
   clearTimeout(timer)
@@ -27,6 +38,7 @@ onBeforeUnmount(() => clearTimeout(timer))
 
 <template>
   <span
+    ref="rootEl"
     class="is-tooltip"
     @mouseenter="show"
     @mouseleave="hide"
@@ -34,15 +46,20 @@ onBeforeUnmount(() => clearTimeout(timer))
     @focusout="hide"
   >
     <slot />
-    <Transition name="is-tooltip-fade">
-      <span
-        v-if="visible && content"
-        class="is-tooltip__bubble"
-        :class="`is-tooltip__bubble--${placement}`"
-        role="tooltip"
-        >{{ content }}</span
-      >
-    </Transition>
+    <Teleport to="body">
+      <Transition name="is-tooltip-fade">
+        <span
+          v-if="visible && content"
+          ref="bubbleEl"
+          class="is-tooltip__bubble"
+          :class="`is-tooltip__bubble--${placement}`"
+          :style="bubbleStyle"
+          data-is-floating="1"
+          role="tooltip"
+          >{{ content }}</span
+        >
+      </Transition>
+    </Teleport>
   </span>
 </template>
 
@@ -52,9 +69,7 @@ onBeforeUnmount(() => clearTimeout(timer))
   display: inline-flex;
 }
 .is-tooltip__bubble {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  /* position/top/left from teleported fixed style */
   background: #1d2939;
   color: #fff;
   font-size: var(--is-text-xs);
@@ -63,15 +78,8 @@ onBeforeUnmount(() => clearTimeout(timer))
   border-radius: var(--is-radius-sm);
   white-space: nowrap;
   max-width: 260px;
-  z-index: var(--is-z-popover);
   pointer-events: none;
   box-shadow: var(--is-shadow-md);
-}
-.is-tooltip__bubble--top {
-  bottom: calc(100% + 6px);
-}
-.is-tooltip__bubble--bottom {
-  top: calc(100% + 6px);
 }
 .is-tooltip-fade-enter-active,
 .is-tooltip-fade-leave-active {
