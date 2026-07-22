@@ -68,6 +68,38 @@ function setPosition(p: ChartPosition) {
   positionOpen.value = false
 }
 
+/* 源表收起：图表视图可隐藏表格，只看全幅图表；按分析+视图持久化 */
+const tableCollapsed = ref(false)
+function tableCollapseKey() {
+  const a = current.value?.id ?? ''
+  const v = selected.value?.viewId ?? ''
+  return `insight-studio:table-collapsed:${a}:${v}`
+}
+function loadTableCollapsed() {
+  if (!hasChart.value || !selected.value?.viewId) {
+    tableCollapsed.value = false
+    return
+  }
+  try {
+    tableCollapsed.value = localStorage.getItem(tableCollapseKey()) === '1'
+  } catch {
+    tableCollapsed.value = false
+  }
+}
+function toggleTableCollapsed() {
+  tableCollapsed.value = !tableCollapsed.value
+  try {
+    localStorage.setItem(tableCollapseKey(), tableCollapsed.value ? '1' : '0')
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+watch(
+  () => [current.value?.id, selected.value?.viewId, hasChart.value] as const,
+  () => loadTableCollapsed(),
+  { immediate: true },
+)
+
 /* 窄屏降级（<900px 左右 → 上下） */
 const rootEl = ref<HTMLElement>()
 const narrow = ref(false)
@@ -194,6 +226,16 @@ provide(
     <!-- 标题栏 -->
     <header v-if="view" class="tcw__head">
       <span class="tcw__head-title is-ellipsis">{{ view.name }}</span>
+      <IButton
+        v-if="hasChart"
+        variant="ghost"
+        size="sm"
+        :icon="tableCollapsed ? 'table' : 'eye-off'"
+        :title="tableCollapsed ? '显示源表' : '隐藏源表'"
+        @click="toggleTableCollapsed"
+      >
+        {{ tableCollapsed ? '显示源表' : '隐藏源表' }}
+      </IButton>
       <IPopover v-if="hasChart" :open="positionOpen" placement="bottom-end" :arrow="false" @update:open="positionOpen = $event">
         <template #anchor>
           <IButton variant="ghost" size="sm" icon="columns" title="图表位置" @click="positionOpen = !positionOpen">
@@ -251,8 +293,13 @@ provide(
 
     <!-- 主体 -->
     <div v-if="result && selected" class="tcw__body" data-mount="table-chart">
+      <!-- 图表视图且已收起源表：全幅图表 -->
+      <div v-if="hasChart && tableCollapsed" class="tcw__chart tcw__chart--solo" data-mount="chart-panel">
+        <ChartView />
+      </div>
+
       <ISplitPane
-        v-if="hasChart"
+        v-else-if="hasChart"
         :key="splitKey"
         :direction="splitDirection"
         :default-ratio="0.55"
@@ -377,6 +424,9 @@ provide(
   border-radius: var(--is-radius);
   overflow: hidden;
   padding: 8px;
+}
+.tcw__chart--solo {
+  width: 100%;
 }
 .tcw__chart-hint {
   font-size: var(--is-text-sm);
