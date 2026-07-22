@@ -4,8 +4,9 @@ import { IButton, IIcon } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
 import { joinTypeLabel, sourceLabel, viewTypeLabel } from './graph'
+import FlowChartPreview from './FlowChartPreview.vue'
 
-/** 选中节点右侧详情卡：类型/名称/摘要 + Inputs / Outputs + 打开主按钮。 */
+/** 选中节点右侧详情卡：类型/名称/摘要 +（图表节点）预览 + Inputs / Outputs + 打开主按钮。 */
 const props = defineProps<{
   node: FlowNodeData
   inputs: FlowNodeData[]
@@ -18,10 +19,15 @@ const emit = defineEmits<{
   (e: 'open'): void
 }>()
 
+/** 图表类视图：侧边展示真实图表内容（对齐参考：点选图表节点 → 预览）。 */
+const isChartNode = computed(
+  () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
+)
+
 const kindTitle = computed(() => {
   const n = props.node
   if (n.kind === 'table') return '数据表'
-  if (n.kind === 'view') return '视图'
+  if (n.kind === 'view') return isChartNode.value ? viewTypeLabel(n.viewType ?? 'bar') : '视图'
   return 'Combine 步骤'
 })
 
@@ -71,9 +77,16 @@ function refIcon(n: FlowNodeData): IconName {
 </script>
 
 <template>
-  <aside class="flow-detail" role="complementary" aria-label="节点详情">
+  <aside
+    class="flow-detail"
+    :class="{ 'flow-detail--chart': isChartNode }"
+    role="complementary"
+    :aria-label="isChartNode ? '图表预览' : '节点详情'"
+  >
     <header class="flow-detail__head">
-      <span class="flow-detail__icon"><IIcon :name="nodeIcon" :size="16" /></span>
+      <span class="flow-detail__icon" :class="{ 'flow-detail__icon--chart': isChartNode }">
+        <IIcon :name="nodeIcon" :size="16" />
+      </span>
       <div class="flow-detail__title">
         <span class="flow-detail__kind">{{ kindTitle }}</span>
         <span class="flow-detail__name is-ellipsis" :title="node.label">{{ node.label }}</span>
@@ -84,8 +97,21 @@ function refIcon(n: FlowNodeData): IconName {
     </header>
 
     <div class="flow-detail__body">
-      <dl class="flow-detail__meta">
+      <!-- 图表节点：侧边主内容为图表预览 -->
+      <section v-if="isChartNode && node.viewId" class="flow-detail__preview">
+        <h4 class="flow-detail__section-title">Output chart</h4>
+        <FlowChartPreview :table-id="node.tableId" :view-id="node.viewId" @open="emit('open')" />
+      </section>
+
+      <dl v-if="!isChartNode" class="flow-detail__meta">
         <template v-for="row in metaRows" :key="row.label">
+          <dt>{{ row.label }}</dt>
+          <dd class="is-ellipsis" :title="row.value">{{ row.value }}</dd>
+        </template>
+      </dl>
+
+      <dl v-else class="flow-detail__meta flow-detail__meta--compact">
+        <template v-for="row in metaRows.slice(0, 2)" :key="row.label">
           <dt>{{ row.label }}</dt>
           <dd class="is-ellipsis" :title="row.value">{{ row.value }}</dd>
         </template>
@@ -142,6 +168,9 @@ function refIcon(n: FlowNodeData): IconName {
   box-shadow: var(--is-shadow-lg);
   overflow: hidden;
 }
+.flow-detail--chart {
+  width: min(520px, calc(100vw - 48px));
+}
 .flow-detail__head {
   display: flex;
   align-items: center;
@@ -159,6 +188,10 @@ function refIcon(n: FlowNodeData): IconName {
   background: var(--is-success-soft);
   color: var(--is-success);
   flex-shrink: 0;
+}
+.flow-detail__icon--chart {
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
 }
 .flow-detail__title {
   flex: 1;
@@ -197,11 +230,20 @@ function refIcon(n: FlowNodeData): IconName {
   flex-direction: column;
   gap: 14px;
 }
+.flow-detail__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .flow-detail__meta {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 6px 14px;
   margin: 0;
+}
+.flow-detail__meta--compact {
+  padding-top: 2px;
+  border-top: 1px solid var(--is-border);
 }
 .flow-detail__meta dt {
   font-size: var(--is-text-xs);

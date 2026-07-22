@@ -1,5 +1,12 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createDemoAndEnter, createView, selectTable, tableNode } from './helpers'
+import {
+  createDemoAndEnter,
+  createView,
+  expectCanvasInk,
+  pickOption,
+  selectTable,
+  tableNode,
+} from './helpers'
 
 /** 进入流程图模式并等待节点渲染。 */
 async function openFlowchart(page: Page) {
@@ -66,5 +73,33 @@ test.describe('g) 流程图', () => {
     await page.getByRole('button', { name: 'Flowchart' }).click()
     await openFlowchart(page)
     await expect(page.locator('.flow-banner')).toHaveCount(0)
+  })
+
+  test('点击图表节点 → 侧边显示图表预览', async ({ page }) => {
+    await createDemoAndEnter(page)
+    await selectTable(page, 'Iris measurements')
+    await page.getByRole('button', { name: '创建图表' }).click()
+    await expect(page.getByRole('combobox', { name: 'Chart type' })).toBeVisible()
+    await pickOption(page.getByRole('combobox', { name: 'X Axis' }), 'species')
+    await pickOption(page.getByRole('combobox', { name: 'Y Axis' }), 'sepal_length')
+    await expectCanvasInk(page)
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.locator('.is-toast--success', { hasText: '图表配置已保存' })).toBeVisible()
+
+    await openFlowchart(page)
+    // 从工作区带入选中 → 详情卡可能已打开；确保点到图表节点
+    const barNode = page.locator('.vue-flow__node').filter({ hasText: /Bar chart/i }).first()
+    await expect(barNode).toBeVisible()
+    await barNode.click({ force: true })
+
+    const detail = page.getByRole('complementary', { name: '图表预览' })
+    await expect(detail).toBeVisible()
+    await expect(detail.getByText('Output chart')).toBeVisible()
+    await expect(page.getByTestId('flow-chart-preview')).toBeVisible()
+    await expect(page.getByTestId('flow-chart-canvas').locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+
+    // 点空白关闭
+    await page.locator('.vue-flow__pane').click({ position: { x: 20, y: 20 }, force: true })
+    await expect(detail).toHaveCount(0)
   })
 })
