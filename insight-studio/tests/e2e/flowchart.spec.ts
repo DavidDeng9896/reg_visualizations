@@ -83,12 +83,14 @@ test.describe('g) 流程图', () => {
     await pickOption(page.getByRole('combobox', { name: 'X Axis' }), 'species')
     await pickOption(page.getByRole('combobox', { name: 'Y Axis' }), 'sepal_length')
     await expectCanvasInk(page)
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.locator('.is-toast--success', { hasText: '图表配置已保存' })).toBeVisible()
 
     await openFlowchart(page)
-    // Demo 默认新建名类似 “Bar chart 1”
+    // 从工作区带入选中 → 详情卡可能已打开；确保点到图表节点
     const barNode = page.locator('.vue-flow__node').filter({ hasText: /Bar chart/i }).first()
     await expect(barNode).toBeVisible()
-    await barNode.click()
+    await barNode.click({ force: true })
 
     const detail = page.getByRole('complementary', { name: '图表预览' })
     await expect(detail).toBeVisible()
@@ -97,7 +99,7 @@ test.describe('g) 流程图', () => {
     await expect(page.getByTestId('flow-chart-canvas').locator('canvas').first()).toBeVisible({ timeout: 10_000 })
 
     // 点空白关闭
-    await page.locator('.vue-flow__pane').click({ position: { x: 20, y: 20 } })
+    await page.locator('.vue-flow__pane').click({ position: { x: 20, y: 20 }, force: true })
     await expect(detail).toHaveCount(0)
   })
 })
