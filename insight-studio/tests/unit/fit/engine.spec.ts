@@ -153,12 +153,53 @@ describe('runFit · 4PL', () => {
     expect(fit.r2!).toBeGreaterThan(0.95)
   })
 
-  it('logX 轴拟合：inflection 同样以原始单位报告', () => {
+  it('logX 轴拟合：inflection 以原始单位报告，hillSlope 与线性轴一致（教科书定义）', () => {
     const fit = runFit(pts(xs, gen(0, 100, 1.5, 5)), cfg({ model: '4pl' }), { logX: true })
     expect(fit.ok).toBe(true)
     if (fit.params?.kind === '4pl') {
       expect(Math.abs(fit.params.inflectionPoint - 5) / 5).toBeLessThan(0.1)
+      // 修复回归：logX 轴下 hillSlope 不得虚增 ln(10) 倍（1.5 → 3.45）
+      expect(Math.abs(fit.params.hillSlope - 1.5) / 1.5).toBeLessThan(0.1)
+      // 与线性轴结果一致
+      const fitLin = runFit(pts(xs, gen(0, 100, 1.5, 5)), cfg({ model: '4pl' }))
+      if (fitLin.params?.kind === '4pl') {
+        expect(fit.params.hillSlope).toBeCloseTo(fitLin.params.hillSlope, 8)
+        expect(fit.params.inflectionPoint).toBeCloseTo(fitLin.params.inflectionPoint, 8)
+      }
     }
+  })
+
+  it('logY + constraints：约束按原始单位解释（内部变换到 log 空间）', () => {
+    const fit = runFit(pts(xs, gen(2, 100, 1.5, 5)), cfg({ model: '4pl', constraints: { min: 2, max: 100 } }), { logY: true })
+    expect(fit.ok).toBe(true)
+    if (fit.params?.kind === '4pl') {
+      // 报告层 back-transform：min/max 应恰为约束的原始单位值
+      expect(fit.params.min).toBeCloseTo(2, 8)
+      expect(fit.params.max).toBeCloseTo(100, 8)
+      // log 空间拟合的拐点与无约束 logY 拟合一致（logY 会改变模型族，EC50 ≠ 原始空间真值 5）
+      const free = runFit(pts(xs, gen(2, 100, 1.5, 5)), cfg({ model: '4pl' }), { logY: true })
+      if (free.params?.kind === '4pl') {
+        expect(Math.abs(fit.params.inflectionPoint - free.params.inflectionPoint) / free.params.inflectionPoint).toBeLessThan(0.15)
+      }
+    }
+  })
+
+  it('logY + 非正约束值：忽略该约束并警告', () => {
+    const fit = runFit(pts(xs, gen(2, 100, 1.5, 5)), cfg({ model: '4pl', constraints: { min: 0 } }), { logY: true })
+    expect(fit.ok).toBe(true)
+    expect(fit.warnings.some((w) => w.includes('已忽略该约束'))).toBe(true)
+    if (fit.params?.kind === '4pl') {
+      // min 未被固定，自由估计接近真值 2
+      expect(Math.abs(fit.params.min - 2)).toBeLessThan(10)
+    }
+  })
+
+  it('恰好 4 点（零自由度）：仍拟合但警告 CI/R² 无意义', () => {
+    const xs4 = [0.1, 1, 10, 100]
+    const ys4 = xs4.map((x) => 100 / (1 + Math.exp(-1.5 * (Math.log(x) - Math.log(5)))))
+    const fit = runFit(pts(xs4, ys4), cfg({ model: '4pl' }))
+    expect(fit.ok).toBe(true)
+    expect(fit.warnings.some((w) => w.includes('零自由度'))).toBe(true)
   })
 
   it('非正 x 对 4PL 必过滤', () => {

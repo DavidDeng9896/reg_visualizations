@@ -236,7 +236,7 @@ const constraintMax = computed({
       <div class="cfg__row">
         <span class="cfg__label cfg__label--icon">
           Weights
-          <ITooltip content="选择数值列作为加权最小二乘的权重（权重越大的点对拟合影响越大）；默认 None = 等权" placement="bottom">
+          <ITooltip content="选择数值列作为加权最小二乘的权重（权重 = 1/σ²，即方差越小、越精确的点权重越大，对拟合影响越大）；默认 None = 等权" placement="bottom">
             <IIcon name="info" :size="12" class="cfg__help" />
           </ITooltip>
         </span>

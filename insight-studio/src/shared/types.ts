@@ -145,7 +145,7 @@ export type RegressionModel = 'none' | 'point-to-point' | 'linear' | 'quadratic'
 
 export interface RegressionConfig {
   model: RegressionModel
-  /** 权重列 field；缺省等权。 */
+  /** 权重列 field；缺省等权。约定 w = 1/σ²（值越大的点对拟合影响越大）。 */
   weightsField?: string
   /** 4PL 约束。 */
   constraints?: { min?: number; max?: number }

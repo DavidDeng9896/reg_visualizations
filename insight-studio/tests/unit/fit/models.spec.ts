@@ -7,12 +7,15 @@ function detNoise(i: number, amp: number): number {
 }
 
 describe('tCrit95', () => {
-  it('小 df 接近 t 分布表值，大 df 趋近 1.96', () => {
-    expect(tCrit95(5)).toBeGreaterThan(2.4)
-    expect(tCrit95(5)).toBeLessThan(2.8)
-    expect(tCrit95(30)).toBeGreaterThan(2.0)
-    expect(tCrit95(30)).toBeLessThan(2.1)
-    expect(Math.abs(tCrit95(10000) - 1.96)).toBeLessThan(0.01)
+  it('小 df 命中精确 t 分布表值（不完全 beta 精确解）', () => {
+    expect(tCrit95(1)).toBeCloseTo(12.7062, 3)
+    expect(tCrit95(2)).toBeCloseTo(4.3027, 3)
+    expect(tCrit95(3)).toBeCloseTo(3.1824, 3)
+    expect(tCrit95(4)).toBeCloseTo(2.7764, 3)
+    expect(tCrit95(5)).toBeCloseTo(2.5706, 3)
+    expect(tCrit95(10)).toBeCloseTo(2.2281, 3)
+    expect(tCrit95(30)).toBeCloseTo(2.0423, 3)
+    expect(Math.abs(tCrit95(10000) - 1.96)).toBeLessThan(0.001)
   })
 })
 

@@ -4,7 +4,8 @@
  * - 最少点数校验（不足返回 ok:false + 警告，不画线）
  * - excludeFlagged 滤点（6F-1）
  * - log 轴 → log10 空间拟合，预测/曲线 back-transform
- * - 4PL 固定要求 x > 0（内部在 t = ln(x) 或 log10(x) 空间求解）
+ * - 4PL 固定要求 x > 0，且统一在 t = ln(x) 空间求解（与 X 轴是否 log 无关，
+ *   保证报告的 hillSlope 恒等于教科书 Hill slope；曲线形状不受底数选择影响）
  * - 曲线 120 采样点；Linear/Quadratic 附 95% CI 带
  */
 import type { RegressionConfig, RegressionModel } from '../../../shared/types'
@@ -101,7 +102,7 @@ function failed(model: RegressionModel, warnings: string[], usedPoints: number):
 
 /** 拟合空间变换描述。 */
 interface Space {
-  /** x 原始 → 拟合 t（4PL 用 ln/log10，其余模型恒等或 log10）。 */
+  /** x 原始 → 拟合 t（4PL 恒为 ln(x)，其余模型 log10 或恒等）。 */
   tx: (x: number) => number
   /** 拟合 t → 原始 x。 */
   bx: (t: number) => number
@@ -115,10 +116,11 @@ function makeSpace(model: RegressionModel, opts: FitOptions): Space {
   const logX = !!opts.logX
   const logY = !!opts.logY
   if (model === '4pl') {
-    // 4PL 内部模型 exp(-hill·(t-c))：t 必须与 inflection 同量纲
+    // 4PL 内部模型 exp(-hill·(t-c))：固定 t = ln(x)，与 X 轴 scale 无关。
+    // 若随 logX 轴改用 log10(x)，exp 底不变会使 hillSlope 虚增 ln(10) 倍。
     return {
-      tx: logX ? (x) => Math.log10(x) : (x) => Math.log(x),
-      bx: logX ? (t) => 10 ** t : (t) => Math.exp(t),
+      tx: (x) => Math.log(x),
+      bx: (t) => Math.exp(t),
       ty: logY ? (y) => Math.log10(y) : (y) => y,
       by: logY ? (v) => 10 ** v : (v) => v,
     }
@@ -283,12 +285,31 @@ export function runFit(input: FitInputPoint[], config: RegressionConfig, opts: F
   }
 
   /* ---------------------------------- 4PL ---------------------------------- */
-  const out = fit4PL(ts, ys, ws, config.constraints)
+  // constraints 以原始 Y 单位配置，需变换到拟合空间（logY 时尤为关键）；
+  // 无法变换的值（如 logY 下 ≤ 0）忽略并警告
+  let constraints = config.constraints
+  if (constraints && (constraints.min !== undefined || constraints.max !== undefined)) {
+    const tr = (v: number | undefined, label: string): number | undefined => {
+      if (v === undefined) return undefined
+      const tv = space.ty(v)
+      if (!Number.isFinite(tv)) {
+        warnings.push(`4PL 约束 ${label}=${v} 在当前拟合空间无效（Log Y 要求约束值 > 0），已忽略该约束`)
+        return undefined
+      }
+      return tv
+    }
+    constraints = { min: tr(constraints.min, 'min'), max: tr(constraints.max, 'max') }
+  }
+  const out = fit4PL(ts, ys, ws, constraints)
   if (!out.ok) {
     warnings.push(out.error)
     return failed(model, warnings, pts.length)
   }
   const f = out.fit
+  const freeParams = 4 - (constraints?.min !== undefined ? 1 : 0) - (constraints?.max !== undefined ? 1 : 0)
+  if (pts.length === freeParams) {
+    warnings.push(`4PL 数据点数（${pts.length}）恰好等于自由参数数：零自由度，R²=1、置信区间无意义`)
+  }
   if (!f.converged) warnings.push('4PL 未完全收敛，参数为当前最优估计（可尝试设置 Constraints）')
   const predict = (x: number) => {
     if (x <= 0) return Number.NaN

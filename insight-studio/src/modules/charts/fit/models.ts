@@ -2,25 +2,85 @@
  * 拟合模型数学核心（纯 TS，无 DOM / Vue 依赖）。
  * - Linear：加权最小二乘（闭式解 + 协方差 CI95）
  * - Quadratic：3×3 正规方程（加权）+ CI95
- * - 4PL：Levenberg-Marquardt + 数值 Jacobian；在对数化 t 空间求解
+ * - 4PL：Levenberg-Marquardt + 数值 Jacobian；统一在 t = ln(x) 空间求解（要求 x > 0）
  *   f(t) = min + (max-min) / (1 + exp(-hill·(t - c)))
- *   其中 t 由 engine 决定（logX 轴 → t = log10(x)，否则 t = ln(x)，要求 x > 0）。
- *   报告层 inflection = back-transform(c)。
+ *   固定 ln 底使报告的 hillSlope 与教科书 Hill slope 定义一致（底数无关）；
+ *   报告层 inflection = exp(c)。
  */
 
 /* ------------------------------- 数值工具 ------------------------------- */
 
-/** Student-t 双侧 95% 临界值（Cornish-Fisher 展开，df≥1 时误差 <0.5%）。 */
+/** Lanczos 近似 ln Γ(x)（g=7，误差 <1e-12）。 */
+function logGamma(x: number): number {
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+    12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ]
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x)
+  const z = x - 1
+  let s = c[0]
+  for (let i = 1; i < c.length; i += 1) s += c[i] / (z + i)
+  const t = z + 7.5
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(s)
+}
+
+/** 不完全 beta 连分式（Numerical Recipes betacf）。 */
+function betaCF(a: number, b: number, x: number): number {
+  const qab = a + b
+  const qap = a + 1
+  const qam = a - 1
+  let c = 1
+  let d = 1 - (qab * x) / qap
+  if (Math.abs(d) < 1e-300) d = 1e-300
+  d = 1 / d
+  let h = d
+  for (let m = 1; m <= 200; m += 1) {
+    const m2 = 2 * m
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2))
+    d = 1 + aa * d
+    if (Math.abs(d) < 1e-300) d = 1e-300
+    c = 1 + aa / c
+    if (Math.abs(c) < 1e-300) c = 1e-300
+    d = 1 / d
+    h *= d * c
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2))
+    d = 1 + aa * d
+    if (Math.abs(d) < 1e-300) d = 1e-300
+    c = 1 + aa / c
+    if (Math.abs(c) < 1e-300) c = 1e-300
+    d = 1 / d
+    const del = d * c
+    h *= del
+    if (Math.abs(del - 1) < 3e-14) break
+  }
+  return h
+}
+
+/** 正则化不完全 beta 函数 I_x(a, b)。 */
+function regIncompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  const bt = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x))
+  if (x < (a + 1) / (a + b + 2)) return (bt * betaCF(a, b, x)) / a
+  return 1 - (bt * betaCF(b, a, 1 - x)) / b
+}
+
+/**
+ * Student-t 双侧 95% 临界值（精确解，相对误差 <1e-9，任意 df≥1 适用）。
+ * 利用恒等式 P(|T| > t) = I_{ν/(ν+t²)}(ν/2, 1/2)，对 t 二分求解尾部概率 = 0.05。
+ */
 export function tCrit95(df: number): number {
-  if (!Number.isFinite(df) || df <= 0) return 1.96
-  const z = 1.959963984540054
-  const z3 = z * z * z
-  const z5 = z3 * z * z
-  const z7 = z5 * z * z
-  const g1 = (z3 + z) / 4
-  const g2 = (5 * z5 + 16 * z3 + 3 * z) / 96
-  const g3 = (3 * z7 + 19 * z5 + 17 * z3 - 15 * z) / 384
-  return z + g1 / df + g2 / df ** 2 + g3 / df ** 3
+  if (!Number.isFinite(df) || df <= 0) return 1.959963984540054
+  const tail = (t: number) => regIncompleteBeta(df / 2, 0.5, df / (df + t * t))
+  let lo = 0
+  let hi = 1
+  while (tail(hi) > 0.05) hi *= 2 // 上界必然存在（t→∞ 时尾部→0）
+  for (let i = 0; i < 100; i += 1) {
+    const mid = (lo + hi) / 2
+    if (tail(mid) > 0.05) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
 }
 
 type Mat = number[][]
@@ -289,7 +349,7 @@ export function fit4PL(ts: number[], ys: number[], ws?: number[], constraints?: 
   const fixedMax = constraints?.max !== undefined && Number.isFinite(constraints.max)
   const k = 4 - (fixedMin ? 1 : 0) - (fixedMax ? 1 : 0)
   if (n < 4) return err('4PL 至少需要 4 个点')
-  if (n <= k) return err('4PL 数据点不足以估计自由参数')
+  if (n < k) return err('4PL 数据点不足以估计自由参数')
   const w = ws ?? ts.map(() => 1)
 
   let yMin = Infinity
