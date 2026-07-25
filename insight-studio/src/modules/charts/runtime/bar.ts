@@ -5,6 +5,11 @@ import type { Row } from '../../../shared/types'
 import { aggregateRows, aggregationLabel, errorValue, numericValues } from './aggregate'
 import { resolveAxis, dataMinOf } from './axis'
 import {
+  AXIS_LABEL_STYLE,
+  AXIS_LINE_SOFT,
+  AXIS_NAME_STYLE,
+  AXIS_TICK_HIDDEN,
+  SPLIT_LINE_SOFT,
   TOOLTIP_DARK,
   buildGrid,
   buildLegend,
@@ -58,11 +63,23 @@ export function buildBarOption({ result, config, viewName }: BuildInput): BuildO
   if (errEnabled && stacked) warnings.push('堆叠模式下误差棒不生效，已忽略')
 
   const valueAxis = resolveAxis(style.yAxis, dataMinOf(allValues), yLabel, warnings, 'Y 轴')
-  const categoryAxis = { type: 'category', data: cats, name: xLabel, nameGap: 28, axisLabel: { color: '#667085' } }
+  const categoryAxis = {
+    type: 'category',
+    data: cats,
+    name: xLabel,
+    nameLocation: 'middle',
+    nameGap: 30,
+    nameTextStyle: AXIS_NAME_STYLE,
+    axisLabel: AXIS_LABEL_STYLE,
+    axisLine: AXIS_LINE_SOFT,
+    axisTick: AXIS_TICK_HIDDEN,
+  }
   const valAxisOpt: ChartOption = {
     ...valueAxis,
-    axisLabel: { color: '#667085' },
-    splitLine: { show: true, lineStyle: { color: '#eef1f5' } },
+    axisLabel: AXIS_LABEL_STYLE,
+    axisLine: AXIS_LINE_SOFT,
+    axisTick: AXIS_TICK_HIDDEN,
+    splitLine: SPLIT_LINE_SOFT,
   }
 
   const series: ChartOption[] = []
@@ -115,7 +132,7 @@ export function buildBarOption({ result, config, viewName }: BuildInput): BuildO
     legend: buildLegend(style, seriesVals.length > 1 || seriesVals[0] !== null),
     grid: buildGrid(style),
     xAxis: horizontal ? valAxisOpt : categoryAxis,
-    yAxis: horizontal ? { ...categoryAxis, inverse: false } : valAxisOpt,
+    yAxis: horizontal ? { ...categoryAxis, inverse: false, nameGap: 48 } : valAxisOpt,
     series,
   }
   return { option, warnings, seriesNames }

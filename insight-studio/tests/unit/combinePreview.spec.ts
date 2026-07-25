@@ -27,7 +27,7 @@ function makeAnalysis(): Analysis {
     { [ROW_ID_FIELD]: 'r1', id: 'a', label: 'A' },
     { [ROW_ID_FIELD]: 'r2', id: 'b', label: 'B' },
   ])
-  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [left, right], flowchartLayout: {} }
+  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [left, right], flowchartLayout: {}, steps: [], files: [] }
 }
 
 describe('resolveCombineInput', () => {

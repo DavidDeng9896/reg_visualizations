@@ -29,7 +29,7 @@ function makeTable(rows: Row[], filters: Filter[] = []): AnalysisTable {
 }
 
 function makeAnalysis(table: AnalysisTable): Analysis {
-  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [table], flowchartLayout: {} }
+  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [table], flowchartLayout: {}, steps: [], files: [] }
 }
 
 function makeView(partial: Partial<ViewNode> = {}): ViewNode {
@@ -300,5 +300,50 @@ describe('evaluateExpression', () => {
     expect(evaluateExpression('(a + b) * 4', r)).toBe(20)
     expect(evaluateExpression('-a + b', r)).toBe(1)
     expect(evaluateExpression('2 * (a - b)', r)).toBe(-2)
+  })
+})
+
+describe('表达式函数扩展', () => {
+  it('if/round/abs/sqrt/log/ln', () => {
+    const r: Row = { v: 3.14159, neg: -4, big: 100 }
+    expect(evaluateExpression('if(v > 3, 1, 0)', r)).toBe(1)
+    expect(evaluateExpression('if(neg > 0, 1, 0)', r)).toBe(0)
+    expect(evaluateExpression('round(v, 2)', r)).toBe(3.14)
+    expect(evaluateExpression('round(v, 0)', r)).toBe(3)
+    expect(evaluateExpression('abs(neg)', r)).toBe(4)
+    expect(evaluateExpression('sqrt(neg)', r)).toBeNull()
+    expect(evaluateExpression('sqrt(4)', r)).toBe(2)
+    expect(evaluateExpression('log(big)', r)).toBe(2)
+    expect(evaluateExpression('ln(big)', r)).toBeCloseTo(Math.log(100))
+    expect(evaluateExpression('log(0)', r)).toBeNull()
+  })
+
+  it('min/max 可变参数', () => {
+    const r: Row = { a: 1, b: 5 }
+    expect(evaluateExpression('min(a, b)', r)).toBe(1)
+    expect(evaluateExpression('max(a, b, 3)', r)).toBe(5)
+    expect(evaluateExpression('min(a, missing)', r)).toBeNull()
+  })
+
+  it('year/month/day 日期函数', () => {
+    const r: Row = { d: '2026-07-22' }
+    expect(evaluateExpression('year(d)', r)).toBe(2026)
+    expect(evaluateExpression('month(d)', r)).toBe(7)
+    expect(evaluateExpression('day(d)', r)).toBe(22)
+    expect(evaluateExpression('year(unknown)', r)).toBeNull()
+  })
+
+  it('concat 保持兼容；嵌套函数调用', () => {
+    const r: Row = { name: 'a', v: 2 }
+    expect(evaluateExpression("concat(name, '-', v)", r)).toBe('a-2')
+    expect(evaluateExpression('round(abs(v - 5) / 2, 1)', r)).toBe(1.5)
+  })
+
+  it('未知函数与参数个数错误抛错', () => {
+    expect(() => parseExpression('nosuch(1)')).toThrow('不支持的函数')
+    expect(() => parseExpression('round(1)')).toThrow('需要 2 个参数')
+    expect(() => parseExpression('if(1, 2)')).toThrow('需要 3 个参数')
+    expect(() => parseExpression('concat()')).toThrow('至少需要一个参数')
+    expect(() => parseExpression('abs()')).toThrow('需要 1 个参数')
   })
 })

@@ -137,12 +137,15 @@ export function applyFilters(rows: Row[], filters: Filter[], columns?: ColumnMet
 
 /**
  * 微型解析器（无 eval）：
- *   expr    := additive
+ *   expr    := comparison
+ *   comparison := additive (('>'|'>='|'<'|'<='|'='|'<>') additive)?
  *   additive:= multiplicative (('+'|'-') multiplicative)*
  *   mult    := unary (('*'|'/') unary)*
  *   unary   := '-' unary | primary
- *   primary := number | 'string' | column | concat(...) | '(' expr ')'
+ *   primary := number | 'string' | column | func(args) | '(' expr ')'
+ * 比较运算结果为 1/0，可直接用于 if(cond,a,b)。
  * 列引用：裸标识符（字母/数字/下划线/非 ASCII）或 [带空格的列名]。
+ * 函数见 EXPRESSION_FUNCTIONS（if/round/abs/sqrt/log/ln/min/max/year/month/day/concat）。
  */
 
 type ExprNode =
@@ -151,10 +154,81 @@ type ExprNode =
   | { kind: 'col'; name: string }
   | { kind: 'neg'; arg: ExprNode }
   | { kind: 'bin'; op: '+' | '-' | '*' | '/'; left: ExprNode; right: ExprNode }
-  | { kind: 'concat'; args: ExprNode[] }
+  | { kind: 'cmp'; op: '>' | '>=' | '<' | '<=' | '=' | '<>'; left: ExprNode; right: ExprNode }
+  | { kind: 'call'; name: string; args: ExprNode[] }
+
+/** 表达式函数签名：固定参数数或可变参数。 */
+interface ExprFunc {
+  /** 允许的参数个数；'variadic' 表示 1..n。 */
+  arity: number | 'variadic'
+  eval: (args: CellValue[]) => CellValue
+}
+
+function num(v: CellValue): number | null {
+  return toNumber(v)
+}
+
+function truthy(v: CellValue): boolean {
+  if (v === null || v === undefined) return false
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'number') return v !== 0 && Number.isFinite(v)
+  return String(v).trim() !== ''
+}
+
+function datePart(v: CellValue, part: 'year' | 'month' | 'day'): CellValue {
+  const t = parseDateLike(v)
+  if (t === null) return null
+  const d = new Date(t)
+  if (part === 'year') return d.getFullYear()
+  if (part === 'month') return d.getMonth() + 1
+  return d.getDate()
+}
+
+/** 支持的表达式函数注册表。 */
+export const EXPRESSION_FUNCTIONS: Record<string, ExprFunc> = {
+  if: {
+    arity: 3,
+    eval: ([cond, a, b]) => (truthy(cond ?? null) ? (a ?? null) : (b ?? null)),
+  },
+  round: {
+    arity: 2,
+    eval: ([x, n]) => {
+      const v = num(x ?? null)
+      const d = num(n ?? null)
+      if (v === null || d === null) return null
+      const f = 10 ** Math.trunc(d)
+      return Math.round(v * f) / f
+    },
+  },
+  abs: { arity: 1, eval: ([x]) => (num(x ?? null) === null ? null : Math.abs(num(x ?? null)!)) },
+  sqrt: { arity: 1, eval: ([x]) => (num(x ?? null) === null || num(x ?? null)! < 0 ? null : Math.sqrt(num(x ?? null)!)) },
+  log: { arity: 1, eval: ([x]) => (num(x ?? null) === null || num(x ?? null)! <= 0 ? null : Math.log10(num(x ?? null)!)) },
+  ln: { arity: 1, eval: ([x]) => (num(x ?? null) === null || num(x ?? null)! <= 0 ? null : Math.log(num(x ?? null)!)) },
+  min: {
+    arity: 'variadic',
+    eval: (args) => {
+      const ns = args.map((a) => num(a))
+      return ns.some((n) => n === null) ? null : Math.min(...(ns as number[]))
+    },
+  },
+  max: {
+    arity: 'variadic',
+    eval: (args) => {
+      const ns = args.map((a) => num(a))
+      return ns.some((n) => n === null) ? null : Math.max(...(ns as number[]))
+    },
+  },
+  year: { arity: 1, eval: ([x]) => datePart(x ?? null, 'year') },
+  month: { arity: 1, eval: ([x]) => datePart(x ?? null, 'month') },
+  day: { arity: 1, eval: ([x]) => datePart(x ?? null, 'day') },
+  concat: {
+    arity: 'variadic',
+    eval: (args) => args.map((v) => (v === null || v === undefined ? '' : String(v))).join(''),
+  },
+}
 
 interface Token {
-  type: 'num' | 'str' | 'ident' | 'op' | 'lparen' | 'rparen' | 'comma'
+  type: 'num' | 'str' | 'ident' | 'op' | 'cmp' | 'lparen' | 'rparen' | 'comma'
   text: string
 }
 
@@ -200,6 +274,17 @@ function tokenize(src: string): Token[] {
       i += 1
       continue
     }
+    if (ch === '>' || ch === '<' || ch === '=') {
+      const two = src.slice(i, i + 2)
+      if (two === '>=' || two === '<=' || two === '<>') {
+        tokens.push({ type: 'cmp', text: two })
+        i += 2
+      } else {
+        tokens.push({ type: 'cmp', text: ch })
+        i += 1
+      }
+      continue
+    }
     if (ch === '(') {
       tokens.push({ type: 'lparen', text: ch })
       i += 1
@@ -240,11 +325,21 @@ class Parser {
   }
 
   parse(): ExprNode {
-    const node = this.parseAdditive()
+    const node = this.parseComparison()
     if (this.pos !== this.tokens.length) {
       throw new PipelineError(`表达式在 "${this.peek()?.text ?? ''}" 之后存在多余内容`)
     }
     return node
+  }
+
+  private parseComparison(): ExprNode {
+    const left = this.parseAdditive()
+    const t = this.peek()
+    if (t?.type === 'cmp') {
+      this.next()
+      return { kind: 'cmp', op: t.text as '>' | '>=' | '<' | '<=' | '=' | '<>', left, right: this.parseAdditive() }
+    }
+    return left
   }
 
   private parseAdditive(): ExprNode {
@@ -288,19 +383,26 @@ class Parser {
       return inner
     }
     if (t.type === 'ident') {
-      if (t.text.toLowerCase() === 'concat' && this.peek()?.type === 'lparen') {
+      if (this.peek()?.type === 'lparen') {
+        const name = t.text.toLowerCase()
+        const fn = EXPRESSION_FUNCTIONS[name]
+        if (!fn) throw new PipelineError(`不支持的函数 "${t.text}"`)
         this.next()
         const args: ExprNode[] = []
         if (this.peek()?.type !== 'rparen') {
-          args.push(this.parseAdditive())
+          args.push(this.parseComparison())
           while (this.peek()?.type === 'comma') {
             this.next()
-            args.push(this.parseAdditive())
+            args.push(this.parseComparison())
           }
         }
         this.expect('rparen')
-        if (args.length === 0) throw new PipelineError('concat 至少需要一个参数')
-        return { kind: 'concat', args }
+        if (fn.arity === 'variadic') {
+          if (args.length === 0) throw new PipelineError(`${name} 至少需要一个参数`)
+        } else if (args.length !== fn.arity) {
+          throw new PipelineError(`${name} 需要 ${fn.arity} 个参数，实际 ${args.length} 个`)
+        }
+        return { kind: 'call', name, args }
       }
       return { kind: 'col', name: t.text }
     }
@@ -327,11 +429,29 @@ function evalNode(node: ExprNode, row: Row): CellValue {
       const v = toNumber(evalNode(node.arg, row) as CellValue)
       return v === null ? null : -v
     }
-    case 'concat':
-      return node.args.map((a) => {
-        const v = evalNode(a, row)
-        return v === null || v === undefined ? '' : String(v)
-      }).join('')
+    case 'cmp': {
+      const l = evalNode(node.left, row)
+      const r = evalNode(node.right, row)
+      switch (node.op) {
+        case '=':
+          return looseEq(l, r) ? 1 : 0
+        case '<>':
+          return looseEq(l, r) ? 0 : 1
+        case '>':
+          return compareValues(l, r) > 0 ? 1 : 0
+        case '>=':
+          return compareValues(l, r) >= 0 ? 1 : 0
+        case '<':
+          return compareValues(l, r) < 0 ? 1 : 0
+        case '<=':
+          return compareValues(l, r) <= 0 ? 1 : 0
+      }
+    }
+    case 'call': {
+      const fn = EXPRESSION_FUNCTIONS[node.name]
+      if (!fn) return null
+      return fn.eval(node.args.map((a) => evalNode(a, row)))
+    }
     case 'bin': {
       const l = toNumber(evalNode(node.left, row) as CellValue)
       const r = toNumber(evalNode(node.right, row) as CellValue)

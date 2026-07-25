@@ -2,7 +2,7 @@
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Panel, VueFlow, useVueFlow } from '@vue-flow/core'
-import type { NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
+import type { Connection, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import '@vue-flow/core/dist/style.css'
@@ -10,24 +10,28 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/minimap/dist/style.css'
 
 import { useAnalysisStore, type SelectedNode } from '../../stores/analysisStore'
-import { IButton, IEmptyState, IIcon, ITooltip } from '../../ui'
-import {
-  buildFlowGraph,
-  downstreamOf,
-  tableNodeId,
-  upstreamOf,
-  viewNodeId,
-  type FlowGraph,
-  type FlowNodeData,
-} from './graph'
+import { IButton, IEmptyState, IIcon, ITooltip, toast } from '../../ui'
+import { buildFlowGraph, downstreamOf, stepNodeId, upstreamOf, viewNodeId, type FlowGraph, type FlowNodeData } from './graph'
 import { resolvePositions } from './layout'
 import FlowNode from './FlowNode.vue'
+import FlowEdge from './FlowEdge.vue'
 import NodeDetailCard from './NodeDetailCard.vue'
+import AddStepPanel from './AddStepPanel.vue'
+import StepConfigPanel from '../steps/panel/StepConfigPanel.vue'
+import { canConnectPorts } from './connection'
+import { getStepDef } from '../steps/registry'
+import { uuid } from '../../shared/id'
+import type { PortType, StepInputRef, StepNode, StepType } from '../../shared/types'
+import { runStep, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
+import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 
 /**
- * 流程图画布（DESIGN.md §5）：
- * 自动拓扑 + 拖拽布局持久化 + 缩放/平移 + 点击详情/导航 + 侧栏双向联动。
- * 只读拓扑：不可连线/删线/删节点。
+ * 流程图可编辑画布：
+ * - 基于 StepNode 自动拓扑 + 拖拽布局持久化
+ * - 节点三态、类型化端口
+ * - 拖线到空白处 → Add step 目录面板
+ * - 拖线到合法端口 → 自动连线
+ * - 点击节点详情卡 / 双击打开工作区
  */
 const emit = defineEmits<{ (e: 'add-data'): void }>()
 
@@ -42,18 +46,24 @@ const graph = computed<FlowGraph>(() =>
 const nodeById = computed(() => new Map(graph.value.nodes.map((n) => [n.id, n])))
 const positions = computed(() => resolvePositions(graph.value, current.value?.flowchartLayout ?? {}))
 const isEmpty = computed(() => graph.value.nodes.length === 0)
-/** >200 节点降级：仅渲染可视元素。 */
 const perfMode = computed(() => graph.value.nodes.length > 200)
+const staleCount = computed(() => (current.value ? current.value.steps.filter((s) => s.status === 'stale').length : 0))
+const hasStale = computed(() => (current.value ? hasStaleSteps(current.value) : false))
+
+/** 重新运行所有 stale 步骤（拓扑序），恢复 configured。 */
+function runAll(): void {
+  if (!current.value) return
+  store.mutate((a) => {
+    const n = rerunStaleSteps(a)
+    if (n > 0) toast.success(`已重新运行 ${n} 个步骤`)
+  })
+}
 
 /* ------------------------------- vue-flow 状态 ------------------------------ */
 
 const FLOW_ID = 'insight-flowchart'
-const { viewport, zoomIn, zoomOut, zoomTo, fitView } = useVueFlow({ id: FLOW_ID })
+const { viewport, zoomIn, zoomOut, zoomTo, fitView, findNode, updateNodeInternals } = useVueFlow({ id: FLOW_ID })
 
-/**
- * 画布节点/边的本地轻量类型（结构上与 vue-flow Node/Edge 兼容）。
- * vue-flow 的 Node 泛型在 strict 下会触发 TS2589 深度实例化，故用最小形状。
- */
 interface CanvasNode {
   id: string
   type?: string
@@ -67,17 +77,26 @@ interface CanvasEdge {
   id: string
   source: string
   target: string
+  sourceHandle?: string
+  targetHandle?: string
   type?: string
   selectable?: boolean
   focusable?: boolean
   class?: string
+  data?: { portType?: PortType }
 }
 
 const vfNodes = ref<CanvasNode[]>([])
 const vfEdges = ref<CanvasEdge[]>([])
 const activeId = ref<string | null>(null)
 const hoverId = ref<string | null>(null)
+const isConnecting = ref(false)
 const minimapOpen = ref(true)
+/**
+ * KeepAlive deactivate 时画布 DOM 被移入隐藏容器（尺寸 0），
+ * vue-flow Background/MiniMap 会算出 NaN 并刷屏 SVG 错误——非活跃期不渲染它们。
+ */
+const alive = ref(true)
 
 const activeNode = computed(() => (activeId.value ? nodeById.value.get(activeId.value) ?? null : null))
 const activeInputs = computed(() => (activeId.value ? upstreamOf(graph.value, activeId.value) : []))
@@ -85,7 +104,6 @@ const activeOutputs = computed(() => (activeId.value ? downstreamOf(graph.value,
 
 const zoomPercent = computed(() => Math.round((viewport.value.zoom || 1) * 100))
 
-/** 与选中/悬停节点相连的节点集合（用于邻接高亮）。 */
 const linkedIds = computed<Set<string>>(() => {
   const focus = activeId.value ?? hoverId.value
   const set = new Set<string>()
@@ -108,7 +126,6 @@ function edgeClass(source: string, target: string): string {
   return focus && (source === focus || target === focus) ? 'flow-edge--active' : ''
 }
 
-/** 全量重建（拓扑/数据变化时），保留已有节点当前位置避免拖拽态闪动。 */
 function rebuild(): void {
   const prev = new Map<string, CanvasNode>()
   for (const n of vfNodes.value) prev.set(n.id, n)
@@ -120,7 +137,7 @@ function rebuild(): void {
       position: old ? { ...old.position } : (positions.value[n.id] ?? { x: 0, y: 0 }),
       data: n,
       draggable: true,
-      connectable: false,
+      connectable: true,
       class: nodeClass(n.id),
     }
   })
@@ -128,17 +145,33 @@ function rebuild(): void {
     id: e.id,
     source: e.source,
     target: e.target,
-    type: 'default',
+    sourceHandle: e.sourcePort,
+    targetHandle: e.targetPort,
+    type: 'flow',
     selectable: false,
     focusable: false,
     class: edgeClass(e.source, e.target),
+    data: {
+      portType: nodeById.value.get(e.source)?.outputs.find((p) => p.name === e.sourcePort)?.type,
+    },
   }))
-  // 选中节点已被删除时清理
   if (activeId.value && !nodeById.value.has(activeId.value)) activeId.value = null
 }
 watch([graph, positions], rebuild, { immediate: true })
 
-/** 仅刷新高亮 class（不触碰位置）。 */
+/**
+ * VueFlow 的 Handle 在 onMounted 时依赖节点尺寸注册 handleBounds；
+ * 节点尺寸由 ResizeObserver 异步测量，需延后更新，否则拖线可能不触发 connect-start。
+ */
+function scheduleHandleBoundsUpdate(): void {
+  void nextTick(() => {
+    updateNodeInternals()
+    setTimeout(() => updateNodeInternals(), 100)
+    setTimeout(() => updateNodeInternals(), 300)
+  })
+}
+watch(graph, scheduleHandleBoundsUpdate, { flush: 'post' })
+
 function refreshHighlight(): void {
   for (const n of vfNodes.value) n.class = nodeClass(n.id)
   for (const e of vfEdges.value) e.class = edgeClass(e.source, e.target)
@@ -159,7 +192,7 @@ function dismissBanner(): void {
   try {
     localStorage.setItem(BANNER_KEY, '1')
   } catch {
-    /* localStorage 不可用时忽略 */
+    /* ignore */
   }
 }
 
@@ -167,11 +200,19 @@ function dismissBanner(): void {
 
 function selectionToFlowId(sel: SelectedNode | null): string | null {
   if (!sel) return null
-  const id = sel.kind === 'table' ? tableNodeId(sel.tableId) : sel.viewId ? viewNodeId(sel.viewId) : null
-  return id && nodeById.value.has(id) ? id : null
+  if (sel.kind === 'view' && sel.viewId) {
+    const id = viewNodeId(sel.viewId)
+    return nodeById.value.has(id) ? id : null
+  }
+  // 表选中：找到产出该表的步骤节点
+  const table = current.value?.tables.find((t) => t.id === sel.tableId)
+  if (table?.stepId) {
+    const id = stepNodeId(table.stepId)
+    return nodeById.value.has(id) ? id : null
+  }
+  return null
 }
 
-/** 画布内选中（同步 store，但不切模式）。 */
 function setActive(id: string | null): void {
   activeId.value = id
   const n = id ? nodeById.value.get(id) : null
@@ -179,12 +220,14 @@ function setActive(id: string | null): void {
     store.setSelected(null)
     return
   }
-  if (n.kind === 'table') store.setSelected({ kind: 'table', tableId: n.tableId })
-  else if (n.kind === 'view' && n.viewId) store.setSelected({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
-  // combine-step 无侧栏对应节点，不回写选中
+  if (n.kind === 'view' && n.viewId && n.tableId) {
+    store.setSelected({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
+  } else if (n.kind === 'step' && n.stepId) {
+    const table = current.value?.tables.find((t) => t.stepId === n.stepId)
+    if (table) store.setSelected({ kind: 'table', tableId: table.id })
+  }
 }
 
-/** 外部（侧栏/工作区）选中 → 高亮并居中。画布内点击先写 activeId，watcher 比对后不重复居中。 */
 watch(selected, (sel) => {
   const flowId = selectionToFlowId(sel)
   if (flowId === activeId.value) return
@@ -198,36 +241,40 @@ async function centerOn(id: string): Promise<void> {
   await fitView({ nodes: [id], duration: 300, padding: 0.35, maxZoom: 1.2 })
 }
 
-/** 首次进入流程图：若已有选中（如侧栏「在流程图中显示」），居中定位。 */
+/**
+ * 适应视图：右侧配置/目录面板打开时，为面板预留右侧 padding，
+ * 避免节点被面板遮挡（对齐 Benchling 画布与面板共存的行为）。
+ */
+const FIT_PANEL_WIDTH = 340
+function fitAll(duration = 300): void {
+  const panelOpen = addStepOpen.value || !!editingStep.value
+  void fitView({
+    duration,
+    maxZoom: 1.25,
+    padding: { top: 0.15, bottom: 0.15, left: 0.15, right: panelOpen ? `${FIT_PANEL_WIDTH + 100}px` : 0.15 },
+  })
+}
+
 onMounted(() => {
   const flowId = selectionToFlowId(selected.value)
   if (flowId) {
     activeId.value = flowId
     void centerOn(flowId)
   }
+  scheduleHandleBoundsUpdate()
 })
 
-/* --------------------------------- 画布交互 --------------------------------- */
+/* --------------------------------- 打开工作区 -------------------------------- */
 
-function onNodeClick(e: NodeMouseEvent): void {
-  setActive(e.node.id)
-}
-function onPaneClick(): void {
-  setActive(null)
-}
-function onNodeMouseEnter(e: NodeMouseEvent): void {
-  hoverId.value = e.node.id
-}
-function onNodeMouseLeave(): void {
-  hoverId.value = null
-}
-
-/** 双击 / 打开按钮 → 跳回工作区并选中该表/视图（store.select 会切模式）。 */
 function openInWorkspace(id: string): void {
   const n = nodeById.value.get(id)
   if (!n) return
-  if (n.kind === 'view' && n.viewId) store.select({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
-  else store.select({ kind: 'table', tableId: n.tableId })
+  if (n.kind === 'view' && n.viewId && n.tableId) {
+    store.select({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
+  } else if (n.kind === 'step' && n.stepId) {
+    const table = current.value?.tables.find((t) => t.stepId === n.stepId)
+    if (table) store.select({ kind: 'table', tableId: table.id })
+  }
 }
 
 function focusNode(id: string): void {
@@ -235,7 +282,8 @@ function focusNode(id: string): void {
   void centerOn(id)
 }
 
-/** 拖拽结束 → 持久化坐标到 analysis.flowchartLayout。 */
+/* --------------------------------- 拖拽布局 -------------------------------- */
+
 function onNodeDragStop(e: NodeDragEvent): void {
   const dragged = e.nodes?.length ? e.nodes : e.node ? [e.node] : []
   if (!dragged.length) return
@@ -246,36 +294,278 @@ function onNodeDragStop(e: NodeDragEvent): void {
   })
 }
 
+/* --------------------------------- 画布交互 -------------------------------- */
+
+function onNodeClick(e: NodeMouseEvent): void {
+  setActive(e.node.id)
+}
+function onPaneClick(): void {
+  setActive(null)
+  if (skipNextPaneClick.value) {
+    skipNextPaneClick.value = false
+    return
+  }
+  closePanels()
+}
+function onNodeMouseEnter(e: NodeMouseEvent): void {
+  hoverId.value = e.node.id
+}
+function onNodeMouseLeave(): void {
+  hoverId.value = null
+}
+
+/* --------------------------------- 连接：拖线加步骤 -------------------------------- */
+
+const pendingSource = ref<{ nodeId: string; port: string } | null>(null)
+const addStepOpen = ref(false)
+const addStepSource = ref<{ nodeId: string; port: string } | null>(null)
+/** 拖线到空白处松开后，VueFlow 会触发 pane-click；需要跳过这一次 pane-click，避免刚打开的 AddStepPanel 被关闭。 */
+const skipNextPaneClick = ref(false)
+
+function closePanels(): void {
+  addStepOpen.value = false
+  addStepSource.value = null
+  skipNextPaneClick.value = false
+  if (editingStep.value) closeStepEditor(true)
+}
+
+function onConnectStart({ nodeId, handleId }: { nodeId?: string; handleId?: string | null }): void {
+  if (!nodeId || !handleId) return
+  isConnecting.value = true
+  pendingSource.value = { nodeId, port: handleId }
+}
+
+function onConnect(conn: Connection): void {
+  pendingSource.value = null
+  isConnecting.value = false
+  if (!conn.source || !conn.target || !conn.sourceHandle || !conn.targetHandle) return
+  const sourceNode = nodeById.value.get(conn.source)
+  const targetNode = nodeById.value.get(conn.target)
+  if (!sourceNode || !targetNode) return
+
+  const sourcePort = sourceNode.outputs.find((p) => p.name === conn.sourceHandle)
+  const targetPort = targetNode.inputs.find((p) => p.name === conn.targetHandle)
+  if (!sourcePort || !targetPort || !canConnectPorts(sourcePort, targetPort)) return
+
+  // 更新目标步骤的输入
+  store.mutate((a) => {
+    const step = a.steps.find((s) => s.id === targetNode.stepId)
+    if (!step) return
+    // 移除同端口旧连接
+    step.inputs = step.inputs.filter((i) => i.port !== targetPort.name)
+    const ref: StepInputRef = {
+      port: targetPort.name,
+      from: { nodeId: sourceNode.stepId!, port: sourcePort.name },
+    }
+    if (targetPort.multiple) {
+      step.inputs.push(ref)
+    } else {
+      step.inputs = [...step.inputs, ref]
+    }
+    // 尝试执行目标步骤
+    step.status = 'running'
+  })
+
+  // 在下一个 tick 执行并持久化
+  void nextTick(() => {
+    const step = current.value?.steps.find((s) => s.id === targetNode.stepId)
+    if (step && current.value) {
+      runStep(current.value, step)
+      store.mutate(() => {})
+    }
+  })
+}
+
+function onConnectEnd(_event?: MouseEvent): void {
+  isConnecting.value = false
+  // 如果 pendingSource 仍然存在，说明没有连到合法端口 → 打开 Add step 面板
+  if (!pendingSource.value) return
+  addStepSource.value = pendingSource.value
+  addStepOpen.value = true
+  skipNextPaneClick.value = true
+  pendingSource.value = null
+}
+
+/** 当前 Add step 面板源端口的数据类型（用于过滤可连接的步骤）。 */
+const addStepSourcePortType = computed(() => {
+  if (!addStepSource.value) return null
+  const node = nodeById.value.get(addStepSource.value.nodeId)
+  return node?.outputs.find((p) => p.name === addStepSource.value!.port)?.type ?? null
+})
+
+/* --------------------------------- Add step 回调 -------------------------------- */
+
+function onStepSelected(type: StepType): void {
+  if (!addStepSource.value || !current.value) return
+  const def = getStepDef(type)
+  const newStep: StepNode = {
+    id: uuid(),
+    type,
+    name: def.label,
+    inputs: [],
+    config: JSON.parse(JSON.stringify(def.defaultConfig)),
+    status: 'pending',
+    output: { tables: [], files: [], views: [] },
+  }
+
+  // 自动连接源端口到第一个合法输入端口
+  const sourceNodeId = addStepSource.value.nodeId
+  const sourcePortName = addStepSource.value.port
+  const sourceNode = nodeById.value.get(sourceNodeId)
+  const sourcePort = sourceNode?.outputs.find((p) => p.name === sourcePortName)
+  const targetPort = def.inputs.find((p) => sourcePort && canConnectPorts(sourcePort, p))
+
+  if (targetPort) {
+    newStep.inputs.push({
+      port: targetPort.name,
+      from: { nodeId: sourceNode!.stepId!, port: sourcePortName },
+    })
+  }
+
+  // 放置位置交给 resolvePositions：新节点落在已落位父节点右侧并自动避让，
+  // 避免写入 flowchartLayout 导致与既有节点重叠。
+  const newNodeId = stepNodeId(newStep.id)
+
+  store.mutate((a) => {
+    a.steps.push(newStep)
+  })
+
+  addStepOpen.value = false
+  addStepSource.value = null
+
+  // 打开配置面板（标记为新建，Cancel/Esc 将撤销该节点）
+  void nextTick(() => {
+    openStepEditor(newStep.id, true)
+    setActive(newNodeId)
+  })
+}
+
+/* --------------------------------- 步骤编辑面板 -------------------------------- */
+
+const editingStep = ref<string | null>(null)
+/** 本次编辑是否为「拖线新建的步骤」（Cancel/Esc 时撤销节点与连线）。 */
+const editingIsNew = ref(false)
+/** 打开编辑时的草稿快照（name + config），Cancel/Esc/点空白时恢复。 */
+const editingSnapshot = ref<{ name: string; config: string } | null>(null)
+
+const editingStepData = computed(() => {
+  if (!editingStep.value || !current.value) return null
+  return current.value.steps.find((s) => s.id === editingStep.value) ?? null
+})
+
+function openStepEditor(stepId: string, isNew: boolean): void {
+  const s = current.value?.steps.find((s) => s.id === stepId)
+  if (!s) return
+  editingStep.value = stepId
+  editingIsNew.value = isNew
+  editingSnapshot.value = { name: s.name, config: JSON.stringify(s.config) }
+}
+
+/** 关闭编辑面板；cancel=true 时恢复快照，新建的步骤连同布局一起撤销。 */
+function closeStepEditor(cancel: boolean): void {
+  if (!editingStep.value || !current.value) {
+    editingStep.value = null
+    return
+  }
+  const stepId = editingStep.value
+  if (cancel && editingIsNew.value) {
+    deleteStep(stepId)
+  } else if (cancel && editingSnapshot.value) {
+    const s = current.value.steps.find((s) => s.id === stepId)
+    if (s) {
+      s.name = editingSnapshot.value.name
+      s.config = JSON.parse(editingSnapshot.value.config)
+    }
+  }
+  editingStep.value = null
+  editingIsNew.value = false
+  editingSnapshot.value = null
+}
+
+function onStepSaved(name: string): void {
+  if (!editingStepData.value || !current.value) return
+  const step = editingStepData.value
+  store.mutate(() => {
+    step.name = name
+    // 源步骤（upload-csv 等无执行逻辑）：重命名同步到输出表
+    if (!IMPLEMENTED_STEP_TYPES.has(step.type)) {
+      const outTable = step.output.tables[0] ? current.value!.tables.find((t) => t.id === step.output.tables[0]) : undefined
+      if (outTable) outTable.name = name
+    }
+  })
+  if (IMPLEMENTED_STEP_TYPES.has(step.type)) {
+    runStep(current.value, step)
+    store.mutate(() => {})
+  }
+  editingStep.value = null
+  editingIsNew.value = false
+  editingSnapshot.value = null
+}
+
+/** 删除步骤及其输出表（调用方需先确认无下游依赖）。 */
+function deleteStep(stepId: string): void {
+  store.mutate((a) => {
+    a.steps = a.steps.filter((s) => s.id !== stepId)
+    a.tables = a.tables.filter((t) => t.stepId !== stepId)
+    delete a.flowchartLayout[stepNodeId(stepId)]
+  })
+  if (editingStep.value === stepId) editingStep.value = null
+  if (activeId.value === stepNodeId(stepId)) activeId.value = null
+}
+
+function onStepDeleted(stepId: string): void {
+  if (!current.value) return
+  const dependents = current.value.steps.filter((s) => s.inputs.some((i) => i.from.nodeId === stepId))
+  if (dependents.length) {
+    toast.error(`无法删除：以下步骤依赖它 — ${dependents.map((d) => d.name).join('、')}。请先删除下游步骤。`)
+    return
+  }
+  deleteStep(stepId)
+}
+
 /* --------------------------------- 键盘 --------------------------------- */
 
 function onKeydown(e: KeyboardEvent): void {
-  // 输入框内（重命名等）不拦截 Esc
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-  if (e.key === 'Escape' && activeId.value) setActive(null)
-  // Delete/Backspace 不生效（只读拓扑）
+  if (e.key === 'Escape') {
+    if (addStepOpen.value) {
+      addStepOpen.value = false
+      return
+    }
+    if (editingStep.value) {
+      closeStepEditor(true)
+      return
+    }
+    if (activeId.value) setActive(null)
+  }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onActivated(() => window.addEventListener('keydown', onKeydown))
-onDeactivated(() => window.removeEventListener('keydown', onKeydown))
+onActivated(() => {
+  alive.value = true
+  window.addEventListener('keydown', onKeydown)
+})
+onDeactivated(() => {
+  alive.value = false
+  window.removeEventListener('keydown', onKeydown)
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-/* --------------------------------- 小地图 --------------------------------- */
+/* --------------------------------- 小地图 -------------------------------- */
 
 function minimapNodeColor(node: { data?: unknown }): string {
-  const kind = (node.data as FlowNodeData | undefined)?.kind
-  if (kind === 'combine-step') return '#b7e8d0'
-  if (kind === 'view') return '#8fd7b5'
+  const d = node.data as FlowNodeData | undefined
+  if (d?.kind === 'view') return '#8fd7b5'
+  if (d?.status === 'pending' || d?.status === 'failed') return '#f3e3b3'
   return '#5cc795'
 }
 </script>
 
 <template>
-  <div class="flow-canvas" :class="{ 'flow-canvas--perf': perfMode }">
-    <!-- 顶部黄色提示条（可关闭，localStorage 记忆） -->
+  <div class="flow-canvas" :class="{ 'flow-canvas--perf': perfMode, 'is-connecting': isConnecting }">
     <Transition name="flow-banner">
       <div v-if="bannerVisible" class="flow-banner" role="status">
         <IIcon name="warning" :size="14" class="flow-banner__icon" />
-        <span class="flow-banner__text">流程图为只读浏览，拖节点仅调整布局；修改分析结构请从侧栏进行</span>
+        <span class="flow-banner__text">流程图即编辑器：拖出端口连线添加步骤；视图节点双击打开工作区</span>
         <button type="button" class="flow-banner__close" aria-label="关闭提示" @click="dismissBanner">
           <IIcon name="close" :size="13" />
         </button>
@@ -287,7 +577,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       v-model:nodes="vfNodes"
       v-model:edges="vfEdges"
       class="flow-canvas__vf"
-      :nodes-connectable="false"
+      :nodes-connectable="true"
       :nodes-draggable="true"
       :edges-focusable="false"
       :elements-selectable="false"
@@ -303,11 +593,14 @@ function minimapNodeColor(node: { data?: unknown }): string {
       @node-mouse-enter="onNodeMouseEnter"
       @node-mouse-leave="onNodeMouseLeave"
       @pane-click="onPaneClick"
+      @connect-start="onConnectStart"
+      @connect="onConnect"
+      @connect-end="onConnectEnd"
     >
-      <Background variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" bg-color="#fbfcfd" />
+      <Background v-if="alive" variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" bg-color="#fbfcfd" />
 
       <MiniMap
-        v-if="minimapOpen && !isEmpty"
+        v-if="alive && minimapOpen && !isEmpty"
         position="bottom-right"
         :pannable="true"
         :zoomable="true"
@@ -318,7 +611,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
         class="flow-minimap"
       />
 
-      <!-- 左下自定义缩放控件：− 百分比 + 适应视图 小地图 -->
       <Panel position="bottom-left" class="flow-controls">
         <ITooltip content="缩小">
           <button type="button" class="flow-controls__btn" aria-label="缩小" @click="zoomOut()">
@@ -341,8 +633,14 @@ function minimapNodeColor(node: { data?: unknown }): string {
         </ITooltip>
         <span class="flow-controls__sep" />
         <ITooltip content="适应视图">
-          <button type="button" class="flow-controls__btn" aria-label="适应视图" @click="fitView({ duration: 300, padding: 0.15 })">
+          <button type="button" class="flow-controls__btn" aria-label="适应视图" @click="fitAll()">
             <IIcon name="expand" :size="14" />
+          </button>
+        </ITooltip>
+        <ITooltip v-if="hasStale" content="重新运行所有待更新步骤">
+          <button type="button" class="flow-controls__btn flow-controls__btn--run" aria-label="重新运行" @click="runAll()">
+            <IIcon name="play" :size="14" />
+            <span v-if="staleCount" class="flow-controls__run-badge">{{ staleCount }}</span>
           </button>
         </ITooltip>
         <ITooltip :content="minimapOpen ? '隐藏小地图' : '显示小地图'">
@@ -367,23 +665,25 @@ function minimapNodeColor(node: { data?: unknown }): string {
           @open="openInWorkspace"
         />
       </template>
+
+      <template #edge-flow="slotProps">
+        <FlowEdge v-bind="slotProps" />
+      </template>
     </VueFlow>
 
-    <!-- 空态 -->
     <div v-if="isEmpty" class="flow-empty">
       <IEmptyState
         icon="flowchart"
         title="还没有数据"
-        description="导入 CSV 或合并表后，这里会展示数据表与视图的派生流程"
+        description="导入 CSV 或合并表后，这里会展示数据加工流程"
       >
         <IButton variant="primary" icon="plus" @click="emit('add-data')">Add data</IButton>
       </IEmptyState>
     </div>
 
-    <!-- 右侧节点详情卡（300px，200ms 滑出） -->
     <Transition name="flow-detail">
       <NodeDetailCard
-        v-if="activeNode"
+        v-if="activeNode && !editingStep"
         :key="activeNode.id"
         class="flow-canvas__detail"
         :node="activeNode"
@@ -392,8 +692,26 @@ function minimapNodeColor(node: { data?: unknown }): string {
         @close="setActive(null)"
         @focus="focusNode"
         @open="openInWorkspace(activeNode.id)"
+        @edit="activeNode.stepId && openStepEditor(activeNode.stepId, false)"
+        @delete="onStepDeleted"
       />
     </Transition>
+
+    <AddStepPanel
+      :open="addStepOpen"
+      :source="addStepSource"
+      :source-port-type="addStepSourcePortType"
+      @update:open="addStepOpen = $event"
+      @select="onStepSelected"
+    />
+
+    <StepConfigPanel
+      v-if="editingStepData"
+      :step="editingStepData"
+      @close="closeStepEditor(true)"
+      @save="onStepSaved"
+      @delete="onStepDeleted(editingStep!)"
+    />
   </div>
 </template>
 
@@ -407,7 +725,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   height: 100%;
 }
 
-/* ------------------------------- 顶部提示条 ------------------------------- */
 .flow-banner {
   position: absolute;
   top: 12px;
@@ -425,6 +742,14 @@ function minimapNodeColor(node: { data?: unknown }): string {
   box-shadow: var(--is-shadow-sm);
   font-size: var(--is-text-sm);
   color: var(--is-warning-text);
+  pointer-events: none;
+}
+.flow-banner__icon,
+.flow-banner__text {
+  pointer-events: none;
+}
+.flow-banner__close {
+  pointer-events: auto;
 }
 .flow-banner__icon {
   flex-shrink: 0;
@@ -455,7 +780,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   transform: translateY(-6px);
 }
 
-/* ------------------------------- 缩放控件 ------------------------------- */
 .flow-controls {
   display: flex;
   align-items: center;
@@ -486,6 +810,30 @@ function minimapNodeColor(node: { data?: unknown }): string {
   color: var(--is-accent);
   background: var(--is-accent-soft);
 }
+.flow-controls__btn--run {
+  position: relative;
+  color: var(--is-warning-text);
+  background: var(--is-warning-bg);
+}
+.flow-controls__btn--run:hover {
+  background: #f3e3b3;
+  color: var(--is-warning-text);
+}
+.flow-controls__run-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #e3a008;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
 .flow-controls__zoom {
   min-width: 44px;
   height: 26px;
@@ -508,7 +856,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   margin: 0 3px;
 }
 
-/* -------------------------------- 小地图 -------------------------------- */
 .flow-minimap {
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
@@ -516,7 +863,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   overflow: hidden;
 }
 
-/* -------------------------------- 空态 -------------------------------- */
 .flow-empty {
   position: absolute;
   inset: 0;
@@ -527,7 +873,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   z-index: 4;
 }
 
-/* ------------------------------- 详情卡 ------------------------------- */
 .flow-canvas__detail {
   position: absolute;
   top: 16px;
@@ -548,7 +893,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
 </style>
 
 <style>
-/* vue-flow 边样式（非 scoped：边由库渲染） */
 .flow-canvas .vue-flow__edge-path {
   stroke: #98a2b3;
   stroke-width: 1.5;
@@ -560,8 +904,32 @@ function minimapNodeColor(node: { data?: unknown }): string {
 .flow-canvas .vue-flow__edge {
   pointer-events: none;
 }
-/* 性能模式：关闭抗锯齿 */
+.flow-canvas .flow-edge-icon__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border: 1px solid var(--is-border-strong);
+  border-radius: 5px;
+  color: var(--is-text-tertiary);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  transition:
+    border-color var(--is-dur-fast) var(--is-ease),
+    color var(--is-dur-fast) var(--is-ease);
+}
+.flow-canvas .vue-flow__edge.flow-edge--active .flow-edge-icon__box {
+  border-color: var(--is-success);
+  color: var(--is-success);
+}
 .flow-canvas--perf .vue-flow__edge-path {
   shape-rendering: optimizeSpeed;
+}
+
+/* 拖线过程中让右侧面板不拦截鼠标，便于连到被面板遮挡的端口 */
+.flow-canvas.is-connecting .step-panel,
+.flow-canvas.is-connecting .add-step {
+  pointer-events: none;
 }
 </style>

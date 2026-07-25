@@ -62,7 +62,7 @@ const stopsOf = (p: { colors?: string[]; stops?: string[] }) => p.colors ?? p.st
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 32px;
+  height: 28px;
   padding: 0 10px;
   background: var(--is-surface);
   border: 1px solid var(--is-border-strong);
@@ -72,6 +72,11 @@ const stopsOf = (p: { colors?: string[]; stops?: string[] }) => p.colors ?? p.st
 }
 .palette:hover {
   border-color: var(--is-accent);
+}
+.palette:focus-visible {
+  border-color: var(--is-accent);
+  box-shadow: 0 0 0 2px rgba(46, 91, 255, 0.14);
+  outline: none;
 }
 .palette__strip {
   display: inline-flex;

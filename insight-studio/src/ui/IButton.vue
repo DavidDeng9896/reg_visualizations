@@ -69,7 +69,7 @@ function onClick(ev: MouseEvent) {
   font-size: var(--is-text-sm);
 }
 .is-btn--sm {
-  height: 26px;
+  height: 28px;
   padding: 0 10px;
   font-size: var(--is-text-xs);
 }
@@ -78,7 +78,7 @@ function onClick(ev: MouseEvent) {
   padding: 0;
 }
 .is-btn--icon-only.is-btn--sm {
-  width: 26px;
+  width: 28px;
   padding: 0;
 }
 

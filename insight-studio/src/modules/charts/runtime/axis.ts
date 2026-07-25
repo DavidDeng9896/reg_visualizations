@@ -10,6 +10,8 @@ export interface ResolvedAxis {
   min?: number
   max?: number
   nameGap?: number
+  nameLocation?: 'start' | 'middle' | 'end'
+  nameTextStyle?: Record<string, unknown>
 }
 
 /**
@@ -18,6 +20,7 @@ export interface ResolvedAxis {
  * @param defaultName 默认轴标题（聚合前缀 + 字段名）
  * @param warnings 警告收集器
  * @param axisLabel 警告文案里的轴名（如 'Y 轴'）
+ * @param orientation 轴朝向：X 轴标题靠下居中（gap 小），Y 轴标题居中垂直（gap 需容纳刻度）
  */
 export function resolveAxis(
   spec: AxisStyleSpec | undefined,
@@ -25,6 +28,7 @@ export function resolveAxis(
   defaultName: string | undefined,
   warnings: string[],
   axisLabel: string,
+  orientation: 'x' | 'y' = 'y',
 ): ResolvedAxis {
   let scale = spec?.scale ?? 'linear'
   if (scale === 'log' && dataMin <= 0) {
@@ -34,7 +38,9 @@ export function resolveAxis(
   const resolved: ResolvedAxis = {
     type: scale === 'log' ? 'log' : 'value',
     name: spec?.label ?? defaultName,
-    nameGap: 14,
+    nameLocation: 'middle',
+    nameGap: orientation === 'x' ? 30 : 48,
+    nameTextStyle: { color: '#475467', fontSize: 12, fontWeight: 600 },
   }
   if (spec?.range === 'manual') {
     if (spec.min !== undefined) resolved.min = spec.min

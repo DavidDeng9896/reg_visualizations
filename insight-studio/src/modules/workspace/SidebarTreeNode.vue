@@ -105,6 +105,15 @@ function commitRename() {
         <button
           type="button"
           class="vnode__action"
+          aria-label="在流程图中定位"
+          title="在流程图中定位"
+          @click.stop="emit('show-in-flowchart', tableId, node.id)"
+        >
+          <IIcon name="flowchart" :size="12" />
+        </button>
+        <button
+          type="button"
+          class="vnode__action"
           aria-label="新建子视图"
           title="新建子视图"
           @click.stop="emit('new-view', tableId, node.id)"

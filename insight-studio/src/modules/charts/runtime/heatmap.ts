@@ -6,7 +6,17 @@
 import { compareValues } from '../../../shared/pipeline'
 import { aggregateValues } from './aggregate'
 import { getContinuousPalette } from './palette'
-import { TOOLTIP_DARK, buildTitle, displayVal, distinctInOrder, formatNumber } from './shared'
+import {
+  AXIS_LABEL_STYLE,
+  AXIS_LINE_SOFT,
+  AXIS_NAME_STYLE,
+  AXIS_TICK_HIDDEN,
+  TOOLTIP_DARK,
+  buildTitle,
+  displayVal,
+  distinctInOrder,
+  formatNumber,
+} from './shared'
 import type { BuildInput, BuildOutput, ChartOption } from '../types'
 
 /* --------------------------- 层次聚类（agglomerative） --------------------------- */
@@ -213,8 +223,27 @@ export function buildHeatmapOption({ result, config, viewName }: BuildInput): Bu
       },
     },
     grid: { top: 40, bottom: 60, left: 70, right: legendPos === 'right' ? 90 : 24, containLabel: true },
-    xAxis: { type: 'category', data: colLabels, name: style.xAxis?.label ?? xField, splitArea: { show: true }, axisLabel: { color: '#667085' } },
-    yAxis: { type: 'category', data: rowLabels, name: style.yAxis?.label ?? yField, inverse: true, splitArea: { show: true }, axisLabel: { color: '#667085' } },
+    xAxis: {
+      type: 'category',
+      data: colLabels,
+      name: style.xAxis?.label ?? xField,
+      nameTextStyle: AXIS_NAME_STYLE,
+      splitArea: { show: true },
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+    },
+    yAxis: {
+      type: 'category',
+      data: rowLabels,
+      name: style.yAxis?.label ?? yField,
+      nameTextStyle: AXIS_NAME_STYLE,
+      inverse: true,
+      splitArea: { show: true },
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+    },
     visualMap,
     series: [
       {

@@ -31,6 +31,7 @@ import {
 import { conditionValid, filterSummary, operatorArity, operatorsFor, parseConditionValue } from './filterForm'
 import { TRANSFORM_TYPE_LABELS, transformSummary } from './transformForm'
 import { promoteViewToTable } from './promote'
+import { markTableEdited } from '../steps/rerun'
 import FilterDialog from './FilterDialog.vue'
 import TransformDialog from './TransformDialog.vue'
 
@@ -528,6 +529,7 @@ function rowMenuItems(rowId: string): CtxItem[] {
       action: () => {
         const entry = makeInsertRowCommand(t, Math.max(0, idx))
         store.commit(entry)
+        markEdited()
       },
     },
     {
@@ -536,6 +538,7 @@ function rowMenuItems(rowId: string): CtxItem[] {
       action: () => {
         const entry = makeInsertRowCommand(t, idx < 0 ? t.rows.length : idx + 1)
         store.commit(entry)
+        markEdited()
       },
     },
     {
@@ -544,8 +547,10 @@ function rowMenuItems(rowId: string): CtxItem[] {
       danger: true,
       action: () => {
         const entry = makeDeleteRowCommand(t, rowId)
-        if (entry) store.commit(entry)
-        else toast.error('未找到该行（可能已被过滤）')
+        if (entry) {
+          store.commit(entry)
+          markEdited()
+        } else toast.error('未找到该行（可能已被过滤）')
       },
     },
   ]
@@ -563,6 +568,14 @@ function addRow() {
   const t = table.value
   if (!t) return
   store.commit(makeInsertRowCommand(t, t.rows.length))
+  markEdited()
+}
+
+/** 编辑源表数据后，把下游步骤标记为 stale（需重新运行）。 */
+function markEdited() {
+  const t = table.value
+  if (!t) return
+  store.mutate((a) => markTableEdited(a, t.id))
 }
 
 /* ------------------------------ 单元格编辑 ------------------------------ */
@@ -624,8 +637,10 @@ function commitCell(row: Row, field: string) {
     return
   }
   const entry = makeEditCellCommand(t, rowId, field, parsed.value)
-  if (entry) store.commit(entry)
-  else toast.error('未找到源行（可能已被过滤或删除）')
+  if (entry) {
+    store.commit(entry)
+    markEdited()
+  } else toast.error('未找到源行（可能已被过滤或删除）')
 }
 
 /* ------------------------------ 选区 / 复制粘贴 ------------------------------ */
@@ -728,7 +743,10 @@ function onPaste(e: ClipboardEvent) {
   }
   if (edits.length) {
     const entry = makePasteCommand(t, edits)
-    if (entry) store.commit(entry)
+    if (entry) {
+      store.commit(entry)
+      markEdited()
+    }
   }
   const notes: string[] = []
   if (invalid) notes.push(`跳过 ${invalid} 个非法值`)

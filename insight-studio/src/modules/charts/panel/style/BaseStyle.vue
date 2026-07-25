@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import { IButton, ISelect, ISlider, ITextField, IToggle } from '../../../../ui'
+import { ISelect, ISlider, ITextField, IToggle } from '../../../../ui'
 import AxisSection from './AxisSection.vue'
 import ColorField from './ColorField.vue'
 import SeriesColorsSection from './SeriesColorsSection.vue'
@@ -63,11 +63,6 @@ const opacity = computed({
   },
 })
 
-function resetTitle() {
-  delete style.value.title
-  ctx.touch()
-}
-
 /* 图种专属存取器（确保子对象存在） */
 const bar = computed(() => (style.value.bar ??= {}))
 const line = computed(() => (style.value.line ??= {}))
@@ -81,7 +76,7 @@ const SHAPES = [
   { value: 'triangle', label: '▲ Triangle' },
   { value: 'diamond', label: '◆ Diamond' },
   { value: 'rect', label: '■ Square' },
-  { value: 'pin', label: '📍 Pin' },
+  { value: 'pin', label: '▼ Pin' },
 ]
 
 const hasSeries = computed(() => !!ctx.draft.configure.series?.field || !!ctx.draft.configure.color?.field)
@@ -120,8 +115,7 @@ const numOr = (v: number | undefined, d: number) => v ?? d
       <h4 class="sty__sec-title">General</h4>
       <div class="sty__row">
         <span class="sty__label">Title</span>
-        <ITextField v-model="title" size="sm" :placeholder="ctx.defaultTitle.value" />
-        <IButton size="sm" variant="ghost" icon="undo" title="恢复默认标题" @click="resetTitle" />
+        <ITextField v-model="title" size="sm" clearable :placeholder="ctx.defaultTitle.value" />
       </div>
       <div class="sty__row">
         <span class="sty__label">Subtitle</span>
@@ -194,9 +188,9 @@ const numOr = (v: number | undefined, d: number) => v ?? d
         <span class="sty__label">Point Shape</span>
         <ISelect :model-value="scatter.pointShape ?? 'circle'" :options="SHAPES" size="sm" aria-label="点形状" @update:model-value="scatter.pointShape = String($event); ctx.touch()" />
       </div>
-      <div class="sty__row">
+      <div class="sty__row sty__row--switch">
         <span class="sty__label">Jitter</span>
-        <IToggle :model-value="!!scatter.jitter" @update:model-value="scatter.jitter = $event; ctx.touch()">Jitter Points</IToggle>
+        <IToggle :model-value="!!scatter.jitter" aria-label="Jitter Points" @update:model-value="scatter.jitter = $event; ctx.touch()" />
       </div>
       <div v-if="scatter.jitter" class="sty__row">
         <span class="sty__label">强度</span>
@@ -261,9 +255,9 @@ const numOr = (v: number | undefined, d: number) => v ?? d
         <span class="sty__label">Outer %</span>
         <ISlider :model-value="numOr(pie.outerRadiusPct, 72)" :min="10" :max="100" aria-label="外径百分比" @update:model-value="pie.outerRadiusPct = $event; ctx.touch()" />
       </div>
-      <div class="sty__row">
+      <div class="sty__row sty__row--switch">
         <span class="sty__label">百分比</span>
-        <IToggle :model-value="pie.showPercent ?? true" @update:model-value="pie.showPercent = $event; ctx.touch()">Show Percentages</IToggle>
+        <IToggle :model-value="pie.showPercent ?? true" aria-label="Show Percentages" @update:model-value="pie.showPercent = $event; ctx.touch()" />
       </div>
       <div v-if="pie.showPercent !== false" class="sty__row">
         <span class="sty__label">Hide % &lt;</span>
@@ -275,9 +269,9 @@ const numOr = (v: number | undefined, d: number) => v ?? d
     <!-- Heatmap 专属 -->
     <section v-if="type === 'heatmap'" class="sty__sec">
       <h4 class="sty__sec-title">Heatmap</h4>
-      <div class="sty__row">
+      <div class="sty__row sty__row--switch">
         <span class="sty__label">格内标注</span>
-        <IToggle :model-value="!!heatmap.showCellValues" @update:model-value="heatmap.showCellValues = $event; ctx.touch()">显示数值</IToggle>
+        <IToggle :model-value="!!heatmap.showCellValues" aria-label="显示数值" @update:model-value="heatmap.showCellValues = $event; ctx.touch()" />
       </div>
       <div class="sty__row">
         <span class="sty__label">行排序</span>
@@ -305,19 +299,21 @@ const numOr = (v: number | undefined, d: number) => v ?? d
           @update:model-value="heatmap.colSort = $event as 'label' | 'mean'; ctx.touch()"
         />
       </div>
-      <div class="sty__row">
+      <div class="sty__row sty__row--switch">
         <span class="sty__label">聚类</span>
-        <IToggle :model-value="!!heatmap.clusterRows" @update:model-value="heatmap.clusterRows = $event; ctx.touch()">行</IToggle>
-        <IToggle :model-value="!!heatmap.clusterCols" @update:model-value="heatmap.clusterCols = $event; ctx.touch()">列</IToggle>
+        <div class="sty__inline">
+          <IToggle :model-value="!!heatmap.clusterRows" @update:model-value="heatmap.clusterRows = $event; ctx.touch()">行</IToggle>
+          <IToggle :model-value="!!heatmap.clusterCols" @update:model-value="heatmap.clusterCols = $event; ctx.touch()">列</IToggle>
+        </div>
       </div>
     </section>
 
     <!-- Legend -->
     <section class="sty__sec">
       <h4 class="sty__sec-title">Legend</h4>
-      <div class="sty__row">
-        <span class="sty__label">显示</span>
-        <IToggle v-model="legendShow">{{ legendShow ? '显示' : '隐藏' }}</IToggle>
+      <div class="sty__row sty__row--switch">
+        <span class="sty__label">显示图例</span>
+        <IToggle v-model="legendShow" aria-label="显示图例" />
       </div>
       <div v-if="legendShow" class="sty__row">
         <span class="sty__label">Position</span>
@@ -354,7 +350,7 @@ const numOr = (v: number | undefined, d: number) => v ?? d
 .sty__sec {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 10px 8px;
   border-top: 1px solid var(--is-border);
 }
@@ -370,12 +366,12 @@ const numOr = (v: number | undefined, d: number) => v ?? d
 }
 .sty__row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
 .sty__label {
   flex-shrink: 0;
-  width: 92px;
   font-size: var(--is-text-xs);
   font-weight: 600;
   color: var(--is-text-secondary);
@@ -391,5 +387,19 @@ const numOr = (v: number | undefined, d: number) => v ?? d
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+}
+.sty__inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sty__row--switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.sty__inline :deep(.is-field) {
+  flex: 1;
+  min-width: 0;
 }
 </style>

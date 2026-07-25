@@ -11,6 +11,12 @@ import { parseDateLike } from '../../../shared/datetime'
 import { aggregateRows, aggregationLabel } from './aggregate'
 import { resolveAxis, dataMinOf } from './axis'
 import {
+  AXIS_LABEL_STYLE,
+  AXIS_LINE_SOFT,
+  AXIS_NAME_STYLE,
+  AXIS_TICK_HIDDEN,
+  SPLIT_LINE_OFF,
+  SPLIT_LINE_SOFT,
   TOOLTIP_DARK,
   buildLegend,
   buildTitle,
@@ -288,28 +294,50 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
 
   const valAxis = (a: typeof leftAxis): ChartOption => ({
     ...a,
-    axisLabel: { color: '#667085' },
-    splitLine: { show: true, lineStyle: { color: '#eef1f5' } },
+    axisLabel: AXIS_LABEL_STYLE,
+    axisLine: AXIS_LINE_SOFT,
+    axisTick: AXIS_TICK_HIDDEN,
+    splitLine: SPLIT_LINE_SOFT,
   })
+  const xAxisShared: ChartOption = {
+    name: xLabel,
+    nameLocation: 'middle',
+    nameGap: 30,
+    nameTextStyle: AXIS_NAME_STYLE,
+    axisLabel: AXIS_LABEL_STYLE,
+    axisLine: AXIS_LINE_SOFT,
+    axisTick: AXIS_TICK_HIDDEN,
+  }
   const xAxisBase: ChartOption =
     xKind === 'category'
-      ? { type: 'category', data: cats, name: xLabel, nameGap: 28, axisLabel: { color: '#667085' } }
-      : { type: xKind, name: xLabel, nameGap: 28, axisLabel: { color: '#667085' }, splitLine: { show: false } }
+      ? { type: 'category', data: cats, ...xAxisShared }
+      : { type: xKind, ...xAxisShared, splitLine: SPLIT_LINE_OFF }
 
   const m = style.margins
   const gridsOpt: ChartOption[] = []
   const xAxes: ChartOption[] = []
   const yAxes: ChartOption[] = []
   for (let gi = 0; gi < grids; gi += 1) {
-    const topPct = (gi / grids) * 100
-    const heightPct = 100 / grids - 6
-    gridsOpt.push({
-      left: m?.left ?? 64,
-      right: m?.right ?? (useRight ? 64 : 32),
-      top: `${topPct + 4}%`,
-      height: `${heightPct}%`,
-      containLabel: true,
-    })
+    if (grids === 1) {
+      // 单 grid：固定像素边距——小高度容器（表图分栏）下轴标题也有保障
+      gridsOpt.push({
+        left: m?.left ?? 64,
+        right: m?.right ?? (useRight ? 64 : 32),
+        top: m?.top ?? 64,
+        bottom: m?.bottom ?? 56,
+        containLabel: true,
+      })
+    } else {
+      const topPct = (gi / grids) * 100
+      const heightPct = 100 / grids - 16
+      gridsOpt.push({
+        left: m?.left ?? 64,
+        right: m?.right ?? (useRight ? 64 : 32),
+        top: `${topPct + 9}%`,
+        height: `${heightPct}%`,
+        containLabel: true,
+      })
+    }
     xAxes.push({ ...xAxisBase, gridIndex: gi, name: gi === grids - 1 ? xLabel : undefined })
     yAxes.push({ ...valAxis(leftAxis), gridIndex: gi, name: facet ? measureLabel(measures[gi]) : leftAxis.name })
     yAxes.push({ ...valAxis(rightAxis), gridIndex: gi, show: useRight, name: rightAxis.name, splitLine: { show: false } })

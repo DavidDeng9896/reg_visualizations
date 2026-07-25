@@ -43,9 +43,9 @@ export function countAnalysisViews(analysis: Analysis): number {
   return analysis.tables.reduce((n, t) => n + countViews(t.views), 0)
 }
 
-/** 删除表前检查：返回引用该表作为 combine 输入的表。 */
+/** 删除表前检查：返回引用该表作为 combine/步骤 输入的表。 */
 export function findCombineDependents(analysis: Analysis, tableId: string): AnalysisTable[] {
-  return analysis.tables.filter(
+  const legacy = analysis.tables.filter(
     (t) =>
       t.combine &&
       ((t.combine.left.kind === 'table' && t.combine.left.tableId === tableId) ||
@@ -53,4 +53,20 @@ export function findCombineDependents(analysis: Analysis, tableId: string): Anal
         (t.combine.left.kind === 'view' && t.combine.left.tableId === tableId) ||
         (t.combine.right.kind === 'view' && t.combine.right.tableId === tableId)),
   )
+
+  const producerStep = analysis.steps.find((s) => s.output.tables.includes(tableId))
+  if (!producerStep) return legacy
+
+  const downstreamSteps = analysis.steps.filter((s) =>
+    s.inputs.some((i) => i.from.nodeId === producerStep.id),
+  )
+  const stepDeps: AnalysisTable[] = []
+  for (const step of downstreamSteps) {
+    for (const id of step.output.tables) {
+      const t = findTable(analysis, id)
+      if (t) stepDeps.push(t)
+    }
+  }
+
+  return [...legacy, ...stepDeps]
 }

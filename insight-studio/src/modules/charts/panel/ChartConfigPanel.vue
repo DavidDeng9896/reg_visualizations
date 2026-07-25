@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import type { ChartType } from '../../../shared/types'
-import { IButton, IIcon, ISelect, ITabs, ITextField, type SelectOption } from '../../../ui'
+import { IButton, ISelect, ITabs, IIcon, type SelectOption } from '../../../ui'
 import { CHART_DEFS } from '../registry'
 import { CHART_DRAFT_CONTEXT } from './context'
 
 /**
- * 配置面板总装：视图名 + Chart type 下拉 + CONFIGURE/STYLE ITabs + 底部 Cancel/Save。
+ * 配置面板总装：图种名标题 + Chart type 设置项 + CONFIGURE/STYLE ITabs + 底部 Cancel/Save。
  * 编辑的是 ChartView 提供的本地草稿（CHART_DRAFT_CONTEXT）。
+ * 视图重命名在侧栏 ⋯ 菜单；面板头部不再放名称输入与 Saved 状态。
  */
-const props = defineProps<{
+defineProps<{
   viewName: string
   /** 过滤/转换 chip 摘要（只读展示；编辑在表格视图）。 */
   chips: string[]
@@ -27,44 +28,31 @@ function onTypeChange(v: string | number) {
   ctx.changeType(v as ChartType)
 }
 
-const nameInput = ref(props.viewName)
-function submitRename() {
-  const name = nameInput.value.trim()
-  if (name && name !== props.viewName) emit('rename', name)
-  else nameInput.value = props.viewName
-}
-
 const activeSection = computed(() => (tab.value === 'configure' ? def.value.configureSection : def.value.styleSection))
 </script>
 
 <template>
   <aside class="ccpanel" @keydown.esc.stop="emit('cancel')">
-    <!-- 视图名 + 状态 -->
-    <div class="ccpanel__head">
-      <ITextField v-model="nameInput" size="sm" aria-label="视图名" class="ccpanel__name" @enter="submitRename" @blur="submitRename" />
-      <span v-if="ctx.dirty.value" class="ccpanel__dirty" title="有未保存修改">
-        <IIcon name="dot" :size="10" />
-      </span>
-      <span v-else class="ccpanel__saved">
-        <IIcon name="check" :size="12" /> Saved
-      </span>
-    </div>
-
-    <!-- Chart type -->
-    <div class="ccpanel__type">
-      <span class="ccpanel__label">Chart type</span>
-      <ISelect :model-value="def.type" :options="typeOptions" size="sm" aria-label="Chart type" @update:model-value="onTypeChange" />
-    </div>
-
-    <!-- CONFIGURE / STYLE -->
-    <ITabs
-      v-model="tab"
-      :tabs="[
-        { key: 'configure', label: 'CONFIGURE' },
-        { key: 'style', label: 'STYLE' },
-      ]"
-      class="ccpanel__tabs"
-    />
+    <!-- 头部行：CONFIGURE/STYLE tabs（左）+ 无框 Chart type 下拉（右） -->
+    <header class="ccpanel__head">
+      <ITabs
+        v-model="tab"
+        :tabs="[
+          { key: 'configure', label: 'CONFIGURE' },
+          { key: 'style', label: 'STYLE' },
+        ]"
+        class="ccpanel__tabs"
+      />
+      <ISelect
+        :model-value="def.type"
+        :options="typeOptions"
+        size="sm"
+        variant="ghost"
+        aria-label="Chart type"
+        class="ccpanel__type"
+        @update:model-value="onTypeChange"
+      />
+    </header>
 
     <div class="ccpanel__body">
       <KeepAlive>
@@ -106,48 +94,26 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
 .ccpanel__head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px 4px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--is-border);
 }
-.ccpanel__name {
+.ccpanel__tabs {
   flex: 1;
   min-width: 0;
 }
-.ccpanel__dirty {
-  color: var(--is-accent);
-  display: inline-flex;
-}
-.ccpanel__saved {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--is-text-xs);
-  color: var(--is-text-tertiary);
-  white-space: nowrap;
+.ccpanel__tabs :deep(.is-tabs) {
+  border-bottom: none;
 }
 .ccpanel__type {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-}
-.ccpanel__label {
   flex-shrink: 0;
-  font-size: var(--is-text-xs);
-  font-weight: 600;
-  color: var(--is-text-secondary);
-}
-.ccpanel__type :deep(.is-select) {
-  flex: 1;
-}
-.ccpanel__tabs {
-  padding: 0 14px;
 }
 .ccpanel__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px 6px;
+  padding: 8px 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;

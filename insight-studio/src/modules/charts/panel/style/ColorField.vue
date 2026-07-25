@@ -11,35 +11,42 @@ const open = ref(false)
 <template>
   <div class="cf">
     <span class="cf__label">{{ label }}</span>
-    <IPopover :open="open" placement="bottom-start" :arrow="false" @update:open="open = $event">
-      <template #anchor>
-        <button
-          type="button"
-          class="cf__swatch"
-          :style="{ background: modelValue }"
-          :aria-label="`修改${label}`"
-          @click="open = !open"
-        />
-      </template>
-      <template #default>
-        <div class="cf__picker">
-          <IColorPicker :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" />
-        </div>
-      </template>
-    </IPopover>
-    <span class="cf__hex">{{ modelValue }}</span>
+    <div class="cf__control">
+      <IPopover :open="open" placement="bottom-start" :arrow="false" @update:open="open = $event">
+        <template #anchor>
+          <button
+            type="button"
+            class="cf__swatch"
+            :style="{ background: modelValue }"
+            :aria-label="`修改${label}`"
+            @click="open = !open"
+          />
+        </template>
+        <template #default>
+          <div class="cf__picker">
+            <IColorPicker :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" />
+          </div>
+        </template>
+      </IPopover>
+      <span class="cf__hex">{{ modelValue }}</span>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .cf {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.cf__control {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
 .cf__label {
   flex-shrink: 0;
-  width: 92px;
   font-size: var(--is-text-xs);
   font-weight: 600;
   color: var(--is-text-secondary);

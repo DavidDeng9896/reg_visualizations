@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import { IButton, ISelect, ITextField, IToggle } from '../../../../ui'
+import { ISelect, ITextField, IToggle } from '../../../../ui'
 import { CHART_DRAFT_CONTEXT } from '../context'
 
 /** STYLE 轴区段：Label(+刷新) / Scale / Range。 */
@@ -64,10 +64,6 @@ const maxStr = computed({
   },
 })
 
-function resetLabel() {
-  delete spec.value.label
-  ctx.touch()
-}
 </script>
 
 <template>
@@ -75,12 +71,11 @@ function resetLabel() {
     <h4 class="axis-sec__title">{{ title }}</h4>
     <div class="axis-sec__row">
       <span class="axis-sec__label">Label</span>
-      <ITextField v-model="label" size="sm" :placeholder="defaultLabel ?? '默认'" />
-      <IButton size="sm" variant="ghost" icon="undo" title="恢复默认标签" @click="resetLabel" />
+      <ITextField v-model="label" size="sm" clearable :placeholder="defaultLabel ?? '默认'" />
     </div>
-    <div v-if="withScale" class="axis-sec__row">
+    <div v-if="withScale" class="axis-sec__row axis-sec__row--switch">
       <span class="axis-sec__label">Scale</span>
-      <IToggle :model-value="scale === 'log'" @update:model-value="scale = $event ? 'log' : 'linear'">
+      <IToggle :model-value="scale === 'log'" aria-label="Scale Log/Linear" @update:model-value="scale = $event ? 'log' : 'linear'">
         {{ scale === 'log' ? 'Log' : 'Linear' }}
       </IToggle>
     </div>
@@ -97,9 +92,11 @@ function resetLabel() {
       />
     </div>
     <div v-if="range === 'manual'" class="axis-sec__row">
-      <span class="axis-sec__label"></span>
-      <ITextField v-model="minStr" size="sm" placeholder="Min" aria-label="最小值" />
-      <ITextField v-model="maxStr" size="sm" placeholder="Max" aria-label="最大值" />
+      <span class="axis-sec__label">Min / Max</span>
+      <div class="axis-sec__inline">
+        <ITextField v-model="minStr" size="sm" placeholder="Min" aria-label="最小值" />
+        <ITextField v-model="maxStr" size="sm" placeholder="Max" aria-label="最大值" />
+      </div>
     </div>
   </section>
 </template>
@@ -108,7 +105,7 @@ function resetLabel() {
 .axis-sec {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 10px 8px;
   border-top: 1px solid var(--is-border);
 }
@@ -121,18 +118,28 @@ function resetLabel() {
 }
 .axis-sec__row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
 }
 .axis-sec__label {
   flex-shrink: 0;
-  width: 64px;
   font-size: var(--is-text-xs);
   font-weight: 600;
   color: var(--is-text-secondary);
 }
+.axis-sec__inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axis-sec__row--switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
 .axis-sec__row :deep(.is-select),
-.axis-sec__row :deep(.is-field) {
+.axis-sec__inline :deep(.is-field) {
   flex: 1;
   min-width: 0;
 }

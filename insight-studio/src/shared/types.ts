@@ -294,9 +294,82 @@ export interface CombineSpec {
   keys: JoinKey[]
 }
 
+/* ---------------------------------- 步骤（流程图可编辑画布） ---------------------------------- */
+
+/** 端口数据类型：决定拖线合法性。 */
+export type PortType = 'table' | 'file' | 'chart'
+
+/** 步骤节点的类型化端口定义。 */
+export interface StepPort {
+  name: string
+  type: PortType
+  /** 是否多输入（Union 等步骤可接 2..n 个）。 */
+  multiple?: boolean
+  /** 可选端口，新建节点时可不连。 */
+  optional?: boolean
+}
+
+/** 步骤类型（P0 仅实现带 * 的核心步骤；其余占位）。 */
+export type StepType =
+  | 'upload-csv' // * 现有 CSV 导入对应的源步骤
+  | 'import-files' // 多文件源（P1）
+  | 'file-to-table' // 文件转表（P1）
+  | 'join' // * 合并步骤
+  | 'union' // * 合并步骤
+  | 'filter' // * 行过滤步骤
+  | 'hide-columns' // * 列选择步骤
+  | 'computed-column' // * 派生列步骤
+  | 'convert-formats' // 列类型转换（P1）
+  | 'find-replace' // 文本查找替换（P1）
+  | 'aggregate' // 分组聚合（P1）
+  | 'bin' // 数值分箱（P1）
+  | 'pivot' // 透视（P2）
+  | 'window' // 窗口函数（P2）
+  | 'format-columns' // 显示格式（P2）
+  | 'dedupe' // 去重（P1/P2）
+  | 'sort' // 排序（P1/P2）
+  | 'interpolation' // 标准曲线插值（P2）
+
+export type StepStatus = 'pending' | 'configured' | 'running' | 'failed' | 'stale'
+
+/** 上游输入引用：端口 → 节点输出端口。 */
+export interface StepInputRef {
+  port: string
+  from: { nodeId: string; port: string }
+}
+
+/** 步骤节点输出产物引用。 */
+export interface StepOutputRefs {
+  tables: string[]
+  files: string[]
+  views: string[]
+}
+
+export interface StepNode {
+  id: string
+  type: StepType
+  name: string
+  inputs: StepInputRef[]
+  /** 步骤专属配置，由各 StepDef 定义具体 shape。 */
+  config: Record<string, unknown>
+  status: StepStatus
+  error?: string
+  output: StepOutputRefs
+}
+
+/** 文件实体（P1 启用；P0 先占位以保持模型稳定）。 */
+export interface AnalysisFile {
+  id: string
+  name: string
+  sizeBytes: number
+  mimeHint: string
+  contentRef: string
+  importedAt: string
+}
+
 /* ---------------------------------- 表 / 分析 ---------------------------------- */
 
-export type TableSource = 'csv' | 'combine' | 'demo'
+export type TableSource = 'csv' | 'combine' | 'demo' | 'file' | 'step'
 
 export interface AnalysisTable {
   id: string
@@ -307,8 +380,10 @@ export interface AnalysisTable {
   /** 表级过滤：向下作用于所有后代视图。 */
   filters: Filter[]
   views: ViewNode[]
-  /** source === 'combine' 时保留输入引用。 */
+  /** source === 'combine' 时保留输入引用（旧数据兼容）。 */
   combine?: CombineSpec
+  /** source === 'step' 时指向产出该表的步骤节点。 */
+  stepId?: string
 }
 
 export interface Analysis {
@@ -318,6 +393,12 @@ export interface Analysis {
   createdAt: string
   updatedAt: string
   tables: AnalysisTable[]
-  /** nodeId → 流程图坐标。 */
+  /** 流程图节点 id → 坐标。 */
   flowchartLayout: Record<string, { x: number; y: number }>
+  /** 数据加工步骤图（真相源）。 */
+  steps: StepNode[]
+  /** 文件源（P1 启用）。 */
+  files: AnalysisFile[]
+  /** 旧数据迁移备份，便于回退与调试。 */
+  __legacyTables?: AnalysisTable[]
 }

@@ -10,6 +10,11 @@ import { ROW_ID_FIELD } from '../../../shared/types'
 import { aggregateRows, aggregationLabel, errorValue, numericValues } from './aggregate'
 import { resolveAxis, dataMinOf } from './axis'
 import {
+  AXIS_LABEL_STYLE,
+  AXIS_LINE_SOFT,
+  AXIS_TICK_HIDDEN,
+  SPLIT_LINE_OFF,
+  SPLIT_LINE_SOFT,
   TOOLTIP_DARK,
   buildLegend,
   buildTitle,
@@ -341,32 +346,52 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
   const rightLabel = style.yAxisRight?.label ?? undefined
   const leftAxis = resolveAxis(style.yAxis, dataMinOf(allY), leftLabel, warnings, 'Y 轴(左)')
   const rightAxis = resolveAxis(style.yAxisRight, dataMinOf(allY), rightLabel, warnings, 'Y 轴(右)')
-  const xAxisResolved = resolveAxis(style.xAxis, dataMinOf(xValsAll), xLabel, warnings, 'X 轴')
+  const xAxisResolved = resolveAxis(style.xAxis, dataMinOf(xValsAll), xLabel, warnings, 'X 轴', 'x')
 
   const m2 = style.margins
   const useRight = measures.some((mm) => mm.axis?.side === 'right')
   const gridsOpt: ChartOption[] = []
   const xAxes: ChartOption[] = []
   const yAxes: ChartOption[] = []
-  const splitOn = { show: true, lineStyle: { color: '#eef1f5' } } // 网格线默认开
   for (let gi = 0; gi < grids; gi += 1) {
-    const topPct = (gi / grids) * 100
-    gridsOpt.push({
-      left: m2?.left ?? 64,
-      right: m2?.right ?? (useRight ? 64 : 32),
-      top: `${topPct + 4}%`,
-      height: `${100 / grids - 6}%`,
-      containLabel: true,
-    })
+    if (grids === 1) {
+      // 单 grid：固定像素边距——小高度容器（表图分栏）下轴标题也有保障
+      gridsOpt.push({
+        left: m2?.left ?? 64,
+        right: m2?.right ?? (useRight ? 64 : 32),
+        top: m2?.top ?? 64,
+        bottom: m2?.bottom ?? 56,
+        containLabel: true,
+      })
+    } else {
+      const topPct = (gi / grids) * 100
+      gridsOpt.push({
+        left: m2?.left ?? 64,
+        right: m2?.right ?? (useRight ? 64 : 32),
+        top: `${topPct + 9}%`,
+        height: `${100 / grids - 16}%`,
+        containLabel: true,
+      })
+    }
     xAxes.push({
       ...xAxisResolved,
       gridIndex: gi,
       name: gi === grids - 1 ? xAxisResolved.name : undefined,
-      axisLabel: { color: '#667085' },
-      splitLine: splitOn,
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+      splitLine: SPLIT_LINE_SOFT,
     })
-    yAxes.push({ ...leftAxis, gridIndex: gi, name: facet ? measureLabel(measures[gi]) : leftAxis.name, axisLabel: { color: '#667085' }, splitLine: splitOn })
-    yAxes.push({ ...rightAxis, gridIndex: gi, show: useRight, axisLabel: { color: '#667085' }, splitLine: { show: false } })
+    yAxes.push({
+      ...leftAxis,
+      gridIndex: gi,
+      name: facet ? measureLabel(measures[gi]) : leftAxis.name,
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+      splitLine: SPLIT_LINE_SOFT,
+    })
+    yAxes.push({ ...rightAxis, gridIndex: gi, show: useRight, axisLabel: AXIS_LABEL_STYLE, axisTick: AXIS_TICK_HIDDEN, splitLine: SPLIT_LINE_OFF })
   }
 
   const tooltipFormatter = (p: ChartOption) => {

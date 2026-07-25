@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import type { Aggregation, FieldMapping } from '../../../shared/types'
-import { IPopover, ISelect, ITextField, IToggle, IButton } from '../../../ui'
+import { IPopover, ISelect, ITextField, IToggle } from '../../../ui'
 import { aggregationLabel } from '../runtime/aggregate'
 import { CHART_DRAFT_CONTEXT } from './context'
 import type { SlotDef } from '../types'
@@ -94,11 +94,6 @@ const side = computed({
   },
 })
 
-function resetLabel() {
-  delete axisSpec.value.label
-  ctx.touch()
-}
-
 const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregation ?? 'count'))
 </script>
 
@@ -131,8 +126,7 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
         <template v-if="slot.axisSettings">
           <div class="axis-pop__row">
             <span class="axis-pop__label">Custom label</span>
-            <ITextField v-model="customLabel" size="sm" placeholder="默认：字段名" @escape="open = false" />
-            <IButton size="sm" variant="ghost" icon="undo" title="恢复默认标签" @click="resetLabel" />
+            <ITextField v-model="customLabel" size="sm" clearable placeholder="默认：字段名" @escape="open = false" />
           </div>
           <div class="axis-pop__row">
             <span class="axis-pop__label">Range</span>
@@ -193,7 +187,8 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
   color: var(--is-text-tertiary);
   white-space: nowrap;
 }
-.axis-pop__row :deep(.is-select) {
+.axis-pop__row :deep(.is-select),
+.axis-pop__row :deep(.is-field) {
   flex: 1;
 }
 </style>

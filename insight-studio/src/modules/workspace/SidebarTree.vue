@@ -130,8 +130,8 @@ function askDeleteTable(t: AnalysisTable) {
     const deps = findCombineDependents(a, t.id)
     if (deps.length) {
       toast.error(
-        `无法删除：以下合并表依赖它 — ${deps.map((d) => d.name).join('、')}。请先删除依赖表。`,
-        { title: '存在 combine 依赖' },
+        `无法删除：以下表依赖它 — ${deps.map((d) => d.name).join('、')}。请先删除依赖表。`,
+        { title: '存在下游依赖' },
       )
       return
     }
@@ -150,7 +150,13 @@ function confirmDelete() {
   if (!p || !current.value) return
   store.mutate((a) => {
     if (p.kind === 'table') {
+      const t = findTable(a, p.tableId)
       a.tables = a.tables.filter((t) => t.id !== p.tableId)
+      // 表由步骤产出时级联删除步骤（依赖检查已在 askDeleteTable 完成）
+      if (t?.stepId) {
+        a.steps = a.steps.filter((s) => s.id !== t.stepId)
+        delete a.flowchartLayout[`step:${t.stepId}`]
+      }
     } else {
       const t = findTable(a, p.tableId)
       if (!t || !p.viewId) return
@@ -263,6 +269,15 @@ function connectExternal() {
             <IIcon :name="t.source === 'combine' ? 'combine' : 'database'" :size="14" class="tnode__icon" />
             <span class="tnode__name is-ellipsis" :title="t.name">{{ t.name }}</span>
             <span class="tnode__actions">
+              <button
+                type="button"
+                class="tnode__action"
+                aria-label="在流程图中定位"
+                title="在流程图中定位"
+                @click.stop="showInFlowchart(t.id)"
+              >
+                <IIcon name="flowchart" :size="12" />
+              </button>
               <button
                 type="button"
                 class="tnode__action"

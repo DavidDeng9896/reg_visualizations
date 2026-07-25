@@ -95,12 +95,12 @@ defineExpose({ focus: () => inputEl.value?.focus(), select: () => inputEl.value?
   height: 32px;
 }
 .is-field--sm {
-  height: 26px;
+  height: 28px;
   padding: 0 8px;
 }
 .is-field:focus-within {
   border-color: var(--is-accent);
-  box-shadow: var(--is-ring);
+  box-shadow: 0 0 0 2px rgba(46, 91, 255, 0.14);
 }
 .is-field--error,
 .is-field--error:focus-within {

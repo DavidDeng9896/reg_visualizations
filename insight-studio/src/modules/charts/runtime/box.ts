@@ -6,6 +6,11 @@
 import { fiveNumber } from './aggregate'
 import { resolveAxis, dataMinOf } from './axis'
 import {
+  AXIS_LABEL_STYLE,
+  AXIS_LINE_SOFT,
+  AXIS_NAME_STYLE,
+  AXIS_TICK_HIDDEN,
+  SPLIT_LINE_SOFT,
   TOOLTIP_DARK,
   buildGrid,
   buildLegend,
@@ -190,8 +195,24 @@ export function buildBoxOption({ result, config, viewName }: BuildInput): BuildO
     tooltip: { ...TOOLTIP_DARK, trigger: 'item', formatter: tooltipFormatter },
     legend: buildLegend(style, colorVals.length > 1),
     grid: buildGrid(style),
-    xAxis: { type: 'category', data: cats, name: xLabel, nameGap: 28, axisLabel: { color: '#667085' } },
-    yAxis: { ...yAxisResolved, axisLabel: { color: '#667085' }, splitLine: { show: true, lineStyle: { color: '#eef1f5' } } },
+    xAxis: {
+      type: 'category',
+      data: cats,
+      name: xLabel,
+      nameLocation: 'middle',
+      nameGap: 30,
+      nameTextStyle: AXIS_NAME_STYLE,
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+    },
+    yAxis: {
+      ...yAxisResolved,
+      axisLabel: AXIS_LABEL_STYLE,
+      axisLine: AXIS_LINE_SOFT,
+      axisTick: AXIS_TICK_HIDDEN,
+      splitLine: SPLIT_LINE_SOFT,
+    },
     series: [boxSeries, ...pointSeries],
   }
   return { option, warnings, seriesNames }

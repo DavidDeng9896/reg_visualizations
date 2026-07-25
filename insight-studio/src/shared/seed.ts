@@ -155,5 +155,7 @@ export function createDemoAnalysis(): Analysis {
     updatedAt: now,
     tables: [buildIrisTable(), buildPlateTable(), buildWeightLengthTable()],
     flowchartLayout: {},
+    steps: [],
+    files: [],
   }
 }

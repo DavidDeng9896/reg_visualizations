@@ -20,7 +20,16 @@ import { nowIso } from './datetime'
 
 export function createEmptyAnalysis(name: string): Analysis {
   const now = nowIso()
-  return { id: uuid(), name, createdAt: now, updatedAt: now, tables: [], flowchartLayout: {} }
+  return {
+    id: uuid(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    tables: [],
+    flowchartLayout: {},
+    steps: [],
+    files: [],
+  }
 }
 
 export function createTable(

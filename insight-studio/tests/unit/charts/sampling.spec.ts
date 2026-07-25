@@ -8,7 +8,7 @@ const cols: ColumnMeta[] = [{ field: 'v', title: 'v', dataType: 'number' }]
 function makeAnalysis(n: number): Analysis {
   const rows: Row[] = Array.from({ length: n }, (_, i) => ({ v: i }))
   const table: AnalysisTable = { id: 't1', name: 'T', source: 'csv', columns: cols, rows, filters: [], views: [] }
-  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [table], flowchartLayout: {} }
+  return { id: 'a1', name: 'A', createdAt: '', updatedAt: '', tables: [table], flowchartLayout: {}, steps: [], files: [] }
 }
 
 describe('runPipeline · skipSampling', () => {

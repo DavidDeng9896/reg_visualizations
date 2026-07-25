@@ -604,7 +604,7 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 .cview__flagbar {
   position: absolute;
   top: 8px;
-  right: 48px;
+  right: 136px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -746,7 +746,7 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 .cview__export {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 92px;
   opacity: 0;
   transition: opacity var(--is-dur-fast) var(--is-ease);
   z-index: 5;
@@ -773,7 +773,7 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 .cview__open {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   display: inline-flex;
   align-items: center;
   gap: 5px;

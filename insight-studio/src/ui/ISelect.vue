@@ -22,9 +22,11 @@ const props = withDefaults(
     searchable?: boolean
     disabled?: boolean
     size?: 'sm' | 'md'
+    /** outline=默认带框；ghost=无框文字下拉（如面板头部图种切换）。 */
+    variant?: 'outline' | 'ghost'
     ariaLabel?: string
   }>(),
-  { size: 'md' },
+  { size: 'md', variant: 'outline' },
 )
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: string | number): void; (e: 'change', v: string | number): void }>()
@@ -155,7 +157,7 @@ function showGroupHeader(i: number): string | null {
 </script>
 
 <template>
-  <div ref="rootEl" class="is-select" :class="[`is-select--${size}`, { 'is-select--open': open }]">
+  <div ref="rootEl" class="is-select" :class="[`is-select--${size}`, `is-select--${variant}`, { 'is-select--open': open }]">
     <button
       type="button"
       class="is-select__trigger"
@@ -247,8 +249,25 @@ function showGroupHeader(i: number): string | null {
   height: 32px;
 }
 .is-select--sm .is-select__trigger {
-  height: 26px;
+  height: 28px;
   font-size: var(--is-text-xs);
+}
+/* ghost：无框文字下拉，仅 hover 浅灰底 */
+.is-select--ghost .is-select__trigger {
+  border-color: transparent;
+  background: transparent;
+  padding: 0 6px;
+  font-weight: 500;
+  width: auto;
+}
+.is-select--ghost .is-select__trigger:hover:not(:disabled) {
+  background: var(--is-surface-hover);
+}
+.is-select--ghost.is-select--open .is-select__trigger,
+.is-select--ghost .is-select__trigger:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  background: var(--is-surface-hover);
 }
 .is-select__trigger:hover:not(:disabled) {
   background: var(--is-surface-hover);
@@ -256,7 +275,7 @@ function showGroupHeader(i: number): string | null {
 .is-select--open .is-select__trigger,
 .is-select__trigger:focus-visible {
   border-color: var(--is-accent);
-  box-shadow: var(--is-ring);
+  box-shadow: 0 0 0 2px rgba(46, 91, 255, 0.14);
 }
 .is-select__trigger:disabled {
   opacity: 0.5;

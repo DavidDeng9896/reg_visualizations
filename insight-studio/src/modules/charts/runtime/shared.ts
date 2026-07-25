@@ -36,6 +36,17 @@ export function columnType(columns: ColumnMeta[], field: string | undefined): Da
 
 /* ------------------------------- option 片段 ------------------------------- */
 
+/**
+ * Benchling 风格图表基底（简洁/干净/专业）：
+ * 浅灰网格、无刻度突刺、灰色小标签、深灰粗体轴标题居中。
+ */
+export const AXIS_LABEL_STYLE: ChartOption = { color: '#667085', fontSize: 11 }
+export const AXIS_NAME_STYLE: ChartOption = { color: '#475467', fontSize: 12, fontWeight: 600 }
+export const AXIS_LINE_SOFT: ChartOption = { show: true, lineStyle: { color: '#d9dee5' } }
+export const AXIS_TICK_HIDDEN: ChartOption = { show: false }
+export const SPLIT_LINE_SOFT: ChartOption = { show: true, lineStyle: { color: '#e9edf2' } }
+export const SPLIT_LINE_OFF: ChartOption = { show: false }
+
 /** 深色 tooltip 基底。 */
 export const TOOLTIP_DARK: Record<string, unknown> = {
   backgroundColor: '#1d2939',
@@ -52,8 +63,9 @@ export function buildTitle(style: ChartStyle, defaultTitle: string): ChartOption
   return {
     text,
     subtext,
-    left: 'center',
-    textStyle: { fontSize: 14, fontWeight: 600, color: '#1d2939' },
+    left: 2,
+    top: 0,
+    textStyle: { fontSize: 15, fontWeight: 600, color: '#101828' },
     subtextStyle: { fontSize: 12, color: '#667085' },
   }
 }
@@ -63,9 +75,11 @@ export function buildLegend(style: ChartStyle, enabled: boolean): ChartOption | 
   const pos = style.legend?.position ?? 'top'
   const base: ChartOption = {
     show: true,
-    textStyle: { fontSize: 12, color: '#1d2939' },
-    itemWidth: 14,
+    icon: 'circle',
+    textStyle: { fontSize: 12, color: '#475467' },
+    itemWidth: 9,
     itemHeight: 9,
+    itemGap: 18,
   }
   const labels = style.legend?.labels
   if (labels && Object.keys(labels).length) {
@@ -79,15 +93,17 @@ export function buildLegend(style: ChartStyle, enabled: boolean): ChartOption | 
     case 'right':
       return { ...base, right: 0, top: 'middle', orient: 'vertical' }
     default:
-      return { ...base, top: style.title ? 40 : 8, left: 'center' }
+      // 左对齐放在标题下方：避开右上角常驻悬浮按钮（配置/导出/打标），窄图也不被遮挡。
+      // 标题几乎总存在（默认取视图名），固定预留标题位。
+      return { ...base, top: 30, left: 2 }
   }
 }
 
-/** 四边距 → grid（含 legend 避开空间的默认值）。 */
+/** 四边距 → grid（含 legend 避开空间的默认值；top 预留标题+图例两行）。 */
 export function buildGrid(style: ChartStyle, extra: ChartOption = {}): ChartOption {
   const m = style.margins
   return {
-    top: m?.top ?? 56,
+    top: m?.top ?? 64,
     right: m?.right ?? 32,
     bottom: m?.bottom ?? 48,
     left: m?.left ?? 64,

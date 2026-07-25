@@ -3,11 +3,12 @@ import { computed, nextTick, ref } from 'vue'
 import Papa from 'papaparse'
 import type { DataType, Row } from '../../shared/types'
 import { createTable, ensureRowIds } from '../../shared/factories'
+import { createStepNode } from '../steps/factory'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IIcon, IModal, ISelect, ITextField, toast, type SelectOption } from '../../ui'
 import { coerceValue, inferColumnTypes } from './csv'
 
-/** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表。 */
+/** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。 */
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
@@ -130,8 +131,15 @@ function confirm() {
   })
   ensureRowIds(rows)
   const table = createTable(name, columns, rows, 'csv')
+  const step = createStepNode('upload-csv', name)
+  step.config.tableName = name
+  step.status = 'configured'
+  step.output.tables = [table.id]
+  table.source = 'step'
+  table.stepId = step.id
   store.mutate((a) => {
     a.tables.push(table)
+    a.steps.push(step)
   })
   store.select({ kind: 'table', tableId: table.id })
   toast.success(`已导入「${name}」（${rows.length} 行 × ${columns.length} 列）`)

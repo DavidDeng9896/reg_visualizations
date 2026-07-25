@@ -1,5 +1,6 @@
 import type { Analysis } from './types'
 import { db, InsightStudioDB } from './db'
+import { migrateAnalysisToSteps } from './migrateSteps'
 
 /**
  * AnalysisRepository：持久化抽象。当前为 Dexie 实现，日后可替换为 HTTP 实现。
@@ -23,7 +24,9 @@ export class DexieAnalysisRepository implements AnalysisRepository {
   }
 
   async get(id: string): Promise<Analysis | undefined> {
-    return this.database.analyses.get(id)
+    const raw = await this.database.analyses.get(id)
+    if (!raw) return undefined
+    return migrateAnalysisToSteps(raw)
   }
 
   async put(analysis: Analysis): Promise<void> {

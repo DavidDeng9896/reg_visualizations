@@ -42,10 +42,10 @@ test.describe('d) 图表：scatter 配置 + STYLE 标题', () => {
       .poll(async () => canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()))
       .not.toBe(dataUrlBefore)
 
-    // Save → toast + dirty 消失
+    // Save → toast + Save 按钮 dirty 高亮消失
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.locator('.is-toast--success', { hasText: '图表配置已保存' })).toBeVisible()
-    await expect(page.locator('.ccpanel__saved')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save' })).not.toHaveClass(/ccpanel__save--dirty/)
     await expectNoErrorToast(page)
   })
 })

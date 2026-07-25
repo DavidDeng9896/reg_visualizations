@@ -11,8 +11,8 @@ export interface CategoricalPalette {
 export const CATEGORICAL_PALETTES: CategoricalPalette[] = [
   {
     id: 'light',
-    label: 'Light (default)',
-    colors: ['#2e5bff', '#1f9d66', '#f79009', '#d92d20', '#7a5af8', '#06aed4', '#e31c79', '#84cc16', '#667085', '#b54708'],
+    label: 'Benchling (default)',
+    colors: ['#1d3fbf', '#df5638', '#f0ad1d', '#31a24c', '#5aa9e6', '#8b5cf6', '#c1272d', '#d9c46a', '#0e7490', '#667085'],
   },
   {
     id: 'dark',

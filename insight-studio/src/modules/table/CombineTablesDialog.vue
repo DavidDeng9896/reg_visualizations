@@ -1,47 +1,32 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Analysis, CombineInputRef, JoinKey, JoinType, ViewNode } from '../../shared/types'
-import { createTable } from '../../shared/factories'
+import type { CombineInputRef, JoinKey, JoinType } from '../../shared/types'
 import { combineTables } from '../../shared/join'
+import { createStepNode } from '../steps/factory'
+import { runStep } from '../steps/exec'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { storeToRefs } from 'pinia'
 import { IButton, IIcon, IModal, ISelect, ITextField, toast, type SelectOption } from '../../ui'
 import { buildCombinePreview, resolveCombineInput } from './combinePreview'
 
-/** Combine 对话框：选左右输入（表/视图）→ Join/Append + 键列配对 → 实时预览 → 建表。 */
+/** Combine 对话框：选左右输入（仅表）→ Join/Append + 键列配对 → 实时预览 → 建表并生成步骤节点。 */
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const store = useAnalysisStore()
 const { current } = storeToRefs(store)
 
-/* 输入选项：表 + 视图（视图先物化） */
+/* 输入选项：仅表（步骤模型的输入端口只接受步骤输出表）。 */
 interface InputOption {
   ref: CombineInputRef
   label: string
   group: string
 }
 
-function collectViews(analysis: Analysis): InputOption[] {
-  const out: InputOption[] = []
-  const walk = (tableId: string, tableName: string, views: ViewNode[], prefix: string) => {
-    for (const v of views) {
-      const label = `${tableName} / ${prefix}${v.name}`
-      out.push({ ref: { kind: 'view', tableId, viewId: v.id }, label, group: '视图' })
-      walk(tableId, tableName, v.children, `${prefix}${v.name} / `)
-    }
-  }
-  for (const t of analysis.tables) walk(t.id, t.name, t.views, '')
-  return out
-}
-
 const inputOptions = computed<InputOption[]>(() => {
   const a = current.value
   if (!a) return []
-  return [
-    ...a.tables.map((t) => ({ ref: { kind: 'table' as const, tableId: t.id }, label: t.name, group: '表' })),
-    ...collectViews(a),
-  ]
+  return a.tables.map((t) => ({ ref: { kind: 'table' as const, tableId: t.id }, label: t.name, group: '表' }))
 })
 
 const selectOptions = computed<SelectOption[]>(() =>
@@ -126,18 +111,60 @@ function close() {
 function confirm() {
   const a = current.value
   const p = preview.value
-  if (!a || !p || p.error || !leftRef.value || !rightRef.value) return
-  const left = resolveCombineInput(a, leftRef.value)
-  const right = resolveCombineInput(a, rightRef.value)
+  const leftRefValue = leftRef.value
+  const rightRefValue = rightRef.value
+  if (!a || !p || p.error || !leftRefValue || !rightRefValue) return
+  const left = resolveCombineInput(a, leftRefValue)
+  const right = resolveCombineInput(a, rightRefValue)
   if (!left || !right) return
   const out = combineTables(left, right, { joinType: joinType.value, keys: keys.value })
-  const name = tableName.value.trim() || `${labelOf(leftRef.value)} + ${labelOf(rightRef.value)}`
-  const table = createTable(name, out.columns, out.rows, 'combine')
-  table.combine = { joinType: joinType.value, left: leftRef.value, right: rightRef.value, keys: keys.value.map((k) => ({ ...k })) }
+  const name = tableName.value.trim() || `${labelOf(leftRefValue)} + ${labelOf(rightRefValue)}`
+
+  const leftTable = a.tables.find((t) => t.id === leftRefValue.tableId)
+  const rightTable = a.tables.find((t) => t.id === rightRefValue.tableId)
+  if (!leftTable?.stepId || !rightTable?.stepId) {
+    toast.error('所选输入表尚未步骤化，请重新打开分析以触发迁移')
+    return
+  }
+
+  const isAppend = joinType.value === 'append'
+  const stepType = isAppend ? 'union' : 'join'
+  const step = createStepNode(stepType, name)
+  if (isAppend) {
+    step.inputs = [
+      { port: 'Input tables', from: { nodeId: leftTable.stepId, port: 'Output dataset' } },
+      { port: 'Input tables', from: { nodeId: rightTable.stepId, port: 'Output dataset' } },
+    ]
+    step.config = {
+      alignBy: 'name',
+      fillNull: true,
+      addSourceColumn: false,
+    }
+  } else {
+    step.inputs = [
+      { port: 'Left table', from: { nodeId: leftTable.stepId, port: 'Output dataset' } },
+      { port: 'Right table', from: { nodeId: rightTable.stepId, port: 'Output dataset' } },
+    ]
+    step.config = {
+      joinType: joinType.value,
+      keys: keys.value.map((k) => ({ left: k.left, right: k.right })),
+      suffixes: ['_x', '_y'],
+    }
+  }
+
   store.mutate((ana) => {
-    ana.tables.push(table)
+    ana.steps.push(step)
   })
-  store.select({ kind: 'table', tableId: table.id })
+
+  const result = runStep(a, step)
+  if (result.status === 'failed') {
+    toast.error(result.error || '合并步骤执行失败')
+    return
+  }
+
+  const tableId = step.output.tables[0]
+  store.mutate(() => {})
+  if (tableId) store.select({ kind: 'table', tableId })
   toast.success(`已创建合并表「${name}」（${out.rows.length} 行）`)
   close()
 }

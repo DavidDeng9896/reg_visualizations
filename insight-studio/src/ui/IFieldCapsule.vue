@@ -44,7 +44,7 @@ const emit = defineEmits<{ (e: 'remove'): void; (e: 'configure'): void; (e: 'cli
       aria-label="字段设置"
       @click.stop="emit('configure')"
     >
-      <IIcon name="gear" :size="12" />
+      <IIcon name="sliders" :size="12" />
     </button>
     <button
       v-if="removable"

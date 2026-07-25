@@ -13,11 +13,14 @@ import type { FlowGraph, FlowNodeData } from '../../../src/modules/flowchart/gra
 /* --------------------------------- 测试工厂 --------------------------------- */
 
 function node(id: string, kind: FlowNodeData['kind'] = 'view'): FlowNodeData {
-  return { id, kind, label: id, tableId: 't', valid: true }
+  return { id, kind, label: id, tableId: 't', valid: true, inputs: [], outputs: [] }
 }
 
 function graph(nodes: FlowNodeData[], edges: [string, string][]): FlowGraph {
-  return { nodes, edges: edges.map(([s, t]) => ({ id: `e:${s}->${t}`, source: s, target: t })) }
+  return {
+    nodes,
+    edges: edges.map(([s, t]) => ({ id: `e:${s}->${t}`, source: s, target: t, sourcePort: '', targetPort: '' })),
+  }
 }
 
 const COLUMN_STEP = NODE_WIDTH + COLUMN_GAP

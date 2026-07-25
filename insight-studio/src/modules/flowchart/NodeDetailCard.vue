@@ -3,10 +3,9 @@ import { computed } from 'vue'
 import { IButton, IIcon } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
-import { joinTypeLabel, sourceLabel, viewTypeLabel } from './graph'
+import { stepTypeLabel, viewTypeLabel } from './graph'
 import FlowChartPreview from './FlowChartPreview.vue'
 
-/** 选中节点右侧详情卡：类型/名称/摘要 +（图表节点）预览 + Inputs / Outputs + 打开主按钮。 */
 const props = defineProps<{
   node: FlowNodeData
   inputs: FlowNodeData[]
@@ -17,25 +16,42 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'focus', id: string): void
   (e: 'open'): void
+  (e: 'edit'): void
+  (e: 'delete', stepId: string): void
 }>()
 
-/** 图表类视图：侧边展示真实图表内容（对齐参考：点选图表节点 → 预览）。 */
 const isChartNode = computed(
   () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
 )
 
 const kindTitle = computed(() => {
   const n = props.node
-  if (n.kind === 'table') return '数据表'
-  if (n.kind === 'view') return isChartNode.value ? viewTypeLabel(n.viewType ?? 'bar') : '视图'
-  return 'Combine 步骤'
+  if (n.kind === 'step') return stepTypeLabel(n.stepType!)
+  return isChartNode.value ? viewTypeLabel(n.viewType ?? 'bar') : '视图'
 })
 
 const nodeIcon = computed<IconName>(() => {
   const n = props.node
-  if (n.kind === 'table') return n.source === 'combine' ? 'combine' : 'database'
-  if (n.kind === 'combine-step') return 'combine'
-  return (n.viewType ?? 'table') as IconName
+  if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
+  switch (n.stepType) {
+    case 'upload-csv':
+    case 'import-files':
+    case 'file-to-table':
+      return 'upload'
+    case 'join':
+    case 'union':
+      return 'combine'
+    case 'filter':
+      return 'filter'
+    case 'hide-columns':
+      return 'table'
+    case 'computed-column':
+      return 'type-number'
+    case 'interpolation':
+      return 'line'
+    default:
+      return 'database'
+  }
 })
 
 interface MetaRow {
@@ -45,34 +61,31 @@ interface MetaRow {
 
 const metaRows = computed<MetaRow[]>(() => {
   const n = props.node
-  if (n.kind === 'table') {
-    return [
-      { label: '来源', value: sourceLabel(n.source ?? 'csv') },
-      { label: '行数', value: String(n.rowCount ?? 0) },
-      { label: '列数', value: String(n.columnCount ?? 0) },
-      { label: '视图数', value: String(n.viewCount ?? 0) },
+  if (n.kind === 'step') {
+    const rows: MetaRow[] = [
+      { label: '类型', value: stepTypeLabel(n.stepType!) },
+      { label: '状态', value: n.status ?? '—' },
     ]
-  }
-  if (n.kind === 'view') {
-    return [
-      { label: '类型', value: viewTypeLabel(n.viewType ?? 'table') },
-      { label: '过滤器', value: String(n.filterCount ?? 0) },
-      { label: '转换', value: String(n.transformCount ?? 0) },
-      { label: '子视图', value: String(n.childCount ?? 0) },
-    ]
+    if (n.rowCount !== undefined) rows.push({ label: '行数', value: String(n.rowCount) })
+    if (n.columnCount !== undefined) rows.push({ label: '列数', value: String(n.columnCount) })
+    if (n.error) rows.push({ label: '错误', value: n.error })
+    return rows
   }
   return [
-    { label: 'Join 类型', value: n.joinType ? joinTypeLabel(n.joinType) : '—' },
-    { label: 'Join 键', value: String(n.joinKeyCount ?? 0) },
-    { label: '结果表', value: n.contextLabel ?? '—' },
-    { label: '状态', value: n.valid ? '输入完整' : '输入缺失' },
+    { label: '类型', value: viewTypeLabel(n.viewType ?? 'table') },
+    { label: '子视图', value: String(n.childCount ?? 0) },
   ]
 })
 
 function refIcon(n: FlowNodeData): IconName {
-  if (n.kind === 'table') return n.source === 'combine' ? 'combine' : 'database'
-  if (n.kind === 'combine-step') return 'combine'
-  return (n.viewType ?? 'table') as IconName
+  if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
+  return nodeIcon.value
+}
+
+function onDelete() {
+  if (props.node.kind === 'step' && props.node.stepId) {
+    emit('delete', props.node.stepId)
+  }
 }
 </script>
 
@@ -97,21 +110,13 @@ function refIcon(n: FlowNodeData): IconName {
     </header>
 
     <div class="flow-detail__body">
-      <!-- 图表节点：侧边主内容为图表预览 -->
       <section v-if="isChartNode && node.viewId" class="flow-detail__preview">
         <h4 class="flow-detail__section-title">Output chart</h4>
-        <FlowChartPreview :table-id="node.tableId" :view-id="node.viewId" @open="emit('open')" />
+        <FlowChartPreview :table-id="node.tableId ?? ''" :view-id="node.viewId" @open="emit('open')" />
       </section>
 
-      <dl v-if="!isChartNode" class="flow-detail__meta">
+      <dl class="flow-detail__meta" :class="{ 'flow-detail__meta--compact': isChartNode }">
         <template v-for="row in metaRows" :key="row.label">
-          <dt>{{ row.label }}</dt>
-          <dd class="is-ellipsis" :title="row.value">{{ row.value }}</dd>
-        </template>
-      </dl>
-
-      <dl v-else class="flow-detail__meta flow-detail__meta--compact">
-        <template v-for="row in metaRows.slice(0, 2)" :key="row.label">
           <dt>{{ row.label }}</dt>
           <dd class="is-ellipsis" :title="row.value">{{ row.value }}</dd>
         </template>
@@ -151,6 +156,10 @@ function refIcon(n: FlowNodeData): IconName {
     </div>
 
     <footer class="flow-detail__foot">
+      <template v-if="node.kind === 'step'">
+        <IButton variant="ghost" icon="edit" @click="emit('edit')">Edit</IButton>
+        <IButton variant="ghost" icon="trash" @click="onDelete">Delete</IButton>
+      </template>
       <IButton variant="primary" icon="external" @click="emit('open')">在工作区打开</IButton>
     </footer>
   </aside>
@@ -289,6 +298,7 @@ function refIcon(n: FlowNodeData): IconName {
   padding: 12px;
   border-top: 1px solid var(--is-border);
   display: flex;
+  gap: 8px;
 }
 .flow-detail__foot :deep(.is-btn) {
   flex: 1;

@@ -166,7 +166,7 @@ const constraintMax = computed({
 
     <!-- X⇄Y 交换 -->
     <div v-if="caps.swapXY" class="cfg__row">
-      <IButton size="sm" variant="ghost" icon="swap" @click="swapXY">交换 X / Y</IButton>
+      <IButton size="sm" variant="ghost" icon="swap" class="cfg__swap" @click="swapXY">交换 X / Y</IButton>
     </div>
 
     <!-- Bar：方向 / 堆叠 -->
@@ -235,7 +235,7 @@ const constraintMax = computed({
         </span>
         <ISelect v-model="regWeights" :options="weightOptions" size="sm" aria-label="权重列" />
       </div>
-      <div class="cfg__row">
+      <div class="cfg__row cfg__row--switch">
         <span class="cfg__label cfg__label--icon">
           Exclude flagged
           <ITooltip content="开启后，打标（×）的点不参与拟合，但仍显示在图表上" placement="bottom">
@@ -252,10 +252,12 @@ const constraintMax = computed({
               <IIcon name="info" :size="12" class="cfg__help" />
             </ITooltip>
           </span>
-          <ITextField v-model="constraintMin" type="number" placeholder="Min（可选）" size="sm" aria-label="4PL Min 约束" class="cfg__constraint" />
-          <ITextField v-model="constraintMax" type="number" placeholder="Max（可选）" size="sm" aria-label="4PL Max 约束" class="cfg__constraint" />
+          <div class="cfg__inline">
+            <ITextField v-model="constraintMin" type="number" placeholder="Min（可选）" size="sm" aria-label="4PL Min 约束" class="cfg__constraint" />
+            <ITextField v-model="constraintMax" type="number" placeholder="Max（可选）" size="sm" aria-label="4PL Max 约束" class="cfg__constraint" />
+          </div>
         </div>
-        <div class="cfg__row">
+        <div class="cfg__row cfg__row--switch">
           <span class="cfg__label">Show asymptotes</span>
           <IToggle v-model="regAsymptotes" aria-label="显示渐近线" />
         </div>
@@ -268,20 +270,29 @@ const constraintMax = computed({
 .cfg {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .cfg__row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   padding: 0 8px;
+}
+.cfg__row--inline {
+  flex-direction: row;
+  align-items: center;
+}
+.cfg__row--switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
 }
 .cfg__row--disabled {
   opacity: 0.55;
 }
 .cfg__label {
   flex-shrink: 0;
-  width: 92px;
   font-size: var(--is-text-xs);
   font-weight: 600;
   color: var(--is-text-secondary);
@@ -299,7 +310,7 @@ const constraintMax = computed({
   border-top: 1px solid var(--is-border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .cfg__section-title {
   font-size: 11px;
@@ -319,5 +330,12 @@ const constraintMax = computed({
 .cfg__constraint {
   flex: 1;
   min-width: 0;
+}
+.cfg__inline {
+  display: flex;
+  gap: 8px;
+}
+.cfg__swap {
+  align-self: flex-start;
 }
 </style>

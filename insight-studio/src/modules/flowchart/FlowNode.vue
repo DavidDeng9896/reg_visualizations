@@ -4,12 +4,13 @@ import { Handle, Position } from '@vue-flow/core'
 import { IIcon } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
-import { viewTypeLabel } from './graph'
+import { stepTypeLabel, viewTypeLabel } from './graph'
+import { portTypeIcon } from '../steps/registry'
 
 /**
- * 流程图自定义节点（对齐 Benchling flow-frame 截图）：
- * 浅绿底圆角卡 + 左侧类型图标 + 名称/摘要 + 右侧绿色对勾圆点；
- * combine 步骤为更小的紧凑卡。
+ * 流程图自定义节点（基于 StepNode + ViewNode）：
+ * - 步骤节点：浅绿底圆角卡 + 端口分组 + 三态圆点 + 打开按钮。
+ * - 视图节点：紧凑卡，无端口，点击打开工作区。
  */
 const props = defineProps<{
   id: string
@@ -19,48 +20,113 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'open', id: string): void }>()
 
-const isCombineStep = computed(() => props.data.kind === 'combine-step')
+const isStep = computed(() => props.data.kind === 'step')
+const isView = computed(() => props.data.kind === 'view')
 
 const icon = computed<IconName>(() => {
   const d = props.data
-  if (d.kind === 'table') return d.source === 'combine' ? 'combine' : 'database'
-  if (d.kind === 'combine-step') return 'combine'
-  return (d.viewType ?? 'table') as IconName
+  if (d.kind === 'view') return (d.viewType ?? 'table') as IconName
+  // step
+  switch (d.stepType) {
+    case 'upload-csv':
+    case 'import-files':
+    case 'file-to-table':
+      return 'upload'
+    case 'join':
+    case 'union':
+      return 'combine'
+    case 'filter':
+      return 'filter'
+    case 'hide-columns':
+      return 'table'
+    case 'computed-column':
+      return 'type-number'
+    case 'interpolation':
+      return 'line'
+    default:
+      return 'database'
+  }
 })
 
 const subLabel = computed(() => {
   const d = props.data
-  if (d.kind === 'table') {
-    const parts = [`${d.rowCount ?? 0} 行`]
-    if (d.viewCount) parts.push(`${d.viewCount} 视图`)
-    return parts.join(' · ')
-  }
   if (d.kind === 'view') return viewTypeLabel(d.viewType ?? 'table')
-  return d.contextLabel ? `→ ${d.contextLabel}` : ''
+  const parts: string[] = []
+  if (d.stepType) parts.push(stepTypeLabel(d.stepType))
+  if (d.rowCount !== undefined) parts.push(`${d.rowCount} 行`)
+  return parts.join(' · ')
 })
+
+const statusClass = computed(() => {
+  const s = props.data.status
+  if (s === 'running') return 'flow-node__status--running'
+  if (s === 'pending') return 'flow-node__status--pending'
+  if (s === 'failed') return 'flow-node__status--failed'
+  if (s === 'stale') return 'flow-node__status--stale'
+  return ''
+})
+
+const statusTitle = computed(() => {
+  const s = props.data.status
+  if (s === 'running') return '执行中'
+  if (s === 'pending') return '待配置'
+  if (s === 'failed') return props.data.error || '失败'
+  if (s === 'stale') return '上游变更，需重新运行'
+  return '已配置'
+})
+
+/** 待配置节点在卡片内提示一行小字（对齐 Benchling 行为）。 */
+const pendingHint = computed(() => props.data.kind === 'step' && props.data.status === 'pending')
 </script>
 
 <template>
   <div
     class="flow-node"
-    :class="[`flow-node--${data.kind}`, { 'flow-node--invalid': !data.valid }]"
+    :class="[
+      `flow-node--${data.kind}`,
+      {
+        'flow-node--pending': data.status === 'pending' || (!data.valid && data.status !== 'failed'),
+        'flow-node--failed': data.status === 'failed',
+      },
+    ]"
     :data-node-kind="data.kind"
   >
-    <Handle type="target" :position="Position.Left" class="flow-node__handle" />
-    <span class="flow-node__icon" aria-hidden="true">
-      <IIcon :name="icon" :size="isCombineStep ? 13 : 15" />
-    </span>
-    <span class="flow-node__body">
-      <span class="flow-node__label is-ellipsis" :title="data.label">{{ data.label }}</span>
+    <!-- 输入端口（步骤节点） -->
+    <div v-if="isStep" class="flow-node__ports flow-node__ports--input">
+      <div v-for="p in data.inputs" :key="p.name" class="flow-node__port-wrap">
+        <Handle type="target" :position="Position.Left" :id="p.name" class="flow-node__handle" />
+        <IIcon :name="(portTypeIcon(p.type) as IconName)" :size="10" class="flow-node__port-icon" />
+        <span class="flow-node__port-label">{{ p.name }}</span>
+      </div>
+    </div>
+
+    <div class="flow-node__body">
+      <div class="flow-node__head">
+        <span class="flow-node__icon" aria-hidden="true">
+          <IIcon :name="icon" :size="isView ? 13 : 15" />
+        </span>
+        <span class="flow-node__label is-ellipsis" :title="data.label">{{ data.label }}</span>
+        <span class="flow-node__status" :class="statusClass" :title="statusTitle">
+          <IIcon v-if="data.status === 'running'" name="spinner" :size="10" />
+          <IIcon v-else-if="data.status === 'pending'" name="warning" :size="10" />
+          <IIcon v-else-if="data.status === 'failed'" name="close" :size="10" />
+          <IIcon v-else name="check" :size="10" />
+        </span>
+      </div>
       <span v-if="subLabel" class="flow-node__sub is-ellipsis">{{ subLabel }}</span>
-    </span>
-    <span
-      class="flow-node__status"
-      :class="{ 'flow-node__status--warn': !data.valid }"
-      :title="data.valid ? '有效' : 'combine 输入缺失'"
-    >
-      <IIcon :name="data.valid ? 'check' : 'warning'" :size="10" />
-    </span>
+      <span v-if="pendingHint" class="flow-node__pending-hint">Waiting on step input or configuration.</span>
+      <span v-if="data.status === 'failed' && data.error" class="flow-node__error-hint is-ellipsis" :title="data.error">{{ data.error }}</span>
+    </div>
+
+    <!-- 输出端口（步骤节点） -->
+    <div v-if="isStep" class="flow-node__ports flow-node__ports--output">
+      <div v-for="p in data.outputs" :key="p.name" class="flow-node__port-wrap">
+        <span class="flow-node__port-label">{{ p.name }}</span>
+        <IIcon :name="(portTypeIcon(p.type) as IconName)" :size="10" class="flow-node__port-icon" />
+        <Handle type="source" :position="Position.Right" :id="p.name" class="flow-node__handle" />
+      </div>
+    </div>
+
     <button
       type="button"
       class="flow-node__open"
@@ -71,7 +137,6 @@ const subLabel = computed(() => {
     >
       <IIcon name="external" :size="11" />
     </button>
-    <Handle type="source" :position="Position.Right" class="flow-node__handle" />
   </div>
 </template>
 
@@ -79,10 +144,10 @@ const subLabel = computed(() => {
 .flow-node {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 200px;
-  min-height: 52px;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 210px;
+  max-width: 320px;
   padding: 8px 10px;
   background: var(--is-node-bg);
   border: 1px solid #cdebdc;
@@ -101,7 +166,6 @@ const subLabel = computed(() => {
   transform: translateY(-1px);
   box-shadow: var(--is-shadow-md);
 }
-/* 选中态：画布通过 node.class 驱动 is-active / is-linked */
 :global(.vue-flow__node.is-active) .flow-node {
   border-color: var(--is-success);
   box-shadow:
@@ -112,20 +176,62 @@ const subLabel = computed(() => {
   border-color: #7ccba4;
 }
 
-/* combine 步骤：小型紧凑连接节点 */
-.flow-node--combine-step {
-  width: 150px;
-  min-height: 36px;
-  padding: 5px 8px;
-  gap: 6px;
-  background: #f3fdf7;
-}
-
-.flow-node--invalid {
+.flow-node--pending {
   background: #fffbeb;
   border-color: #f3e3b3;
 }
+.flow-node--failed {
+  background: #fef3f2;
+  border-color: #fecdca;
+}
+.flow-node--view {
+  min-width: 140px;
+  padding: 6px 10px;
+  background: #f7f9fb;
+  border-color: var(--is-border);
+}
 
+.flow-node__ports {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-width: 12px;
+}
+.flow-node__ports--input {
+  margin-left: -16px;
+  padding-right: 4px;
+}
+.flow-node__ports--output {
+  margin-right: -16px;
+  padding-left: 4px;
+  align-items: flex-end;
+}
+.flow-node__port-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+}
+.flow-node__port-label {
+  font-size: 10px;
+  color: var(--is-text-tertiary);
+  white-space: nowrap;
+}
+
+.flow-node__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;
+}
+.flow-node__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .flow-node__icon {
   display: inline-flex;
   align-items: center;
@@ -137,30 +243,41 @@ const subLabel = computed(() => {
   color: var(--is-success);
   flex-shrink: 0;
 }
-.flow-node--combine-step .flow-node__icon {
-  width: 18px;
-  height: 18px;
+.flow-node--view .flow-node__icon {
+  width: 20px;
+  height: 20px;
+  background: rgba(102, 112, 133, 0.12);
+  color: var(--is-text-secondary);
 }
-.flow-node--invalid .flow-node__icon {
+.flow-node--pending .flow-node__icon {
   background: rgba(138, 109, 26, 0.12);
   color: var(--is-warning-text);
 }
-
-.flow-node__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+.flow-node--failed .flow-node__icon {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--is-danger);
+}
+.flow-node__pending-hint {
+  font-size: 10px;
+  color: var(--is-warning-text);
+  line-height: 1.3;
+}
+.flow-node__error-hint {
+  font-size: 10px;
+  color: var(--is-danger);
+  line-height: 1.3;
+}
+.flow-node__port-icon {
+  color: var(--is-text-tertiary);
+  flex-shrink: 0;
 }
 .flow-node__label {
   font-size: var(--is-text-sm);
   font-weight: 500;
   color: var(--is-text);
   line-height: 1.3;
-}
-.flow-node--combine-step .flow-node__label {
-  font-size: var(--is-text-xs);
+  flex: 1;
+  min-width: 0;
 }
 .flow-node__sub {
   font-size: 11px;
@@ -179,15 +296,28 @@ const subLabel = computed(() => {
   color: #fff;
   flex-shrink: 0;
 }
-.flow-node__status--warn {
+.flow-node__status--pending {
   background: #e3a008;
 }
-.flow-node--combine-step .flow-node__status {
-  width: 13px;
-  height: 13px;
+.flow-node__status--running {
+  background: var(--is-accent);
+  animation: spin 1s linear infinite;
+}
+.flow-node__status--failed {
+  background: var(--is-danger);
+}
+.flow-node__status--stale {
+  background: var(--is-text-tertiary);
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* hover 出现的「打开」按钮 */
 .flow-node__open {
   position: absolute;
   top: -8px;
@@ -212,11 +342,21 @@ const subLabel = computed(() => {
   border-color: var(--is-accent);
 }
 
-/* 连接点：仅作视觉锚点（nodes-connectable=false） */
 .flow-node__handle {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
   background: #fff;
   border: 1.5px solid #b6c2cf;
+  position: relative;
+}
+/* 扩大端口点击热区，提升拖线命中率（对齐 Benchling 端口可点性） */
+.flow-node__handle::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.flow-node__handle:hover {
+  border-color: var(--is-success);
+  transform: scale(1.25);
 }
 </style>

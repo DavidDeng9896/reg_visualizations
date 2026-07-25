@@ -13,6 +13,7 @@ export type IconName =
   | 'pie'
   | 'heatmap'
   | 'gear'
+  | 'sliders'
   | 'close'
   | 'plus'
   | 'check'
@@ -52,6 +53,8 @@ export type IconName =
   | 'flag'
   | 'expand'
   | 'minus'
+  | 'spinner'
+  | 'play'
 
 interface IconDef {
   /** stroke 图标（默认）或 text 图标。 */
@@ -75,6 +78,7 @@ export const ICONS: Record<IconName, IconDef> = {
   pie: S('<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/><path d="M12 12l6.5 6.2"/>'),
   heatmap: F('<rect x="3" y="3" width="5" height="5" rx="1" opacity=".35"/><rect x="9.5" y="3" width="5" height="5" rx="1" opacity=".7"/><rect x="16" y="3" width="5" height="5" rx="1"/><rect x="3" y="9.5" width="5" height="5" rx="1" opacity=".7"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><rect x="16" y="9.5" width="5" height="5" rx="1" opacity=".35"/><rect x="3" y="16" width="5" height="5" rx="1"/><rect x="9.5" y="16" width="5" height="5" rx="1" opacity=".35"/><rect x="16" y="16" width="5" height="5" rx="1" opacity=".7"/>'),
   gear: S('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2"/>'),
+  sliders: S('<path d="M5 6h6M15 6h4M5 12h12M21 12h-2M5 18h8M17 18h2"/><circle cx="13" cy="6" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/>'),
   close: S('<path d="M6 6l12 12M18 6L6 18"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   check: S('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
@@ -114,4 +118,6 @@ export const ICONS: Record<IconName, IconDef> = {
   flag: S('<path d="M5 21V4"/><path d="M5 5h12l-2.5 3.5L17 12H5"/>'),
   expand: S('<path d="M9 4H4v5"/><path d="M4 4l6 6"/><path d="M15 20h5v-5"/><path d="M20 20l-6-6"/>'),
   minus: S('<path d="M5 12h14"/>'),
+  spinner: S('<path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.9 4.9l2.8 2.8"/><path d="M16.3 16.3l2.8 2.8"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.9 19.1l2.8-2.8"/><path d="M16.3 7.7l2.8-2.8"/>'),
+  play: F('<path d="M8 5.5v13l11-6.5z"/>'),
 }

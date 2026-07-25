@@ -100,6 +100,106 @@ export function makeCsv(rows: number): string {
   return lines.join('\n')
 }
 
+/* ------------------------------- 流程图 ------------------------------- */
+
+/** 关闭节点详情卡 / 配置面板，避免遮挡端口。 */
+export async function closePanels(page: Page): Promise<void> {
+  // 用 Escape 关闭面板/详情卡；避免 pane click 重置 VueFlow 的 handle 状态
+  await page.keyboard.press('Escape')
+}
+
+/** 根据节点显示名称定位流程图节点，返回其 data-id。 */
+export async function flowNodeIdByName(page: Page, name: string): Promise<string> {
+  const node = page.locator('.vue-flow__node').filter({ hasText: name }).first()
+  await node.scrollIntoViewIfNeeded()
+  const id = await node.getAttribute('data-id')
+  if (!id) throw new Error(`Flow node "${name}" has no data-id`)
+  return id
+}
+
+/** 获取指定节点端口的屏幕中心坐标。 */
+export async function portCenter(page: Page, nodeId: string, portName: string): Promise<{ x: number; y: number }> {
+  const node = page.locator(`.vue-flow__node[data-id="${nodeId}"]`).first()
+  const handle = node.locator(`.vue-flow__handle[data-handleid="${portName}"]`).first()
+  const rect = await handle.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height }
+  })
+  if (!rect.width || !rect.height) throw new Error(`Port "${portName}" on node "${nodeId}" not visible`)
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+}
+
+/**
+ * 从源节点端口拖线到目标端口或画布空白处。
+ * 分段慢速移动，确保 VueFlow 正确识别连接。
+ * `closePanels=false` 用于「配置面板已打开时拖第二根线」，避免 Esc 撤销新建步骤。
+ */
+export async function dragConnect(
+  page: Page,
+  from: { nodeId: string; port: string },
+  to: { nodeId: string; port: string } | { x: number; y: number },
+  options?: { closePanels?: boolean },
+): Promise<void> {
+  if (options?.closePanels !== false) await closePanels(page)
+  // VueFlow 的 handleBounds 由 ResizeObserver 异步注册，等待其稳定后再拖线
+  await page.waitForTimeout(250)
+  const start = await portCenter(page, from.nodeId, from.port)
+  const end = 'nodeId' in to ? await portCenter(page, to.nodeId, to.port) : { x: to.x, y: to.y }
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  const segments = 10
+  for (let i = 1; i <= segments; i += 1) {
+    const t = i / segments
+    await page.mouse.move(start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t)
+    await page.waitForTimeout(12)
+  }
+  await page.mouse.up()
+}
+
+/** 拖动画布平移（dx/dy 为屏幕像素位移）。 */
+export async function panCanvas(page: Page, dx: number, dy: number): Promise<void> {
+  const pane = page.locator('.vue-flow__pane')
+  const box = await pane.boundingBox()
+  if (!box) return
+  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(start.x + dx, start.y + dy, { steps: 10 })
+  await page.mouse.up()
+}
+
+/** 从源端口拖线到「源端口 + offset」的画布空白处（用于添加步骤）。 */
+export async function dragConnectByOffset(
+  page: Page,
+  from: { nodeId: string; port: string },
+  offset: { x: number; y: number },
+): Promise<void> {
+  const start = await portCenter(page, from.nodeId, from.port)
+  await dragConnect(page, from, { x: start.x + offset.x, y: start.y + offset.y })
+}
+
+/**
+ * 从源端口拖线到画布空白处：自动选择空间更大的一侧，并钳制在可视区内。
+ * 用于「拖到空白 → 添加步骤」的 E2E。
+ */
+export async function dragConnectToBlank(page: Page, from: { nodeId: string; port: string }): Promise<void> {
+  const start = await portCenter(page, from.nodeId, from.port)
+  const pane = page.locator('.vue-flow__pane')
+  const box = await pane.boundingBox()
+  if (!box) throw new Error('vue-flow pane not visible')
+  const margin = 60
+  const rightSpace = box.x + box.width - start.x
+  const leftSpace = start.x - box.x
+  const downSpace = box.y + box.height - start.y
+  const upSpace = start.y - box.y
+  const dx = rightSpace >= leftSpace ? Math.min(320, rightSpace - margin) : -Math.min(320, leftSpace - margin)
+  const dy = downSpace >= upSpace ? Math.min(160, downSpace - margin) : -Math.min(160, upSpace - margin)
+  await dragConnect(page, from, {
+    x: Math.max(box.x + margin, Math.min(box.x + box.width - margin, start.x + dx)),
+    y: Math.max(box.y + margin, Math.min(box.y + box.height - margin, start.y + dy)),
+  })
+}
+
 /**
  * 在图表 canvas 上做一次套索圈选。
  * echarts 5.6 的 polygon brush 是自由拖拽轨迹：mousedown 起笔 → mousemove 沿途

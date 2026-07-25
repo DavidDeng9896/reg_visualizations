@@ -1,47 +1,43 @@
 /**
- * 流程图拓扑构建（纯函数，可单测）。
- * 依据 DESIGN.md §5 与 specs §7：节点 = 表 / 视图 / combine 步骤；边 = 派生关系（自动推导，不可手改）。
+ * 流程图拓扑构建（基于 StepNode 模型）。
+ * 节点 = 步骤节点；边 = 步骤输入引用。
+ * 同时叠加视图树作为只读浏览节点（表节点 → 视图节点 → 子视图）。
  */
-import type {
-  Analysis,
-  AnalysisTable,
-  CombineInputRef,
-  JoinType,
-  TableSource,
-  ViewNode,
-  ViewType,
-} from '../../shared/types'
+import type { Analysis, StepNode, StepType, ViewNode, ViewType } from '../../shared/types'
 import { countViews, findTable, findView } from '../../shared/tree'
+import { getStepDef } from '../steps/registry'
 
-export type FlowNodeKind = 'table' | 'view' | 'combine-step'
+export type FlowNodeKind = 'step' | 'view'
 
-/** 流程图节点数据（挂在 vue-flow node.data 上）。 */
+export interface FlowNodePort {
+  name: string
+  type: 'table' | 'file' | 'chart'
+  multiple?: boolean
+}
+
 export interface FlowNodeData {
-  /** 流程图节点 id（带命名空间，亦作为 flowchartLayout 的 key）。 */
   id: string
   kind: FlowNodeKind
   label: string
-  /** 所属/产物表 id（视图 = 挂载表；combine 步骤 = 结果表）。 */
-  tableId: string
+  /** 步骤节点 id；view 节点无 stepId。 */
+  stepId?: string
+  /** 视图节点专属。 */
   viewId?: string
+  tableId?: string
   viewType?: ViewType
-  /** 表来源徽标（表节点）。 */
-  source?: TableSource
-  /** combine 步骤的 join 类型。 */
-  joinType?: JoinType
-  /** combine 步骤的补充说明（结果表名）。 */
-  contextLabel?: string
-  /* ---- 摘要 ---- */
+  /** 步骤类型（步骤节点）。 */
+  stepType?: StepType
+  /** 输入/输出端口。 */
+  inputs: FlowNodePort[]
+  outputs: FlowNodePort[]
+  /** 节点状态（步骤节点）。 */
+  status?: 'pending' | 'configured' | 'running' | 'failed' | 'stale'
+  error?: string
   rowCount?: number
   columnCount?: number
-  /** 表的全部后代视图数。 */
   viewCount?: number
-  /** 视图的直接子视图数。 */
   childCount?: number
-  filterCount?: number
-  transformCount?: number
-  joinKeyCount?: number
-  /** 拓扑完整性：combine 输入引用缺失时为 false（显示警告而非对勾）。 */
+  /** 节点是否完整有效（输入全部解析）。 */
   valid: boolean
 }
 
@@ -49,6 +45,8 @@ export interface FlowEdgeData {
   id: string
   source: string
   target: string
+  sourcePort: string
+  targetPort: string
 }
 
 export interface FlowGraph {
@@ -58,36 +56,19 @@ export interface FlowGraph {
 
 /* ---------------------------------- id 约定 ---------------------------------- */
 
-export function tableNodeId(tableId: string): string {
-  return `table:${tableId}`
+export function stepNodeId(stepId: string): string {
+  return `step:${stepId}`
 }
+
 export function viewNodeId(viewId: string): string {
   return `view:${viewId}`
 }
-export function combineStepNodeId(tableId: string): string {
-  return `combine-step:${tableId}`
-}
 
-function edgeId(source: string, target: string): string {
-  return `e:${source}->${target}`
+function edgeId(source: string, target: string, sourcePort: string, targetPort: string): string {
+  return `e:${source}:${sourcePort}->${target}:${targetPort}`
 }
 
 /* --------------------------------- 文案标签 --------------------------------- */
-
-export function joinTypeLabel(j: JoinType): string {
-  switch (j) {
-    case 'left':
-      return 'Left join'
-    case 'inner':
-      return 'Inner join'
-    case 'right':
-      return 'Right join'
-    case 'full':
-      return 'Full join'
-    case 'append':
-      return 'Append'
-  }
-}
 
 export function viewTypeLabel(t: ViewType): string {
   switch (t) {
@@ -108,31 +89,38 @@ export function viewTypeLabel(t: ViewType): string {
   }
 }
 
-export function sourceLabel(s: TableSource): string {
-  switch (s) {
-    case 'csv':
-      return 'CSV'
-    case 'combine':
-      return 'Combine'
-    case 'demo':
-      return 'Demo'
+export function stepTypeLabel(t: StepType): string {
+  const def = getStepDef(t)
+  return def.label
+}
+
+/* --------------------------------- 步骤节点 --------------------------------- */
+
+function buildStepNodeData(analysis: Analysis, step: StepNode): FlowNodeData {
+  const def = getStepDef(step.type)
+  const outputTable = step.output.tables[0] ? findTable(analysis, step.output.tables[0]) : undefined
+
+  return {
+    id: stepNodeId(step.id),
+    kind: 'step',
+    label: step.name,
+    stepId: step.id,
+    stepType: step.type,
+    inputs: def.inputs.map((p) => ({ name: p.name, type: p.type, multiple: p.multiple })),
+    outputs: def.outputs.map((p) => ({ name: p.name, type: p.type, multiple: p.multiple })),
+    status: step.status,
+    error: step.error,
+    rowCount: outputTable?.rows.length,
+    columnCount: outputTable?.columns.length,
+    valid: step.status !== 'pending' && step.status !== 'failed',
   }
 }
 
-/* --------------------------------- 拓扑构建 --------------------------------- */
-
-/** combine 输入引用 → 流程图节点 id；引用失效（表/视图已删）返回 null。 */
-function resolveInputRef(analysis: Analysis, ref: CombineInputRef): string | null {
-  const t = findTable(analysis, ref.tableId)
-  if (!t) return null
-  if (ref.kind === 'table') return tableNodeId(t.id)
-  if (!ref.viewId) return null
-  return findView(t.views, ref.viewId) ? viewNodeId(ref.viewId) : null
-}
+/* --------------------------------- 视图节点 --------------------------------- */
 
 function pushViewNodes(
   view: ViewNode,
-  table: AnalysisTable,
+  table: { id: string; rows: unknown[]; columns: unknown[]; views: ViewNode[] },
   parentFlowId: string,
   nodes: FlowNodeData[],
   edges: FlowEdgeData[],
@@ -145,57 +133,55 @@ function pushViewNodes(
     tableId: table.id,
     viewId: view.id,
     viewType: view.type,
+    inputs: [],
+    outputs: [],
     childCount: view.children.length,
-    filterCount: view.filters.length,
-    transformCount: view.transforms.length,
     valid: true,
   })
-  edges.push({ id: edgeId(parentFlowId, id), source: parentFlowId, target: id })
+  edges.push({ id: edgeId(parentFlowId, id, '', ''), source: parentFlowId, target: id, sourcePort: '', targetPort: '' })
   for (const child of view.children) pushViewNodes(child, table, id, nodes, edges)
 }
 
-/** 由 Analysis 派生流程图节点与边。纯函数；同输入稳定输出（节点按表/视图声明序）。 */
+/* --------------------------------- 拓扑构建 --------------------------------- */
+
+/** 由 Analysis 的 steps + 视图树派生流程图节点与边。 */
 export function buildFlowGraph(analysis: Analysis): FlowGraph {
   const nodes: FlowNodeData[] = []
   const edges: FlowEdgeData[] = []
+  const stepNodeMap = new Map<string, FlowNodeData>()
 
-  for (const table of analysis.tables) {
-    const tId = tableNodeId(table.id)
-    nodes.push({
-      id: tId,
-      kind: 'table',
-      label: table.name,
-      tableId: table.id,
-      source: table.source,
-      rowCount: table.rows.length,
-      columnCount: table.columns.length,
-      viewCount: countViews(table.views),
-      valid: true,
-    })
+  // 步骤节点
+  for (const step of analysis.steps) {
+    const n = buildStepNodeData(analysis, step)
+    nodes.push(n)
+    stepNodeMap.set(step.id, n)
+  }
 
-    // combine 来源：输入（表/视图）→ combine 步骤节点 → 结果表
-    if (table.combine) {
-      const stepId = combineStepNodeId(table.id)
-      const leftId = resolveInputRef(analysis, table.combine.left)
-      const rightId = resolveInputRef(analysis, table.combine.right)
-      nodes.push({
-        id: stepId,
-        kind: 'combine-step',
-        label: joinTypeLabel(table.combine.joinType),
-        contextLabel: table.name,
-        tableId: table.id,
-        joinType: table.combine.joinType,
-        joinKeyCount: table.combine.keys.length,
-        valid: leftId !== null && rightId !== null,
+  // 步骤输入边
+  for (const step of analysis.steps) {
+    const targetId = stepNodeId(step.id)
+    for (const input of step.inputs) {
+      const sourceNode = stepNodeMap.get(input.from.nodeId)
+      if (!sourceNode) continue
+      edges.push({
+        id: edgeId(sourceNode.id, targetId, input.from.port, input.port),
+        source: sourceNode.id,
+        target: targetId,
+        sourcePort: input.from.port,
+        targetPort: input.port,
       })
-      for (const src of [leftId, rightId]) {
-        if (src) edges.push({ id: edgeId(src, stepId), source: src, target: stepId })
-      }
-      edges.push({ id: edgeId(stepId, tId), source: stepId, target: tId })
     }
+  }
 
-    // 表 → 根视图 → 子视图（多级嵌套）
-    for (const view of table.views) pushViewNodes(view, table, tId, nodes, edges)
+  // 视图树节点：挂在对应输出表所属步骤节点下。
+  // 一张表若由步骤产出，则该表下的视图作为该步骤节点的子节点。
+  for (const table of analysis.tables) {
+    if (!table.stepId || table.views.length === 0) continue
+    const parentStep = analysis.steps.find((s) => s.id === table.stepId)
+    if (!parentStep) continue
+    const parentId = stepNodeId(parentStep.id)
+    const tableMeta = { id: table.id, rows: table.rows, columns: table.columns, views: table.views }
+    for (const view of table.views) pushViewNodes(view, tableMeta, parentId, nodes, edges)
   }
 
   return { nodes, edges }
@@ -203,13 +189,11 @@ export function buildFlowGraph(analysis: Analysis): FlowGraph {
 
 /* --------------------------------- 邻接查询 --------------------------------- */
 
-/** 上游节点（Inputs）。 */
 export function upstreamOf(graph: FlowGraph, id: string): FlowNodeData[] {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]))
   return graph.edges.filter((e) => e.target === id).map((e) => byId.get(e.source)!)
 }
 
-/** 下游节点（Outputs）。 */
 export function downstreamOf(graph: FlowGraph, id: string): FlowNodeData[] {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]))
   return graph.edges.filter((e) => e.source === id).map((e) => byId.get(e.target)!)
