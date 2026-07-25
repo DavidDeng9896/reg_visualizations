@@ -1,0 +1,1644 @@
+# Pages — 关键页面与组件依赖树
+
+> 项目：`insight-studio/`。树由脚本从页面入口递归追踪**本地 import** 生成（跳过 `node_modules`）。
+> 标记说明：`(...)` = 该文件已在本树上方展开过，不再重复；`ui/index.ts` 折叠为叶子（完整内容见 `components.md`）。
+> 路径均相对 `insight-studio/src/`。
+
+## Analysis 列表页（route `/`）
+Entry: `src/modules/analyses/AnalysisListPage.vue`
+渲染：渲染项目卡片网格（名称/表数/视图数/更新时间）+ 新建、重命名、删除确认弹窗 + 一键 Demo；空态引导。
+
+Dependencies:
+```
+- shared/types.ts
+- shared/repository.ts
+  - shared/types.ts  (…)
+  - shared/db.ts
+    - shared/types.ts  (…)
+  - shared/migrateSteps.ts
+    - shared/types.ts  (…)
+    - shared/id.ts
+    - shared/datetime.ts
+    - modules/steps/registry.ts
+      - shared/types.ts  (…)
+- shared/factories.ts
+  - shared/types.ts  (…)
+  - shared/id.ts  (…)
+  - shared/datetime.ts  (…)
+- shared/seed.ts
+  - shared/types.ts  (…)
+  - shared/id.ts  (…)
+  - shared/datetime.ts  (…)
+- shared/tree.ts
+  - shared/types.ts  (…)
+- shared/datetime.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+```
+
+## 404 页（route `/:pathMatch(.*)*`）
+Entry: `src/modules/analyses/NotFoundPage.vue`
+渲染：渲染空态 + 返回列表按钮。
+
+Dependencies:
+```
+- ui/index.ts  (collapsed — see components.md)
+```
+
+## 工作区 App Shell（route `/analysis/:id`）
+Entry: `src/modules/workspace/WorkspacePage.vue`
+渲染：渲染顶栏（面包屑 + ⋯ 菜单 + Flowchart 切换 + Add data）+ 左侧数据树 + 主区（Workspace/Flowchart 双模式 KeepAlive 切换）+ 重命名/删除/CSV 导入/表合并弹窗。
+
+Dependencies:
+```
+- stores/analysisStore.ts
+  - shared/types.ts
+  - shared/datetime.ts
+  - shared/repository.ts
+    - shared/types.ts  (…)
+    - shared/db.ts
+      - shared/types.ts  (…)
+    - shared/migrateSteps.ts
+      - shared/types.ts  (…)
+      - shared/id.ts
+      - shared/datetime.ts  (…)
+      - modules/steps/registry.ts
+        - shared/types.ts  (…)
+- shared/repository.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+- modules/workspace/SidebarTree.vue
+  - shared/types.ts  (…)
+  - shared/tree.ts
+    - shared/types.ts  (…)
+  - shared/factories.ts
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - shared/datetime.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/workspace/SidebarTreeNode.vue
+    - shared/types.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+- modules/workspace/WorkspaceMain.vue
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/table/TableChartWorkspace.vue
+    - shared/types.ts  (…)
+    - shared/pipeline.ts
+      - shared/types.ts  (…)
+      - shared/datetime.ts  (…)
+      - shared/tree.ts  (…)
+    - shared/tree.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/table/DataGrid.vue
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/tree.ts  (…)
+      - shared/factories.ts  (…)
+      - stores/analysisStore.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - ui/floating.ts
+      - ui/utils.ts
+      - modules/table/csv.ts
+        - shared/types.ts  (…)
+        - shared/datetime.ts  (…)
+      - modules/table/editing.ts
+        - shared/types.ts  (…)
+        - shared/id.ts  (…)
+        - shared/datetime.ts  (…)
+        - shared/pipeline.ts  (…)
+      - modules/table/filterForm.ts
+        - shared/types.ts  (…)
+      - modules/table/transformForm.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+      - modules/table/promote.ts
+        - stores/analysisStore.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/tree.ts  (…)
+        - shared/factories.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+      - modules/steps/rerun.ts
+        - shared/types.ts  (…)
+        - modules/steps/exec/index.ts
+          - shared/types.ts  (…)
+          - shared/tree.ts  (…)
+          - modules/steps/registry.ts  (…)
+          - modules/steps/exec/types.ts
+            - shared/types.ts  (…)
+          - modules/steps/exec/computedColumn.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - shared/factories.ts  (…)
+            - modules/steps/exec/types.ts  (…)
+          - modules/steps/exec/filter.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - shared/factories.ts  (…)
+            - modules/steps/exec/types.ts  (…)
+          - modules/steps/exec/hideColumns.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - shared/factories.ts  (…)
+            - modules/steps/exec/types.ts  (…)
+          - modules/steps/exec/join.ts
+            - shared/types.ts  (…)
+            - shared/join.ts
+              - shared/types.ts  (…)
+              - shared/id.ts  (…)
+            - shared/factories.ts  (…)
+            - modules/steps/exec/types.ts  (…)
+          - modules/steps/exec/union.ts
+            - shared/types.ts  (…)
+            - shared/id.ts  (…)
+            - shared/factories.ts  (…)
+            - modules/steps/exec/types.ts  (…)
+      - modules/table/FilterDialog.vue
+        - shared/types.ts  (…)
+        - shared/factories.ts  (…)
+        - shared/id.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/table/filterForm.ts  (…)
+      - modules/table/TransformDialog.vue
+        - shared/types.ts  (…)
+        - shared/factories.ts  (…)
+        - shared/id.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/table/transformForm.ts  (…)
+    - modules/charts/ChartView.vue
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/tree.ts  (…)
+      - stores/analysisStore.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/table/context.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - stores/analysisStore.ts  (…)
+      - modules/table/csv.ts  (…)
+      - modules/table/filterForm.ts  (…)
+      - modules/table/transformForm.ts  (…)
+      - modules/charts/registry.ts
+        - shared/types.ts  (…)
+        - shared/factories.ts  (…)
+        - shared/pipeline.ts  (…)
+        - modules/charts/runtime/bar.ts
+          - shared/types.ts  (…)
+          - modules/charts/runtime/aggregate.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+          - modules/charts/runtime/axis.ts
+            - shared/types.ts  (…)
+          - modules/charts/runtime/shared.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - modules/charts/runtime/palette.ts
+            - modules/charts/types.ts
+              - shared/types.ts  (…)
+              - shared/pipeline.ts  (…)
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/fit/summary.ts
+                - shared/types.ts  (…)
+                - modules/charts/fit/engine.ts
+                  - shared/types.ts  (…)
+                  - modules/charts/fit/models.ts
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/line.ts
+          - shared/types.ts  (…)
+          - shared/datetime.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/fit/engine.ts  (…)
+          - modules/charts/fit/summary.ts  (…)
+          - modules/charts/flags.ts
+            - shared/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/scatter.ts
+          - shared/types.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/fit/engine.ts  (…)
+          - modules/charts/fit/summary.ts  (…)
+          - modules/charts/flags.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/box.ts
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/pie.ts
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/heatmap.ts
+          - shared/pipeline.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/palette.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/mapping.ts
+          - shared/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/panel/configure/BarConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue
+            - shared/types.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/MappingSlot.vue
+              - shared/types.ts  (…)
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/aggregate.ts  (…)
+              - modules/charts/panel/AxisSettingsPopover.vue
+                - shared/types.ts  (…)
+                - ui/index.ts  (collapsed — see components.md)
+                - modules/charts/runtime/aggregate.ts  (…)
+                - modules/charts/panel/context.ts
+                  - shared/types.ts  (…)
+                  - modules/charts/types.ts  (…)
+                - modules/charts/types.ts  (…)
+              - modules/charts/panel/context.ts  (…)
+              - modules/charts/types.ts  (…)
+            - modules/charts/panel/PalettePicker.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/palette.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/configure/LineConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/ScatterConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/BoxConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/PieConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/HeatmapConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/style/BarStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/style/AxisSection.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/panel/context.ts  (…)
+            - modules/charts/panel/style/ColorField.vue
+              - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/style/SeriesColorsSection.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/palette.ts  (…)
+              - modules/charts/panel/context.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/style/LineStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/ScatterStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/BoxStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/PieStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/HeatmapStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/mapping.ts  (…)
+      - modules/charts/runtime/sampling.ts
+        - shared/pipeline.ts  (…)
+      - modules/charts/draft.ts
+        - shared/types.ts  (…)
+      - modules/charts/export.ts
+      - modules/charts/flags.ts  (…)
+      - modules/charts/fit/summary.ts  (…)
+      - modules/charts/ChartPanel.vue
+        - modules/charts/types.ts  (…)
+      - modules/charts/panel/ChartConfigPanel.vue
+        - shared/types.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/registry.ts  (…)
+        - modules/charts/panel/context.ts  (…)
+      - modules/charts/tables/ModelTables.vue
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/table/csv.ts  (…)
+        - modules/charts/flags.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/fit/summary.ts  (…)
+      - modules/charts/panel/context.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/table/context.ts  (…)
+    - modules/table/promote.ts  (…)
+    - modules/table/csv.ts  (…)
+- modules/workspace/FlowchartMain.vue
+  - modules/flowchart/FlowchartCanvas.vue
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/flowchart/graph.ts
+      - shared/types.ts  (…)
+      - shared/tree.ts  (…)
+      - modules/steps/registry.ts  (…)
+    - modules/flowchart/layout.ts
+      - modules/flowchart/graph.ts  (…)
+    - modules/flowchart/FlowNode.vue
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/flowchart/graph.ts  (…)
+      - modules/steps/registry.ts  (…)
+    - modules/flowchart/FlowEdge.vue
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/steps/registry.ts  (…)
+      - shared/types.ts  (…)
+    - modules/flowchart/NodeDetailCard.vue
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/flowchart/graph.ts  (…)
+      - modules/flowchart/FlowChartPreview.vue
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/tree.ts  (…)
+        - stores/analysisStore.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/ChartPanel.vue  (…)
+        - modules/charts/registry.ts  (…)
+        - modules/charts/types.ts  (…)
+    - modules/flowchart/AddStepPanel.vue
+      - shared/types.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/steps/registry.ts  (…)
+      - modules/steps/exec/index.ts  (…)
+    - modules/steps/panel/StepConfigPanel.vue
+      - shared/types.ts  (…)
+      - stores/analysisStore.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/steps/registry.ts  (…)
+      - modules/steps/exec/index.ts  (…)
+      - modules/steps/panel/StepConfigForm.vue
+        - shared/types.ts  (…)
+        - stores/analysisStore.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/steps/registry.ts  (…)
+        - modules/steps/exec/index.ts  (…)
+        - modules/table/filterForm.ts  (…)
+    - modules/flowchart/connection.ts
+      - modules/flowchart/graph.ts  (…)
+    - modules/steps/registry.ts  (…)
+    - shared/id.ts  (…)
+    - shared/types.ts  (…)
+    - modules/steps/exec/index.ts  (…)
+    - modules/steps/rerun.ts  (…)
+- modules/table/CsvImportDialog.vue
+  - shared/types.ts  (…)
+  - shared/factories.ts  (…)
+  - modules/steps/factory.ts
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - modules/steps/registry.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/table/csv.ts  (…)
+- modules/table/CombineTablesDialog.vue
+  - shared/types.ts  (…)
+  - shared/join.ts  (…)
+  - modules/steps/factory.ts  (…)
+  - modules/steps/exec/index.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/table/combinePreview.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/join.ts  (…)
+    - shared/tree.ts  (…)
+```
+
+## Workspace 主区（表视图模式）
+Entry: `src/modules/workspace/WorkspaceMain.vue`
+渲染：按当前选中表/视图渲染 TableChartWorkspace；未选中时渲染空态引导。
+
+Dependencies:
+```
+- stores/analysisStore.ts
+  - shared/types.ts
+  - shared/datetime.ts
+  - shared/repository.ts
+    - shared/types.ts  (…)
+    - shared/db.ts
+      - shared/types.ts  (…)
+    - shared/migrateSteps.ts
+      - shared/types.ts  (…)
+      - shared/id.ts
+      - shared/datetime.ts  (…)
+      - modules/steps/registry.ts
+        - shared/types.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+- modules/table/TableChartWorkspace.vue
+  - shared/types.ts  (…)
+  - shared/pipeline.ts
+    - shared/types.ts  (…)
+    - shared/datetime.ts  (…)
+    - shared/tree.ts
+      - shared/types.ts  (…)
+  - shared/tree.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/table/DataGrid.vue
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/tree.ts  (…)
+    - shared/factories.ts
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+      - shared/datetime.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - ui/floating.ts
+    - ui/utils.ts
+    - modules/table/csv.ts
+      - shared/types.ts  (…)
+      - shared/datetime.ts  (…)
+    - modules/table/editing.ts
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+      - shared/datetime.ts  (…)
+      - shared/pipeline.ts  (…)
+    - modules/table/filterForm.ts
+      - shared/types.ts  (…)
+    - modules/table/transformForm.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+    - modules/table/promote.ts
+      - stores/analysisStore.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/tree.ts  (…)
+      - shared/factories.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+    - modules/steps/rerun.ts
+      - shared/types.ts  (…)
+      - modules/steps/exec/index.ts
+        - shared/types.ts  (…)
+        - shared/tree.ts  (…)
+        - modules/steps/registry.ts  (…)
+        - modules/steps/exec/types.ts
+          - shared/types.ts  (…)
+        - modules/steps/exec/computedColumn.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - shared/factories.ts  (…)
+          - modules/steps/exec/types.ts  (…)
+        - modules/steps/exec/filter.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - shared/factories.ts  (…)
+          - modules/steps/exec/types.ts  (…)
+        - modules/steps/exec/hideColumns.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - shared/factories.ts  (…)
+          - modules/steps/exec/types.ts  (…)
+        - modules/steps/exec/join.ts
+          - shared/types.ts  (…)
+          - shared/join.ts
+            - shared/types.ts  (…)
+            - shared/id.ts  (…)
+          - shared/factories.ts  (…)
+          - modules/steps/exec/types.ts  (…)
+        - modules/steps/exec/union.ts
+          - shared/types.ts  (…)
+          - shared/id.ts  (…)
+          - shared/factories.ts  (…)
+          - modules/steps/exec/types.ts  (…)
+    - modules/table/FilterDialog.vue
+      - shared/types.ts  (…)
+      - shared/factories.ts  (…)
+      - shared/id.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/table/filterForm.ts  (…)
+    - modules/table/TransformDialog.vue
+      - shared/types.ts  (…)
+      - shared/factories.ts  (…)
+      - shared/id.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/table/transformForm.ts  (…)
+  - modules/charts/ChartView.vue
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/tree.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/table/context.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - stores/analysisStore.ts  (…)
+    - modules/table/csv.ts  (…)
+    - modules/table/filterForm.ts  (…)
+    - modules/table/transformForm.ts  (…)
+    - modules/charts/registry.ts
+      - shared/types.ts  (…)
+      - shared/factories.ts  (…)
+      - shared/pipeline.ts  (…)
+      - modules/charts/runtime/bar.ts
+        - shared/types.ts  (…)
+        - modules/charts/runtime/aggregate.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+        - modules/charts/runtime/axis.ts
+          - shared/types.ts  (…)
+        - modules/charts/runtime/shared.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - modules/charts/runtime/palette.ts
+          - modules/charts/types.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/fit/summary.ts
+              - shared/types.ts  (…)
+              - modules/charts/fit/engine.ts
+                - shared/types.ts  (…)
+                - modules/charts/fit/models.ts
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/line.ts
+        - shared/types.ts  (…)
+        - shared/datetime.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/fit/engine.ts  (…)
+        - modules/charts/fit/summary.ts  (…)
+        - modules/charts/flags.ts
+          - shared/types.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/scatter.ts
+        - shared/types.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/fit/engine.ts  (…)
+        - modules/charts/fit/summary.ts  (…)
+        - modules/charts/flags.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/box.ts
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/pie.ts
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/heatmap.ts
+        - shared/pipeline.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/palette.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/mapping.ts
+        - shared/types.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/panel/configure/BarConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue
+          - shared/types.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/MappingSlot.vue
+            - shared/types.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/aggregate.ts  (…)
+            - modules/charts/panel/AxisSettingsPopover.vue
+              - shared/types.ts  (…)
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/aggregate.ts  (…)
+              - modules/charts/panel/context.ts
+                - shared/types.ts  (…)
+                - modules/charts/types.ts  (…)
+              - modules/charts/types.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+            - modules/charts/types.ts  (…)
+          - modules/charts/panel/PalettePicker.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/palette.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/configure/LineConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/ScatterConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/BoxConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/PieConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/HeatmapConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/style/BarStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/style/AxisSection.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/context.ts  (…)
+          - modules/charts/panel/style/ColorField.vue
+            - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/style/SeriesColorsSection.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/palette.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/style/LineStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/ScatterStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/BoxStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/PieStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/HeatmapStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/mapping.ts  (…)
+    - modules/charts/runtime/sampling.ts
+      - shared/pipeline.ts  (…)
+    - modules/charts/draft.ts
+      - shared/types.ts  (…)
+    - modules/charts/export.ts
+    - modules/charts/flags.ts  (…)
+    - modules/charts/fit/summary.ts  (…)
+    - modules/charts/ChartPanel.vue
+      - modules/charts/types.ts  (…)
+    - modules/charts/panel/ChartConfigPanel.vue
+      - shared/types.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/charts/registry.ts  (…)
+      - modules/charts/panel/context.ts  (…)
+    - modules/charts/tables/ModelTables.vue
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/table/csv.ts  (…)
+      - modules/charts/flags.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/fit/summary.ts  (…)
+    - modules/charts/panel/context.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/table/context.ts  (…)
+  - modules/table/promote.ts  (…)
+  - modules/table/csv.ts  (…)
+```
+
+## Flowchart 主区（流程图模式）
+Entry: `src/modules/workspace/FlowchartMain.vue`
+渲染：挂载流程图画布 FlowchartCanvas 的薄壳。
+
+Dependencies:
+```
+- modules/flowchart/FlowchartCanvas.vue
+  - stores/analysisStore.ts
+    - shared/types.ts
+    - shared/datetime.ts
+    - shared/repository.ts
+      - shared/types.ts  (…)
+      - shared/db.ts
+        - shared/types.ts  (…)
+      - shared/migrateSteps.ts
+        - shared/types.ts  (…)
+        - shared/id.ts
+        - shared/datetime.ts  (…)
+        - modules/steps/registry.ts
+          - shared/types.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/flowchart/graph.ts
+    - shared/types.ts  (…)
+    - shared/tree.ts
+      - shared/types.ts  (…)
+    - modules/steps/registry.ts  (…)
+  - modules/flowchart/layout.ts
+    - modules/flowchart/graph.ts  (…)
+  - modules/flowchart/FlowNode.vue
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/flowchart/graph.ts  (…)
+    - modules/steps/registry.ts  (…)
+  - modules/flowchart/FlowEdge.vue
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/steps/registry.ts  (…)
+    - shared/types.ts  (…)
+  - modules/flowchart/NodeDetailCard.vue
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/flowchart/graph.ts  (…)
+    - modules/flowchart/FlowChartPreview.vue
+      - shared/types.ts  (…)
+      - shared/pipeline.ts
+        - shared/types.ts  (…)
+        - shared/datetime.ts  (…)
+        - shared/tree.ts  (…)
+      - shared/tree.ts  (…)
+      - stores/analysisStore.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/charts/ChartPanel.vue
+        - modules/charts/types.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/fit/summary.ts
+            - shared/types.ts  (…)
+            - modules/charts/fit/engine.ts
+              - shared/types.ts  (…)
+              - modules/charts/fit/models.ts
+      - modules/charts/registry.ts
+        - shared/types.ts  (…)
+        - shared/factories.ts
+          - shared/types.ts  (…)
+          - shared/id.ts  (…)
+          - shared/datetime.ts  (…)
+        - shared/pipeline.ts  (…)
+        - modules/charts/runtime/bar.ts
+          - shared/types.ts  (…)
+          - modules/charts/runtime/aggregate.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+          - modules/charts/runtime/axis.ts
+            - shared/types.ts  (…)
+          - modules/charts/runtime/shared.ts
+            - shared/types.ts  (…)
+            - shared/pipeline.ts  (…)
+            - modules/charts/runtime/palette.ts
+            - modules/charts/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/line.ts
+          - shared/types.ts  (…)
+          - shared/datetime.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/fit/engine.ts  (…)
+          - modules/charts/fit/summary.ts  (…)
+          - modules/charts/flags.ts
+            - shared/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/scatter.ts
+          - shared/types.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/fit/engine.ts  (…)
+          - modules/charts/fit/summary.ts  (…)
+          - modules/charts/flags.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/box.ts
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/axis.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/pie.ts
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/heatmap.ts
+          - shared/pipeline.ts  (…)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/runtime/palette.ts  (…)
+          - modules/charts/runtime/shared.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/runtime/mapping.ts
+          - shared/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/panel/configure/BarConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue
+            - shared/types.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/MappingSlot.vue
+              - shared/types.ts  (…)
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/aggregate.ts  (…)
+              - modules/charts/panel/AxisSettingsPopover.vue
+                - shared/types.ts  (…)
+                - ui/index.ts  (collapsed — see components.md)
+                - modules/charts/runtime/aggregate.ts  (…)
+                - modules/charts/panel/context.ts
+                  - shared/types.ts  (…)
+                  - modules/charts/types.ts  (…)
+                - modules/charts/types.ts  (…)
+              - modules/charts/panel/context.ts  (…)
+              - modules/charts/types.ts  (…)
+            - modules/charts/panel/PalettePicker.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/palette.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/configure/LineConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/ScatterConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/BoxConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/PieConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/configure/HeatmapConfigure.vue
+          - modules/charts/panel/configure/BaseConfigure.vue  (…)
+        - modules/charts/panel/style/BarStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/style/AxisSection.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/panel/context.ts  (…)
+            - modules/charts/panel/style/ColorField.vue
+              - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/style/SeriesColorsSection.vue
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/palette.ts  (…)
+              - modules/charts/panel/context.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/style/LineStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/ScatterStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/BoxStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/PieStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/panel/style/HeatmapStyle.vue
+          - modules/charts/panel/style/BaseStyle.vue  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/types.ts  (…)
+  - modules/flowchart/AddStepPanel.vue
+    - shared/types.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/steps/registry.ts  (…)
+    - modules/steps/exec/index.ts
+      - shared/types.ts  (…)
+      - shared/tree.ts  (…)
+      - modules/steps/registry.ts  (…)
+      - modules/steps/exec/types.ts
+        - shared/types.ts  (…)
+      - modules/steps/exec/computedColumn.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/filter.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/hideColumns.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/join.ts
+        - shared/types.ts  (…)
+        - shared/join.ts
+          - shared/types.ts  (…)
+          - shared/id.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/union.ts
+        - shared/types.ts  (…)
+        - shared/id.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+  - modules/steps/panel/StepConfigPanel.vue
+    - shared/types.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/steps/registry.ts  (…)
+    - modules/steps/exec/index.ts  (…)
+    - modules/steps/panel/StepConfigForm.vue
+      - shared/types.ts  (…)
+      - stores/analysisStore.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/steps/registry.ts  (…)
+      - modules/steps/exec/index.ts  (…)
+      - modules/table/filterForm.ts
+        - shared/types.ts  (…)
+  - modules/flowchart/connection.ts
+    - modules/flowchart/graph.ts  (…)
+  - modules/steps/registry.ts  (…)
+  - shared/id.ts  (…)
+  - shared/types.ts  (…)
+  - modules/steps/exec/index.ts  (…)
+  - modules/steps/rerun.ts
+    - shared/types.ts  (…)
+    - modules/steps/exec/index.ts  (…)
+```
+
+## 表+图一体化工作区（核心页面）
+Entry: `src/modules/table/TableChartWorkspace.vue`
+渲染：DataGrid 表格 + 图表区（ChartView/ChartPanel）按 chart.position（top/bottom/left/right）经 ISplitPane 排布；provide TABLE_CHART_CONTEXT。
+
+Dependencies:
+```
+- shared/types.ts
+- shared/pipeline.ts
+  - shared/types.ts  (…)
+  - shared/datetime.ts
+  - shared/tree.ts
+    - shared/types.ts  (…)
+- shared/tree.ts  (…)
+- stores/analysisStore.ts
+  - shared/types.ts  (…)
+  - shared/datetime.ts  (…)
+  - shared/repository.ts
+    - shared/types.ts  (…)
+    - shared/db.ts
+      - shared/types.ts  (…)
+    - shared/migrateSteps.ts
+      - shared/types.ts  (…)
+      - shared/id.ts
+      - shared/datetime.ts  (…)
+      - modules/steps/registry.ts
+        - shared/types.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+- modules/table/DataGrid.vue
+  - shared/types.ts  (…)
+  - shared/id.ts  (…)
+  - shared/pipeline.ts  (…)
+  - shared/tree.ts  (…)
+  - shared/factories.ts
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - shared/datetime.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - ui/floating.ts
+  - ui/utils.ts
+  - modules/table/csv.ts
+    - shared/types.ts  (…)
+    - shared/datetime.ts  (…)
+  - modules/table/editing.ts
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - shared/datetime.ts  (…)
+    - shared/pipeline.ts  (…)
+  - modules/table/filterForm.ts
+    - shared/types.ts  (…)
+  - modules/table/transformForm.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+  - modules/table/promote.ts
+    - stores/analysisStore.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/tree.ts  (…)
+    - shared/factories.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+  - modules/steps/rerun.ts
+    - shared/types.ts  (…)
+    - modules/steps/exec/index.ts
+      - shared/types.ts  (…)
+      - shared/tree.ts  (…)
+      - modules/steps/registry.ts  (…)
+      - modules/steps/exec/types.ts
+        - shared/types.ts  (…)
+      - modules/steps/exec/computedColumn.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/filter.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/hideColumns.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/join.ts
+        - shared/types.ts  (…)
+        - shared/join.ts
+          - shared/types.ts  (…)
+          - shared/id.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+      - modules/steps/exec/union.ts
+        - shared/types.ts  (…)
+        - shared/id.ts  (…)
+        - shared/factories.ts  (…)
+        - modules/steps/exec/types.ts  (…)
+  - modules/table/FilterDialog.vue
+    - shared/types.ts  (…)
+    - shared/factories.ts  (…)
+    - shared/id.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/table/filterForm.ts  (…)
+  - modules/table/TransformDialog.vue
+    - shared/types.ts  (…)
+    - shared/factories.ts  (…)
+    - shared/id.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/table/transformForm.ts  (…)
+- modules/charts/ChartView.vue
+  - shared/types.ts  (…)
+  - shared/pipeline.ts  (…)
+  - shared/tree.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/table/context.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - stores/analysisStore.ts  (…)
+  - modules/table/csv.ts  (…)
+  - modules/table/filterForm.ts  (…)
+  - modules/table/transformForm.ts  (…)
+  - modules/charts/registry.ts
+    - shared/types.ts  (…)
+    - shared/factories.ts  (…)
+    - shared/pipeline.ts  (…)
+    - modules/charts/runtime/bar.ts
+      - shared/types.ts  (…)
+      - modules/charts/runtime/aggregate.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+      - modules/charts/runtime/axis.ts
+        - shared/types.ts  (…)
+      - modules/charts/runtime/shared.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - modules/charts/runtime/palette.ts
+        - modules/charts/types.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/fit/summary.ts
+            - shared/types.ts  (…)
+            - modules/charts/fit/engine.ts
+              - shared/types.ts  (…)
+              - modules/charts/fit/models.ts
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/line.ts
+      - shared/types.ts  (…)
+      - shared/datetime.ts  (…)
+      - modules/charts/runtime/aggregate.ts  (…)
+      - modules/charts/runtime/axis.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/fit/engine.ts  (…)
+      - modules/charts/fit/summary.ts  (…)
+      - modules/charts/flags.ts
+        - shared/types.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/scatter.ts
+      - shared/types.ts  (…)
+      - modules/charts/runtime/aggregate.ts  (…)
+      - modules/charts/runtime/axis.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/fit/engine.ts  (…)
+      - modules/charts/fit/summary.ts  (…)
+      - modules/charts/flags.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/box.ts
+      - modules/charts/runtime/aggregate.ts  (…)
+      - modules/charts/runtime/axis.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/pie.ts
+      - modules/charts/runtime/aggregate.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/heatmap.ts
+      - shared/pipeline.ts  (…)
+      - modules/charts/runtime/aggregate.ts  (…)
+      - modules/charts/runtime/palette.ts  (…)
+      - modules/charts/runtime/shared.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/runtime/mapping.ts
+      - shared/types.ts  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/panel/configure/BarConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue
+        - shared/types.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/panel/MappingSlot.vue
+          - shared/types.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/panel/AxisSettingsPopover.vue
+            - shared/types.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/aggregate.ts  (…)
+            - modules/charts/panel/context.ts
+              - shared/types.ts  (…)
+              - modules/charts/types.ts  (…)
+            - modules/charts/types.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/panel/PalettePicker.vue
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/runtime/palette.ts  (…)
+        - modules/charts/panel/context.ts  (…)
+    - modules/charts/panel/configure/LineConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue  (…)
+    - modules/charts/panel/configure/ScatterConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue  (…)
+    - modules/charts/panel/configure/BoxConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue  (…)
+    - modules/charts/panel/configure/PieConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue  (…)
+    - modules/charts/panel/configure/HeatmapConfigure.vue
+      - modules/charts/panel/configure/BaseConfigure.vue  (…)
+    - modules/charts/panel/style/BarStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/panel/style/AxisSection.vue
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/style/ColorField.vue
+          - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/panel/style/SeriesColorsSection.vue
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/runtime/palette.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+        - modules/charts/panel/context.ts  (…)
+    - modules/charts/panel/style/LineStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue  (…)
+    - modules/charts/panel/style/ScatterStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue  (…)
+    - modules/charts/panel/style/BoxStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue  (…)
+    - modules/charts/panel/style/PieStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue  (…)
+    - modules/charts/panel/style/HeatmapStyle.vue
+      - modules/charts/panel/style/BaseStyle.vue  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/mapping.ts  (…)
+  - modules/charts/runtime/sampling.ts
+    - shared/pipeline.ts  (…)
+  - modules/charts/draft.ts
+    - shared/types.ts  (…)
+  - modules/charts/export.ts
+  - modules/charts/flags.ts  (…)
+  - modules/charts/fit/summary.ts  (…)
+  - modules/charts/ChartPanel.vue
+    - modules/charts/types.ts  (…)
+  - modules/charts/panel/ChartConfigPanel.vue
+    - shared/types.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/charts/registry.ts  (…)
+    - modules/charts/panel/context.ts  (…)
+  - modules/charts/tables/ModelTables.vue
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/table/csv.ts  (…)
+    - modules/charts/flags.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/fit/summary.ts  (…)
+  - modules/charts/panel/context.ts  (…)
+  - modules/charts/types.ts  (…)
+- modules/table/context.ts  (…)
+- modules/table/promote.ts  (…)
+- modules/table/csv.ts  (…)
+```
+
+## 图表引擎挂载（ChartPanel）
+Entry: `src/modules/charts/ChartPanel.vue`
+渲染：ECharts 按需注册（六图种 + 误差棒/箱体 custom series + visualMap + brush 套索 + markLine）并渲染 option。
+
+Dependencies:
+```
+- modules/charts/types.ts
+  - shared/types.ts
+  - shared/pipeline.ts
+    - shared/types.ts  (…)
+    - shared/datetime.ts
+    - shared/tree.ts
+      - shared/types.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/charts/fit/summary.ts
+    - shared/types.ts  (…)
+    - modules/charts/fit/engine.ts
+      - shared/types.ts  (…)
+      - modules/charts/fit/models.ts
+```
+
+## 图表配置面板（核心页面）
+Entry: `src/modules/charts/panel/ChartConfigPanel.vue`
+渲染：右侧滑出配置面板：Chart type 下拉 + CONFIGURE/STYLE Tabs + 各图种 configure/style 分区 + 底部 Cancel/Save；编辑 ChartView 提供的草稿。
+
+Dependencies:
+```
+- shared/types.ts
+- ui/index.ts  (collapsed — see components.md)
+- modules/charts/registry.ts
+  - shared/types.ts  (…)
+  - shared/factories.ts
+    - shared/types.ts  (…)
+    - shared/id.ts
+    - shared/datetime.ts
+  - shared/pipeline.ts
+    - shared/types.ts  (…)
+    - shared/datetime.ts  (…)
+    - shared/tree.ts
+      - shared/types.ts  (…)
+  - modules/charts/runtime/bar.ts
+    - shared/types.ts  (…)
+    - modules/charts/runtime/aggregate.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+    - modules/charts/runtime/axis.ts
+      - shared/types.ts  (…)
+    - modules/charts/runtime/shared.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - modules/charts/runtime/palette.ts
+      - modules/charts/types.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/fit/summary.ts
+          - shared/types.ts  (…)
+          - modules/charts/fit/engine.ts
+            - shared/types.ts  (…)
+            - modules/charts/fit/models.ts
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/line.ts
+    - shared/types.ts  (…)
+    - shared/datetime.ts  (…)
+    - modules/charts/runtime/aggregate.ts  (…)
+    - modules/charts/runtime/axis.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/fit/engine.ts  (…)
+    - modules/charts/fit/summary.ts  (…)
+    - modules/charts/flags.ts
+      - shared/types.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/scatter.ts
+    - shared/types.ts  (…)
+    - modules/charts/runtime/aggregate.ts  (…)
+    - modules/charts/runtime/axis.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/fit/engine.ts  (…)
+    - modules/charts/fit/summary.ts  (…)
+    - modules/charts/flags.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/box.ts
+    - modules/charts/runtime/aggregate.ts  (…)
+    - modules/charts/runtime/axis.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/pie.ts
+    - modules/charts/runtime/aggregate.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/heatmap.ts
+    - shared/pipeline.ts  (…)
+    - modules/charts/runtime/aggregate.ts  (…)
+    - modules/charts/runtime/palette.ts  (…)
+    - modules/charts/runtime/shared.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/runtime/mapping.ts
+    - shared/types.ts  (…)
+    - modules/charts/types.ts  (…)
+  - modules/charts/panel/configure/BarConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue
+      - shared/types.ts  (…)
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/charts/panel/MappingSlot.vue
+        - shared/types.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/panel/AxisSettingsPopover.vue
+          - shared/types.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/runtime/aggregate.ts  (…)
+          - modules/charts/panel/context.ts
+            - shared/types.ts  (…)
+            - modules/charts/types.ts  (…)
+          - modules/charts/types.ts  (…)
+        - modules/charts/panel/context.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/panel/PalettePicker.vue
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/runtime/palette.ts  (…)
+      - modules/charts/panel/context.ts  (…)
+  - modules/charts/panel/configure/LineConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue  (…)
+  - modules/charts/panel/configure/ScatterConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue  (…)
+  - modules/charts/panel/configure/BoxConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue  (…)
+  - modules/charts/panel/configure/PieConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue  (…)
+  - modules/charts/panel/configure/HeatmapConfigure.vue
+    - modules/charts/panel/configure/BaseConfigure.vue  (…)
+  - modules/charts/panel/style/BarStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue
+      - ui/index.ts  (collapsed — see components.md)
+      - modules/charts/panel/style/AxisSection.vue
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/style/ColorField.vue
+        - ui/index.ts  (collapsed — see components.md)
+      - modules/charts/panel/style/SeriesColorsSection.vue
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/runtime/palette.ts  (…)
+        - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/context.ts  (…)
+  - modules/charts/panel/style/LineStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue  (…)
+  - modules/charts/panel/style/ScatterStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue  (…)
+  - modules/charts/panel/style/BoxStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue  (…)
+  - modules/charts/panel/style/PieStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue  (…)
+  - modules/charts/panel/style/HeatmapStyle.vue
+    - modules/charts/panel/style/BaseStyle.vue  (…)
+  - modules/charts/types.ts  (…)
+- modules/charts/panel/context.ts  (…)
+```
+
+## 流程图画布（核心页面）
+Entry: `src/modules/flowchart/FlowchartCanvas.vue`
+渲染：@vue-flow 画布：节点（表/视图/合并步骤）+ 派生边 + 拖拽布局持久化 + 节点详情卡 + Add step 面板 + 步骤配置面板。
+
+Dependencies:
+```
+- stores/analysisStore.ts
+  - shared/types.ts
+  - shared/datetime.ts
+  - shared/repository.ts
+    - shared/types.ts  (…)
+    - shared/db.ts
+      - shared/types.ts  (…)
+    - shared/migrateSteps.ts
+      - shared/types.ts  (…)
+      - shared/id.ts
+      - shared/datetime.ts  (…)
+      - modules/steps/registry.ts
+        - shared/types.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+- modules/flowchart/graph.ts
+  - shared/types.ts  (…)
+  - shared/tree.ts
+    - shared/types.ts  (…)
+  - modules/steps/registry.ts  (…)
+- modules/flowchart/layout.ts
+  - modules/flowchart/graph.ts  (…)
+- modules/flowchart/FlowNode.vue
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/flowchart/graph.ts  (…)
+  - modules/steps/registry.ts  (…)
+- modules/flowchart/FlowEdge.vue
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/steps/registry.ts  (…)
+  - shared/types.ts  (…)
+- modules/flowchart/NodeDetailCard.vue
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/flowchart/graph.ts  (…)
+  - modules/flowchart/FlowChartPreview.vue
+    - shared/types.ts  (…)
+    - shared/pipeline.ts
+      - shared/types.ts  (…)
+      - shared/datetime.ts  (…)
+      - shared/tree.ts  (…)
+    - shared/tree.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/charts/ChartPanel.vue
+      - modules/charts/types.ts
+        - shared/types.ts  (…)
+        - shared/pipeline.ts  (…)
+        - ui/index.ts  (collapsed — see components.md)
+        - modules/charts/fit/summary.ts
+          - shared/types.ts  (…)
+          - modules/charts/fit/engine.ts
+            - shared/types.ts  (…)
+            - modules/charts/fit/models.ts
+    - modules/charts/registry.ts
+      - shared/types.ts  (…)
+      - shared/factories.ts
+        - shared/types.ts  (…)
+        - shared/id.ts  (…)
+        - shared/datetime.ts  (…)
+      - shared/pipeline.ts  (…)
+      - modules/charts/runtime/bar.ts
+        - shared/types.ts  (…)
+        - modules/charts/runtime/aggregate.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+        - modules/charts/runtime/axis.ts
+          - shared/types.ts  (…)
+        - modules/charts/runtime/shared.ts
+          - shared/types.ts  (…)
+          - shared/pipeline.ts  (…)
+          - modules/charts/runtime/palette.ts
+          - modules/charts/types.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/line.ts
+        - shared/types.ts  (…)
+        - shared/datetime.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/fit/engine.ts  (…)
+        - modules/charts/fit/summary.ts  (…)
+        - modules/charts/flags.ts
+          - shared/types.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/scatter.ts
+        - shared/types.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/fit/engine.ts  (…)
+        - modules/charts/fit/summary.ts  (…)
+        - modules/charts/flags.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/box.ts
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/axis.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/pie.ts
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/heatmap.ts
+        - shared/pipeline.ts  (…)
+        - modules/charts/runtime/aggregate.ts  (…)
+        - modules/charts/runtime/palette.ts  (…)
+        - modules/charts/runtime/shared.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/runtime/mapping.ts
+        - shared/types.ts  (…)
+        - modules/charts/types.ts  (…)
+      - modules/charts/panel/configure/BarConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue
+          - shared/types.ts  (…)
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/MappingSlot.vue
+            - shared/types.ts  (…)
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/aggregate.ts  (…)
+            - modules/charts/panel/AxisSettingsPopover.vue
+              - shared/types.ts  (…)
+              - ui/index.ts  (collapsed — see components.md)
+              - modules/charts/runtime/aggregate.ts  (…)
+              - modules/charts/panel/context.ts
+                - shared/types.ts  (…)
+                - modules/charts/types.ts  (…)
+              - modules/charts/types.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+            - modules/charts/types.ts  (…)
+          - modules/charts/panel/PalettePicker.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/palette.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/configure/LineConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/ScatterConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/BoxConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/PieConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/configure/HeatmapConfigure.vue
+        - modules/charts/panel/configure/BaseConfigure.vue  (…)
+      - modules/charts/panel/style/BarStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue
+          - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/style/AxisSection.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/panel/context.ts  (…)
+          - modules/charts/panel/style/ColorField.vue
+            - ui/index.ts  (collapsed — see components.md)
+          - modules/charts/panel/style/SeriesColorsSection.vue
+            - ui/index.ts  (collapsed — see components.md)
+            - modules/charts/runtime/palette.ts  (…)
+            - modules/charts/panel/context.ts  (…)
+          - modules/charts/panel/context.ts  (…)
+      - modules/charts/panel/style/LineStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/ScatterStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/BoxStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/PieStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/panel/style/HeatmapStyle.vue
+        - modules/charts/panel/style/BaseStyle.vue  (…)
+      - modules/charts/types.ts  (…)
+    - modules/charts/types.ts  (…)
+- modules/flowchart/AddStepPanel.vue
+  - shared/types.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/steps/registry.ts  (…)
+  - modules/steps/exec/index.ts
+    - shared/types.ts  (…)
+    - shared/tree.ts  (…)
+    - modules/steps/registry.ts  (…)
+    - modules/steps/exec/types.ts
+      - shared/types.ts  (…)
+    - modules/steps/exec/computedColumn.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/factories.ts  (…)
+      - modules/steps/exec/types.ts  (…)
+    - modules/steps/exec/filter.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/factories.ts  (…)
+      - modules/steps/exec/types.ts  (…)
+    - modules/steps/exec/hideColumns.ts
+      - shared/types.ts  (…)
+      - shared/pipeline.ts  (…)
+      - shared/factories.ts  (…)
+      - modules/steps/exec/types.ts  (…)
+    - modules/steps/exec/join.ts
+      - shared/types.ts  (…)
+      - shared/join.ts
+        - shared/types.ts  (…)
+        - shared/id.ts  (…)
+      - shared/factories.ts  (…)
+      - modules/steps/exec/types.ts  (…)
+    - modules/steps/exec/union.ts
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+      - shared/factories.ts  (…)
+      - modules/steps/exec/types.ts  (…)
+- modules/steps/panel/StepConfigPanel.vue
+  - shared/types.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/steps/registry.ts  (…)
+  - modules/steps/exec/index.ts  (…)
+  - modules/steps/panel/StepConfigForm.vue
+    - shared/types.ts  (…)
+    - stores/analysisStore.ts  (…)
+    - ui/index.ts  (collapsed — see components.md)
+    - modules/steps/registry.ts  (…)
+    - modules/steps/exec/index.ts  (…)
+    - modules/table/filterForm.ts
+      - shared/types.ts  (…)
+- modules/flowchart/connection.ts
+  - modules/flowchart/graph.ts  (…)
+- modules/steps/registry.ts  (…)
+- shared/id.ts  (…)
+- shared/types.ts  (…)
+- modules/steps/exec/index.ts  (…)
+- modules/steps/rerun.ts
+  - shared/types.ts  (…)
+  - modules/steps/exec/index.ts  (…)
+```
+
+## 数据管道步骤配置面板
+Entry: `src/modules/steps/panel/StepConfigPanel.vue`
+渲染：步骤配置抽屉（草稿语义）：StepConfigForm 编辑 step.config 驱动 150ms 防抖预览，Save 物化落盘，Cancel 恢复快照。
+
+Dependencies:
+```
+- shared/types.ts
+- stores/analysisStore.ts
+  - shared/types.ts  (…)
+  - shared/datetime.ts
+  - shared/repository.ts
+    - shared/types.ts  (…)
+    - shared/db.ts
+      - shared/types.ts  (…)
+    - shared/migrateSteps.ts
+      - shared/types.ts  (…)
+      - shared/id.ts
+      - shared/datetime.ts  (…)
+      - modules/steps/registry.ts
+        - shared/types.ts  (…)
+- ui/index.ts  (collapsed — see components.md)
+- modules/steps/registry.ts  (…)
+- modules/steps/exec/index.ts
+  - shared/types.ts  (…)
+  - shared/tree.ts
+    - shared/types.ts  (…)
+  - modules/steps/registry.ts  (…)
+  - modules/steps/exec/types.ts
+    - shared/types.ts  (…)
+  - modules/steps/exec/computedColumn.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts
+      - shared/types.ts  (…)
+      - shared/datetime.ts  (…)
+      - shared/tree.ts  (…)
+    - shared/factories.ts
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+      - shared/datetime.ts  (…)
+    - modules/steps/exec/types.ts  (…)
+  - modules/steps/exec/filter.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/factories.ts  (…)
+    - modules/steps/exec/types.ts  (…)
+  - modules/steps/exec/hideColumns.ts
+    - shared/types.ts  (…)
+    - shared/pipeline.ts  (…)
+    - shared/factories.ts  (…)
+    - modules/steps/exec/types.ts  (…)
+  - modules/steps/exec/join.ts
+    - shared/types.ts  (…)
+    - shared/join.ts
+      - shared/types.ts  (…)
+      - shared/id.ts  (…)
+    - shared/factories.ts  (…)
+    - modules/steps/exec/types.ts  (…)
+  - modules/steps/exec/union.ts
+    - shared/types.ts  (…)
+    - shared/id.ts  (…)
+    - shared/factories.ts  (…)
+    - modules/steps/exec/types.ts  (…)
+- modules/steps/panel/StepConfigForm.vue
+  - shared/types.ts  (…)
+  - stores/analysisStore.ts  (…)
+  - ui/index.ts  (collapsed — see components.md)
+  - modules/steps/registry.ts  (…)
+  - modules/steps/exec/index.ts  (…)
+  - modules/table/filterForm.ts
+    - shared/types.ts  (…)
+```

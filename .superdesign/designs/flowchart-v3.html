@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowchart Canvas - Insight Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet">
+    <meta name="view-transition" content="same-origin">
+    <style>
+        :root {
+            --is-primary: #1e2a78;
+            --is-primary-hover: #27359a;
+            --is-accent: #2e5bff;
+            --is-accent-soft: #eef2ff;
+            --is-bg: #f7f8fa;
+            --is-surface: #ffffff;
+            --is-surface-hover: #f2f4f7;
+            --is-border: #e4e7ec;
+            --is-border-strong: #d0d5dd;
+            --is-text: #1d2939;
+            --is-text-secondary: #667085;
+            --is-text-tertiary: #98a2b3;
+            --is-radius: 8px;
+            --is-radius-sm: 6px;
+            --is-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+            --is-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
+            --is-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+            --is-font: 'Inter', sans-serif;
+            --is-success: #1f9d66;
+            --is-dur-fast: 150ms;
+            --is-ease: cubic-bezier(0.33, 1, 0.68, 1);
+        }
+
+        body {
+            font-family: var(--is-font);
+            font-size: 13px;
+            color: var(--is-text);
+            background: var(--is-bg);
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        @view-transition { navigation: auto; }
+
+        .ws-grid {
+            display: grid;
+            grid-template-rows: 52px 1fr;
+            grid-template-columns: 280px 1fr 340px;
+            height: 100vh;
+        }
+
+        .header { grid-column: 1 / 4; height: 52px; background: var(--is-surface); border-bottom: 1px solid var(--is-border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 50; view-transition-name: main-header; }
+        .sidebar { background: var(--is-surface); border-right: 1px solid var(--is-border); display: flex; flex-direction: column; overflow-y: auto; view-transition-name: sidebar; }
+        .main-canvas { background: #fbfcfd; background-image: radial-gradient(#d0d5dd 1px, transparent 1px); background-size: 20px 20px; position: relative; overflow: auto; cursor: grab; view-transition-name: main-content; }
+        .config-panel { background: var(--is-surface); border-left: 1px solid var(--is-border); display: flex; flex-direction: column; height: 100%; overflow: hidden; view-transition-name: config-panel; }
+
+        .node-card {
+            position: absolute;
+            background: white;
+            border: 1px solid var(--is-border);
+            border-radius: var(--is-radius);
+            width: 210px;
+            padding: 8px 10px;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+            transition: border-color var(--is-dur-fast) var(--is-ease), transform var(--is-dur-fast) var(--is-ease);
+            cursor: grab;
+        }
+        .node-card:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--is-shadow-md);
+        }
+        .node-card-selected {
+            border: 1px solid var(--is-success);
+            box-shadow: 0 0 0 2px rgba(31, 157, 102, 0.25), var(--is-shadow-md);
+        }
+        .node-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .flow-edge-path {
+            stroke: #98a2b3;
+            stroke-width: 1.5;
+            fill: none;
+            transition: stroke var(--is-dur-fast) var(--is-ease);
+        }
+        .flow-edge-active {
+            stroke: var(--is-success);
+            stroke-width: 2;
+        }
+        .flow-edge-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border: 1px solid var(--is-border-strong);
+            border-radius: 5px;
+            color: var(--is-text-tertiary);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+        }
+
+        .is-btn {
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0 14px;
+            border: 1px solid transparent;
+            border-radius: var(--is-radius-sm);
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all var(--is-dur-fast) var(--is-ease);
+            font-size: 13px;
+        }
+        .is-btn-primary { background: var(--is-primary); color: white; }
+        .is-btn-primary:hover { background: var(--is-primary-hover); }
+        .is-btn-secondary { background: white; border-color: var(--is-border-strong); color: var(--is-text); box-shadow: var(--is-shadow-sm); }
+        .is-btn-secondary:hover { background: var(--is-surface-hover); border-color: var(--is-text-tertiary); }
+        .is-btn-ghost { color: var(--is-text-secondary); background: transparent; }
+        .is-btn-ghost:hover { background: var(--is-surface-hover); color: var(--is-text); }
+        .is-btn-active { background: var(--is-accent-soft); color: var(--is-accent); border-color: transparent; }
+
+        .popover {
+            position: absolute;
+            background: white;
+            border: 1px solid var(--is-border);
+            border-radius: var(--is-radius);
+            box-shadow: var(--is-shadow-lg);
+            width: 220px;
+            z-index: 60;
+            padding: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="ws-grid">
+        <header class="header">
+            <nav class="flex items-center gap-[6px]">
+                <a href="/" id="nav-projects-link" class="text-[var(--is-text-secondary)] hover:text-[var(--is-accent)] transition-colors">Projects</a>
+                <iconify-icon icon="lucide:chevron-right" class="text-[var(--is-text-tertiary)]" width="12"></iconify-icon>
+                <span class="font-semibold">Kinetic Analysis Demo</span>
+            </nav>
+            <div class="flex items-center gap-[6px]">
+                <a href="#flowchart" class="is-btn is-btn-active" id="cta-flowchart-view">
+                    <iconify-icon icon="lucide:git-branch" width="15"></iconify-icon>
+                    <span>Flowchart</span>
+                </a>
+                <a href="#grid" class="is-btn is-btn-ghost" id="cta-grid-view">
+                    <iconify-icon icon="lucide:table-2" width="15"></iconify-icon>
+                    <span>Grid View</span>
+                </a>
+                <button class="is-btn is-btn-primary" id="cta-run-pipeline">
+                    <iconify-icon icon="lucide:play" width="15"></iconify-icon>
+                    <span>Run pipeline</span>
+                </button>
+            </div>
+        </header>
+
+        <aside class="sidebar">
+            <div class="p-4 pb-2">
+                <div class="h-8 px-3 flex items-center gap-2 border border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] focus-within:border-[var(--is-accent)] transition-all shadow-sm">
+                    <iconify-icon icon="lucide:search" class="text-[var(--is-text-tertiary)]" width="14"></iconify-icon>
+                    <input type="text" placeholder="Search analysis..." class="bg-transparent outline-none w-full text-[13px]">
+                </div>
+            </div>
+            <div class="px-4 py-2 mt-2 flex justify-between items-center">
+                <span class="text-[11px] font-bold text-[var(--is-text-tertiary)] uppercase tracking-[0.05em]">Analysis Data</span>
+                <button id="sidebar-add-btn" class="p-1 text-[var(--is-text-secondary)] hover:bg-[var(--is-surface-hover)] hover:text-[var(--is-text)] rounded transition-colors">
+                    <iconify-icon icon="lucide:plus" width="14"></iconify-icon>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-2">
+                <div class="space-y-[1px]">
+                    <div class="flex items-center h-9 px-3 rounded-[var(--is-radius-sm)] hover:bg-[var(--is-surface-hover)] cursor-pointer group transition-colors">
+                        <iconify-icon icon="lucide:chevron-down" class="text-[var(--is-text-tertiary)] mr-2 group-hover:text-[var(--is-text)]" width="16"></iconify-icon>
+                        <iconify-icon icon="lucide:database" class="text-[var(--is-text-secondary)] mr-2" width="16"></iconify-icon>
+                        <span class="text-[13px] font-medium truncate">Source_Plate_A</span>
+                    </div>
+                    <div class="ml-4 space-y-[1px] border-l border-[var(--is-border)] pl-1">
+                        <div class="flex items-center h-9 px-3 rounded-[var(--is-radius-sm)] bg-[var(--is-accent-soft)] text-[var(--is-accent)] font-semibold cursor-pointer shadow-sm">
+                            <iconify-icon icon="lucide:line-chart" class="mr-2" width="16"></iconify-icon>
+                            <span class="text-[13px] truncate">Kinetic View 1</span>
+                        </div>
+                        <div class="flex items-center h-9 px-3 rounded-[var(--is-radius-sm)] hover:bg-[var(--is-surface-hover)] text-[var(--is-text-secondary)] cursor-pointer group">
+                            <iconify-icon icon="lucide:table-2" class="mr-2" width="16"></iconify-icon>
+                            <span class="text-[13px] truncate">Filtered Results</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center h-9 px-3 rounded-[var(--is-radius-sm)] hover:bg-[var(--is-surface-hover)] cursor-pointer group transition-colors">
+                        <iconify-icon icon="lucide:chevron-right" class="text-[var(--is-text-tertiary)] mr-2" width="16"></iconify-icon>
+                        <iconify-icon icon="lucide:database" class="text-[var(--is-text-secondary)] mr-2" width="16"></iconify-icon>
+                        <span class="text-[13px] truncate text-[var(--is-text-secondary)]">Reference_Metadata</span>
+                    </div>
+                    <div class="flex items-center h-9 px-3 rounded-[var(--is-radius-sm)] hover:bg-[var(--is-surface-hover)] cursor-pointer group transition-colors">
+                        <iconify-icon icon="lucide:chevron-right" class="text-[var(--is-text-tertiary)] mr-2" width="16"></iconify-icon>
+                        <iconify-icon icon="lucide:folder-closed" class="text-[var(--is-text-secondary)] mr-2" width="16"></iconify-icon>
+                        <span class="text-[13px] truncate text-[var(--is-text-secondary)]">QC Archives</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-canvas">
+            <svg class="pipeline-edge absolute inset-0 w-full h-full pointer-events-none">
+                <!-- Smooth Cubic Bezier Paths to match design system FlowEdge.vue -->
+                <!-- Source to Filter -->
+                <path d="M 240 145 C 290 145, 290 145, 340 145" class="flow-edge-path"></path>
+                <!-- Filter to Join -->
+                <path d="M 550 145 C 600 145, 600 215, 650 215" class="flow-edge-path flow-edge-active"></path>
+                <!-- Join to Compute -->
+                <path d="M 860 215 C 910 215, 910 215, 960 215" class="flow-edge-path"></path>
+                <!-- Compute to Chart -->
+                <path d="M 1170 215 C 1220 215, 1220 215, 1270 215" class="flow-edge-path"></path>
+            </svg>
+
+            <!-- Edge Icon Markers -->
+            <div class="absolute pointer-events-none" style="top: 136px; left: 281px;">
+                <div class="flow-edge-marker">
+                    <iconify-icon icon="lucide:table-2" width="10"></iconify-icon>
+                </div>
+            </div>
+            <div class="absolute pointer-events-none" style="top: 171px; left: 591px;">
+                <div class="flow-edge-marker border-[var(--is-success)] text-[var(--is-success)]">
+                    <iconify-icon icon="lucide:table-2" width="10"></iconify-icon>
+                </div>
+            </div>
+
+            <!-- Nodes -->
+            <div class="node-card" style="top: 100px; left: 30px;">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="node-icon bg-blue-50 text-blue-600">
+                        <iconify-icon icon="lucide:file-spreadsheet" width="15"></iconify-icon>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-[var(--is-success-soft)] text-[var(--is-success)] font-semibold rounded-[var(--is-radius-full)]">Ready</span>
+                </div>
+                <div class="font-semibold truncate leading-tight">Source_Plate_A</div>
+                <div class="text-[11px] text-[var(--is-text-tertiary)] mt-0.5">Dataset • 128 rows</div>
+            </div>
+
+            <div class="node-card node-card-selected" style="top: 100px; left: 340px;">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="node-icon bg-orange-50 text-orange-600">
+                        <iconify-icon icon="lucide:filter" width="15"></iconify-icon>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-[var(--is-success-soft)] text-[var(--is-success)] font-semibold rounded-[var(--is-radius-full)]">Applied</span>
+                </div>
+                <div class="font-semibold truncate leading-tight">Clean Replicates</div>
+                <div class="text-[11px] text-[var(--is-text-tertiary)] mt-0.5">Filter • 2 conditions</div>
+            </div>
+
+            <div class="node-card" style="top: 170px; left: 650px;">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="node-icon bg-purple-50 text-purple-600">
+                        <iconify-icon icon="lucide:git-merge" width="15"></iconify-icon>
+                    </div>
+                </div>
+                <div class="font-semibold truncate leading-tight">Metadata Join</div>
+                <div class="text-[11px] text-[var(--is-text-tertiary)] mt-0.5">Inner Join • Sample ID</div>
+            </div>
+
+            <div class="node-card" style="top: 170px; left: 960px;">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="node-icon bg-indigo-50 text-indigo-600">
+                        <iconify-icon icon="lucide:calculator" width="15"></iconify-icon>
+                    </div>
+                </div>
+                <div class="font-semibold truncate leading-tight">Normalize Response</div>
+                <div class="text-[11px] text-[var(--is-text-tertiary)] mt-0.5">Calculated • 1 col</div>
+            </div>
+
+            <div class="node-card" style="top: 170px; left: 1270px;">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="node-icon bg-emerald-50 text-emerald-600">
+                        <iconify-icon icon="lucide:line-chart" width="15"></iconify-icon>
+                    </div>
+                </div>
+                <div class="font-semibold truncate leading-tight">Kinetic View 1</div>
+                <div class="text-[11px] text-[var(--is-text-tertiary)] mt-0.5">Output • Plot</div>
+            </div>
+
+            <div class="popover" style="top: 190px; left: 450px;">
+                <div class="px-3 py-2 border-b border-[var(--is-border)] bg-gray-50 rounded-t-[var(--is-radius)]">
+                    <span class="text-[11px] font-bold text-[var(--is-text-secondary)] uppercase tracking-[.05em]">Add step</span>
+                </div>
+                <div class="py-1">
+                    <button id="add-filter-btn" class="w-full text-left px-3 py-2 hover:bg-[var(--is-surface-hover)] flex items-center gap-[10px] text-[13px] transition-colors">
+                        <iconify-icon icon="lucide:filter" class="text-orange-500" width="14"></iconify-icon>
+                        Filter Rows
+                    </button>
+                    <button id="add-compute-btn" class="w-full text-left px-3 py-2 hover:bg-[var(--is-surface-hover)] flex items-center gap-[10px] text-[13px] transition-colors">
+                        <iconify-icon icon="lucide:calculator" class="text-indigo-500" width="14"></iconify-icon>
+                        Computed Column
+                    </button>
+                    <button id="add-join-btn" class="w-full text-left px-3 py-2 hover:bg-[var(--is-surface-hover)] flex items-center gap-[10px] text-[13px] transition-colors">
+                        <iconify-icon icon="lucide:git-merge" class="text-purple-500" width="14"></iconify-icon>
+                        Join Datasets
+                    </button>
+                    <div class="h-[1px] bg-[var(--is-border)] my-1"></div>
+                    <button id="add-chart-btn" class="w-full text-left px-3 py-2 hover:bg-[var(--is-surface-hover)] flex items-center gap-[10px] text-[13px] transition-colors">
+                        <iconify-icon icon="lucide:line-chart" class="text-emerald-500" width="14"></iconify-icon>
+                        Create Visualization
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <aside class="config-panel">
+            <header class="h-[52px] flex items-center px-4 border-b border-[var(--is-border)] flex-shrink-0">
+                <h2 class="font-semibold text-sm tracking-tight">Configure Step</h2>
+                <button id="close-config-btn" class="ml-auto p-1.5 text-[var(--is-text-tertiary)] hover:bg-[var(--is-surface-hover)] hover:text-[var(--is-text)] rounded transition-all">
+                    <iconify-icon icon="lucide:x" width="18"></iconify-icon>
+                </button>
+            </header>
+            <div class="flex-1 overflow-y-auto">
+                <section class="p-4">
+                    <h3 class="text-[11px] font-bold text-[var(--is-text-tertiary)] uppercase tracking-[0.05em] mb-3">Step Details</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[12px] font-semibold text-[var(--is-text-secondary)] block mb-1.5">Node Name</label>
+                            <div class="h-8 px-2 flex items-center border border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] bg-white focus-within:border-[var(--is-accent)] transition-all">
+                                <input type="text" value="Clean Replicates" class="bg-transparent outline-none w-full text-[13px] font-medium">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-[13px] font-medium text-[var(--is-text)]">Active during run</span>
+                            <button id="toggle-active" class="w-[34px] h-[20px] bg-[var(--is-accent)] rounded-full relative transition-all">
+                                <div class="absolute right-[2px] top-[2px] w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="h-[1px] bg-[var(--is-border)] mx-4"></div>
+
+                <section class="p-4">
+                    <h3 class="text-[11px] font-bold text-[var(--is-text-tertiary)] uppercase tracking-[0.05em] mb-3">Filter Logic</h3>
+                    <div class="space-y-2">
+                        <div class="p-3 bg-[var(--is-bg)] border border-[var(--is-border)] rounded-[var(--is-radius-sm)] relative group">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-[10px] font-bold text-[var(--is-text-tertiary)] uppercase">Condition 1</span>
+                                <button id="delete-cond-1" class="text-[var(--is-text-tertiary)] hover:text-[var(--is-danger)] transition-colors opacity-0 group-hover:opacity-100">
+                                    <iconify-icon icon="lucide:trash-2" width="14"></iconify-icon>
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex gap-2">
+                                    <div class="h-8 px-2 border border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] bg-white flex-1 text-[13px] flex items-center">Concentration</div>
+                                    <div class="h-8 px-2 border border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] bg-white w-[64px] text-[13px] flex items-center justify-between">
+                                        <span>&gt;</span>
+                                        <iconify-icon icon="lucide:chevron-down" width="14" class="text-[var(--is-text-tertiary)]"></iconify-icon>
+                                    </div>
+                                </div>
+                                <div class="h-8 px-2 border border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] bg-white text-[13px] flex items-center font-mono">0.005</div>
+                            </div>
+                        </div>
+                        
+                        <button id="add-condition-btn" class="w-full h-8 border border-dashed border-[var(--is-border-strong)] rounded-[var(--is-radius-sm)] text-[var(--is-accent)] font-semibold text-[12px] flex items-center justify-center gap-2 hover:bg-[var(--is-accent-soft)] transition-all mt-2">
+                            <iconify-icon icon="lucide:plus" width="14"></iconify-icon>
+                            <span>Add condition</span>
+                        </button>
+                    </div>
+                </section>
+
+                <div class="h-[1px] bg-[var(--is-border)] mx-4"></div>
+
+                <section class="p-4">
+                    <h3 class="text-[11px] font-bold text-[var(--is-text-tertiary)] uppercase tracking-[0.05em] mb-3">Advanced Settings</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] text-[var(--is-text-secondary)]">Propagate error flags</span>
+                            <button id="toggle-propagate" class="w-[34px] h-[20px] bg-[var(--is-border-strong)] rounded-full relative transition-all">
+                                <div class="absolute left-[2px] top-[2px] w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] text-[var(--is-text-secondary)]">Strict type matching</span>
+                            <button id="toggle-strict" class="w-[34px] h-[20px] bg-[var(--is-accent)] rounded-full relative transition-all">
+                                <div class="absolute right-[2px] top-[2px] w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <footer class="p-4 border-t border-[var(--is-border)] flex justify-end gap-2 bg-white">
+                <button id="cancel-update-btn" class="is-btn is-btn-secondary min-w-[80px]">Cancel</button>
+                <button id="confirm-update-btn" class="is-btn is-btn-primary min-w-[100px]">Update Node</button>
+            </footer>
+        </aside>
+    </div>
+
+</body></html>
