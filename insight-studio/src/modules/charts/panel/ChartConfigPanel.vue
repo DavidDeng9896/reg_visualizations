@@ -96,6 +96,8 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  height: 44px;
+  flex-shrink: 0;
   padding: 0 8px 0 16px;
   border-bottom: 1px solid var(--is-border);
 }
@@ -113,22 +115,29 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 10px 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+}
+/* 面板内输入/下拉统一 32px 高（对齐设计稿 is-field h-8） */
+.ccpanel__body :deep(.is-field--sm),
+.ccpanel__body :deep(.is-select--sm .is-select__trigger) {
+  height: 32px;
 }
 .ccpanel__ft {
-  margin-top: 12px;
-  padding: 10px 8px;
+  margin-top: auto;
+  padding: 16px;
   border-top: 1px solid var(--is-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .ccpanel__ft-title {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--is-text-tertiary);
-  margin-bottom: 6px;
 }
 .ccpanel__ft-empty {
   font-size: var(--is-text-xs);

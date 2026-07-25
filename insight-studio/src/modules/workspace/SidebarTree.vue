@@ -236,7 +236,7 @@ function connectExternal() {
       <div class="sidebar__section-head">
         <span class="sidebar__section-title">Analysis data</span>
         <button type="button" class="sidebar__add" aria-label="添加数据" title="Add data" @click="emit('add-data')">
-          <IIcon name="plus" :size="13" />
+          <IIcon name="plus" :size="14" />
         </button>
       </div>
 
@@ -264,9 +264,9 @@ function connectExternal() {
               :aria-label="isTableExpanded(t) ? '收起' : '展开'"
               @click.stop="toggleTable(t.id)"
             >
-              <IIcon :name="isTableExpanded(t) ? 'chevron-down' : 'chevron-right'" :size="12" />
+              <IIcon :name="isTableExpanded(t) ? 'chevron-down' : 'chevron-right'" :size="14" />
             </button>
-            <IIcon :name="t.source === 'combine' ? 'combine' : 'database'" :size="14" class="tnode__icon" />
+            <IIcon :name="t.source === 'combine' ? 'combine' : 'database'" :size="16" class="tnode__icon" />
             <span class="tnode__name is-ellipsis" :title="t.name">{{ t.name }}</span>
             <span class="tnode__actions">
               <button
@@ -412,7 +412,7 @@ function connectExternal() {
   position: relative;
 }
 .sidebar__search {
-  padding: 12px 12px 8px;
+  padding: 12px;
 }
 .sidebar__section {
   flex: 1;
@@ -424,7 +424,7 @@ function connectExternal() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
+  padding: 8px 18px;
 }
 .sidebar__section-title {
   font-size: 11px;
@@ -446,7 +446,7 @@ function connectExternal() {
 .sidebar__tree {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 8px 16px;
+  padding: 4px 0 16px;
 }
 .sidebar__empty {
   padding: 24px 12px;
@@ -467,11 +467,13 @@ function connectExternal() {
 .tnode__row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 30px;
-  padding: 0 4px 0 8px;
+  gap: 8px;
+  height: 36px;
+  margin: 0 6px;
+  padding: 0 12px;
   border-radius: var(--is-radius-sm);
   cursor: pointer;
+  font-size: var(--is-text-sm);
   transition: background-color var(--is-dur-fast) var(--is-ease);
 }
 .tnode__row:hover {
@@ -484,6 +486,9 @@ function connectExternal() {
 .tnode__row--selected .tnode__name {
   color: var(--is-accent);
   font-weight: 500;
+}
+.tnode__row--selected .tnode__icon {
+  color: var(--is-accent);
 }
 .tnode__chevron {
   display: inline-flex;

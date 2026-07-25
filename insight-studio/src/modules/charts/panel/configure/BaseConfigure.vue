@@ -162,66 +162,73 @@ const constraintMax = computed({
 <template>
   <div class="cfg">
     <!-- 映射槽位 -->
-    <MappingSlot v-for="slot in def.mappingSlots" :key="slot.key" :slot="slot" />
+    <section class="cfg__section">
+      <MappingSlot v-for="slot in def.mappingSlots" :key="slot.key" :slot="slot" />
 
-    <!-- X⇄Y 交换 -->
-    <div v-if="caps.swapXY" class="cfg__row">
-      <IButton size="sm" variant="ghost" icon="swap" class="cfg__swap" @click="swapXY">交换 X / Y</IButton>
-    </div>
+      <!-- X⇄Y 交换 -->
+      <div v-if="caps.swapXY" class="cfg__row">
+        <IButton size="sm" variant="ghost" icon="swap" class="cfg__swap" @click="swapXY">交换 X / Y</IButton>
+      </div>
+    </section>
 
-    <!-- Bar：方向 / 堆叠 -->
-    <div v-if="caps.horizontal" class="cfg__row">
-      <span class="cfg__label">方向</span>
-      <ISelect
-        v-model="direction"
-        :options="[
-          { value: 'vertical', label: '竖直' },
-          { value: 'horizontal', label: '水平' },
-        ]"
-        size="sm"
-        aria-label="柱方向"
-      />
-    </div>
-    <div v-if="caps.stack" class="cfg__row">
-      <span class="cfg__label">分组模式</span>
-      <ISelect
-        v-model="mode"
-        :options="[
-          { value: 'grouped', label: '并排 (Grouped)' },
-          { value: 'stacked', label: '堆叠 (Stacked)' },
-        ]"
-        size="sm"
-        aria-label="分组模式"
-      />
-    </div>
+    <!-- 图种选项 -->
+    <section class="cfg__section">
+      <h4 class="cfg__section-title">Options</h4>
 
-    <!-- 误差棒 -->
-    <div v-if="caps.errorBars" class="cfg__row">
-      <span class="cfg__label">Error bars</span>
-      <ITooltip :content="meanActive ? '' : '仅在聚合为 Average (Mean) 时可用'" placement="bottom">
+      <!-- Bar：方向 / 堆叠 -->
+      <div v-if="caps.horizontal" class="cfg__row">
+        <span class="cfg__label">方向</span>
         <ISelect
-          v-model="errorBars"
-          :disabled="!meanActive"
+          v-model="direction"
           :options="[
-            { value: 'none', label: 'None' },
-            { value: 'sd', label: 'Standard Deviation' },
-            { value: 'sem', label: 'Standard Error of the Mean' },
+            { value: 'vertical', label: '竖直' },
+            { value: 'horizontal', label: '水平' },
           ]"
           size="sm"
-          aria-label="误差棒"
+          aria-label="柱方向"
         />
-      </ITooltip>
-    </div>
+      </div>
+      <div v-if="caps.stack" class="cfg__row">
+        <span class="cfg__label">分组模式</span>
+        <ISelect
+          v-model="mode"
+          :options="[
+            { value: 'grouped', label: '并排 (Grouped)' },
+            { value: 'stacked', label: '堆叠 (Stacked)' },
+          ]"
+          size="sm"
+          aria-label="分组模式"
+        />
+      </div>
 
-    <!-- 色板 -->
-    <div class="cfg__row">
-      <span class="cfg__label">Color palette</span>
-      <PalettePicker v-model="palette" :continuous="def.type === 'heatmap'" class="cfg__palette" />
-    </div>
+      <!-- 误差棒 -->
+      <div v-if="caps.errorBars" class="cfg__row">
+        <span class="cfg__label">Error bars</span>
+        <ITooltip :content="meanActive ? '' : '仅在聚合为 Average (Mean) 时可用'" placement="bottom">
+          <ISelect
+            v-model="errorBars"
+            :disabled="!meanActive"
+            :options="[
+              { value: 'none', label: 'None' },
+              { value: 'sd', label: 'Standard Deviation' },
+              { value: 'sem', label: 'Standard Error of the Mean' },
+            ]"
+            size="sm"
+            aria-label="误差棒"
+          />
+        </ITooltip>
+      </div>
+
+      <!-- 色板 -->
+      <div class="cfg__row">
+        <span class="cfg__label">Color palette</span>
+        <PalettePicker v-model="palette" :continuous="def.type === 'heatmap'" class="cfg__palette" />
+      </div>
+    </section>
 
     <!-- REGRESSION（6B：Line/Scatter 拟合套件） -->
     <section v-if="caps.regression" class="cfg__section">
-      <h4 class="cfg__section-title">REGRESSION</h4>
+      <h4 class="cfg__section-title">Regression</h4>
       <div class="cfg__row">
         <span class="cfg__label">Regression model</span>
         <ISelect v-model="regModel" :options="regressionModels" placeholder="Select a regression type" size="sm" aria-label="回归模型" />
@@ -270,14 +277,30 @@ const constraintMax = computed({
 .cfg {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+}
+/* 分区：hairline 分隔，内部统一 padding 与节奏 */
+.cfg__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--is-border);
+}
+.cfg__section:first-child {
+  border-top: none;
+}
+.cfg__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--is-text-tertiary);
 }
 .cfg__row {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 6px;
 }
 .cfg__row--inline {
   flex-direction: row;
@@ -287,6 +310,7 @@ const constraintMax = computed({
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  min-height: 32px;
 }
 .cfg__row--disabled {
   opacity: 0.55;
@@ -294,8 +318,12 @@ const constraintMax = computed({
 .cfg__label {
   flex-shrink: 0;
   font-size: var(--is-text-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--is-text-secondary);
+}
+.cfg__row--switch > .cfg__label {
+  font-weight: 600;
+  color: var(--is-text);
 }
 .cfg__row :deep(.is-select) {
   flex: 1;
@@ -303,20 +331,6 @@ const constraintMax = computed({
 .cfg__palette {
   flex: 1;
   min-width: 0;
-}
-.cfg__section {
-  margin-top: 8px;
-  padding: 10px 8px 4px;
-  border-top: 1px solid var(--is-border);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.cfg__section-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--is-text-tertiary);
 }
 .cfg__label--icon {
   display: inline-flex;

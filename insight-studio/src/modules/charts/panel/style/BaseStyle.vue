@@ -345,13 +345,12 @@ const numOr = (v: number | undefined, d: number) => v ?? d
 .sty {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 .sty__sec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 8px;
+  gap: 12px;
+  padding: 16px;
   border-top: 1px solid var(--is-border);
 }
 .sty__sec:first-child {
@@ -368,13 +367,17 @@ const numOr = (v: number | undefined, d: number) => v ?? d
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 6px;
 }
 .sty__label {
   flex-shrink: 0;
   font-size: var(--is-text-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--is-text-secondary);
+}
+.sty__row--switch > .sty__label {
+  font-weight: 600;
+  color: var(--is-text);
 }
 .sty__row :deep(.is-field),
 .sty__row :deep(.is-select),
@@ -386,7 +389,7 @@ const numOr = (v: number | undefined, d: number) => v ?? d
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 .sty__inline {
   display: flex;
@@ -397,6 +400,7 @@ const numOr = (v: number | undefined, d: number) => v ?? d
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  min-height: 32px;
 }
 .sty__inline :deep(.is-field) {
   flex: 1;

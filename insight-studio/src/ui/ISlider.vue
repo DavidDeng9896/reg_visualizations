@@ -81,11 +81,12 @@ function onInput(e: Event) {
   transform: scale(1.15);
 }
 .is-slider__input::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #fff;
   border: 2px solid var(--is-accent);
+  box-shadow: var(--is-shadow-sm);
 }
 .is-slider__input:focus-visible {
   box-shadow: var(--is-ring);

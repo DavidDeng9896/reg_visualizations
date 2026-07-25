@@ -40,7 +40,7 @@ function onClick(ev: MouseEvent) {
     @click="onClick"
   >
     <span v-if="loading" class="is-btn__spinner" aria-hidden="true" />
-    <IIcon v-else-if="icon" :name="icon" :size="size === 'sm' ? 13 : 15" />
+    <IIcon v-else-if="icon" :name="icon" :size="size === 'sm' ? 13 : 14" />
     <span v-if="$slots.default" class="is-btn__label"><slot /></span>
   </button>
 </template>
@@ -54,6 +54,7 @@ function onClick(ev: MouseEvent) {
   border: 1px solid transparent;
   border-radius: var(--is-radius-sm);
   font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
   user-select: none;
   transition:
@@ -64,21 +65,21 @@ function onClick(ev: MouseEvent) {
     opacity var(--is-dur-fast) var(--is-ease);
 }
 .is-btn--md {
-  height: 32px;
-  padding: 0 14px;
+  height: var(--is-control-h-md);
+  padding: 0 10px;
   font-size: var(--is-text-sm);
 }
 .is-btn--sm {
-  height: 28px;
-  padding: 0 10px;
+  height: var(--is-control-h-sm);
+  padding: 0 8px;
   font-size: var(--is-text-xs);
 }
 .is-btn--icon-only.is-btn--md {
-  width: 32px;
+  width: var(--is-control-h-md);
   padding: 0;
 }
 .is-btn--icon-only.is-btn--sm {
-  width: 28px;
+  width: var(--is-control-h-sm);
   padding: 0;
 }
 

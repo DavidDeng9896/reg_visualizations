@@ -69,8 +69,8 @@ function setLabel(name: string, label: string) {
 .scolors {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 8px;
+  gap: 12px;
+  padding: 16px;
   border-top: 1px solid var(--is-border);
 }
 .scolors__title {
@@ -84,12 +84,13 @@ function setLabel(name: string, label: string) {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 32px;
 }
 .scolors__swatch {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
-  border: 1px solid rgba(16, 24, 40, 0.15);
+  border: 1px solid rgba(16, 24, 40, 0.1);
   flex-shrink: 0;
   transition: transform var(--is-dur-fast) var(--is-ease);
 }

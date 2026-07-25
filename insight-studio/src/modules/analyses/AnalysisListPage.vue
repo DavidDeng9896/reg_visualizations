@@ -7,16 +7,23 @@ import { createEmptyAnalysis } from '../../shared/factories'
 import { createDemoAnalysis } from '../../shared/seed'
 import { countAnalysisViews } from '../../shared/tree'
 import { formatRelative } from '../../shared/datetime'
-import { IButton, IEmptyState, IModal, IPopover, ITextField, IIcon, toast } from '../../ui'
+import { IButton, IBadge, IEmptyState, IModal, IPopover, ITextField, IIcon, toast } from '../../ui'
 
 const router = useRouter()
 
 const analyses = ref<Analysis[]>([])
 const loading = ref(true)
+const query = ref('')
 
 const sorted = computed(() =>
   analyses.value.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 )
+
+const visible = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return sorted.value
+  return sorted.value.filter((a) => a.name.toLowerCase().includes(q))
+})
 
 async function refresh() {
   loading.value = true
@@ -142,51 +149,80 @@ function toggleMenu(id: string) {
         <IButton icon="database" :loading="demoLoading" @click="createDemo">一键 Demo</IButton>
       </IEmptyState>
 
-      <div v-else class="grid">
-        <article
-          v-for="a in sorted"
-          :key="a.id"
-          class="card"
-          tabindex="0"
-          role="link"
-          data-testid="analysis-card"
-          :data-name="a.name"
-          :aria-label="`打开 ${a.name}`"
-          @click="router.push(`/analysis/${a.id}`)"
-          @keydown.enter="router.push(`/analysis/${a.id}`)"
-        >
-          <div class="card__top">
-            <div class="card__icon"><IIcon name="flowchart" :size="18" /></div>
-            <IPopover :open="menuFor === a.id" placement="bottom-end" :arrow="false" @update:open="menuFor = $event ? a.id : null">
-              <template #anchor>
-                <button
-                  type="button"
-                  class="card__menu-btn"
-                  aria-label="更多操作"
-                  @click.stop="toggleMenu(a.id)"
-                >
-                  <IIcon name="more" :size="15" />
-                </button>
-              </template>
-              <template #default="{ close }">
-                <div class="menu" role="menu">
-                  <button type="button" class="menu__item" role="menuitem" @click.stop="close(); openRename(a)">
-                    <IIcon name="edit" :size="13" /> 重命名
-                  </button>
-                  <button type="button" class="menu__item menu__item--danger" role="menuitem" @click.stop="close(); openDelete(a)">
-                    <IIcon name="trash" :size="13" /> 删除
-                  </button>
+      <template v-else>
+        <!-- 工具栏：搜索 -->
+        <div class="page__toolbar">
+          <ITextField
+            v-model="query"
+            prefix-icon="search"
+            clearable
+            placeholder="搜索 Analysis 名称…"
+            aria-label="搜索 Analysis"
+            class="page__search"
+          />
+        </div>
+
+        <p v-if="!visible.length" class="page__no-result">没有匹配「{{ query.trim() }}」的 Analysis</p>
+
+        <div v-else class="grid">
+          <article
+            v-for="a in visible"
+            :key="a.id"
+            class="card"
+            tabindex="0"
+            role="link"
+            data-testid="analysis-card"
+            :data-name="a.name"
+            :aria-label="`打开 ${a.name}`"
+            @click="router.push(`/analysis/${a.id}`)"
+            @keydown.enter="router.push(`/analysis/${a.id}`)"
+          >
+            <div class="card__main">
+              <div class="card__head">
+                <div class="card__title-row">
+                  <h3 class="card__name is-ellipsis" :title="a.name">{{ a.name }}</h3>
+                  <IBadge tone="blue" class="card__badge">Analysis</IBadge>
                 </div>
-              </template>
-            </IPopover>
-          </div>
-          <h3 class="card__name is-ellipsis" :title="a.name">{{ a.name }}</h3>
-          <p class="card__meta">
-            {{ a.tables.length }} 张表 · {{ countAnalysisViews(a) }} 个视图
-          </p>
-          <p class="card__time">更新于 {{ formatRelative(a.updatedAt) }}</p>
-        </article>
-      </div>
+                <IPopover :open="menuFor === a.id" placement="bottom-end" :arrow="false" @update:open="menuFor = $event ? a.id : null">
+                  <template #anchor>
+                    <button
+                      type="button"
+                      class="card__menu-btn"
+                      aria-label="更多操作"
+                      @click.stop="toggleMenu(a.id)"
+                    >
+                      <IIcon name="more" :size="15" />
+                    </button>
+                  </template>
+                  <template #default="{ close }">
+                    <div class="menu" role="menu">
+                      <button type="button" class="menu__item" role="menuitem" @click.stop="close(); openRename(a)">
+                        <IIcon name="edit" :size="13" /> 重命名
+                      </button>
+                      <button type="button" class="menu__item menu__item--danger" role="menuitem" @click.stop="close(); openDelete(a)">
+                        <IIcon name="trash" :size="13" /> 删除
+                      </button>
+                    </div>
+                  </template>
+                </IPopover>
+              </div>
+              <p class="card__meta">{{ a.tables.length }} 张表 · {{ countAnalysisViews(a) }} 个视图</p>
+            </div>
+            <div class="card__foot">
+              <span class="card__time">
+                <IIcon name="calendar" :size="12" />
+                更新于 {{ formatRelative(a.updatedAt) }}
+              </span>
+            </div>
+          </article>
+
+          <!-- 新建入口卡片 -->
+          <button type="button" class="card card--create" @click="openCreate">
+            <span class="card__create-icon"><IIcon name="plus" :size="16" /></span>
+            <span class="card__create-text">新建空白 Analysis</span>
+          </button>
+        </div>
+      </template>
     </main>
 
     <!-- 新建 -->
@@ -243,11 +279,13 @@ function toggleMenu(id: string) {
   border-bottom: 1px solid var(--is-border);
 }
 .page__title {
-  font-size: var(--is-text-lg);
+  font-size: 20px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .page__subtitle {
-  font-size: var(--is-text-xs);
+  margin-top: 2px;
+  font-size: var(--is-text-sm);
   color: var(--is-text-secondary);
 }
 .page__actions {
@@ -263,18 +301,38 @@ function toggleMenu(id: string) {
   padding: 40px 0;
   text-align: center;
 }
+.page__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.page__search {
+  width: 320px;
+  max-width: 100%;
+}
+.page__no-result {
+  padding: 40px 0;
+  text-align: center;
+  font-size: var(--is-text-sm);
+  color: var(--is-text-tertiary);
+}
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
 .card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 148px;
   background: var(--is-surface);
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
-  box-shadow: var(--is-shadow-sm);
-  padding: 14px 16px;
+  padding: 20px;
   cursor: pointer;
+  text-align: left;
   transition:
     box-shadow var(--is-dur) var(--is-ease),
     border-color var(--is-dur) var(--is-ease),
@@ -282,29 +340,40 @@ function toggleMenu(id: string) {
 }
 .card:hover,
 .card:focus-visible {
-  border-color: var(--is-border-strong);
+  border-color: var(--is-accent);
   box-shadow: var(--is-shadow-md);
   transform: translateY(-1px);
 }
-.card__top {
+.card__main {
+  min-width: 0;
+}
+.card__head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  gap: 8px;
 }
-.card__icon {
+.card__title-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--is-radius-sm);
-  background: var(--is-accent-soft);
+  gap: 8px;
+  min-width: 0;
+}
+.card__name {
+  font-size: var(--is-text-md);
+  font-weight: 600;
+  transition: color var(--is-dur-fast) var(--is-ease);
+}
+.card:hover .card__name {
   color: var(--is-accent);
+}
+.card__badge {
+  flex-shrink: 0;
 }
 .card__menu-btn {
   display: inline-flex;
   padding: 5px;
+  margin: -5px -5px 0 0;
   border-radius: var(--is-radius-sm);
   color: var(--is-text-tertiary);
   opacity: 0;
@@ -320,19 +389,65 @@ function toggleMenu(id: string) {
   background: var(--is-surface-hover);
   color: var(--is-text);
 }
-.card__name {
-  font-size: var(--is-text-md);
-  font-weight: 600;
-  margin-bottom: 4px;
-}
 .card__meta {
+  margin-top: 6px;
   font-size: var(--is-text-xs);
   color: var(--is-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card__foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--is-border);
 }
 .card__time {
-  font-size: var(--is-text-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
   color: var(--is-text-tertiary);
-  margin-top: 10px;
+}
+/* 新建入口卡片（虚线） */
+.card--create {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px dashed var(--is-border);
+  background: transparent;
+  box-shadow: none;
+}
+.card--create:hover,
+.card--create:focus-visible {
+  border-color: var(--is-accent);
+  background: var(--is-surface);
+  box-shadow: none;
+  transform: none;
+}
+.card__create-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--is-radius-full);
+  background: var(--is-surface-hover);
+  color: var(--is-text-tertiary);
+  transition:
+    background-color var(--is-dur-fast) var(--is-ease),
+    color var(--is-dur-fast) var(--is-ease);
+}
+.card--create:hover .card__create-icon,
+.card--create:focus-visible .card__create-icon {
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
+}
+.card__create-text {
+  font-size: var(--is-text-sm);
+  font-weight: 500;
+  color: var(--is-text-secondary);
 }
 .menu {
   padding: 4px;

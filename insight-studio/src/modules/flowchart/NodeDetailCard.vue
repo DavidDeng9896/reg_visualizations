@@ -97,7 +97,7 @@ function onDelete() {
     :aria-label="isChartNode ? '图表预览' : '节点详情'"
   >
     <header class="flow-detail__head">
-      <span class="flow-detail__icon" :class="{ 'flow-detail__icon--chart': isChartNode }">
+      <span class="flow-detail__icon">
         <IIcon :name="nodeIcon" :size="16" />
       </span>
       <div class="flow-detail__title">
@@ -184,7 +184,7 @@ function onDelete() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--is-border);
 }
 .flow-detail__icon {
@@ -194,13 +194,9 @@ function onDelete() {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: var(--is-success-soft);
-  color: var(--is-success);
-  flex-shrink: 0;
-}
-.flow-detail__icon--chart {
   background: var(--is-accent-soft);
   color: var(--is-accent);
+  flex-shrink: 0;
 }
 .flow-detail__title {
   flex: 1;
@@ -234,10 +230,10 @@ function onDelete() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 .flow-detail__preview {
   display: flex;
@@ -247,7 +243,7 @@ function onDelete() {
 .flow-detail__meta {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 6px 14px;
+  gap: 8px 16px;
   margin: 0;
 }
 .flow-detail__meta--compact {
@@ -271,7 +267,7 @@ function onDelete() {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--is-text-tertiary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .flow-detail__none {
   font-size: var(--is-text-xs);
@@ -295,12 +291,10 @@ function onDelete() {
 }
 
 .flow-detail__foot {
-  padding: 12px;
+  padding: 12px 16px;
   border-top: 1px solid var(--is-border);
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
-}
-.flow-detail__foot :deep(.is-btn) {
-  flex: 1;
 }
 </style>

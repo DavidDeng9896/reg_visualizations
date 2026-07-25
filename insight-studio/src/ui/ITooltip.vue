@@ -70,8 +70,8 @@ onBeforeUnmount(() => clearTimeout(timer))
 }
 .is-tooltip__bubble {
   /* position/top/left from teleported fixed style */
-  background: #1d2939;
-  color: #fff;
+  background: var(--is-text);
+  color: var(--is-text-inverse);
   font-size: var(--is-text-xs);
   line-height: 1.4;
   padding: 4px 8px;

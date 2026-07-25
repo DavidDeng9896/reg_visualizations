@@ -92,7 +92,7 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
     <header class="ws__header">
       <nav class="ws__breadcrumb" aria-label="面包屑">
         <RouterLink to="/" class="ws__crumb-link">Projects</RouterLink>
-        <IIcon name="chevron-right" :size="12" class="ws__crumb-sep" />
+        <IIcon name="chevron-right" :size="14" class="ws__crumb-sep" />
         <span class="ws__crumb-current is-ellipsis">{{ current?.name ?? '…' }}</span>
         <span v-if="dirty" class="ws__dirty" title="有未保存更改">
           <IIcon name="dot" :size="8" />
@@ -252,7 +252,7 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
 .ws__header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .ws__body {
   flex: 1;

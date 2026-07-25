@@ -119,8 +119,10 @@ function select(type: StepType) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  height: 52px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--is-border);
+  flex-shrink: 0;
 }
 .add-step__title {
   font-size: var(--is-text-md);
@@ -153,10 +155,12 @@ function select(type: StepType) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 12px 16px;
+  padding: 4px 12px 16px;
 }
 .add-step__group + .add-step__group {
-  margin-top: 14px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--is-border);
 }
 .add-step__group-title {
   font-size: 11px;
@@ -164,7 +168,7 @@ function select(type: StepType) {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--is-text-tertiary);
-  padding: 8px 4px 4px;
+  padding: 8px 4px 6px;
 }
 .add-step__item {
   display: flex;
@@ -172,7 +176,7 @@ function select(type: StepType) {
   gap: 10px;
   width: 100%;
   padding: 8px;
-  border-radius: var(--is-radius);
+  border-radius: var(--is-radius-sm);
   text-align: left;
   transition: background-color var(--is-dur-fast) var(--is-ease);
 }
@@ -183,12 +187,16 @@ function select(type: StepType) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
-  background: rgba(102, 112, 133, 0.1);
+  background: var(--is-surface-hover);
   color: var(--is-text-secondary);
   flex-shrink: 0;
+}
+.add-step__item:hover .add-step__icon {
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
 }
 .add-step__item-body {
   display: flex;

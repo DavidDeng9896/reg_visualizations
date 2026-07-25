@@ -82,7 +82,7 @@ defineExpose({ focus: () => inputEl.value?.focus(), select: () => inputEl.value?
 .is-field {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--is-surface);
   border: 1px solid var(--is-border-strong);
   border-radius: var(--is-radius-sm);
@@ -92,15 +92,15 @@ defineExpose({ focus: () => inputEl.value?.focus(), select: () => inputEl.value?
     box-shadow var(--is-dur-fast) var(--is-ease);
 }
 .is-field--md {
-  height: 32px;
+  height: var(--is-control-h-md);
 }
 .is-field--sm {
-  height: 28px;
+  height: var(--is-control-h-sm);
   padding: 0 8px;
 }
 .is-field:focus-within {
   border-color: var(--is-accent);
-  box-shadow: 0 0 0 2px rgba(46, 91, 255, 0.14);
+  box-shadow: var(--is-ring-sm);
 }
 .is-field--error,
 .is-field--error:focus-within {

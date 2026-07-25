@@ -39,6 +39,10 @@
   --is-space-8: 32px;
   --is-space-10: 40px;
 
+  /* 控件尺寸 */
+  --is-control-h-sm: 28px;
+  --is-control-h-md: 32px;
+
   /* 圆角 */
   --is-radius-sm: 6px;
   --is-radius: 8px;
@@ -50,6 +54,8 @@
   --is-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
   --is-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
   --is-ring: 0 0 0 3px rgba(46, 91, 255, 0.22);
+  /* 输入控件内用的 2px 窄聚焦环 */
+  --is-ring-sm: 0 0 0 2px rgba(46, 91, 255, 0.14);
 
   /* 字号 */
   --is-text-xs: 12px;

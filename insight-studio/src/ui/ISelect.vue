@@ -246,10 +246,10 @@ function showGroupHeader(i: number): string | null {
     background-color var(--is-dur-fast) var(--is-ease);
 }
 .is-select--md .is-select__trigger {
-  height: 32px;
+  height: var(--is-control-h-md);
 }
 .is-select--sm .is-select__trigger {
-  height: 28px;
+  height: var(--is-control-h-sm);
   font-size: var(--is-text-xs);
 }
 /* ghost：无框文字下拉，仅 hover 浅灰底 */
@@ -275,7 +275,7 @@ function showGroupHeader(i: number): string | null {
 .is-select--open .is-select__trigger,
 .is-select__trigger:focus-visible {
   border-color: var(--is-accent);
-  box-shadow: 0 0 0 2px rgba(46, 91, 255, 0.14);
+  box-shadow: var(--is-ring-sm);
 }
 .is-select__trigger:disabled {
   opacity: 0.5;

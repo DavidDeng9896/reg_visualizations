@@ -76,7 +76,7 @@ const emit = defineEmits<{ (e: 'remove'): void; (e: 'configure'): void; (e: 'cli
     border-color var(--is-dur-fast) var(--is-ease);
 }
 .is-capsule:hover {
-  background: #e9edf3;
+  background: var(--is-border);
   border-color: var(--is-border-strong);
 }
 .is-capsule--active {

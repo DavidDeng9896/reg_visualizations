@@ -134,8 +134,9 @@ const capsuleAgg = (m: FieldMapping): string | undefined =>
 .mslot {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 0 -6px;
   border-radius: var(--is-radius-sm);
   border: 1px solid transparent;
   transition:
@@ -152,9 +153,11 @@ const capsuleAgg = (m: FieldMapping): string | undefined =>
   justify-content: space-between;
 }
 .mslot__label {
-  font-size: var(--is-text-xs);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--is-text-secondary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--is-text-tertiary);
 }
 .mslot__req {
   color: var(--is-danger);
@@ -163,7 +166,7 @@ const capsuleAgg = (m: FieldMapping): string | undefined =>
 .mslot__body {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .mslot__select {

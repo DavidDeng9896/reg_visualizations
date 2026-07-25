@@ -65,7 +65,7 @@ function commitRename() {
     <div
       class="vnode__row"
       :class="{ 'vnode__row--selected': isSelected }"
-      :style="{ paddingLeft: `${8 + depth * 14}px` }"
+      :style="{ paddingLeft: `${12 + depth * 12}px` }"
       role="treeitem"
       data-testid="sidebar-view"
       :data-name="node.name"
@@ -83,10 +83,10 @@ function commitRename() {
         :aria-label="isExpanded ? '收起' : '展开'"
         @click.stop="emit('toggle', node.id)"
       >
-        <IIcon :name="isExpanded ? 'chevron-down' : 'chevron-right'" :size="12" />
+        <IIcon :name="isExpanded ? 'chevron-down' : 'chevron-right'" :size="14" />
       </button>
       <span v-else class="vnode__chevron vnode__chevron--empty" />
-      <IIcon :name="VIEW_ICON[node.type]" :size="14" class="vnode__icon" />
+      <IIcon :name="VIEW_ICON[node.type]" :size="16" class="vnode__icon" />
       <input
         v-if="isEditing"
         v-model="draft"
@@ -185,11 +185,13 @@ function commitRename() {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding-right: 4px;
+  gap: 8px;
+  height: 36px;
+  margin: 0 6px;
+  padding-right: 12px;
   border-radius: var(--is-radius-sm);
   cursor: pointer;
+  font-size: var(--is-text-sm);
   transition: background-color var(--is-dur-fast) var(--is-ease);
 }
 .vnode__row:hover {
@@ -202,6 +204,9 @@ function commitRename() {
 .vnode__row--selected .vnode__name {
   color: var(--is-accent);
   font-weight: 500;
+}
+.vnode__row--selected .vnode__icon {
+  color: var(--is-accent);
 }
 .vnode__chevron {
   display: inline-flex;
@@ -228,7 +233,7 @@ function commitRename() {
 .vnode__rename {
   flex: 1;
   min-width: 0;
-  height: 22px;
+  height: 24px;
   border: 1px solid var(--is-accent);
   border-radius: 4px;
   padding: 0 6px;

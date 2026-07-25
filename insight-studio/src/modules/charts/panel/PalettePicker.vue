@@ -62,7 +62,7 @@ const stopsOf = (p: { colors?: string[]; stops?: string[] }) => p.colors ?? p.st
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 28px;
+  height: 32px;
   padding: 0 10px;
   background: var(--is-surface);
   border: 1px solid var(--is-border-strong);

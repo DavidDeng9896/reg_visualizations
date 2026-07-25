@@ -105,8 +105,8 @@ const maxStr = computed({
 .axis-sec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 8px;
+  gap: 12px;
+  padding: 16px;
   border-top: 1px solid var(--is-border);
 }
 .axis-sec__title {
@@ -120,12 +120,12 @@ const maxStr = computed({
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 6px;
 }
 .axis-sec__label {
   flex-shrink: 0;
   font-size: var(--is-text-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--is-text-secondary);
 }
 .axis-sec__inline {
@@ -137,6 +137,11 @@ const maxStr = computed({
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  min-height: 32px;
+}
+.axis-sec__row--switch > .axis-sec__label {
+  font-weight: 600;
+  color: var(--is-text);
 }
 .axis-sec__row :deep(.is-select),
 .axis-sec__inline :deep(.is-field) {

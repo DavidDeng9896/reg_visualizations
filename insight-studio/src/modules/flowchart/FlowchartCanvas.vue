@@ -784,7 +784,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
+  padding: 4px;
   background: var(--is-surface);
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
@@ -794,8 +794,8 @@ function minimapNodeColor(node: { data?: unknown }): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--is-radius-sm);
   color: var(--is-text-secondary);
   transition:
@@ -836,7 +836,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
 }
 .flow-controls__zoom {
   min-width: 44px;
-  height: 26px;
+  height: 28px;
   padding: 0 6px;
   border-radius: var(--is-radius-sm);
   font-size: var(--is-text-xs);
@@ -853,7 +853,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
   width: 1px;
   height: 16px;
   background: var(--is-border);
-  margin: 0 3px;
+  margin: 0 4px;
 }
 
 .flow-minimap {

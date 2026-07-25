@@ -164,7 +164,7 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
 .axis-pop__body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 12px;
   min-width: 260px;
 }
@@ -172,6 +172,7 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 32px;
 }
 .axis-pop__row--range > * {
   flex: 1;
@@ -180,6 +181,7 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
   flex-shrink: 0;
   width: 84px;
   font-size: var(--is-text-xs);
+  font-weight: 500;
   color: var(--is-text-secondary);
 }
 .axis-pop__hint {
@@ -190,5 +192,10 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
 .axis-pop__row :deep(.is-select),
 .axis-pop__row :deep(.is-field) {
   flex: 1;
+}
+/* 弹层 teleport 到 body，面板级 32px 覆盖不到，这里单独对齐 */
+.axis-pop__row :deep(.is-field--sm),
+.axis-pop__row :deep(.is-select--sm .is-select__trigger) {
+  height: 32px;
 }
 </style>

@@ -9,8 +9,8 @@ import { portTypeIcon } from '../steps/registry'
 
 /**
  * 流程图自定义节点（基于 StepNode + ViewNode）：
- * - 步骤节点：浅绿底圆角卡 + 端口分组 + 三态圆点 + 打开按钮。
- * - 视图节点：紧凑卡，无端口，点击打开工作区。
+ * - 步骤节点：白卡 + 类型图标 + 状态徽章 + 端口分组 + 打开按钮。
+ * - 视图节点：紧凑卡，无端口与徽章，点击打开工作区。
  */
 const props = defineProps<{
   id: string
@@ -75,6 +75,16 @@ const statusTitle = computed(() => {
   return '已配置'
 })
 
+/** 状态徽章文字（仅步骤节点展示；视图节点不显示徽章）。 */
+const statusText = computed(() => {
+  const s = props.data.status
+  if (s === 'running') return 'Running'
+  if (s === 'pending') return 'Pending'
+  if (s === 'failed') return 'Failed'
+  if (s === 'stale') return 'Stale'
+  return 'Ready'
+})
+
 /** 待配置节点在卡片内提示一行小字（对齐 Benchling 行为）。 */
 const pendingHint = computed(() => props.data.kind === 'step' && props.data.status === 'pending')
 </script>
@@ -106,11 +116,9 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
           <IIcon :name="icon" :size="isView ? 13 : 15" />
         </span>
         <span class="flow-node__label is-ellipsis" :title="data.label">{{ data.label }}</span>
-        <span class="flow-node__status" :class="statusClass" :title="statusTitle">
-          <IIcon v-if="data.status === 'running'" name="spinner" :size="10" />
-          <IIcon v-else-if="data.status === 'pending'" name="warning" :size="10" />
-          <IIcon v-else-if="data.status === 'failed'" name="close" :size="10" />
-          <IIcon v-else name="check" :size="10" />
+        <span v-if="isStep" class="flow-node__status" :class="statusClass" :title="statusTitle">
+          <IIcon v-if="data.status === 'running'" name="spinner" :size="10" class="flow-node__status-spin" />
+          {{ statusText }}
         </span>
       </div>
       <span v-if="subLabel" class="flow-node__sub is-ellipsis">{{ subLabel }}</span>
@@ -149,10 +157,10 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
   min-width: 210px;
   max-width: 320px;
   padding: 8px 10px;
-  background: var(--is-node-bg);
-  border: 1px solid #cdebdc;
+  background: var(--is-surface);
+  border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: var(--is-shadow-sm);
   cursor: grab;
   transition:
     border-color var(--is-dur-fast) var(--is-ease),
@@ -167,28 +175,18 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
   box-shadow: var(--is-shadow-md);
 }
 :global(.vue-flow__node.is-active) .flow-node {
-  border-color: var(--is-success);
+  border-color: var(--is-accent);
   box-shadow:
-    0 0 0 2px rgba(31, 157, 102, 0.25),
+    var(--is-ring),
     var(--is-shadow-md);
 }
 :global(.vue-flow__node.is-linked) .flow-node {
-  border-color: #7ccba4;
+  border-color: var(--is-accent);
 }
 
-.flow-node--pending {
-  background: #fffbeb;
-  border-color: #f3e3b3;
-}
-.flow-node--failed {
-  background: #fef3f2;
-  border-color: #fecdca;
-}
 .flow-node--view {
   min-width: 140px;
   padding: 6px 10px;
-  background: #f7f9fb;
-  border-color: var(--is-border);
 }
 
 .flow-node__ports {
@@ -239,22 +237,22 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: rgba(31, 157, 102, 0.12);
-  color: var(--is-success);
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
   flex-shrink: 0;
 }
 .flow-node--view .flow-node__icon {
   width: 20px;
   height: 20px;
-  background: rgba(102, 112, 133, 0.12);
+  background: var(--is-surface-hover);
   color: var(--is-text-secondary);
 }
 .flow-node--pending .flow-node__icon {
-  background: rgba(138, 109, 26, 0.12);
+  background: var(--is-warning-bg);
   color: var(--is-warning-text);
 }
 .flow-node--failed .flow-node__icon {
-  background: rgba(180, 35, 24, 0.12);
+  background: var(--is-danger-soft);
   color: var(--is-danger);
 }
 .flow-node__pending-hint {
@@ -273,7 +271,7 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
 }
 .flow-node__label {
   font-size: var(--is-text-sm);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--is-text);
   line-height: 1.3;
   flex: 1;
@@ -281,33 +279,42 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
 }
 .flow-node__sub {
   font-size: 11px;
-  color: var(--is-text-secondary);
+  color: var(--is-text-tertiary);
   line-height: 1.2;
 }
 
 .flow-node__status {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--is-success);
-  color: #fff;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--is-radius-full);
+  background: var(--is-success-soft);
+  color: var(--is-success);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 .flow-node__status--pending {
-  background: #e3a008;
+  background: var(--is-warning-bg);
+  color: var(--is-warning-text);
 }
 .flow-node__status--running {
-  background: var(--is-accent);
-  animation: spin 1s linear infinite;
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
 }
 .flow-node__status--failed {
-  background: var(--is-danger);
+  background: var(--is-danger-soft);
+  color: var(--is-danger);
 }
 .flow-node__status--stale {
-  background: var(--is-text-tertiary);
+  background: var(--is-surface-hover);
+  color: var(--is-text-secondary);
+}
+.flow-node__status-spin {
+  animation: spin 1s linear infinite;
 }
 @keyframes spin {
   from {
@@ -346,7 +353,7 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
   width: 10px;
   height: 10px;
   background: #fff;
-  border: 1.5px solid #b6c2cf;
+  border: 1.5px solid var(--is-border-strong);
   position: relative;
 }
 /* 扩大端口点击热区，提升拖线命中率（对齐 Benchling 端口可点性） */

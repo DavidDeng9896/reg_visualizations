@@ -38,24 +38,25 @@ const open = ref(false)
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 6px;
 }
 .cf__control {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 32px;
 }
 .cf__label {
   flex-shrink: 0;
   font-size: var(--is-text-xs);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--is-text-secondary);
 }
 .cf__swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  border: 1px solid rgba(16, 24, 40, 0.15);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 24, 40, 0.1);
   transition: transform var(--is-dur-fast) var(--is-ease);
 }
 .cf__swatch:hover {

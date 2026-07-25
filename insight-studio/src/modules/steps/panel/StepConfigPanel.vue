@@ -77,7 +77,7 @@ function cancel() {
     <aside class="step-panel" :class="{ 'step-panel--fullscreen': isFullscreen }" @keydown.esc.stop="cancel">
       <header class="step-panel__header">
         <div class="step-panel__head-left">
-          <ITextField v-model="nameInput" size="sm" class="step-panel__name" aria-label="步骤名称" />
+          <h2 class="step-panel__title">Configure step</h2>
           <span class="step-panel__type">{{ def.label }}</span>
         </div>
         <div class="step-panel__head-actions">
@@ -91,38 +91,52 @@ function cancel() {
       </header>
 
       <div class="step-panel__body">
-        <div class="step-panel__form">
-          <StepConfigForm :step="step" @change="onConfigChange" />
-        </div>
+        <section class="step-panel__section">
+          <h3 class="step-panel__section-title">Step details</h3>
+          <div class="step-panel__field">
+            <label class="step-panel__label">Node name</label>
+            <ITextField v-model="nameInput" size="sm" aria-label="步骤名称" />
+          </div>
+        </section>
 
-        <div class="step-panel__preview">
-          <div class="step-panel__preview-head">
-            <span class="step-panel__preview-title">Preview</span>
-            <span v-if="preview && !preview.error" class="step-panel__preview-count">{{ preview.totalRows }} rows</span>
+        <div class="step-panel__divider" />
+
+        <section class="step-panel__section">
+          <StepConfigForm :step="step" @change="onConfigChange" />
+        </section>
+
+        <div class="step-panel__divider" />
+
+        <section class="step-panel__section">
+          <div class="step-panel__preview">
+            <div class="step-panel__preview-head">
+              <span class="step-panel__preview-title">Preview</span>
+              <span v-if="preview && !preview.error" class="step-panel__preview-count">{{ preview.totalRows }} rows</span>
+            </div>
+            <div v-if="preview?.stats?.length" class="step-panel__preview-stats">
+              <span v-for="s in preview.stats" :key="s.label" class="step-panel__preview-stat">
+                {{ s.label }} <b>{{ s.value }}</b>
+              </span>
+            </div>
+            <div v-if="previewLoading" class="step-panel__preview-loading">Loading preview…</div>
+            <div v-else-if="preview?.error" class="step-panel__preview-error">{{ preview.error }}</div>
+            <div v-else-if="preview && preview.rows.length" class="step-panel__preview-table-wrap">
+              <table class="step-panel__preview-table">
+                <thead>
+                  <tr>
+                    <th v-for="c in preview.columns" :key="c.field">{{ c.title }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, i) in preview.rows" :key="i">
+                    <td v-for="c in preview.columns" :key="c.field">{{ row[c.field] ?? '' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="step-panel__preview-empty">无预览数据</div>
           </div>
-          <div v-if="preview?.stats?.length" class="step-panel__preview-stats">
-            <span v-for="s in preview.stats" :key="s.label" class="step-panel__preview-stat">
-              {{ s.label }} <b>{{ s.value }}</b>
-            </span>
-          </div>
-          <div v-if="previewLoading" class="step-panel__preview-loading">Loading preview…</div>
-          <div v-else-if="preview?.error" class="step-panel__preview-error">{{ preview.error }}</div>
-          <div v-else-if="preview && preview.rows.length" class="step-panel__preview-table-wrap">
-            <table class="step-panel__preview-table">
-              <thead>
-                <tr>
-                  <th v-for="c in preview.columns" :key="c.field">{{ c.title }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, i) in preview.rows" :key="i">
-                  <td v-for="c in preview.columns" :key="c.field">{{ row[c.field] ?? '' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="step-panel__preview-empty">无预览数据</div>
-        </div>
+        </section>
       </div>
 
       <footer class="step-panel__footer">
@@ -158,21 +172,29 @@ function cancel() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  height: 52px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--is-border);
+  flex-shrink: 0;
 }
 .step-panel__head-left {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
 }
-.step-panel__name {
+.step-panel__title {
+  font-size: var(--is-text-md);
   font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 .step-panel__type {
   font-size: var(--is-text-xs);
   color: var(--is-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .step-panel__head-actions {
   display: flex;
@@ -184,7 +206,7 @@ function cancel() {
   display: inline-flex;
   padding: 6px;
   border-radius: var(--is-radius-sm);
-  color: var(--is-text-secondary);
+  color: var(--is-text-tertiary);
 }
 .step-panel__action:hover {
   background: var(--is-surface-hover);
@@ -194,10 +216,40 @@ function cancel() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+}
+.step-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.step-panel__section:first-child {
+  padding-top: 16px;
+}
+.step-panel__divider {
+  height: 1px;
+  margin: 0 16px;
+  background: var(--is-border);
+  flex-shrink: 0;
+}
+.step-panel__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--is-text-tertiary);
+}
+.step-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.step-panel__label {
+  font-size: var(--is-text-xs);
+  font-weight: 600;
+  color: var(--is-text-secondary);
 }
 .step-panel__preview {
   border: 1px solid var(--is-border);
@@ -278,7 +330,7 @@ function cancel() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-top: 1px solid var(--is-border);
 }
 .step-panel__footer-right {
