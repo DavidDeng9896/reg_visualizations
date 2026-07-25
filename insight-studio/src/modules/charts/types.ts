@@ -44,9 +44,15 @@ export interface ChartCapabilities {
   swapXY?: boolean
 }
 
-/** 松散 ECharts option（builder 纯函数产物，交给 ChartPanel 渲染）。 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type ChartOption = Record<string, any>
+export interface PlotlyFigure {
+  data: Array<Record<string, unknown>>
+  layout: Record<string, unknown>
+  config?: Record<string, unknown>
+}
+
+export type ChartOption = PlotlyFigure
+
+export const EMPTY_FIGURE: PlotlyFigure = { data: [], layout: {} }
 
 export interface BuildInput {
   result: ViewResult
@@ -58,6 +64,7 @@ export interface BuildInput {
 }
 
 export interface BuildOutput {
+  /** Plotly figure（builder 纯函数产物，交给 ChartPanel 渲染）。 */
   option: ChartOption
   warnings: string[]
   /** 当前渲染的系列名（供 STYLE 逐系列取色/改标签）。 */

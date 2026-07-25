@@ -254,12 +254,8 @@ watch([() => view.value?.id, () => def.value.type], () => {
 })
 
 function toggleFlagMode(mode: 'flag' | 'clear') {
-  if (flagMode.value === mode) {
-    flagMode.value = 'off'
-    return
-  }
-  flagMode.value = mode
-  toast.info(mode === 'flag' ? '打标模式：在图表上套索圈选数据点（Esc 退出）' : '清除模式：套索圈选已打标（×）的点（Esc 退出）')
+  void mode
+  toast.info('Plotly 版本暂未支持套索打标')
 }
 
 function mutateFlags(arr: RowFlag[]) {
@@ -380,10 +376,10 @@ const chartRef = ref<InstanceType<typeof ChartPanel>>()
 const exportOpen = ref(false)
 function doExport(kind: 'png' | 'pdf') {
   exportOpen.value = false
-  const get = () => chartRef.value?.getDataURL() ?? ''
+  const get = () => chartRef.value?.getDataURL() ?? Promise.resolve('')
   const name = view.value?.name ?? 'chart'
-  if (kind === 'png') exportPng(get, name)
-  else exportPdf(get, name)
+  if (kind === 'png') void exportPng(get, name)
+  else void exportPdf(get, name)
 }
 
 const chips = computed(() => {
@@ -444,6 +440,8 @@ const chartHeight = computed(() => previewConfig.value.style.height)
             <button
               type="button"
               class="cview__flagbtn"
+              disabled
+              title="Plotly 版本暂未支持套索打标"
               :class="{ 'cview__flagbtn--active': flagMode === 'flag' }"
               :aria-pressed="flagMode === 'flag'"
               @click="toggleFlagMode('flag')"
@@ -453,6 +451,8 @@ const chartHeight = computed(() => previewConfig.value.style.height)
             <button
               type="button"
               class="cview__flagbtn"
+              disabled
+              title="Plotly 版本暂未支持套索打标"
               :class="{ 'cview__flagbtn--active': flagMode === 'clear' }"
               :aria-pressed="flagMode === 'clear'"
               @click="toggleFlagMode('clear')"

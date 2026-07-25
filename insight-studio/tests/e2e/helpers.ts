@@ -45,32 +45,12 @@ export async function mapField(page: Page, slotLabel: string, fieldLabel: string
   await pickOption(page.getByRole('combobox', { name: slotLabel }), fieldLabel)
 }
 
-/** 断言图表 canvas 上有「墨迹」（非空白像素超过阈值）。 */
-export async function expectCanvasInk(page: Page, minInk = 40, timeout = 10_000): Promise<void> {
-  const canvases = page.getByTestId('chart-canvas').locator('canvas')
-  await expect(canvases.first()).toBeVisible()
-  await expect
-    .poll(
-      // zrender 分层渲染：大数据量 progressive 序列画在独立图层，
-      // 必须汇总所有 canvas 图层的墨迹，不能只读第一层
-      async () =>
-        canvases.evaluateAll((els: HTMLCanvasElement[]) => {
-          let ink = 0
-          for (const el of els) {
-            const ctx = el.getContext('2d')
-            if (!ctx || el.width === 0) continue
-            const { data } = ctx.getImageData(0, 0, el.width, el.height)
-            for (let i = 0; i < data.length; i += 4 * 173) {
-              const visible = data[i + 3] > 0
-              const nonWhite = data[i] < 240 || data[i + 1] < 240 || data[i + 2] < 240
-              if (visible && nonWhite) ink += 1
-            }
-          }
-          return ink
-        }),
-      { timeout },
-    )
-    .toBeGreaterThan(minInk)
+/** 断言 Plotly 图表已渲染出可见 trace。 */
+export async function expectCanvasInk(page: Page, _minInk = 40, timeout = 10_000): Promise<void> {
+  const plot = page.getByTestId('chart-canvas')
+  await expect(plot).toHaveClass(/js-plotly-plot/, { timeout })
+  await expect(plot).toBeVisible({ timeout })
+  await expect(plot.locator('.plotly .trace').first()).toBeVisible({ timeout })
 }
 
 /** 断言当前没有 error toast。 */

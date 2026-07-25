@@ -5,13 +5,9 @@
 import type { AxisStyleSpec } from '../../../shared/types'
 
 export interface ResolvedAxis {
-  type: 'value' | 'log'
-  name?: string
-  min?: number
-  max?: number
-  nameGap?: number
-  nameLocation?: 'start' | 'middle' | 'end'
-  nameTextStyle?: Record<string, unknown>
+  type: 'linear' | 'log' | 'date' | 'category'
+  title?: { text?: string; font?: Record<string, unknown> }
+  range?: [number, number]
 }
 
 /**
@@ -28,7 +24,7 @@ export function resolveAxis(
   defaultName: string | undefined,
   warnings: string[],
   axisLabel: string,
-  orientation: 'x' | 'y' = 'y',
+  _orientation: 'x' | 'y' = 'y',
 ): ResolvedAxis {
   let scale = spec?.scale ?? 'linear'
   if (scale === 'log' && dataMin <= 0) {
@@ -36,15 +32,19 @@ export function resolveAxis(
     scale = 'linear'
   }
   const resolved: ResolvedAxis = {
-    type: scale === 'log' ? 'log' : 'value',
-    name: spec?.label ?? defaultName,
-    nameLocation: 'middle',
-    nameGap: orientation === 'x' ? 30 : 48,
-    nameTextStyle: { color: '#475467', fontSize: 12, fontWeight: 600 },
+    type: scale === 'log' ? 'log' : 'linear',
+    title: {
+      text: spec?.label ?? defaultName,
+      font: { color: '#475467', size: 12, weight: 600 },
+    },
   }
   if (spec?.range === 'manual') {
-    if (spec.min !== undefined) resolved.min = spec.min
-    if (spec.max !== undefined) resolved.max = spec.max
+    if (spec.min !== undefined && spec.max !== undefined) {
+      resolved.range =
+        scale === 'log'
+          ? [Math.log10(spec.min), Math.log10(spec.max)]
+          : [spec.min, spec.max]
+    }
   }
   return resolved
 }
