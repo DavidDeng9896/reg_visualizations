@@ -39,8 +39,10 @@ echarts.use([
 export type FlagMode = 'off' | 'flag' | 'clear'
 
 /**
- * 图表渲染容器：init + ResizeObserver + 平滑 setOption（notMerge:false）。
- * 行数 > 5000 关闭动画。
+ * 图表渲染容器：init + ResizeObserver + setOption 内容组件替换（replaceMerge）。
+ * 配置驱动的更新不做 merge/形变动画 —— 切图种或改配置时旧系列会残留、
+ * 数据点会"飘"过去，直接无动画替换渲染更稳重；brush 组件不在替换列表中，
+ * 以保证进行中的套索会话不被并发更新销毁。
  * Flag/Clear 模式：激活 brush 套索，禁用 tooltip，圈选结束 emit('lasso', rowIds)。
  */
 const props = withDefaults(
@@ -63,13 +65,16 @@ let ro: ResizeObserver | null = null
 function apply() {
   if (!chart || !props.option) return
   const opt = { ...props.option }
-  if (props.rowCount > 5000) {
-    opt.animation = false
-  }
+  // 配置驱动的更新一律无动画替换内容组件：避免切图种残留旧系列、改配置时数据点形变"飘动"。
+  // 用 replaceMerge 指定内容组件而非 notMerge 全量替换 —— 保留 brush 套索会话，
+  // 否则进行中的圈选会被并发的配置更新销毁。
+  opt.animation = false
   if (props.flagMode !== 'off') {
     opt.tooltip = { ...(opt.tooltip ?? {}), show: false }
   }
-  chart.setOption(opt, { notMerge: false })
+  chart.setOption(opt, {
+    replaceMerge: ['series', 'xAxis', 'yAxis', 'grid', 'visualMap', 'legend', 'title', 'tooltip'],
+  })
   syncBrush()
   emit('rendered')
 }

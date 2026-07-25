@@ -318,7 +318,7 @@ function connectExternal() {
             </span>
           </div>
 
-          <div v-if="isTableExpanded(t)" role="group">
+          <div v-if="isTableExpanded(t)" class="tnode__children" role="group">
             <SidebarTreeNode
               v-for="v in filterViews(t.views, search.trim().toLowerCase())"
               :key="v.id"
@@ -404,8 +404,8 @@ function connectExternal() {
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 260px;
-  min-width: 260px;
+  width: 280px;
+  min-width: 280px;
   height: 100%;
   background: var(--is-surface);
   border-right: 1px solid var(--is-border);
@@ -424,7 +424,7 @@ function connectExternal() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 18px;
+  padding: 8px 20px;
 }
 .sidebar__section-title {
   font-size: 11px;
@@ -482,6 +482,11 @@ function connectExternal() {
 .tnode__row--selected,
 .tnode__row--selected:hover {
   background: var(--is-accent-soft);
+  border-radius: 4px;
+}
+.tnode__children {
+  margin-left: 21px;
+  border-left: 1px solid var(--is-border);
 }
 .tnode__row--selected .tnode__name {
   color: var(--is-accent);

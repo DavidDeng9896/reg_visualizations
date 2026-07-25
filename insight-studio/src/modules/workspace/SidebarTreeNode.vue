@@ -65,7 +65,6 @@ function commitRename() {
     <div
       class="vnode__row"
       :class="{ 'vnode__row--selected': isSelected }"
-      :style="{ paddingLeft: `${12 + depth * 12}px` }"
       role="treeitem"
       data-testid="sidebar-view"
       :data-name="node.name"
@@ -85,7 +84,6 @@ function commitRename() {
       >
         <IIcon :name="isExpanded ? 'chevron-down' : 'chevron-right'" :size="14" />
       </button>
-      <span v-else class="vnode__chevron vnode__chevron--empty" />
       <IIcon :name="VIEW_ICON[node.type]" :size="16" class="vnode__icon" />
       <input
         v-if="isEditing"
@@ -151,7 +149,7 @@ function commitRename() {
       </span>
     </div>
 
-    <div v-if="isExpanded && node.children.length" role="group">
+    <div v-if="isExpanded && node.children.length" class="vnode__children" role="group">
       <SidebarTreeNode
         v-for="child in node.children"
         :key="child.id"
@@ -188,6 +186,7 @@ function commitRename() {
   gap: 8px;
   height: 36px;
   margin: 0 6px;
+  padding-left: 12px;
   padding-right: 12px;
   border-radius: var(--is-radius-sm);
   cursor: pointer;
@@ -200,6 +199,11 @@ function commitRename() {
 .vnode__row--selected,
 .vnode__row--selected:hover {
   background: var(--is-accent-soft);
+  border-radius: 4px;
+}
+.vnode__children {
+  margin-left: 21px;
+  border-left: 1px solid var(--is-border);
 }
 .vnode__row--selected .vnode__name {
   color: var(--is-accent);
@@ -218,9 +222,6 @@ function commitRename() {
   flex-shrink: 0;
   border-radius: 3px;
 }
-.vnode__chevron--empty {
-  width: 16px;
-}
 .vnode__icon {
   color: var(--is-text-secondary);
   flex-shrink: 0;
@@ -229,6 +230,7 @@ function commitRename() {
   flex: 1;
   min-width: 0;
   font-size: var(--is-text-sm);
+  color: var(--is-text-secondary);
 }
 .vnode__rename {
   flex: 1;
