@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { VxeColumn, VxeTable } from 'vxe-table'
 import 'vxe-table/es/style.css'
-import type { Analysis, AnalysisTable, CellValue, ColumnMeta, Filter, Row, Transform, TransformType } from '../../shared/types'
+import type { Analysis, AnalysisTable, CellValue, ColumnMeta, DataType, Filter, Row, Transform, TransformType } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { uuid } from '../../shared/id'
 import { compareValues, isIdentityOrSortOnly, rowIdOf, type ViewResult } from '../../shared/pipeline'
@@ -14,7 +14,7 @@ import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, ITo
 import type { IconName } from '../../ui/icons'
 import { useFloatingPanel } from '../../ui/floating'
 import { useClickOutside, useEscape } from '../../ui/utils'
-import { downloadCsv, toCsv } from './csv'
+import { coerceValue, downloadCsv, toCsv } from './csv'
 import {
   buildPasteRect,
   findRowIndexById,
@@ -429,10 +429,29 @@ function clearColumnFilter() {
 
 /* ------------------------------ 列菜单（单一弹层） ------------------------------ */
 
+const COLUMN_TYPE_OPTIONS: { value: DataType; label: string; icon: IconName }[] = [
+  { value: 'string', label: 'Text', icon: 'type-text' },
+  { value: 'number', label: 'Number', icon: 'type-number' },
+  { value: 'boolean', label: 'Boolean', icon: 'type-text' },
+  { value: 'date', label: 'Date', icon: 'calendar' },
+  { value: 'datetime', label: 'Datetime', icon: 'calendar' },
+  { value: 'structure', label: 'Structure', icon: 'type-structure' },
+]
+
+function dataTypeLabel(type: DataType): string {
+  return COLUMN_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type
+}
+
 const colMenuFor = ref<string | null>(null)
+const colTypeSubOpen = ref(false)
 const menuAnchorEl = ref<HTMLElement>()
 const menuPanelEl = ref<HTMLElement>()
 const menuOpen = computed(() => !!colMenuFor.value)
+const menuColDataType = computed(() => {
+  const f = colMenuFor.value
+  if (!f) return null
+  return table.value?.columns.find((c) => c.field === f)?.dataType ?? props.result.columns.find((c) => c.field === f)?.dataType ?? null
+})
 const { style: menuPanelStyle } = useFloatingPanel(menuOpen, menuAnchorEl, menuPanelEl, () => 'bottom-end', {
   zIndex: 'var(--is-z-popover)',
   minWidth: 180,
@@ -450,6 +469,52 @@ function openColumnMenu(field: string, ev?: Event) {
 }
 function closeColumnMenu() {
   colMenuFor.value = null
+  colTypeSubOpen.value = false
+}
+
+function setColumnDataType(field: string, next: DataType) {
+  const t = table.value
+  if (!t || !editable.value) return
+  const col = t.columns.find((c) => c.field === field)
+  if (!col || col.dataType === next) return
+  const prevType = col.dataType
+  const title = col.title
+  const prevValues = t.rows.map((r) => r[field] ?? null)
+
+  const applyTypeOnly = (dataType: DataType) => {
+    col.dataType = dataType
+  }
+  const applyWithValues = (dataType: DataType, values: (CellValue | null)[]) => {
+    col.dataType = dataType
+    t.rows.forEach((r, i) => {
+      r[field] = values[i]
+    })
+  }
+
+  const label = dataTypeLabel(next)
+  if (next === 'structure') {
+    applyTypeOnly(next)
+    store.commit({
+      label: `将「${title}」设为 ${label}`,
+      undo: () => applyTypeOnly(prevType),
+      redo: () => applyTypeOnly(next),
+    })
+  } else {
+    const coerced = t.rows.map((r) => coerceValue(String(r[field] ?? ''), next))
+    applyWithValues(next, coerced)
+    store.commit({
+      label: `将「${title}」设为 ${label}`,
+      undo: () => applyWithValues(prevType, prevValues),
+      redo: () => applyWithValues(next, coerced),
+    })
+    if (prevType === 'structure') {
+      for (const v of prevValues) {
+        if (v != null) invalidateStructureCache(String(v))
+      }
+    }
+  }
+  toast.success(`已将「${title}」设为 ${label}`)
+  markEdited()
 }
 function openColumnFilterFromMenu() {
   const f = colMenuFor.value
@@ -1137,6 +1202,30 @@ function promote() {
             <IIcon name="plus" :size="13" /> 在右侧插入派生列
           </button>
           <template v-if="editable">
+            <div
+              class="dg__menu-item-wrap"
+              @mouseenter="colTypeSubOpen = true"
+              @mouseleave="colTypeSubOpen = false"
+            >
+              <button type="button" class="dg__menu-item dg__menu-item--sub" role="menuitem">
+                <IIcon name="type-text" :size="13" /> 列类型
+                <IIcon name="chevron-right" :size="12" class="dg__menu-item__arrow" />
+              </button>
+              <div v-if="colTypeSubOpen" class="dg__menu-submenu" role="menu">
+                <button
+                  v-for="opt in COLUMN_TYPE_OPTIONS"
+                  :key="opt.value"
+                  type="button"
+                  class="dg__menu-item"
+                  :class="{ 'dg__menu-item--checked': menuColDataType === opt.value }"
+                  role="menuitem"
+                  :disabled="menuColDataType === opt.value"
+                  @click="runColumnMenu((f) => setColumnDataType(f, opt.value))"
+                >
+                  <IIcon :name="opt.icon" :size="13" /> {{ opt.label }}
+                </button>
+              </div>
+            </div>
             <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => openRenameColumn(f))">
               <IIcon name="edit" :size="13" /> 重命名列
             </button>
@@ -1455,6 +1544,41 @@ function promote() {
   height: 1px;
   background: var(--is-border);
   margin: 4px 6px;
+}
+.dg__menu-item-wrap {
+  position: relative;
+}
+.dg__menu-item--sub {
+  width: 100%;
+}
+.dg__menu-item__arrow {
+  margin-left: auto;
+  opacity: 0.55;
+}
+.dg__menu-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  background: var(--is-surface);
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius);
+  box-shadow: var(--is-shadow-md);
+  z-index: 1;
+}
+.dg__menu-item--checked {
+  color: var(--is-accent);
+}
+.dg__menu-item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.dg__menu-item:disabled:hover {
+  background: transparent;
 }
 
 .dg__cf-panel,
