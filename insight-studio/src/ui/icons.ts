@@ -37,6 +37,7 @@ import {
   Grip,
   GripVertical,
   Hash,
+  Hexagon,
   Info,
   Link2,
   LoaderCircle,
@@ -65,6 +66,7 @@ import {
 export type IconName =
   | 'type-text'
   | 'type-number'
+  | 'type-structure'
   | 'table'
   | 'bar'
   | 'line'
@@ -123,6 +125,7 @@ export type IconName =
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
   'type-number': Hash,
+  'type-structure': Hexagon,
   table: Table2,
   bar: ChartColumnBig,
   line: ChartLine,

@@ -11,6 +11,7 @@ import { findTable, findView, findViewPath } from '../../shared/tree'
 import { createTransform, createViewNode, defaultViewName } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, ITooltip, IBadge, toast, type SelectOption } from '../../ui'
+import type { IconName } from '../../ui/icons'
 import { useFloatingPanel } from '../../ui/floating'
 import { useClickOutside, useEscape } from '../../ui/utils'
 import { downloadCsv, toCsv } from './csv'
@@ -34,6 +35,8 @@ import { promoteViewToTable } from './promote'
 import { markTableEdited } from '../steps/rerun'
 import FilterDialog from './FilterDialog.vue'
 import TransformDialog from './TransformDialog.vue'
+import StructureCell from './structure/StructureCell.vue'
+import { invalidateStructureCache } from './structure/render'
 
 /**
  * DataGrid：vxe-table 封装。
@@ -96,6 +99,14 @@ function persistHidden() {
 
 const visibleColumns = computed<ColumnMeta[]>(() => props.result.columns.filter((c) => !hiddenCols.value.has(c.field)))
 const colIndexMap = computed(() => new Map(visibleColumns.value.map((c, i) => [c.field, i])))
+const hasStructureColumn = computed(() => visibleColumns.value.some((c) => c.dataType === 'structure'))
+
+function columnTypeIcon(dataType: ColumnMeta['dataType']): IconName {
+  if (dataType === 'number') return 'type-number'
+  if (dataType === 'structure') return 'type-structure'
+  if (dataType === 'date' || dataType === 'datetime') return 'calendar'
+  return 'type-text'
+}
 
 function toggleColumn(field: string) {
   const next = new Set(hiddenCols.value)
@@ -640,6 +651,10 @@ function commitCell(row: Row, field: string) {
   if (entry) {
     store.commit(entry)
     markEdited()
+    if (col.dataType === 'structure') {
+      if (oldValue != null) invalidateStructureCache(String(oldValue))
+      if (parsed.value != null) invalidateStructureCache(String(parsed.value))
+    }
   } else toast.error('未找到源行（可能已被过滤或删除）')
 }
 
@@ -827,7 +842,7 @@ function promote() {
               <div class="dg__colvis-list">
                 <label v-for="c in colVisList" :key="c.field" class="dg__colvis-item">
                   <input type="checkbox" :checked="!hiddenCols.has(c.field)" @change="toggleColumn(c.field)" />
-                  <IIcon :name="c.dataType === 'number' ? 'type-number' : 'type-text'" :size="12" class="dg__typeicon" />
+                  <IIcon :name="columnTypeIcon(c.dataType)" :size="12" class="dg__typeicon" />
                   <span class="is-ellipsis">{{ c.title }}</span>
                 </label>
                 <div v-if="!colVisList.length" class="dg__colvis-empty">无匹配列</div>
@@ -947,7 +962,7 @@ function promote() {
         :auto-resize="true"
         border="none"
         :show-header="true"
-        :row-config="{ keyField: ROW_ID_FIELD, isHover: true }"
+        :row-config="{ keyField: ROW_ID_FIELD, isHover: true, height: hasStructureColumn ? 88 : undefined }"
         :column-config="{ resizable: true }"
         :scroll-y="{ enabled: true, gt: 500 }"
         :edit-config="editConfig"
@@ -972,7 +987,7 @@ function promote() {
           <template #header>
             <div class="dg__th" @contextmenu.prevent="openColumnMenu(col.field, $event)">
               <IIcon
-                :name="col.dataType === 'number' ? 'type-number' : col.dataType === 'date' || col.dataType === 'datetime' ? 'calendar' : 'type-text'"
+                :name="columnTypeIcon(col.dataType)"
                 :size="13"
                 class="dg__typeicon"
               />
@@ -1008,7 +1023,16 @@ function promote() {
           </template>
 
           <template #default="{ row }">
-            <span class="dg__cell" :class="{ 'dg__cell--num': col.dataType === 'number', 'dg__cell--blank': row[col.field] === null || row[col.field] === undefined }">
+            <StructureCell
+              v-if="col.dataType === 'structure'"
+              class="dg__cell dg__cell--structure"
+              :value="row[col.field] == null ? null : String(row[col.field])"
+            />
+            <span
+              v-else
+              class="dg__cell"
+              :class="{ 'dg__cell--num': col.dataType === 'number', 'dg__cell--blank': row[col.field] === null || row[col.field] === undefined }"
+            >
               {{ fmtCell(row, col) }}
             </span>
           </template>
@@ -1363,6 +1387,11 @@ function promote() {
 }
 .dg__cell--blank {
   color: var(--is-text-tertiary);
+}
+.dg__cell--structure {
+  min-height: 80px;
+  overflow: visible;
+  white-space: normal;
 }
 
 .dg__edit-input {

@@ -40,7 +40,7 @@ const typeOptions: SelectOption[] = [
   { value: 'boolean', label: 'Boolean' },
   { value: 'date', label: 'Date', icon: 'calendar' },
   { value: 'datetime', label: 'Datetime', icon: 'calendar' },
-  { value: 'structure', label: 'Structure', icon: 'type-text' },
+  { value: 'structure', label: 'Structure', icon: 'type-structure' },
 ]
 
 function reset() {
