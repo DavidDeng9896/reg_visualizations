@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  assetsInclude: ['**/*.wasm'],
   server: {
     port: 7100,
     host: true,
@@ -20,6 +21,7 @@ export default defineConfig({
           if (id.includes('vxe-table') || id.includes('xe-utils')) return 'vendor-vxe'
           if (id.includes('@vue-flow') || id.includes('d3-') || id.includes('@dagrejs')) return 'vendor-vue-flow'
           if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('dompurify') || id.includes('fflate')) return 'vendor-jspdf'
+          if (id.includes('@rdkit/rdkit')) return 'vendor-rdkit'
           if (id.includes('dexie') || id.includes('papaparse')) return 'vendor-data'
           if (id.includes('pinia') || id.includes('vue-router') || id.includes('/vue/') || id.includes('@vue/')) return 'vendor-vue'
         },
