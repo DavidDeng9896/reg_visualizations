@@ -12,7 +12,7 @@ export type Row = Record<string, CellValue>
 /** 行对象内部的稳定 id 键（用于编辑写回、打标）。不作为普通列展示。 */
 export const ROW_ID_FIELD = '__rowId'
 
-export type DataType = 'string' | 'number' | 'boolean' | 'date' | 'datetime'
+export type DataType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'structure'
 
 export interface ColumnMeta {
   field: string
