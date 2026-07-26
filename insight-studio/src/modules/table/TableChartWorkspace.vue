@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { AnalysisTable, ChartPosition, ViewNode } from '../../shared/types'
 import { runPipeline, PipelineError, isIdentityOrSortOnly, type ViewResult } from '../../shared/pipeline'
@@ -7,10 +7,11 @@ import { findTable, findView, findViewParent, findViewPath } from '../../shared/
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IIcon, IModal, IPopover, ISplitPane, ITextField, toast } from '../../ui'
 import DataGrid from './DataGrid.vue'
-import ChartView from '../charts/ChartView.vue'
 import { TABLE_CHART_CONTEXT, type TableChartContext } from './context'
 import { promoteViewToTable } from './promote'
 import { downloadCsv, toCsv } from './csv'
+
+const ChartView = defineAsyncComponent(() => import('../charts/ChartView.vue'))
 
 /**
  * 表+图一体化布局壳：
@@ -28,32 +29,24 @@ const view = computed<ViewNode | null>(() =>
   table.value && selected.value?.viewId ? findView(table.value.views, selected.value.viewId) : null,
 )
 
-/* 管道结果：表格与图表共用 */
-const result = computed<ViewResult | null>(() => {
+/* 管道结果：表格与图表共用（只跑一次 pipeline） */
+const pipelineState = computed(() => {
   const a = current.value
-  if (!a || !selected.value) return null
+  // 显式依赖 updatedAt：行数据已 markRaw，单元格写入不会触发深度追踪
+  const _updatedAt = a?.updatedAt
+  void _updatedAt
+  if (!a || !selected.value) return { result: null as ViewResult | null, error: '' }
   try {
-    return runPipeline(a, selected.value.tableId, selected.value.viewId)
+    return { result: runPipeline(a, selected.value.tableId, selected.value.viewId), error: '' }
   } catch (e) {
-    if (e instanceof PipelineError) return null
-    throw e
+    if (e instanceof PipelineError) {
+      return { result: null, error: e.message }
+    }
+    return { result: null, error: e instanceof Error ? e.message : '数据计算失败' }
   }
 })
-const pipelineError = ref('')
-watch(
-  () => [selected.value, current.value],
-  () => {
-    const a = current.value
-    pipelineError.value = ''
-    if (!a || !selected.value) return
-    try {
-      runPipeline(a, selected.value.tableId, selected.value.viewId)
-    } catch (e) {
-      pipelineError.value = e instanceof Error ? e.message : '数据计算失败'
-    }
-  },
-  { immediate: true, deep: false },
-)
+const result = computed(() => pipelineState.value.result)
+const pipelineError = computed(() => pipelineState.value.error)
 
 /* 图表方位（默认 bottom） */
 const hasChart = computed(() => !!view.value && view.value.type !== 'table' && !!view.value.chart)

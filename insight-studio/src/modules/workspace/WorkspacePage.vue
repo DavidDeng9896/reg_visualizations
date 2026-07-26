@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -7,10 +7,11 @@ import { analysisRepository } from '../../shared/repository'
 import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '../../ui'
 import SidebarTree from './SidebarTree.vue'
 import WorkspaceMain from './WorkspaceMain.vue'
-import FlowchartMain from './FlowchartMain.vue'
 import AddDataMenu from './AddDataMenu.vue'
 import CsvImportDialog from '../table/CsvImportDialog.vue'
 import CombineTablesDialog from '../table/CombineTablesDialog.vue'
+
+const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
 
 const route = useRoute()
 const router = useRouter()

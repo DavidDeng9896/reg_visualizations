@@ -15,8 +15,28 @@ import type {
 import { ROW_ID_FIELD } from './types'
 import { uuid } from './id'
 import { nowIso } from './datetime'
+import { markRaw } from 'vue'
 
 /** 领域对象工厂。 */
+
+/**
+ * 封印行数据，避免 Pinia/Vue 对上万单元格做深度响应式代理（主线程卡顿主因之一）。
+ * 行内容变更后需依赖 Analysis.updatedAt 等显式信号刷新派生计算。
+ */
+export function sealRows(rows: Row[]): Row[] {
+  for (let i = 0; i < rows.length; i++) {
+    rows[i] = markRaw(rows[i])
+  }
+  return markRaw(rows)
+}
+
+/** 加载/导入后封印分析内所有表的行数组。 */
+export function sealAnalysisRows(analysis: Analysis): Analysis {
+  for (const t of analysis.tables) {
+    t.rows = sealRows(t.rows)
+  }
+  return analysis
+}
 
 export function createEmptyAnalysis(name: string): Analysis {
   const now = nowIso()
@@ -38,7 +58,7 @@ export function createTable(
   rows: Row[],
   source: AnalysisTable['source'] = 'csv',
 ): AnalysisTable {
-  return { id: uuid(), name, source, columns, rows, filters: [], views: [] }
+  return { id: uuid(), name, source, columns, rows: sealRows(ensureRowIds(rows)), filters: [], views: [] }
 }
 
 export const VIEW_TYPE_LABELS: Record<ViewType, string> = {

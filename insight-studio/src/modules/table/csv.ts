@@ -1,13 +1,12 @@
 /**
  * CSV 导入/导出纯函数。
  * 类型推断规则：非空值全部为数值 → number；全部为 true/false → boolean；
- * 全部匹配 YYYY-MM-DD → date；全部匹配 ISO datetime → datetime；
- * ≥80% 符合 SMILES/mol 启发式 → structure；否则 string。
+ * 全部匹配 YYYY-MM-DD → date；全部匹配 ISO datetime → datetime；否则 string。
+ * structure 不自动推断，由用户在导入对话框或列菜单中手动指定。
  */
 import type { CellValue, ColumnMeta, DataType, Row } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { parseDateLike } from '../../shared/datetime'
-import { isStructureCandidate } from './structure/parse'
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
@@ -27,7 +26,10 @@ export function normalizeHeaders(headers: string[]): string[] {
   })
 }
 
-/** 推断单列类型。空列（无非空值）按 string 处理。 */
+/**
+ * 推断单列类型。空列（无非空值）按 string 处理。
+ * 不自动推断 structure（需用户手动改类型）。
+ */
 export function inferColumnType(values: string[]): DataType {
   const nonEmpty = values.filter((v) => v.trim() !== '')
   if (nonEmpty.length === 0) return 'string'
@@ -35,8 +37,6 @@ export function inferColumnType(values: string[]): DataType {
   if (nonEmpty.every((v) => /^(true|false)$/i.test(v.trim()))) return 'boolean'
   if (nonEmpty.every((v) => DATE_ONLY_RE.test(v.trim()) && parseDateLike(v) !== null)) return 'date'
   if (nonEmpty.every((v) => DATETIME_RE.test(v.trim()) && parseDateLike(v) !== null)) return 'datetime'
-  const hits = nonEmpty.filter((v) => isStructureCandidate(v)).length
-  if (hits / nonEmpty.length >= 0.8) return 'structure'
   return 'string'
 }
 

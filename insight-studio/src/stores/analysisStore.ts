@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { Analysis } from '../shared/types'
 import { nowIso } from '../shared/datetime'
+import { sealAnalysisRows } from '../shared/factories'
 import { analysisRepository, type AnalysisRepository } from '../shared/repository'
 
 /** 当前选中节点（侧栏树 / 工作区）。 */
@@ -67,7 +68,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.loading = true
       try {
         const found = await repo.get(id)
-        this.current = found ?? null
+        this.current = found ? sealAnalysisRows(found) : null
         this.dirty = false
         this.selected = null
         this.undoStack = []

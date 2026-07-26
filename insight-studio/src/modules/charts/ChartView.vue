@@ -107,7 +107,10 @@ function rebuild() {
 }
 
 const rebuildDeb = debounce(rebuild, 150)
-watch([result, previewConfig, flags], () => rebuildDeb.call(), { deep: true, immediate: true })
+// 避免对含上万行的 result 做 deep watch；result/flags 引用变化即重建，配置草稿仍 deep
+watch(result, () => rebuildDeb.call(), { immediate: true })
+watch(flags, () => rebuildDeb.call())
+watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 
 function touch() {
   rebuildDeb.call()

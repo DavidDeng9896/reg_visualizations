@@ -120,7 +120,7 @@ function buildStepNodeData(analysis: Analysis, step: StepNode): FlowNodeData {
 
 function pushViewNodes(
   view: ViewNode,
-  table: { id: string; rows: unknown[]; columns: unknown[]; views: ViewNode[] },
+  table: { id: string; views: ViewNode[] },
   parentFlowId: string,
   nodes: FlowNodeData[],
   edges: FlowEdgeData[],
@@ -188,7 +188,7 @@ export function buildFlowGraph(analysis: Analysis): FlowGraph {
     const parentStep = analysis.steps.find((s) => s.id === table.stepId)
     if (!parentStep) continue
     const parentId = stepNodeId(parentStep.id)
-    const tableMeta = { id: table.id, rows: table.rows, columns: table.columns, views: table.views }
+    const tableMeta = { id: table.id, views: table.views }
     const sourcePort =
       getStepDef(parentStep.type).outputs.find((p) => p.type === 'table')?.name ??
       getStepDef(parentStep.type).outputs[0]?.name ??

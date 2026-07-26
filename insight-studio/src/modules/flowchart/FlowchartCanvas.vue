@@ -22,6 +22,7 @@ import { canConnectPorts } from './connection'
 import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
 import type { PortType, StepInputRef, StepNode, StepType } from '../../shared/types'
+import { debounce } from '../charts/draft'
 import { runStep, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 
@@ -158,7 +159,8 @@ function rebuild(): void {
   }))
   if (activeId.value && !nodeById.value.has(activeId.value)) activeId.value = null
 }
-watch([graph, positions], rebuild, { immediate: true })
+const rebuildDeb = debounce(rebuild, 64)
+watch([graph, positions], () => rebuildDeb.call(), { immediate: true })
 
 /**
  * VueFlow 的 Handle 在 onMounted 时依赖节点尺寸注册 handleBounds；
@@ -167,8 +169,7 @@ watch([graph, positions], rebuild, { immediate: true })
 function scheduleHandleBoundsUpdate(): void {
   void nextTick(() => {
     updateNodeInternals()
-    setTimeout(() => updateNodeInternals(), 100)
-    setTimeout(() => updateNodeInternals(), 300)
+    setTimeout(() => updateNodeInternals(), 120)
   })
 }
 watch(graph, scheduleHandleBoundsUpdate, { flush: 'post' })

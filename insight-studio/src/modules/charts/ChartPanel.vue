@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Plotly from 'plotly.js-dist-min'
 import type { ChartOption } from './types'
 
 export type FlagMode = 'off' | 'flag' | 'clear'
+
+type PlotlyApi = typeof import('plotly.js-dist-min').default
+
+let plotlyPromise: Promise<PlotlyApi> | null = null
+function loadPlotly(): Promise<PlotlyApi> {
+  if (!plotlyPromise) {
+    plotlyPromise = import('plotly.js-dist-min').then((m) => m.default)
+  }
+  return plotlyPromise
+}
 
 const props = withDefaults(
   defineProps<{
@@ -21,8 +30,11 @@ void emit
 const el = ref<HTMLDivElement>()
 let mounted = false
 let ro: ResizeObserver | null = null
+let Plotly: PlotlyApi | null = null
 
 async function apply(initial = false): Promise<void> {
+  if (!mounted || !el.value) return
+  Plotly ??= await loadPlotly()
   if (!mounted || !el.value) return
   const figure = props.option ?? { data: [], layout: {} }
   const layout = { ...figure.layout, autosize: true }
@@ -44,7 +56,7 @@ onMounted(() => {
   ro = new ResizeObserver(() => {
     const div = el.value
     // 隐藏/未挂载的 plot div 上调用 resize 会抛错（如切到流程图模式后工作区图表被 KeepAlive 隐藏）
-    if (div && div.isConnected && div.clientWidth > 0 && div.clientHeight > 0) {
+    if (Plotly && div && div.isConnected && div.clientWidth > 0 && div.clientHeight > 0) {
       void Plotly.Plots.resize(div)
     }
   })
@@ -60,10 +72,12 @@ watch(
 onBeforeUnmount(() => {
   mounted = false
   ro?.disconnect()
-  if (el.value) Plotly.purge(el.value)
+  if (Plotly && el.value) Plotly.purge(el.value)
 })
 
 async function getDataURL(): Promise<string> {
+  if (!el.value) return ''
+  Plotly ??= await loadPlotly()
   if (!el.value) return ''
   return Plotly.toImage(el.value, { format: 'png', scale: 2, width: el.value.clientWidth, height: el.value.clientHeight })
 }
@@ -78,7 +92,6 @@ defineExpose({ getDataURL })
     :style="{
       width: width ? `${width}px` : '100%',
       height: height ? `${height}px` : '100%',
-      maxWidth: '100%',
     }"
   />
 </template>
@@ -87,6 +100,5 @@ defineExpose({ getDataURL })
 .chart-panel {
   min-height: 0;
   min-width: 0;
-  transition: opacity var(--is-dur-fast) var(--is-ease);
 }
 </style>

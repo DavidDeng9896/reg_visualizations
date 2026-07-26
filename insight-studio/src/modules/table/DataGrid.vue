@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { VxeColumn, VxeTable } from 'vxe-table'
 import 'vxe-table/es/style.css'
@@ -35,8 +35,10 @@ import { promoteViewToTable } from './promote'
 import { markTableEdited } from '../steps/rerun'
 import FilterDialog from './FilterDialog.vue'
 import TransformDialog from './TransformDialog.vue'
-import StructureCell from './structure/StructureCell.vue'
 import { invalidateStructureCache } from './structure/render'
+
+/** 结构列按需加载，避免无结构表也拉 RDKit WASM。 */
+const StructureCellView = defineAsyncComponent(() => import('./structure/StructureCell.vue'))
 
 /**
  * DataGrid：vxe-table 封装。
@@ -100,6 +102,14 @@ function persistHidden() {
 const visibleColumns = computed<ColumnMeta[]>(() => props.result.columns.filter((c) => !hiddenCols.value.has(c.field)))
 const colIndexMap = computed(() => new Map(visibleColumns.value.map((c, i) => [c.field, i])))
 const hasStructureColumn = computed(() => visibleColumns.value.some((c) => c.dataType === 'structure'))
+/** 有结构列时强制虚拟滚动，避免一次挂载整表 StructureCell。 */
+const scrollYConfig = computed(() => ({ enabled: true, gt: hasStructureColumn.value ? 0 : 100 }))
+const rowConfig = computed(() => ({
+  keyField: ROW_ID_FIELD,
+  isHover: true,
+  // 结构列单元格自带高度；不强制全表 140px，仅略增高以容纳缩略图
+  height: hasStructureColumn.value ? 132 : undefined,
+}))
 
 function columnTypeIcon(dataType: ColumnMeta['dataType']): IconName {
   if (dataType === 'number') return 'type-number'
@@ -1027,9 +1037,9 @@ function promote() {
         :auto-resize="true"
         border="none"
         :show-header="true"
-        :row-config="{ keyField: ROW_ID_FIELD, isHover: true, height: hasStructureColumn ? 88 : undefined }"
+        :row-config="rowConfig"
         :column-config="{ resizable: true }"
-        :scroll-y="{ enabled: true, gt: 500 }"
+        :scroll-y="scrollYConfig"
         :edit-config="editConfig"
         :keyboard-config="editable ? keyboardConfig : undefined"
         :mouse-config="editable ? mouseConfig : undefined"
@@ -1088,7 +1098,7 @@ function promote() {
           </template>
 
           <template #default="{ row }">
-            <StructureCell
+            <StructureCellView
               v-if="col.dataType === 'structure'"
               class="dg__cell dg__cell--structure"
               :value="row[col.field] == null ? null : String(row[col.field])"
@@ -1478,9 +1488,15 @@ function promote() {
   color: var(--is-text-tertiary);
 }
 .dg__cell--structure {
-  min-height: 80px;
-  overflow: visible;
+  min-height: 128px;
+  overflow: visible !important;
   white-space: normal;
+  line-height: normal;
+  text-overflow: clip;
+}
+.dg .vxe-table .vxe-body--column:has(.dg__cell--structure),
+.dg .vxe-table .vxe-cell:has(.dg__cell--structure) {
+  overflow: visible !important;
 }
 
 .dg__edit-input {
