@@ -10,12 +10,12 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/minimap/dist/style.css'
 
 import { useAnalysisStore, type SelectedNode } from '../../stores/analysisStore'
-import { IButton, IEmptyState, IIcon, ITooltip, toast } from '../../ui'
-import { buildFlowGraph, downstreamOf, stepNodeId, upstreamOf, viewNodeId, type FlowGraph, type FlowNodeData } from './graph'
-import { resolvePositions } from './layout'
+import { IButton, IEmptyState, IIcon, ISplitPane, ITooltip, toast } from '../../ui'
+import { buildFlowGraph, downstreamOf, resolveStepSourceRef, stepNodeId, upstreamOf, viewNodeId, type FlowGraph, type FlowNodeData } from './graph'
+import { autoLayout, resolvePositions } from './layout'
 import FlowNode from './FlowNode.vue'
 import FlowEdge from './FlowEdge.vue'
-import NodeDetailCard from './NodeDetailCard.vue'
+import NodeDetailCard, { type DetailLayout } from './NodeDetailCard.vue'
 import AddStepPanel from './AddStepPanel.vue'
 import StepConfigPanel from '../steps/panel/StepConfigPanel.vue'
 import { canConnectPorts } from './connection'
@@ -101,7 +101,8 @@ const alive = ref(true)
 const activeNode = computed(() => (activeId.value ? nodeById.value.get(activeId.value) ?? null : null))
 const activeInputs = computed(() => (activeId.value ? upstreamOf(graph.value, activeId.value) : []))
 const activeOutputs = computed(() => (activeId.value ? downstreamOf(graph.value, activeId.value) : []))
-
+/** 详情卡是否展示（固定模式下无选中时收起第二栏，避免空白面板）。 */
+const detailOpen = computed(() => !!activeNode.value && !editingStep.value)
 const zoomPercent = computed(() => Math.round((viewport.value.zoom || 1) * 100))
 
 const linkedIds = computed<Set<string>>(() => {
@@ -196,6 +197,25 @@ function dismissBanner(): void {
   }
 }
 
+/* ------------------------------- 详情展示方式 ------------------------------- */
+
+const DETAIL_LAYOUT_KEY = 'insight-studio:flow-detail-layout'
+const detailLayout = ref<DetailLayout>('float')
+try {
+  const v = localStorage.getItem(DETAIL_LAYOUT_KEY)
+  if (v === 'float' || v === 'right' || v === 'bottom') detailLayout.value = v
+} catch {
+  /* ignore */
+}
+function setDetailLayout(layout: DetailLayout): void {
+  detailLayout.value = layout
+  try {
+    localStorage.setItem(DETAIL_LAYOUT_KEY, layout)
+  } catch {
+    /* ignore */
+  }
+}
+
 /* --------------------------------- 选中联动 --------------------------------- */
 
 function selectionToFlowId(sel: SelectedNode | null): string | null {
@@ -253,6 +273,22 @@ function fitAll(duration = 300): void {
     maxZoom: 1.25,
     padding: { top: 0.15, bottom: 0.15, left: 0.15, right: panelOpen ? `${FIT_PANEL_WIDTH + 100}px` : 0.15 },
   })
+}
+
+/** 全自动排列：按血缘分层重写所有节点坐标，视图紧跟所属数据。 */
+function arrangeAll(): void {
+  if (!current.value || isEmpty.value) return
+  const layout = autoLayout(graph.value)
+  store.mutate((a) => {
+    a.flowchartLayout = { ...layout }
+  })
+  // rebuild 对已有节点保留拖拽坐标；此处强制覆盖为自动布局结果
+  for (const n of vfNodes.value) {
+    const p = layout[n.id]
+    if (p) n.position = { x: p.x, y: p.y }
+  }
+  void nextTick(() => fitAll())
+  toast.success('已自动排列节点')
 }
 
 onMounted(() => {
@@ -347,6 +383,9 @@ function onConnect(conn: Connection): void {
   const targetPort = targetNode.inputs.find((p) => p.name === conn.targetHandle)
   if (!sourcePort || !targetPort || !canConnectPorts(sourcePort, targetPort)) return
 
+  const sourceRef = current.value ? resolveStepSourceRef(current.value, sourceNode, sourcePort.name) : null
+  if (!sourceRef) return
+
   // 更新目标步骤的输入
   store.mutate((a) => {
     const step = a.steps.find((s) => s.id === targetNode.stepId)
@@ -355,7 +394,7 @@ function onConnect(conn: Connection): void {
     step.inputs = step.inputs.filter((i) => i.port !== targetPort.name)
     const ref: StepInputRef = {
       port: targetPort.name,
-      from: { nodeId: sourceNode.stepId!, port: sourcePort.name },
+      from: { nodeId: sourceRef.nodeId, port: sourceRef.port },
     }
     if (targetPort.multiple) {
       step.inputs.push(ref)
@@ -415,11 +454,14 @@ function onStepSelected(type: StepType): void {
   const sourcePort = sourceNode?.outputs.find((p) => p.name === sourcePortName)
   const targetPort = def.inputs.find((p) => sourcePort && canConnectPorts(sourcePort, p))
 
-  if (targetPort) {
-    newStep.inputs.push({
-      port: targetPort.name,
-      from: { nodeId: sourceNode!.stepId!, port: sourcePortName },
-    })
+  if (targetPort && sourceNode && current.value) {
+    const sourceRef = resolveStepSourceRef(current.value, sourceNode, sourcePortName)
+    if (sourceRef) {
+      newStep.inputs.push({
+        port: targetPort.name,
+        from: { nodeId: sourceRef.nodeId, port: sourceRef.port },
+      })
+    }
   }
 
   // 放置位置交给 resolvePositions：新节点落在已落位父节点右侧并自动避让，
@@ -572,6 +614,18 @@ function minimapNodeColor(node: { data?: unknown }): string {
       </div>
     </Transition>
 
+    <ISplitPane
+      class="flow-canvas__split"
+      :class="[`flow-canvas__split--${detailLayout}`, { 'flow-canvas__split--solo': !detailOpen }]"
+      :direction="detailLayout === 'bottom' ? 'vertical' : 'horizontal'"
+      :disabled="detailLayout === 'float'"
+      :default-ratio="detailLayout === 'bottom' ? 0.6 : 0.65"
+      :min-first="detailLayout === 'bottom' ? 200 : 320"
+      :min-second="detailLayout === 'bottom' ? 160 : 300"
+      storage-key="flow-detail"
+    >
+      <template #first>
+        <div class="flow-canvas__stage">
     <VueFlow
       :id="FLOW_ID"
       v-model:nodes="vfNodes"
@@ -597,7 +651,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       @connect="onConnect"
       @connect-end="onConnectEnd"
     >
-      <Background v-if="alive" variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" bg-color="#fbfcfd" />
+      <Background v-if="alive" variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" />
 
       <MiniMap
         v-if="alive && minimapOpen && !isEmpty"
@@ -635,6 +689,17 @@ function minimapNodeColor(node: { data?: unknown }): string {
         <ITooltip content="适应视图">
           <button type="button" class="flow-controls__btn" aria-label="适应视图" @click="fitAll()">
             <IIcon name="expand" :size="14" />
+          </button>
+        </ITooltip>
+        <ITooltip content="自动排列">
+          <button
+            type="button"
+            class="flow-controls__btn"
+            aria-label="自动排列"
+            :disabled="isEmpty"
+            @click="arrangeAll()"
+          >
+            <IIcon name="arrange" :size="14" />
           </button>
         </ITooltip>
         <ITooltip v-if="hasStale" content="重新运行所有待更新步骤">
@@ -683,12 +748,14 @@ function minimapNodeColor(node: { data?: unknown }): string {
 
     <Transition name="flow-detail">
       <NodeDetailCard
-        v-if="activeNode && !editingStep"
+        v-if="detailLayout === 'float' && activeNode && !editingStep"
         :key="activeNode.id"
         class="flow-canvas__detail"
         :node="activeNode"
         :inputs="activeInputs"
         :outputs="activeOutputs"
+        :layout="detailLayout"
+        @update:layout="setDetailLayout"
         @close="setActive(null)"
         @focus="focusNode"
         @open="openInWorkspace(activeNode.id)"
@@ -696,6 +763,25 @@ function minimapNodeColor(node: { data?: unknown }): string {
         @delete="onStepDeleted"
       />
     </Transition>
+        </div>
+      </template>
+      <template #second>
+        <NodeDetailCard
+          v-if="detailLayout !== 'float' && activeNode && !editingStep"
+          :key="activeNode.id"
+          :node="activeNode"
+          :inputs="activeInputs"
+          :outputs="activeOutputs"
+          :layout="detailLayout"
+          @update:layout="setDetailLayout"
+          @close="setActive(null)"
+          @focus="focusNode"
+          @open="openInWorkspace(activeNode.id)"
+          @edit="activeNode.stepId && openStepEditor(activeNode.stepId, false)"
+          @delete="onStepDeleted"
+        />
+      </template>
+    </ISplitPane>
 
     <AddStepPanel
       :open="addStepOpen"
@@ -723,6 +809,27 @@ function minimapNodeColor(node: { data?: unknown }): string {
 }
 .flow-canvas__vf {
   height: 100%;
+}
+
+/* 详情固定模式：画布与详情用 ISplitPane 分割；悬浮模式退化为整幅画布 */
+.flow-canvas__split {
+  height: 100%;
+}
+.flow-canvas__stage {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.flow-canvas__split--float :deep(.is-split__divider),
+.flow-canvas__split--float :deep(.is-split__second),
+.flow-canvas__split--solo :deep(.is-split__divider),
+.flow-canvas__split--solo :deep(.is-split__second) {
+  display: none;
+}
+.flow-canvas__split--float :deep(.is-split__first),
+.flow-canvas__split--solo :deep(.is-split__first) {
+  flex: 1 1 auto !important;
 }
 
 .flow-banner {
@@ -805,6 +912,11 @@ function minimapNodeColor(node: { data?: unknown }): string {
 .flow-controls__btn:hover {
   background: var(--is-surface-hover);
   color: var(--is-text);
+}
+.flow-controls__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 .flow-controls__btn--on {
   color: var(--is-accent);
@@ -925,6 +1037,12 @@ function minimapNodeColor(node: { data?: unknown }): string {
 }
 .flow-canvas--perf .vue-flow__edge-path {
   shape-rendering: optimizeSpeed;
+}
+
+/* 点阵背景：不用 Background 的 bg-color prop（其生成的不透明矩形盖在圆点之上），
+   改为给背景 SVG 上 CSS 底色，圆点透出来。 */
+.flow-canvas .vue-flow__background {
+  background-color: #fbfcfd;
 }
 
 /* 拖线过程中让右侧面板不拦截鼠标，便于连到被面板遮挡的端口 */

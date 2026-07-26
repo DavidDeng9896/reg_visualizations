@@ -61,7 +61,7 @@ function commitRename() {
 </script>
 
 <template>
-  <div class="vnode">
+  <div class="vnode" :style="{ '--depth': depth }">
     <div
       class="vnode__row"
       :class="{ 'vnode__row--selected': isSelected }"
@@ -76,13 +76,14 @@ function commitRename() {
       @keydown.enter="emit('select', tableId, node.id)"
     >
       <button
-        v-if="node.children.length"
         type="button"
         class="vnode__chevron"
+        :class="{ 'vnode__chevron--hidden': !node.children.length }"
         :aria-label="isExpanded ? '收起' : '展开'"
-        @click.stop="emit('toggle', node.id)"
+        :tabindex="node.children.length ? 0 : -1"
+        @click.stop="node.children.length && emit('toggle', node.id)"
       >
-        <IIcon :name="isExpanded ? 'chevron-down' : 'chevron-right'" :size="14" />
+        <IIcon v-if="node.children.length" :name="isExpanded ? 'chevron-down' : 'chevron-right'" :size="14" />
       </button>
       <IIcon :name="VIEW_ICON[node.type]" :size="16" class="vnode__icon" />
       <input
@@ -183,11 +184,11 @@ function commitRename() {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 36px;
-  margin: 0 6px;
-  padding-left: 12px;
-  padding-right: 12px;
+  gap: 6px;
+  height: 32px;
+  margin: 0 8px;
+  /* depth≥1：挂在表下，逐层缩进 */
+  padding: 0 8px 0 calc(8px + var(--depth, 0) * 16px);
   border-radius: var(--is-radius-sm);
   cursor: pointer;
   font-size: var(--is-text-sm);
@@ -199,11 +200,10 @@ function commitRename() {
 .vnode__row--selected,
 .vnode__row--selected:hover {
   background: var(--is-accent-soft);
-  border-radius: 4px;
 }
 .vnode__children {
-  margin-left: 21px;
-  border-left: 1px solid var(--is-border);
+  display: flex;
+  flex-direction: column;
 }
 .vnode__row--selected .vnode__name {
   color: var(--is-accent);
@@ -216,11 +216,14 @@ function commitRename() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   color: var(--is-text-tertiary);
   flex-shrink: 0;
-  border-radius: 3px;
+}
+.vnode__chevron--hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 .vnode__icon {
   color: var(--is-text-secondary);

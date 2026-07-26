@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Analysis, AnalysisTable, StepNode, ViewNode } from '../../../src/shared/types'
 import { createTable } from '../../../src/shared/factories'
-import { buildFlowGraph, stepNodeId, viewNodeId } from '../../../src/modules/flowchart/graph'
+import { buildFlowGraph, resolveStepSourceRef, stepNodeId, viewNodeId } from '../../../src/modules/flowchart/graph'
 
 function step(id: string, type: StepNode['type'], outputTableId: string, inputs: StepNode['inputs'] = []): StepNode {
   return {
@@ -46,7 +46,13 @@ describe('buildFlowGraph · steps', () => {
     const g = buildFlowGraph(a)
     expect(g.nodes.map((n) => n.id)).toContain(stepNodeId('s1'))
     expect(g.nodes.map((n) => n.id)).toContain(viewNodeId('v1'))
-    expect(g.edges.some((e) => e.source === stepNodeId('s1') && e.target === viewNodeId('v1'))).toBe(true)
+    const edge = g.edges.find((e) => e.source === stepNodeId('s1') && e.target === viewNodeId('v1'))
+    expect(edge).toBeTruthy()
+    expect(edge!.sourcePort).toBe('Output dataset')
+    expect(edge!.targetPort).toBe('in')
+    const viewNode = g.nodes.find((n) => n.id === viewNodeId('v1'))!
+    expect(viewNode.inputs.map((p) => p.name)).toEqual(['in'])
+    expect(viewNode.outputs.map((p) => p.name)).toEqual(['out'])
   })
 
   it('步骤输入边：filter 步骤连接上游 upload-csv', () => {
@@ -88,5 +94,32 @@ describe('buildFlowGraph · steps', () => {
 
     const g = buildFlowGraph(a)
     expect(g.edges).toHaveLength(2)
+  })
+})
+
+describe('resolveStepSourceRef · 视图回落产出步骤', () => {
+  it('步骤节点原样返回 stepId + 端口', () => {
+    const t = createTable('T', [{ field: 'v', title: 'v', dataType: 'number' }], [{ v: 1 }], 'step')
+    t.stepId = 's1'
+    const a = analysis({ steps: [step('s1', 'upload-csv', t.id)], tables: [t] })
+    const g = buildFlowGraph(a)
+    const n = g.nodes.find((x) => x.id === stepNodeId('s1'))!
+    expect(resolveStepSourceRef(a, n, 'Output dataset')).toEqual({
+      nodeId: 's1',
+      port: 'Output dataset',
+    })
+  })
+
+  it('视图节点回落到所属表的产出步骤', () => {
+    const t = createTable('T', [{ field: 'v', title: 'v', dataType: 'number' }], [{ v: 1 }], 'step')
+    t.stepId = 's1'
+    t.views = [{ id: 'v1', name: 'Bar', type: 'bar', filters: [], transforms: [], children: [] }]
+    const a = analysis({ steps: [step('s1', 'upload-csv', t.id)], tables: [t] })
+    const g = buildFlowGraph(a)
+    const n = g.nodes.find((x) => x.id === viewNodeId('v1'))!
+    expect(resolveStepSourceRef(a, n, 'out')).toEqual({
+      nodeId: 's1',
+      port: 'Output dataset',
+    })
   })
 })

@@ -5,6 +5,7 @@
 import type { FunctionalComponent } from 'vue'
 import {
   ArrowDownWideNarrow,
+  AlignStartHorizontal,
   ArrowLeftRight,
   ArrowRight,
   ArrowUpNarrowWide,
@@ -41,7 +42,10 @@ import {
   LoaderCircle,
   Maximize2,
   Minus,
+  PanelBottom,
+  PanelRight,
   Pencil,
+  PictureInPicture2,
   Play,
   Plus,
   Search,
@@ -108,9 +112,13 @@ export type IconName =
   | 'columns'
   | 'flag'
   | 'expand'
+  | 'arrange'
   | 'minus'
   | 'spinner'
   | 'play'
+  | 'overlay'
+  | 'panel-right'
+  | 'panel-bottom'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -162,7 +170,11 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   columns: Columns3,
   flag: Flag,
   expand: Maximize2,
+  arrange: AlignStartHorizontal,
   minus: Minus,
   spinner: LoaderCircle,
   play: Play,
+  overlay: PictureInPicture2,
+  'panel-right': PanelRight,
+  'panel-bottom': PanelBottom,
 }

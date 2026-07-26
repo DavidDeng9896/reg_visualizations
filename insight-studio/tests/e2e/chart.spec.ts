@@ -27,7 +27,9 @@ test.describe('d) 图表：scatter 配置 + STYLE 标题', () => {
     await setupPlateScatter(page)
 
     const plot = page.getByTestId('chart-canvas')
-    const svgBefore = await plot.locator('.main-svg').first().innerHTML()
+    // Plotly 3 分层渲染：标题在独立的 main-svg 层（首个 main-svg 仅数据层），
+    // 预览探针需覆盖整个绘图区，否则标题改动观测不到
+    const svgBefore = await plot.innerHTML()
 
     // STYLE → Title
     await page.getByRole('tab', { name: 'STYLE' }).click()
@@ -39,7 +41,7 @@ test.describe('d) 图表：scatter 配置 + STYLE 标题', () => {
 
     // 实时预览：Plotly SVG 内容变化（新标题已绘制）
     await expect
-      .poll(async () => plot.locator('.main-svg').first().innerHTML())
+      .poll(async () => plot.innerHTML())
       .not.toBe(svgBefore)
 
     // Save → toast + Save 按钮 dirty 高亮消失

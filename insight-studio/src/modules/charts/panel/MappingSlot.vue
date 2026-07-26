@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
-import type { Aggregation, ChartConfigure, FieldMapping } from '../../../shared/types'
+import type { ChartConfigure, FieldMapping } from '../../../shared/types'
 import { IFieldCapsule, ISelect, type SelectOption } from '../../../ui'
 import { aggregationLabel } from '../runtime/aggregate'
 import AxisSettingsPopover from './AxisSettingsPopover.vue'
@@ -65,8 +65,12 @@ const gearFor = ref<number | null>(null)
 
 const axisKeyOf = computed<'xAxis' | 'yAxis'>(() => (props.slot.key === 'x' ? 'xAxis' : 'yAxis'))
 
-const capsuleAgg = (m: FieldMapping): string | undefined =>
-  props.slot.aggregatable ? aggregationLabel(m.aggregation ?? 'count') : undefined
+const capsuleAgg = (m: FieldMapping): string | undefined => {
+  if (!props.slot.aggregatable) return undefined
+  const method = m.aggregation
+  if (!method || method === 'none') return undefined
+  return aggregationLabel(method)
+}
 </script>
 
 <template>

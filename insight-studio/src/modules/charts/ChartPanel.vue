@@ -26,7 +26,13 @@ async function apply(initial = false): Promise<void> {
   if (!mounted || !el.value) return
   const figure = props.option ?? { data: [], layout: {} }
   const layout = { ...figure.layout, autosize: true }
-  const config = { responsive: true, displaylogo: false, ...figure.config }
+  // 关闭 Plotly 自带 modebar：应用已有 Flag/Clear/导出浮层，避免与右上角工具条叠在一起。
+  const config = {
+    responsive: true,
+    displaylogo: false,
+    ...figure.config,
+    displayModeBar: false,
+  }
   if (initial) await Plotly.newPlot(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
   else await Plotly.react(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
   emit('rendered')
@@ -36,7 +42,11 @@ onMounted(() => {
   mounted = true
   void apply(true)
   ro = new ResizeObserver(() => {
-    if (el.value) void Plotly.Plots.resize(el.value)
+    const div = el.value
+    // 隐藏/未挂载的 plot div 上调用 resize 会抛错（如切到流程图模式后工作区图表被 KeepAlive 隐藏）
+    if (div && div.isConnected && div.clientWidth > 0 && div.clientHeight > 0) {
+      void Plotly.Plots.resize(div)
+    }
   })
   if (el.value) ro.observe(el.value)
 })

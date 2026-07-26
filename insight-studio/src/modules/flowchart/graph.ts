@@ -124,6 +124,7 @@ function pushViewNodes(
   parentFlowId: string,
   nodes: FlowNodeData[],
   edges: FlowEdgeData[],
+  sourcePort: string,
 ): void {
   const id = viewNodeId(view.id)
   nodes.push({
@@ -133,13 +134,20 @@ function pushViewNodes(
     tableId: table.id,
     viewId: view.id,
     viewType: view.type,
-    inputs: [],
-    outputs: [],
+    // 视图节点用固定 in/out 锚点，保证连线落在左侧/右侧（而非默认顶部）。
+    inputs: [{ name: 'in', type: 'table' }],
+    outputs: [{ name: 'out', type: 'table' }],
     childCount: view.children.length,
     valid: true,
   })
-  edges.push({ id: edgeId(parentFlowId, id, '', ''), source: parentFlowId, target: id, sourcePort: '', targetPort: '' })
-  for (const child of view.children) pushViewNodes(child, table, id, nodes, edges)
+  edges.push({
+    id: edgeId(parentFlowId, id, sourcePort, 'in'),
+    source: parentFlowId,
+    target: id,
+    sourcePort,
+    targetPort: 'in',
+  })
+  for (const child of view.children) pushViewNodes(child, table, id, nodes, edges, 'out')
 }
 
 /* --------------------------------- 拓扑构建 --------------------------------- */
@@ -181,10 +189,42 @@ export function buildFlowGraph(analysis: Analysis): FlowGraph {
     if (!parentStep) continue
     const parentId = stepNodeId(parentStep.id)
     const tableMeta = { id: table.id, rows: table.rows, columns: table.columns, views: table.views }
-    for (const view of table.views) pushViewNodes(view, tableMeta, parentId, nodes, edges)
+    const sourcePort =
+      getStepDef(parentStep.type).outputs.find((p) => p.type === 'table')?.name ??
+      getStepDef(parentStep.type).outputs[0]?.name ??
+      'Output dataset'
+    for (const view of table.views) pushViewNodes(view, tableMeta, parentId, nodes, edges, sourcePort)
   }
 
   return { nodes, edges }
+}
+
+/**
+ * 将流程图源节点解析为步骤输入引用（from.nodeId 必须是 step.id）。
+ * - 步骤节点：直接用其 stepId + 拖出的端口名
+ * - 视图节点：回落到该视图所属表的产出步骤及其 table 输出端口
+ *   （保证 Filter 等挂在正确的数据表下，侧栏/布局一层层对应）
+ */
+export function resolveStepSourceRef(
+  analysis: Analysis,
+  node: FlowNodeData,
+  handlePort: string,
+): { nodeId: string; port: string } | null {
+  if (node.kind === 'step' && node.stepId) {
+    return { nodeId: node.stepId, port: handlePort }
+  }
+  if (node.kind === 'view' && node.tableId) {
+    const table = findTable(analysis, node.tableId)
+    if (!table?.stepId) return null
+    const step = analysis.steps.find((s) => s.id === table.stepId)
+    if (!step) return null
+    const port =
+      getStepDef(step.type).outputs.find((p) => p.type === 'table')?.name ??
+      getStepDef(step.type).outputs[0]?.name ??
+      'Output dataset'
+    return { nodeId: table.stepId, port }
+  }
+  return null
 }
 
 /* --------------------------------- 邻接查询 --------------------------------- */

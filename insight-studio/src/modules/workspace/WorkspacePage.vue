@@ -8,6 +8,7 @@ import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '.
 import SidebarTree from './SidebarTree.vue'
 import WorkspaceMain from './WorkspaceMain.vue'
 import FlowchartMain from './FlowchartMain.vue'
+import AddDataMenu from './AddDataMenu.vue'
 import CsvImportDialog from '../table/CsvImportDialog.vue'
 import CombineTablesDialog from '../table/CombineTablesDialog.vue'
 
@@ -133,44 +134,14 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             <IButton variant="primary" icon="plus" @click="addDataOpen = !addDataOpen">Add data</IButton>
           </template>
           <template #default>
-            <div class="menu menu--adddata" role="menu">
-              <button type="button" class="menu__item" role="menuitem" @click="openCsvImport">
-                <IIcon name="upload" :size="14" />
-                <span>
-                  <span class="menu__item-title">Import CSV</span>
-                  <span class="menu__item-desc">上传 .csv 文件创建新表</span>
-                </span>
-              </button>
-              <button type="button" class="menu__item" role="menuitem" @click="openCombine">
-                <IIcon name="combine" :size="14" />
-                <span>
-                  <span class="menu__item-title">Combine tables</span>
-                  <span class="menu__item-desc">Join / Append 现有表</span>
-                </span>
-              </button>
-              <div class="menu__sep" role="separator" />
-              <button type="button" class="menu__item" role="menuitem" disabled aria-disabled="true">
-                <IIcon name="database" :size="14" />
-                <span>
-                  <span class="menu__item-title">From Registry</span>
-                  <span class="menu__item-desc">后续版本</span>
-                </span>
-              </button>
-              <button type="button" class="menu__item" role="menuitem" disabled aria-disabled="true">
-                <IIcon name="plate" :size="14" />
-                <span>
-                  <span class="menu__item-title">From Plate</span>
-                  <span class="menu__item-desc">后续版本</span>
-                </span>
-              </button>
-            </div>
+            <AddDataMenu @import-csv="openCsvImport" @combine="openCombine" />
           </template>
         </IPopover>
       </div>
     </header>
 
     <div class="ws__body">
-      <SidebarTree @add-data="addDataOpen = true" />
+      <SidebarTree @import-csv="openCsvImport" @combine="openCombine" />
       <main class="ws__main">
         <KeepAlive>
           <component :is="modeComponent" :key="mode" @add-data="addDataOpen = true" />
@@ -281,9 +252,6 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   flex-direction: column;
   min-width: 180px;
 }
-.menu--adddata {
-  width: 260px;
-}
 .menu__item {
   display: flex;
   align-items: center;
@@ -302,28 +270,11 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   opacity: 0.45;
   cursor: not-allowed;
 }
-.menu__item > span {
-  display: flex;
-  flex-direction: column;
-}
-.menu__item-title {
-  font-size: var(--is-text-sm);
-  font-weight: 500;
-}
-.menu__item-desc {
-  font-size: var(--is-text-xs);
-  color: var(--is-text-tertiary);
-}
 .menu__item--danger {
   color: var(--is-danger);
 }
 .menu__item--danger:hover {
   background: var(--is-danger-soft);
-}
-.menu__sep {
-  height: 1px;
-  background: var(--is-border);
-  margin: 4px 6px;
 }
 .confirm-text {
   font-size: var(--is-text-sm);

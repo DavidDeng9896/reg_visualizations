@@ -2,61 +2,67 @@
 import { computed, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { AnalysisTable, ViewNode, ViewType } from '../../shared/types'
-import { findCombineDependents, findTable, findView, findViewParent } from '../../shared/tree'
+import { buildTableForest, filterTableForest, findCombineDependents, findTable, findView, findViewParent } from '../../shared/tree'
 import { createViewNode, defaultViewName } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import type { SelectedNode } from '../../stores/analysisStore'
 import { IButton, IIcon, IModal, IPopover, ITextField, toast } from '../../ui'
 import type { IconName } from '../../ui'
-import SidebarTreeNode from './SidebarTreeNode.vue'
+import SidebarTableNode from './SidebarTableNode.vue'
+import AddDataMenu from './AddDataMenu.vue'
 
-const emit = defineEmits<{ (e: 'add-data'): void }>()
+const emit = defineEmits<{ (e: 'import-csv' | 'combine'): void }>()
+
+/** 侧栏「+」Add data 浮窗开关（折叠 rail 与区头共用一份状态，二者不会同时渲染）。 */
+const addMenuOpen = ref(false)
 
 const store = useAnalysisStore()
 const { current, selected } = storeToRefs(store)
+
+const SIDEBAR_COLLAPSED_KEY = 'insight-studio:sidebar-collapsed'
+const collapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
+
+function toggleCollapsed() {
+  collapsed.value = !collapsed.value
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed.value ? '1' : '0')
+}
 
 const search = ref('')
 
 /* 展开/收起 */
 const expanded = reactive<Set<string>>(new Set())
+const collapsedTables = reactive<Set<string>>(new Set())
 function toggle(id: string) {
   if (expanded.has(id)) expanded.delete(id)
   else expanded.add(id)
 }
-function isTableExpanded(t: AnalysisTable): boolean {
-  // 默认展开；收起后 id 进 expandedClosed 集合。为简化：用「已收起」集合语义。
-  return !collapsedTables.has(t.id)
-}
-const collapsedTables = reactive<Set<string>>(new Set())
 function toggleTable(id: string) {
   if (collapsedTables.has(id)) collapsedTables.delete(id)
   else collapsedTables.add(id)
 }
 
-/* 搜索过滤：名称命中或后代命中则保留 */
-function viewMatches(v: ViewNode, q: string): boolean {
-  if (v.name.toLowerCase().includes(q)) return true
-  return v.children.some((c) => viewMatches(c, q))
-}
-function filterViews(views: ViewNode[], q: string): ViewNode[] {
-  if (!q) return views
-  return views.filter((v) => viewMatches(v, q))
-}
-const visibleTables = computed(() => {
+const tableForest = computed(() => {
   const a = current.value
   if (!a) return []
+  const forest = buildTableForest(a)
   const q = search.value.trim().toLowerCase()
-  if (!q) return a.tables
-  return a.tables.filter(
-    (t) => t.name.toLowerCase().includes(q) || t.views.some((v) => viewMatches(v, q)),
-  )
+  return q ? filterTableForest(forest, q) : forest
 })
 
 /* 选中 */
+/**
+ * 树节点选择：流程图模式下只更新选中态、不切回工作区，
+ * 由 FlowchartCanvas 监听 selected 做居中定位与高亮（对齐「在流程图中显示」）。
+ */
+function selectNode(node: SelectedNode) {
+  if (store.mode === 'flowchart') store.setSelected(node)
+  else store.select(node)
+}
 function selectTable(tableId: string) {
-  store.select({ kind: 'table', tableId })
+  selectNode({ kind: 'table', tableId })
 }
 function selectView(tableId: string, viewId: string) {
-  store.select({ kind: 'view', tableId, viewId })
+  selectNode({ kind: 'view', tableId, viewId })
 }
 
 /** ⋯ 菜单「在流程图中显示」：选中并切到流程图模式（画布负责居中定位）。 */
@@ -218,7 +224,8 @@ function pickViewType(type: ViewType) {
     }
   })
   pickerFor.value = null
-  if (newViewId) selectView(target.tableId, newViewId)
+  // 新建视图属于「创建并配置」而非树导航：始终切到工作区打开编辑器（不受需求2树选择规则影响）
+  if (newViewId) store.select({ kind: 'view', tableId: target.tableId, viewId: newViewId })
 }
 
 function connectExternal() {
@@ -227,128 +234,105 @@ function connectExternal() {
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="sidebar__search">
-      <ITextField v-model="search" placeholder="Search" prefix-icon="search" clearable size="md" />
+  <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }" :aria-expanded="!collapsed">
+    <!-- 收起态：窄条 + 展开按钮 -->
+    <div v-if="collapsed" class="sidebar__rail">
+      <button
+        type="button"
+        class="sidebar__toggle"
+        aria-label="展开侧栏"
+        title="展开侧栏"
+        @click="toggleCollapsed"
+      >
+        <IIcon name="chevron-right" :size="16" />
+      </button>
+      <IPopover :open="addMenuOpen" placement="right-start" :arrow="true" @update:open="addMenuOpen = $event">
+        <template #anchor>
+          <button
+            type="button"
+            class="sidebar__rail-add"
+            aria-label="添加数据"
+            title="Add data"
+            @click="addMenuOpen = !addMenuOpen"
+          >
+            <IIcon name="plus" :size="16" />
+          </button>
+        </template>
+        <template #default>
+          <AddDataMenu @import-csv="addMenuOpen = false; emit('import-csv')" @combine="addMenuOpen = false; emit('combine')" />
+        </template>
+      </IPopover>
     </div>
 
-    <div class="sidebar__section">
-      <div class="sidebar__section-head">
-        <span class="sidebar__section-title">Analysis data</span>
-        <button type="button" class="sidebar__add" aria-label="添加数据" title="Add data" @click="emit('add-data')">
-          <IIcon name="plus" :size="14" />
+    <template v-else>
+      <div class="sidebar__search">
+        <ITextField v-model="search" placeholder="Search" prefix-icon="search" clearable size="md" />
+        <button
+          type="button"
+          class="sidebar__toggle"
+          aria-label="收起侧栏"
+          title="收起侧栏"
+          @click="toggleCollapsed"
+        >
+          <IIcon name="chevron-left" :size="16" />
         </button>
       </div>
 
-      <div class="sidebar__tree" role="tree">
-        <div v-if="!visibleTables.length" class="sidebar__empty">
-          {{ search ? '无匹配结果' : '还没有数据，点击 Add data 开始' }}
+      <div class="sidebar__section">
+        <div class="sidebar__section-head">
+          <span class="sidebar__section-title">Analysis data</span>
+          <IPopover :open="addMenuOpen" placement="bottom-start" :arrow="true" @update:open="addMenuOpen = $event">
+            <template #anchor>
+              <button type="button" class="sidebar__add" aria-label="添加数据" title="Add data" @click="addMenuOpen = !addMenuOpen">
+                <IIcon name="plus" :size="14" />
+              </button>
+            </template>
+            <template #default>
+              <AddDataMenu @import-csv="addMenuOpen = false; emit('import-csv')" @combine="addMenuOpen = false; emit('combine')" />
+            </template>
+          </IPopover>
         </div>
 
-        <div v-for="t in visibleTables" :key="t.id" class="tnode">
-          <div
-            class="tnode__row"
-            :class="{ 'tnode__row--selected': selected?.kind === 'table' && selected.tableId === t.id }"
-            role="treeitem"
-            data-testid="sidebar-table"
-            :data-name="t.name"
-            :aria-expanded="isTableExpanded(t)"
-            :aria-selected="selected?.kind === 'table' && selected.tableId === t.id"
-            tabindex="0"
-            @click="selectTable(t.id)"
-            @keydown.enter="selectTable(t.id)"
-          >
-            <button
-              type="button"
-              class="tnode__chevron"
-              :aria-label="isTableExpanded(t) ? '收起' : '展开'"
-              @click.stop="toggleTable(t.id)"
-            >
-              <IIcon :name="isTableExpanded(t) ? 'chevron-down' : 'chevron-right'" :size="14" />
-            </button>
-            <IIcon :name="t.source === 'combine' ? 'combine' : 'database'" :size="16" class="tnode__icon" />
-            <span class="tnode__name is-ellipsis" :title="t.name">{{ t.name }}</span>
-            <span class="tnode__actions">
-              <button
-                type="button"
-                class="tnode__action"
-                aria-label="在流程图中定位"
-                title="在流程图中定位"
-                @click.stop="showInFlowchart(t.id)"
-              >
-                <IIcon name="flowchart" :size="12" />
-              </button>
-              <button
-                type="button"
-                class="tnode__action"
-                aria-label="新建视图"
-                title="新建视图"
-                @click.stop="openPicker(t.id, null)"
-              >
-                <IIcon name="plus" :size="12" />
-              </button>
-              <IPopover :open="menuFor === t.id" placement="bottom-end" :arrow="false" @update:open="setMenu($event ? t.id : null)">
-                <template #anchor>
-                  <button
-                    type="button"
-                    class="tnode__action"
-                    aria-label="更多操作"
-                    @click.stop="setMenu(menuFor === t.id ? null : t.id)"
-                  >
-                    <IIcon name="more" :size="13" />
-                  </button>
-                </template>
-                <template #default="{ close }">
-                  <div class="menu" role="menu">
-                    <button type="button" class="menu__item" role="menuitem" @click.stop="close(); showInFlowchart(t.id)">
-                      <IIcon name="flowchart" :size="13" /> 在流程图中显示
-                    </button>
-                    <button type="button" class="menu__item" role="menuitem" @click.stop="close(); openTableRename(t)">
-                      <IIcon name="edit" :size="13" /> 重命名
-                    </button>
-                    <button type="button" class="menu__item" role="menuitem" @click.stop="close(); openPicker(t.id, null)">
-                      <IIcon name="plus" :size="13" /> 新建视图
-                    </button>
-                    <button type="button" class="menu__item menu__item--danger" role="menuitem" @click.stop="close(); askDeleteTable(t)">
-                      <IIcon name="trash" :size="13" /> 删除
-                    </button>
-                  </div>
-                </template>
-              </IPopover>
-            </span>
+        <div class="sidebar__tree" role="tree">
+          <div v-if="!tableForest.length" class="sidebar__empty">
+            {{ search ? '无匹配结果' : '还没有数据，点击 Add data 开始' }}
           </div>
 
-          <div v-if="isTableExpanded(t)" class="tnode__children" role="group">
-            <SidebarTreeNode
-              v-for="v in filterViews(t.views, search.trim().toLowerCase())"
-              :key="v.id"
-              :node="v"
-              :table-id="t.id"
-              :depth="1"
-              :expanded="expanded"
-              :selected-view-id="selected?.kind === 'view' ? selected.viewId : undefined"
-              :editing-id="editingId"
-              :menu-for="menuFor"
-              @toggle="toggle"
-              @select="selectView"
-              @menu="setMenu"
-              @rename="commitRename"
-              @rename-start="startRename"
-              @rename-cancel="cancelRename"
-              @delete="(id: string, name: string) => askDeleteView(t.id, id, name)"
-              @new-view="openPicker"
-              @show-in-flowchart="showInFlowchart"
-            />
-          </div>
+          <SidebarTableNode
+            v-for="node in tableForest"
+            :key="node.table.id"
+            :node="node"
+            :depth="0"
+            :search="search"
+            :collapsed-tables="collapsedTables"
+            :expanded="expanded"
+            :selected-table-id="selected?.kind === 'table' ? selected.tableId : undefined"
+            :selected-view-id="selected?.kind === 'view' ? selected.viewId : undefined"
+            :editing-id="editingId"
+            :menu-for="menuFor"
+            @toggle-table="toggleTable"
+            @toggle-view="toggle"
+            @select-table="selectTable"
+            @select-view="selectView"
+            @menu="setMenu"
+            @rename="commitRename"
+            @rename-start="startRename"
+            @rename-cancel="cancelRename"
+            @delete-view="askDeleteView"
+            @delete-table="askDeleteTable"
+            @rename-table="openTableRename"
+            @new-view="openPicker"
+            @show-in-flowchart="showInFlowchart"
+          />
         </div>
       </div>
-    </div>
 
-    <div class="sidebar__footer">
-      <IButton variant="ghost" icon="link" size="sm" @click="connectExternal">
-        Connect with external tool
-      </IButton>
-    </div>
+      <div class="sidebar__footer">
+        <IButton variant="ghost" icon="link" size="sm" @click="connectExternal">
+          Connect with external tool
+        </IButton>
+      </div>
+    </template>
 
     <!-- 节点类型选择（tiles） -->
     <IPopover
@@ -410,9 +394,57 @@ function connectExternal() {
   background: var(--is-surface);
   border-right: 1px solid var(--is-border);
   position: relative;
+  flex-shrink: 0;
+  transition: width var(--is-dur) var(--is-ease), min-width var(--is-dur) var(--is-ease);
+}
+.sidebar--collapsed {
+  width: 44px;
+  min-width: 44px;
+}
+.sidebar__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  height: 100%;
+}
+.sidebar__rail-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--is-radius-sm);
+  color: var(--is-text-secondary);
+}
+.sidebar__rail-add:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
+.sidebar__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--is-radius-sm);
+  color: var(--is-text-tertiary);
+}
+.sidebar__toggle:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
 }
 .sidebar__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 12px;
+}
+.sidebar__search > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 .sidebar__section {
   flex: 1;
@@ -427,11 +459,11 @@ function connectExternal() {
   padding: 8px 20px;
 }
 .sidebar__section-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--is-text-tertiary);
+  color: var(--is-text-secondary);
 }
 .sidebar__add {
   display: inline-flex;
@@ -462,104 +494,6 @@ function connectExternal() {
   position: absolute;
   left: 0;
   top: 120px;
-}
-
-.tnode__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  margin: 0 6px;
-  padding: 0 12px;
-  border-radius: var(--is-radius-sm);
-  cursor: pointer;
-  font-size: var(--is-text-sm);
-  transition: background-color var(--is-dur-fast) var(--is-ease);
-}
-.tnode__row:hover {
-  background: var(--is-surface-hover);
-}
-.tnode__row--selected,
-.tnode__row--selected:hover {
-  background: var(--is-accent-soft);
-  border-radius: 4px;
-}
-.tnode__children {
-  margin-left: 21px;
-  border-left: 1px solid var(--is-border);
-}
-.tnode__row--selected .tnode__name {
-  color: var(--is-accent);
-  font-weight: 500;
-}
-.tnode__row--selected .tnode__icon {
-  color: var(--is-accent);
-}
-.tnode__chevron {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  align-items: center;
-  justify-content: center;
-  color: var(--is-text-tertiary);
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.tnode__icon {
-  color: var(--is-text-secondary);
-  flex-shrink: 0;
-}
-.tnode__name {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--is-text-sm);
-  font-weight: 500;
-}
-.tnode__actions {
-  display: none;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.tnode__row:hover .tnode__actions,
-.tnode__row:focus-within .tnode__actions {
-  display: inline-flex;
-}
-.tnode__action {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: 4px;
-  color: var(--is-text-tertiary);
-}
-.tnode__action:hover {
-  background: rgba(16, 24, 40, 0.08);
-  color: var(--is-text);
-}
-
-.menu {
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  min-width: 140px;
-}
-.menu__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: var(--is-radius-sm);
-  font-size: var(--is-text-sm);
-  text-align: left;
-  color: var(--is-text);
-}
-.menu__item:hover {
-  background: var(--is-surface-hover);
-}
-.menu__item--danger {
-  color: var(--is-danger);
-}
-.menu__item--danger:hover {
-  background: var(--is-danger-soft);
 }
 
 .picker {

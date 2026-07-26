@@ -22,6 +22,7 @@ const open = defineModel<boolean>('open', { default: false })
 const ctx = inject(CHART_DRAFT_CONTEXT)!
 
 const AGG_OPTIONS = [
+  { value: 'none', label: 'None（不聚合）' },
   { value: 'count', label: 'Count (non-blank)' },
   { value: 'sum', label: 'Sum' },
   { value: 'min', label: 'Min' },
@@ -78,9 +79,10 @@ const maxStr = computed({
 })
 
 const agg = computed({
-  get: () => props.mapping.aggregation ?? 'count',
+  get: () => props.mapping.aggregation ?? 'none',
   set: (v: string | number) => {
-    props.mapping.aggregation = v as Aggregation
+    if (v === 'none') delete props.mapping.aggregation
+    else props.mapping.aggregation = v as Aggregation
     ctx.touch()
   },
 })
@@ -94,7 +96,11 @@ const side = computed({
   },
 })
 
-const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregation ?? 'count'))
+const aggLabelPreview = computed(() => {
+  const method = props.mapping.aggregation
+  if (!method || method === 'none') return ''
+  return `${aggregationLabel(method)} of ${props.mapping.field}`
+})
 </script>
 
 <template>
@@ -107,7 +113,7 @@ const aggLabelPreview = computed(() => aggregationLabel(props.mapping.aggregatio
         <div v-if="slot.aggregatable" class="axis-pop__row">
           <span class="axis-pop__label">聚合方式</span>
           <ISelect v-model="agg" :options="AGG_OPTIONS" size="sm" aria-label="聚合方式" />
-          <span class="axis-pop__hint">{{ aggLabelPreview }} of {{ mapping.field }}</span>
+          <span v-if="aggLabelPreview" class="axis-pop__hint">{{ aggLabelPreview }}</span>
         </div>
 
         <div v-if="slot.ySide" class="axis-pop__row">
