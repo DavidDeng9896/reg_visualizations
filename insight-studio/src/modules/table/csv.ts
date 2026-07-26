@@ -1,11 +1,13 @@
 /**
  * CSV 导入/导出纯函数。
  * 类型推断规则：非空值全部为数值 → number；全部为 true/false → boolean；
- * 全部匹配 YYYY-MM-DD → date；全部匹配 ISO datetime → datetime；否则 string。
+ * 全部匹配 YYYY-MM-DD → date；全部匹配 ISO datetime → datetime；
+ * ≥80% 符合 SMILES/mol 启发式 → structure；否则 string。
  */
 import type { CellValue, ColumnMeta, DataType, Row } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { parseDateLike } from '../../shared/datetime'
+import { isStructureCandidate } from './structure/parse'
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
@@ -33,6 +35,8 @@ export function inferColumnType(values: string[]): DataType {
   if (nonEmpty.every((v) => /^(true|false)$/i.test(v.trim()))) return 'boolean'
   if (nonEmpty.every((v) => DATE_ONLY_RE.test(v.trim()) && parseDateLike(v) !== null)) return 'date'
   if (nonEmpty.every((v) => DATETIME_RE.test(v.trim()) && parseDateLike(v) !== null)) return 'datetime'
+  const hits = nonEmpty.filter((v) => isStructureCandidate(v)).length
+  if (hits / nonEmpty.length >= 0.8) return 'structure'
   return 'string'
 }
 
@@ -61,6 +65,8 @@ export function coerceValue(raw: string, type: DataType): CellValue {
     case 'date':
     case 'datetime':
       return parseDateLike(s) !== null ? s : null
+    case 'structure':
+      return s
     default:
       return s
   }

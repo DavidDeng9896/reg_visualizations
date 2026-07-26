@@ -26,7 +26,7 @@ describe('inferColumnType', () => {
   })
   it('string：混合或文本', () => {
     expect(inferColumnType(['abc', '1'])).toBe('string')
-    expect(inferColumnType(['hello'])).toBe('string')
+    expect(inferColumnType(['hello!'])).toBe('string')
   })
   it('空值被忽略；全空列按 string', () => {
     expect(inferColumnType(['', '  ', '3'])).toBe('number')
@@ -61,6 +61,25 @@ describe('coerceValue', () => {
   it('空串 → null', () => {
     expect(coerceValue('  ', 'number')).toBe(null)
     expect(coerceValue('', 'string')).toBe(null)
+  })
+})
+
+describe('inferColumnType · structure', () => {
+  it('≥80% SMILES → structure', () => {
+    expect(inferColumnType(['CCO', 'c1ccccc1', 'CC(=O)O', 'not a smiles', 'C'])).toBe('structure')
+  })
+  it('plain English stays string', () => {
+    expect(inferColumnType(['hello world', 'foo bar', 'baz qux'])).toBe('string')
+  })
+  it('all numbers still number (priority over structure)', () => {
+    expect(inferColumnType(['1', '2', '3'])).toBe('number')
+  })
+})
+
+describe('coerceValue · structure', () => {
+  it('trims string; empty → null', () => {
+    expect(coerceValue('  CCO  ', 'structure')).toBe('CCO')
+    expect(coerceValue('  ', 'structure')).toBe(null)
   })
 })
 

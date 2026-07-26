@@ -39,6 +39,8 @@ export function parseCellInput(raw: string, dataType: DataType): ParseResult {
       if (parseDateLike(s) === null) return { ok: false, error: `「${raw}」不是有效日期` }
       return { ok: true, value: s }
     }
+    case 'structure':
+      return { ok: true, value: s }
     default:
       return { ok: true, value: raw }
   }
