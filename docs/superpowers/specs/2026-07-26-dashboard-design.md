@@ -107,11 +107,11 @@ type DashboardWidgetType = 'chart' | 'table'
 interface DashboardWidget {
   id: string
   type: DashboardWidgetType
-  /** Live 引用：跨 Insight，故必须带 analysisId。 */
+  /** Live 引用：可跨多个 Insight；viewId 缺省表示源表只读。 */
   ref: {
     analysisId: string
     tableId: string
-    viewId: string
+    viewId?: string
   }
   grid: { x: number; y: number; w: number; h: number }
   /** 看板层展示名；默认用源 ViewNode.name。 */
