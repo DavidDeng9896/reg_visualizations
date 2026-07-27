@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Analysis, ViewNode } from '../../shared/types'
+import type { Analysis, ViewType } from '../../shared/types'
 import { analysisRepository } from '../../shared/repository'
 import { normalizeExternalUrl } from '../../shared/factories'
 import { IButton, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
+import SourceTreePicker, { type TreePick } from './SourceTreePicker.vue'
 
 export type AddWidgetPayload =
   | {
@@ -29,42 +30,16 @@ const mode = ref<'insight' | 'link'>('insight')
 const analyses = ref<Analysis[]>([])
 const loading = ref(false)
 const analysisId = ref('')
-const tableId = ref('')
-const viewKey = ref('')
+const pick = ref<TreePick | null>(null)
 const linkUrl = ref('')
 const linkTitle = ref('')
 const linkError = ref('')
 
-const selectedAnalysis = computed(() => analyses.value.find((a) => a.id === analysisId.value))
-const tables = computed(() => selectedAnalysis.value?.tables ?? [])
-const selectedTable = computed(() => tables.value.find((t) => t.id === tableId.value))
+const selectedAnalysis = computed(() => analyses.value.find((a) => a.id === analysisId.value) ?? null)
 
 const analysisOptions = computed<SelectOption[]>(() =>
   analyses.value.map((a) => ({ value: a.id, label: a.name })),
 )
-const tableOptions = computed<SelectOption[]>(() =>
-  tables.value.map((t) => ({ value: t.id, label: t.name })),
-)
-
-function flattenViews(views: ViewNode[], depth = 0): { id: string; name: string; type: ViewNode['type'] }[] {
-  const out: { id: string; name: string; type: ViewNode['type'] }[] = []
-  for (const v of views) {
-    out.push({ id: v.id, name: `${'—'.repeat(depth)}${depth ? ' ' : ''}${v.name}`, type: v.type })
-    out.push(...flattenViews(v.children, depth + 1))
-  }
-  return out
-}
-
-const viewOptions = computed<SelectOption[]>(() => {
-  const t = selectedTable.value
-  if (!t) return []
-  const opts: SelectOption[] = [{ value: 'table', label: `源表「${t.name}」（只读）` }]
-  for (const v of flattenViews(t.views)) {
-    const kind = v.type === 'table' ? '表视图' : '图表'
-    opts.push({ value: `view:${v.id}`, label: `${v.name} · ${kind}` })
-  }
-  return opts
-})
 
 watch(
   () => props.open,
@@ -74,32 +49,29 @@ watch(
     linkUrl.value = ''
     linkTitle.value = ''
     linkError.value = ''
+    pick.value = null
     loading.value = true
     try {
       analyses.value = await analysisRepository.list()
       analysisId.value = analyses.value[0]?.id ?? ''
-      syncTable()
     } finally {
       loading.value = false
     }
   },
 )
 
-watch(analysisId, () => syncTable())
-watch(tableId, () => {
-  viewKey.value = selectedTable.value ? 'table' : ''
+watch(analysisId, () => {
+  pick.value = null
 })
-
-function syncTable() {
-  const list = tables.value
-  tableId.value = list[0]?.id ?? ''
-  viewKey.value = tableId.value ? 'table' : ''
-}
 
 const canConfirm = computed(() => {
   if (mode.value === 'link') return !!normalizeExternalUrl(linkUrl.value)
-  return !!analysisId.value && !!tableId.value && !!viewKey.value
+  return !!analysisId.value && !!pick.value
 })
+
+function chartTypeOf(viewType: ViewType): 'chart' | 'table' {
+  return viewType === 'table' ? 'table' : 'chart'
+}
 
 function confirm() {
   if (!canConfirm.value) return
@@ -113,21 +85,24 @@ function confirm() {
     emit('update:open', false)
     return
   }
-  let viewId: string | undefined
-  let type: 'chart' | 'table' = 'table'
-  if (viewKey.value.startsWith('view:')) {
-    viewId = viewKey.value.slice(5)
-    const t = selectedTable.value
-    const v = t ? flattenViews(t.views).find((x) => x.id === viewId) : undefined
-    type = v && v.type !== 'table' ? 'chart' : 'table'
+  const p = pick.value
+  if (!p) return
+  if (p.kind === 'table') {
+    emit('confirm', {
+      kind: 'insight',
+      analysisId: analysisId.value,
+      tableId: p.tableId,
+      type: 'table',
+    })
+  } else {
+    emit('confirm', {
+      kind: 'insight',
+      analysisId: analysisId.value,
+      tableId: p.tableId,
+      viewId: p.viewId,
+      type: chartTypeOf(p.viewType),
+    })
   }
-  emit('confirm', {
-    kind: 'insight',
-    analysisId: analysisId.value,
-    tableId: tableId.value,
-    viewId,
-    type,
-  })
   emit('update:open', false)
 }
 
@@ -137,7 +112,7 @@ function onClose(v: boolean) {
 </script>
 
 <template>
-  <IModal :open="open" title="添加组件" :width="480" @update:open="onClose">
+  <IModal :open="open" title="添加组件" :width="520" @update:open="onClose">
     <div class="awd__tabs" role="tablist">
       <button
         type="button"
@@ -187,14 +162,11 @@ function onClose(v: boolean) {
           <span class="awd__label">Insight</span>
           <ISelect v-model="analysisId" :options="analysisOptions" placeholder="选择 Insight" />
         </label>
-        <label class="awd__row">
-          <span class="awd__label">表</span>
-          <ISelect v-model="tableId" :options="tableOptions" placeholder="选择表" :disabled="!tableOptions.length" />
-        </label>
-        <label class="awd__row">
-          <span class="awd__label">视图</span>
-          <ISelect v-model="viewKey" :options="viewOptions" placeholder="选择视图或源表" :disabled="!viewOptions.length" />
-        </label>
+        <div class="awd__row">
+          <span class="awd__label">选择表或图表</span>
+          <SourceTreePicker v-model="pick" :analysis="selectedAnalysis" />
+          <p class="awd__hint">与左侧侧栏相同：图标区分表/图，缩进表示父子关系。</p>
+        </div>
       </div>
     </template>
 
