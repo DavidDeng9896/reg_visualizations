@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   left: 40px;
-  right: 72px;
+  right: 88px;
   height: 28px;
   z-index: 2;
   cursor: grab;

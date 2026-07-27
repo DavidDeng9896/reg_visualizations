@@ -75,8 +75,8 @@ export function createDashboard(name: string): Dashboard {
 }
 
 export function createDashboardWidget(
-  type: DashboardWidgetType,
-  ref: DashboardWidget['ref'],
+  type: Exclude<DashboardWidgetType, 'link'>,
+  ref: NonNullable<DashboardWidget['ref']>,
   grid?: Partial<DashboardWidget['grid']>,
 ): DashboardWidget {
   const defaults =
@@ -88,6 +88,41 @@ export function createDashboardWidget(
     type,
     ref: { ...ref },
     grid: { ...defaults, ...grid },
+  }
+}
+
+/** 规范化外部链接；非法则返回 null。 */
+export function normalizeExternalUrl(raw: string): string | null {
+  const s = raw.trim()
+  if (!s) return null
+  try {
+    const withProto = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(s) ? s : `https://${s.replace(/^\/\//, '')}`
+    const u = new URL(withProto)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+    return u.toString()
+  } catch {
+    return null
+  }
+}
+
+export function createLinkWidget(
+  url: string,
+  opts?: { title?: string; grid?: Partial<DashboardWidget['grid']> },
+): DashboardWidget {
+  const normalized = normalizeExternalUrl(url)
+  if (!normalized) throw new Error('无效的外部链接')
+  let host = normalized
+  try {
+    host = new URL(normalized).hostname
+  } catch {
+    /* ignore */
+  }
+  return {
+    id: uuid(),
+    type: 'link',
+    url: normalized,
+    title: opts?.title?.trim() || host,
+    grid: { x: 0, y: 0, w: 6, h: 10, ...opts?.grid },
   }
 }
 

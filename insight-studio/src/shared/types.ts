@@ -405,7 +405,7 @@ export interface Analysis {
 
 /* ---------------------------------- 看板（与 Analysis 平级） ---------------------------------- */
 
-export type DashboardWidgetType = 'chart' | 'table'
+export type DashboardWidgetType = 'chart' | 'table' | 'link'
 
 export interface DashboardLayout {
   /** 网格列数，固定 12。 */
@@ -432,9 +432,12 @@ export interface DashboardWidgetGrid {
 export interface DashboardWidget {
   id: string
   type: DashboardWidgetType
-  ref: DashboardWidgetRef
+  /** chart / table：指向 Insight 内表/视图。 */
+  ref?: DashboardWidgetRef
+  /** link：可在看板内预览的外部 http(s) 链接。 */
+  url?: string
   grid: DashboardWidgetGrid
-  /** 看板层展示名；默认用源 ViewNode.name / 表名。 */
+  /** 看板层展示名；默认用源 ViewNode.name / 表名 / 链接主机名。 */
   title?: string
 }
 

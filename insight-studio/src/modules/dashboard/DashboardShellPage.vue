@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { createDashboardWidget } from '../../shared/factories'
+import { createDashboardWidget, createLinkWidget } from '../../shared/factories'
 import { useDashboardStore } from '../../stores/dashboardStore'
 import { IButton, IEmptyState, toast } from '../../ui'
 import HomeSegmentNav from '../home/HomeSegmentNav.vue'
@@ -68,6 +68,12 @@ function onRemoveWidget(widgetId: string) {
 
 function onAddWidget(payload: AddWidgetPayload) {
   store.mutate((d) => {
+    if (payload.kind === 'link') {
+      const grid = findNextSlot(d.widgets, 6, 10)
+      const w = createLinkWidget(payload.url, { title: payload.title, grid })
+      d.widgets.push(w)
+      return
+    }
     const defaults = payload.type === 'chart' ? { w: 6, h: 8 } : { w: 12, h: 10 }
     const grid = findNextSlot(d.widgets, defaults.w, defaults.h)
     const w = createDashboardWidget(

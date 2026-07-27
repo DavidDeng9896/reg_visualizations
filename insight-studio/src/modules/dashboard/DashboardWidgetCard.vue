@@ -6,6 +6,7 @@ import { IButton, IIcon } from '../../ui'
 import { resolveWidgetSource, type WidgetResolveResult } from './widgetData'
 import ChartWidget from './ChartWidget.vue'
 import TableWidget from './TableWidget.vue'
+import LinkWidget from './LinkWidget.vue'
 
 const props = defineProps<{
   widget: DashboardWidget
@@ -24,19 +25,29 @@ const resolved = ref<WidgetResolveResult | null>(null)
 let io: IntersectionObserver | null = null
 let gen = 0
 
+const isLink = computed(() => props.widget.type === 'link')
+
 const title = computed(() => {
   if (props.widget.title) return props.widget.title
+  if (isLink.value) {
+    try {
+      return props.widget.url ? new URL(props.widget.url).hostname : '外部链接'
+    } catch {
+      return '外部链接'
+    }
+  }
   if (resolved.value?.ok) return resolved.value.title
   return props.widget.type === 'chart' ? '图表' : '表格'
 })
 
 const sourceLabel = computed(() => {
+  if (isLink.value) return props.widget.url ? '外部链接' : ''
   if (!resolved.value?.ok) return ''
   return `来自 Insight · ${resolved.value.analysis.name}`
 })
 
 async function load() {
-  if (!inView.value) return
+  if (isLink.value || !inView.value || !props.widget.ref) return
   const token = ++gen
   loading.value = true
   const r = await resolveWidgetSource(props.widget.ref)
@@ -46,7 +57,14 @@ async function load() {
 }
 
 watch(
-  () => [props.widget.ref.analysisId, props.widget.ref.tableId, props.widget.ref.viewId] as const,
+  () =>
+    [
+      props.widget.type,
+      props.widget.ref?.analysisId,
+      props.widget.ref?.tableId,
+      props.widget.ref?.viewId,
+      props.widget.url,
+    ] as const,
   () => {
     resolved.value = null
     void load()
@@ -58,6 +76,10 @@ watch(inView, (v) => {
 })
 
 onMounted(() => {
+  if (isLink.value) {
+    inView.value = true
+    return
+  }
   const el = rootEl.value
   if (!el || typeof IntersectionObserver === 'undefined') {
     inView.value = true
@@ -83,10 +105,16 @@ onBeforeUnmount(() => {
 })
 
 function openSource() {
-  const { analysisId, tableId, viewId } = props.widget.ref
-  const q = new URLSearchParams({ tableId })
-  if (viewId) q.set('viewId', viewId)
-  void router.push(`/analysis/${analysisId}?${q.toString()}`)
+  if (isLink.value && props.widget.url) {
+    window.open(props.widget.url, '_blank', 'noopener,noreferrer')
+    return
+  }
+  const ref = props.widget.ref
+  if (!ref) return
+  const q = new URLSearchParams({ tableId: ref.tableId })
+  if (ref.viewId) q.set('viewId', ref.viewId)
+  const loc = router.resolve(`/analysis/${ref.analysisId}?${q.toString()}`)
+  window.open(loc.href, '_blank', 'noopener,noreferrer')
 }
 </script>
 
@@ -98,24 +126,25 @@ function openSource() {
         <p v-if="sourceLabel" class="dwc__src is-ellipsis">{{ sourceLabel }}</p>
       </div>
       <div class="dwc__actions">
-        <IButton variant="ghost" size="sm" icon="external" title="打开源视图" @click.stop="openSource" />
-        <IButton variant="ghost" size="sm" icon="trash" title="移除" @click.stop="emit('remove')" />
+        <IButton
+          variant="ghost"
+          size="sm"
+          icon="external"
+          :title="isLink ? '在新标签页打开链接' : '在新标签页打开源视图'"
+          @click="openSource"
+        />
+        <IButton variant="ghost" size="sm" icon="trash" title="移除" @click="emit('remove')" />
       </div>
     </header>
     <div class="dwc__body">
-      <div v-if="!inView || loading" class="dwc__skel" aria-hidden="true" />
+      <LinkWidget v-if="isLink && widget.url" :url="widget.url" :title="title" />
+      <div v-else-if="!inView || loading" class="dwc__skel" aria-hidden="true" />
       <div v-else-if="resolved && !resolved.ok" class="dwc__broken">
         <IIcon name="warning" :size="18" />
         <span>{{ resolved.message }}</span>
       </div>
-      <ChartWidget
-        v-else-if="resolved?.ok && widget.type === 'chart'"
-        :source="resolved"
-      />
-      <TableWidget
-        v-else-if="resolved?.ok"
-        :source="resolved"
-      />
+      <ChartWidget v-else-if="resolved?.ok && widget.type === 'chart'" :source="resolved" />
+      <TableWidget v-else-if="resolved?.ok" :source="resolved" />
     </div>
   </article>
 </template>
@@ -139,6 +168,8 @@ function openSource() {
   padding: 8px 10px 6px;
   border-bottom: 1px solid var(--is-border);
   flex-shrink: 0;
+  position: relative;
+  z-index: 4;
 }
 .dwc__titles {
   min-width: 0;

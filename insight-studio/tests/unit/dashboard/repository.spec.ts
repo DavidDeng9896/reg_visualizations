@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { InsightStudioDB } from '../../../src/shared/db'
 import { DexieDashboardRepository } from '../../../src/shared/dashboardRepository'
-import { createDashboard, createDashboardWidget } from '../../../src/shared/factories'
+import { createDashboard, createDashboardWidget, createLinkWidget, normalizeExternalUrl } from '../../../src/shared/factories'
 
 let dbNameSeq = 0
 
@@ -36,8 +36,8 @@ describe('DexieDashboardRepository', () => {
     const got = await repo.get(d.id)
     expect(got?.name).toBe('Assay 总览')
     expect(got?.widgets).toHaveLength(2)
-    expect(got?.widgets[0].ref.analysisId).toBe('a1')
-    expect(got?.widgets[1].ref.viewId).toBeUndefined()
+    expect(got!.widgets[0]!.ref!.analysisId).toBe('a1')
+    expect(got!.widgets[1]!.ref!.viewId).toBeUndefined()
   })
 
   it('list 按 updatedAt 倒序', async () => {
@@ -66,5 +66,21 @@ describe('createDashboardWidget', () => {
     expect(c.grid).toEqual({ x: 0, y: 0, w: 6, h: 8 })
     const t = createDashboardWidget('table', { analysisId: 'a', tableId: 't' })
     expect(t.grid).toEqual({ x: 0, y: 0, w: 12, h: 10 })
+  })
+})
+
+describe('normalizeExternalUrl / createLinkWidget', () => {
+  it('补全 https 并校验', () => {
+    expect(normalizeExternalUrl('example.com/a')).toBe('https://example.com/a')
+    expect(normalizeExternalUrl('https://x.test')).toBe('https://x.test/')
+    expect(normalizeExternalUrl('ftp://x')).toBe(null)
+    expect(normalizeExternalUrl('')).toBe(null)
+  })
+  it('createLinkWidget', () => {
+    const w = createLinkWidget('example.com', { title: 'SOP' })
+    expect(w.type).toBe('link')
+    expect(w.url).toBe('https://example.com/')
+    expect(w.title).toBe('SOP')
+    expect(w.grid.w).toBe(6)
   })
 })
