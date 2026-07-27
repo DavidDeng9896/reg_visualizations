@@ -141,7 +141,7 @@ const DEFS: Record<ChartType, ChartTypeDefinition> = {
 export const CHART_DEFS: ChartTypeDefinition[] = [barDef, lineDef, scatterDef, boxDef, pieDef, heatmapDef]
 
 export function getChartDef(type: ChartType): ChartTypeDefinition {
-  return DEFS[type]
+  return DEFS[type] ?? DEFS.bar
 }
 
 export function isChartType(t: string): t is ChartType {
@@ -150,9 +150,11 @@ export function isChartType(t: string): t is ChartType {
 
 /** 统一构建入口：ViewResult + ChartConfig → option + warnings。 */
 export function buildChartOption(result: ViewResult, config: ChartConfig, viewName?: string, flags?: RowFlag[]): BuildOutput {
-  return DEFS[config.chartType].buildOption({ result, config, viewName, flags })
+  const def = getChartDef(config.chartType)
+  return def.buildOption({ result, config: { ...config, chartType: def.type }, viewName, flags })
 }
 
 export function validateChartMapping(config: ChartConfig, columns: ColumnMeta[]): MappingError[] {
-  return DEFS[config.chartType].validateMapping(config, columns)
+  const def = getChartDef(config.chartType)
+  return def.validateMapping({ ...config, chartType: def.type }, columns)
 }

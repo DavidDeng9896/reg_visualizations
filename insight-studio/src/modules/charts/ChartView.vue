@@ -791,6 +791,9 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   border-color: var(--is-accent);
 }
 .cview__drawer {
+  width: 340px;
+  min-width: 340px;
+  flex-shrink: 0;
   height: 100%;
   overflow: hidden;
 }
@@ -799,11 +802,12 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   transition:
     width var(--is-dur) var(--is-ease),
     opacity var(--is-dur) var(--is-ease);
-  width: 340px;
+  overflow: hidden;
 }
 .cview-drawer-enter-from,
 .cview-drawer-leave-to {
-  width: 0;
+  width: 0 !important;
+  min-width: 0 !important;
   opacity: 0;
 }
 .cview__guard-text {
