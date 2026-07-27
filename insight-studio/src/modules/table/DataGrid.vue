@@ -8,7 +8,7 @@ import { ROW_ID_FIELD } from '../../shared/types'
 import { uuid } from '../../shared/id'
 import { compareValues, isIdentityOrSortOnly, rowIdOf, type ViewResult } from '../../shared/pipeline'
 import { findTable, findView, findViewPath } from '../../shared/tree'
-import { createTransform, createViewNode, defaultViewName } from '../../shared/factories'
+import { createTransform, createViewNode, defaultViewName, sealRows } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, ITooltip, IBadge, toast, type SelectOption } from '../../ui'
 import type { IconName } from '../../ui/icons'
@@ -70,7 +70,101 @@ const editMode = computed<'direct' | 'writeback' | 'none'>(() => {
   if (!view.value) return 'direct'
   return isIdentityOrSortOnly(view.value, ancestors.value) ? 'writeback' : 'none'
 })
+/** 表/视图是否允许进入数据编辑会话。 */
 const editable = computed(() => editMode.value !== 'none')
+
+/**
+ * 编辑会话：须点「编辑」进入，改完点「确认」才写回传播；「取消」还原。
+ * 会话内单元格可改，但不触发 flowchart 下游重跑。
+ */
+const sessionEditing = ref(false)
+const sessionDirty = ref(false)
+interface TableDataSnapshot {
+  columns: ColumnMeta[]
+  rows: Row[]
+}
+let sessionSnapshot: TableDataSnapshot | null = null
+let sessionUndoBookmark = 0
+/** 进入会话时的表 id（切换表时 props 已变，还原必须用它）。 */
+let sessionTableId = ''
+
+/** 会话中才允许改单元格/行/粘贴等。 */
+const sessionActive = computed(() => editable.value && sessionEditing.value)
+
+function cloneTableData(t: AnalysisTable): TableDataSnapshot {
+  return {
+    columns: JSON.parse(JSON.stringify(t.columns)) as ColumnMeta[],
+    rows: JSON.parse(JSON.stringify(t.rows)) as Row[],
+  }
+}
+
+function enterEditSession() {
+  const t = table.value
+  if (!t || !editable.value || sessionEditing.value) return
+  sessionSnapshot = cloneTableData(t)
+  sessionUndoBookmark = store.undoStack.length
+  sessionTableId = props.tableId
+  sessionDirty.value = false
+  sessionEditing.value = true
+}
+
+function exitEditSession() {
+  sessionEditing.value = false
+  sessionDirty.value = false
+  sessionSnapshot = null
+  sessionUndoBookmark = 0
+  sessionTableId = ''
+}
+
+/** 放弃会话：回滚历史并还原快照，不触发下游传播。 */
+function discardEditSession(options?: { silent?: boolean }) {
+  if (!sessionEditing.value) return
+  while (store.undoStack.length > sessionUndoBookmark) {
+    store.undo()
+  }
+  const snap = sessionSnapshot
+  const tid = sessionTableId || props.tableId
+  if (snap) {
+    store.mutate((a) => {
+      const target = findTable(a, tid)
+      if (!target) return
+      target.columns = JSON.parse(JSON.stringify(snap.columns)) as ColumnMeta[]
+      target.rows = sealRows(JSON.parse(JSON.stringify(snap.rows)) as Row[])
+    })
+  }
+  exitEditSession()
+  if (!options?.silent) toast.info('已取消编辑，数据未变更')
+}
+
+function cancelEditSession() {
+  discardEditSession()
+}
+
+/** 确认：提交会话并一次性调度 flowchart 同步。 */
+function confirmEditSession() {
+  if (!sessionEditing.value) return
+  const t = table.value
+  const dirty = sessionDirty.value
+  const tableId = t?.id
+  exitEditSession()
+  if (dirty && tableId) {
+    schedulePropagateTableEdit((fn) => store.mutate(fn), tableId)
+    toast.success('已确认修改，流程图将同步更新')
+  } else {
+    toast.info('没有需要保存的修改')
+  }
+}
+
+watch(
+  () => [props.tableId, props.viewId] as const,
+  () => {
+    if (sessionEditing.value) discardEditSession({ silent: true })
+  },
+)
+
+onBeforeUnmount(() => {
+  if (sessionEditing.value) discardEditSession({ silent: true })
+})
 
 const title = computed(() => view.value?.name ?? table.value?.name ?? '')
 const kindLabel = computed(() => (view.value ? `视图 · ${view.value.type}` : '源表'))
@@ -484,7 +578,7 @@ function closeColumnMenu() {
 
 function setColumnDataType(field: string, next: DataType) {
   const t = table.value
-  if (!t || !editable.value) return
+  if (!t || !sessionActive.value) return
   const col = t.columns.find((c) => c.field === field)
   if (!col || col.dataType === next) return
   const prevType = col.dataType
@@ -565,18 +659,22 @@ function openRenameColumn(field: string) {
 
 function submitRenameColumn() {
   const name = renameCol.title.trim()
-  if (!name || !table.value) return
+  if (!name || !table.value || !sessionActive.value) return
   const entry = makeRenameColumnCommand(table.value, renameCol.field, name)
-  if (entry) store.commit(entry)
+  if (entry) {
+    store.commit(entry)
+    markEdited()
+  }
   renameCol.open = false
 }
 
 function confirmDeleteColumn() {
   const field = deleteColField.value
-  if (!field || !table.value) return
+  if (!field || !table.value || !sessionActive.value) return
   const entry = makeDeleteColumnCommand(table.value, field)
   if (entry) {
     store.commit(entry)
+    markEdited()
     toast.success('已删除列')
   }
   deleteColField.value = null
@@ -643,7 +741,7 @@ function rowMenuItems(rowId: string): CtxItem[] {
 }
 
 function onCellContextMenu(params: { row?: Row; $event: MouseEvent }) {
-  if (!editable.value || !params.row) return
+  if (!sessionActive.value || !params.row) return
   const rowId = rowIdOf(params.row)
   if (!rowId) return
   params.$event.preventDefault()
@@ -652,17 +750,15 @@ function onCellContextMenu(params: { row?: Row; $event: MouseEvent }) {
 
 function addRow() {
   const t = table.value
-  if (!t) return
+  if (!t || !sessionActive.value) return
   store.commit(makeInsertRowCommand(t, t.rows.length))
   markEdited()
 }
 
-/** 编辑源表：立刻标 stale；防抖后按成本自动重跑下游（性能闸门）。 */
+/** 编辑会话内改动：只标脏，确认后才传播 flowchart。 */
 function markEdited() {
-  const t = table.value
-  if (!t) return
-  const tableId = t.id
-  schedulePropagateTableEdit((fn) => store.mutate(fn), tableId)
+  if (!sessionEditing.value) return
+  sessionDirty.value = true
 }
 
 /* ------------------------------ 单元格编辑 ------------------------------ */
@@ -673,7 +769,7 @@ const editCancelled = ref(false)
 const editActive = ref(false)
 
 const editConfig = computed(() =>
-  editable.value ? { trigger: 'dblclick' as const, mode: 'cell' as const, autoClear: true } : undefined,
+  sessionActive.value ? { trigger: 'dblclick' as const, mode: 'cell' as const, autoClear: true } : undefined,
 )
 const keyboardConfig = { isArrow: true, isEnter: true, isTab: true, isEdit: true, isEsc: true }
 const mouseConfig = { selected: true }
@@ -804,7 +900,7 @@ function onCopy(e: ClipboardEvent) {
 const showSelection = ref(false)
 
 function onPaste(e: ClipboardEvent) {
-  if (!editable.value || editActive.value) return
+  if (!sessionActive.value || editActive.value) return
   const target = e.target as HTMLElement
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
   const text = e.clipboardData?.getData('text/plain')
@@ -849,6 +945,7 @@ function onPaste(e: ClipboardEvent) {
 /* ------------------------------ 键盘：全局撤销/重做 ------------------------------ */
 
 function onWrapperKeydown(e: KeyboardEvent) {
+  if (!sessionActive.value) return
   const mod = e.ctrlKey || e.metaKey
   if (!mod) return
   const target = e.target as HTMLElement
@@ -901,11 +998,36 @@ function promote() {
         <span class="dg__stats" data-testid="grid-stats">{{ statsText }}</span>
       </div>
       <div class="dg__actions">
+        <template v-if="editable && sessionEditing">
+          <IBadge v-if="sessionDirty" tone="yellow">未确认</IBadge>
+          <IButton variant="ghost" size="sm" data-testid="cancel-edit-btn" @click="cancelEditSession">取消</IButton>
+          <IButton
+            variant="primary"
+            size="sm"
+            icon="check"
+            data-testid="confirm-edit-btn"
+            :disabled="!sessionDirty"
+            @click="confirmEditSession"
+          >
+            确认修改
+          </IButton>
+          <span class="dg__sep" />
+        </template>
+        <IButton
+          v-else-if="editable"
+          variant="secondary"
+          size="sm"
+          icon="edit"
+          data-testid="enter-edit-btn"
+          @click="enterEditSession"
+        >
+          编辑数据
+        </IButton>
         <ITooltip content="撤销 (Ctrl/⌘+Z)">
-          <IButton variant="ghost" icon="undo" size="sm" :disabled="!canUndo" aria-label="撤销" data-testid="undo-btn" @click="store.undo()" />
+          <IButton variant="ghost" icon="undo" size="sm" :disabled="!canUndo || !sessionActive" aria-label="撤销" data-testid="undo-btn" @click="store.undo()" />
         </ITooltip>
         <ITooltip content="重做 (Ctrl/⌘+Shift+Z)">
-          <IButton variant="ghost" icon="redo" size="sm" :disabled="!canRedo" aria-label="重做" @click="store.redo()" />
+          <IButton variant="ghost" icon="redo" size="sm" :disabled="!canRedo || !sessionActive" aria-label="重做" @click="store.redo()" />
         </ITooltip>
         <span class="dg__sep" />
         <IPopover :open="colVisibilityOpen" placement="bottom-end" @update:open="colVisibilityOpen = $event">
@@ -943,6 +1065,12 @@ function promote() {
         <IButton variant="primary" size="sm" icon="bar" @click="createChart">创建图表</IButton>
       </div>
     </header>
+
+    <!-- 编辑会话提示 -->
+    <div v-if="sessionEditing" class="dg__banner dg__banner--edit" data-testid="edit-session-banner">
+      <IIcon name="edit" :size="14" />
+      <span>正在编辑数据：改完后点击「确认修改」才会保存并更新流程图；「取消」将丢弃本次改动。</span>
+    </div>
 
     <!-- FILTERS & TRANSFORMS -->
     <div class="dg__ft">
@@ -1042,8 +1170,8 @@ function promote() {
         :column-config="{ resizable: true }"
         :scroll-y="scrollYConfig"
         :edit-config="editConfig"
-        :keyboard-config="editable ? keyboardConfig : undefined"
-        :mouse-config="editable ? mouseConfig : undefined"
+        :keyboard-config="sessionActive ? keyboardConfig : undefined"
+        :mouse-config="sessionActive ? mouseConfig : undefined"
         :cell-class-name="cellClassName"
         @cell-click="onCellClick"
         @cell-context-menu="onCellContextMenu"
@@ -1058,7 +1186,7 @@ function promote() {
           :field="col.field"
           :title="col.title"
           :min-width="120"
-          :edit-render="editable ? {} : undefined"
+          :edit-render="sessionActive ? {} : undefined"
         >
           <template #header>
             <div class="dg__th" @contextmenu.prevent="openColumnMenu(col.field, $event)">
@@ -1128,14 +1256,14 @@ function promote() {
 
         <template #empty>
           <IEmptyState icon="table" title="暂无数据" description="没有符合条件的行。">
-            <IButton v-if="editable" size="sm" icon="plus" @click="addRow">添加行</IButton>
+            <IButton v-if="sessionActive" size="sm" icon="plus" @click="addRow">添加行</IButton>
           </IEmptyState>
         </template>
       </VxeTable>
     </div>
 
     <!-- 添加行 -->
-    <button v-if="editable && result.columns.length" type="button" class="dg__addrow" @click="addRow">
+    <button v-if="sessionActive && result.columns.length" type="button" class="dg__addrow" @click="addRow">
       <IIcon name="plus" :size="13" /> 添加行
     </button>
 
@@ -1212,7 +1340,7 @@ function promote() {
           <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu(() => openTransformDialog(null, 'derived'))">
             <IIcon name="plus" :size="13" /> 在右侧插入派生列
           </button>
-          <template v-if="editable">
+          <template v-if="sessionActive">
             <div
               class="dg__menu-item-wrap"
               @mouseenter="colTypeSubOpen = true"
@@ -1416,6 +1544,10 @@ function promote() {
   border-bottom: 1px solid var(--is-border);
 }
 .dg__banner--warn {
+  background: var(--is-warning-bg);
+  color: var(--is-warning-text);
+}
+.dg__banner--edit {
   background: var(--is-warning-bg);
   color: var(--is-warning-text);
 }
