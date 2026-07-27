@@ -1,5 +1,6 @@
 /**
  * 将解析后的行列提交为 Analysis 表 + 源步骤节点。
+ * 产品拍板：只持久化数据内容（列/行），不保存原始 File/Blob。
  */
 import type { ColumnMeta, DataType, Row, StepType } from '../../shared/types'
 import { createTable, ensureRowIds } from '../../shared/factories'
@@ -17,6 +18,8 @@ export interface CommitImportOptions {
   /** 写入 step.config 的额外字段（如 sheetName / sql）。 */
   stepConfig?: Record<string, unknown>
   sourceLabel?: string
+  /** 仅作显示/溯源的原文件名，不存文件本体。 */
+  originalFileName?: string
 }
 
 export function commitImportedTable(opts: CommitImportOptions): boolean {
@@ -38,11 +41,13 @@ export function commitImportedTable(opts: CommitImportOptions): boolean {
   const table = createTable(name, columns, rows, 'csv')
   const step = createStepNode(opts.stepType, name)
   step.config.tableName = name
+  if (opts.originalFileName) step.config.originalFileName = opts.originalFileName
   if (opts.stepConfig) Object.assign(step.config, opts.stepConfig)
   step.status = 'configured'
   step.output.tables = [table.id]
   table.source = 'step'
   table.stepId = step.id
+  // 仅推入表数据内容 + 步骤；原始 File 已在调用方丢弃
   store.mutate((a) => {
     a.tables.push(table)
     a.steps.push(step)

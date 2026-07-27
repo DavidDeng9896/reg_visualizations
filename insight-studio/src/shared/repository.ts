@@ -1,10 +1,12 @@
 import type { Analysis } from './types'
 import { db, InsightStudioDB } from './db'
 import { migrateAnalysisToSteps } from './migrateSteps'
+import { normalizeAnalysis } from './normalizeAnalysis'
+import { HttpAnalysisRepository, isHttpPersistenceEnabled } from './httpRepository'
 
 /**
- * AnalysisRepository：持久化抽象。当前为 Dexie 实现，日后可替换为 HTTP 实现。
- * 所有方法按整个 Analysis 文档读写；导入/合并等多步写入用 transaction 包裹。
+ * AnalysisRepository：持久化抽象。
+ * 默认 Dexie；设置 VITE_API_BASE_URL 后切换为 insight-api（SQLite/PG）。
  */
 export interface AnalysisRepository {
   list(): Promise<Analysis[]>
@@ -20,20 +22,22 @@ export class DexieAnalysisRepository implements AnalysisRepository {
   constructor(private readonly database: InsightStudioDB = db) {}
 
   async list(): Promise<Analysis[]> {
-    return this.database.analyses.orderBy('updatedAt').reverse().toArray()
+    const rows = await this.database.analyses.orderBy('updatedAt').reverse().toArray()
+    return rows.map((raw) => migrateAnalysisToSteps(normalizeAnalysis(raw)))
   }
 
   async get(id: string): Promise<Analysis | undefined> {
     const raw = await this.database.analyses.get(id)
     if (!raw) return undefined
-    return migrateAnalysisToSteps(raw)
+    return migrateAnalysisToSteps(normalizeAnalysis(raw))
   }
 
   async put(analysis: Analysis): Promise<void> {
     // Pinia 传进来的可能是响应式 Proxy，结构化克隆会抛 DataCloneError，
     // 导致工作区编辑静默不落盘。Analysis 为纯数据（无 Date/Map/函数），
     // JSON round-trip 安全地剥掉 Proxy。
-    await this.database.analyses.put(JSON.parse(JSON.stringify(analysis)) as Analysis)
+    const plain = JSON.parse(JSON.stringify(normalizeAnalysis(analysis))) as Analysis
+    await this.database.analyses.put(plain)
   }
 
   async delete(id: string): Promise<void> {
@@ -46,4 +50,6 @@ export class DexieAnalysisRepository implements AnalysisRepository {
 }
 
 /** 默认单例，供 app/store/页面直接使用。 */
-export const analysisRepository: AnalysisRepository = new DexieAnalysisRepository()
+export const analysisRepository: AnalysisRepository = isHttpPersistenceEnabled()
+  ? new HttpAnalysisRepository()
+  : new DexieAnalysisRepository()

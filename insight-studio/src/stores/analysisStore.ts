@@ -108,6 +108,7 @@ export const useAnalysisStore = defineStore('analysis', {
       if (!this.current) return
       fn(this.current)
       this.current.updatedAt = nowIso()
+      this.current.revision = (this.current.revision ?? 0) + 1
       this.dirty = true
       this._scheduleSave()
     },

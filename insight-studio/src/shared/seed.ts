@@ -154,6 +154,7 @@ export function createDemoAnalysis(): Analysis {
     name: 'Demo analysis',
     createdAt: now,
     updatedAt: now,
+    revision: 0,
     tables: [buildIrisTable(), buildPlateTable(), buildWeightLengthTable()],
     flowchartLayout: {},
     steps: [],

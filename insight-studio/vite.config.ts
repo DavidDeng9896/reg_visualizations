@@ -9,6 +9,11 @@ export default defineConfig({
     host: true,
     // allow Cloudflare / localtunnel hosts for external preview
     allowedHosts: true,
+    proxy: {
+      // 同源代理 insight-api，公网隧道只需暴露前端端口
+      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+    },
   },
   build: {
     rollupOptions: {

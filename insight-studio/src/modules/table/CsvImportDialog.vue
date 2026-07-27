@@ -124,6 +124,7 @@ function confirm() {
     columnTypes: columnTypes.value,
     stepType: 'upload-csv',
     sourceLabel: 'CSV',
+    originalFileName: fileName.value || undefined,
   })
   if (ok) close()
 }
