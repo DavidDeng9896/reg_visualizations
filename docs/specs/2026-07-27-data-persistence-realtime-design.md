@@ -1,8 +1,13 @@
 # 数据长期保存、外部动态源与 Flowchart 实时更新
 
 > 状态：设计规格（待评审）  
-> 范围：`insight-studio` 持久化分层、**服务端数据库**、导入不丢、外部数据源接入、步骤图/看板实时刷新  
-> 关联：`DESIGN.md` Repository 抽象、`AnalysisFile`/`files` 占位、Dashboard P2（revision / SSE）、Automation Designer Connect external
+> 范围：`insight-studio` 数据内容入库、服务端数据库、改数驱动 flowchart 全链路同步、外部动态源  
+> 关联：`DESIGN.md` Repository 抽象、Dashboard P2（revision / SSE）、`modules/steps/rerun.ts`  
+>
+> ### 产品拍板（2026-07-27）
+> 1. **不保存导入的原始文件**（CSV/Excel 字节用完即弃）。  
+> 2. **必须保存导入后的数据内容**（列 + 行）到数据库，保证长期可调用、不遗失。  
+> 3. **数据内容一旦变更**（手工改表 / 外部源刷新），**整条 flowchart 下游必须同步更新**（标 stale 并自动重跑物化）。
 
 ## 1. 问题与目标
 
@@ -12,66 +17,67 @@
 | --- | --- | --- |
 | **服务端数据库** | **无**；仅浏览器 IndexedDB（Dexie） | 数据随浏览器配置消亡；无法跨设备、无法被其他系统调用 |
 | 长期保存 | Dexie 整份 `Analysis` JSON（含全部行）写 IndexedDB | 清浏览器 / 换机 / IDB 配额 → 数据丢失；大表整文档覆盖成本高 |
-| 导入留存 | CSV/Excel/SQL 解析后只物化 `tables[].rows`；原始文件未写入 `files` | 无法重解析、审计、再导出原始字节；`contentRef` 空转 |
+| 导入数据内容 | 解析后的行仅在浏览器 Dexie；无服务端库 | 清缓存即丢；无法跨设备调用 |
 | 外部动态源 | Registry / Plate / Connect external 仅为 UI 占位 | 无法对接后续仪器、中台、API |
 | 实时更新 | 仅本 Tab Pinia 响应；无 revision / SSE | 外部数据变了，flowchart 与看板不会自动变 stale / 重算 |
 
 ### 1.2 目标（验收口径）
 
-1. **入库即真相源**：导入与外部同步的数据写入**服务端数据库**（及对象存储）；浏览器 IDB 仅作缓存/离线副本，清缓存不得导致永久丢失。
-2. **导入不丢**：任意导入必须先入库（原始文件 + 解析快照），再进入步骤图；跨设备、跨会话可打开同一 Analysis。
-3. **可长期调用**：Analysis / 表快照 / 文件有稳定 UUID；HTTP API 按 ID 读取；Repository 从 Dexie 换 HTTP 后 Store 不变。
-4. **动态源可插拔**：外部源用统一 `DataSource` + Connector；源侧变更写入 DB 新版本并通过 `dataVersion` 推送。
-5. **数流实时**：源变更入库 → 下游 `StepNode` 标 `stale` →（自动或一键）按 DAG 重跑 → flowchart / 工作区 / Dashboard 同步刷新。
+1. **只存数据内容，不存原始文件**：导入解析成功后，列/行写入数据库；原始 File/Blob 不落库、不进对象存储。
+2. **入库即真相源**：数据内容写入 **PostgreSQL**；浏览器 IDB 仅缓存；清浏览器不得导致永久丢失。
+3. **可长期调用**：Analysis / 表数据快照有稳定 UUID；HTTP API 按 ID 读取。
+4. **改数 → 全链路同步**（硬需求）：任意数据内容变更后，下游步骤自动 stale **并自动重跑**，flowchart / 工作区表与图 / Dashboard 一起更新。
+5. **动态源可插拔**：外部源变更同样写入数据内容新版本，走同一条「改数 → 全链路同步」路径。
 
-### 1.3 非目标（本规格不展开实现）
+### 1.3 非目标
 
+- **不保存**导入原始文件（无 file blob / 对象存储导入路径）
 - 多租户权限与审计 UI
 - Python Custom Code 沙箱
 - 跨组织联邦查询引擎
 
 ---
 
-## 2. 总体架构：三层存储 + 事件总线
+## 2. 总体架构：双层存储（文档 + 数据内容）+ 事件总线
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  UI：Workspace / Flowchart / Dashboard                       │
-│       Pinia analysisStore / dashboardStore                   │
+│       改单元格 / 外部刷新 → mutate → 自动重跑下游            │
 └───────────────────────────┬─────────────────────────────────┘
-                            │ mutate / subscribe
+                            │
 ┌───────────────────────────▼─────────────────────────────────┐
-│  Domain：Analysis 文档（步骤图真相源）+ Pipeline / Step exec  │
-└───────┬───────────────────┬───────────────────┬─────────────┘
-        │                   │                   │
-   ┌────▼────┐        ┌─────▼─────┐       ┌─────▼──────┐
-   │ Document│        │  Snapshot │       │ Blob/File  │
-   │ Store   │        │  Store    │       │ Store      │
-   │Analysis │        │表行/版本  │       │原始文件    │
-   │Dashboard│        │dataVersion│       │contentRef  │
-   └────┬────┘        └─────┬─────┘       └─────┬──────┘
-        │                   │                   │
-        └─────────┬─────────┴───────────────────┘
-                  │ Repository（Dexie 缓存 → HTTP → 服务端）
-┌─────────────────▼───────────────────────────────────────────┐
-│  服务端：PostgreSQL（元数据+快照+事件）+ 对象存储（原始文件） │
-│  API / SSE：analysis.updated | source.changed | step.*      │
-└─────────────────┬───────────────────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────────────────┐
-│  Connectors：upload | http-poll | webhook | registry | plate │
+│  Domain：Analysis 文档（步骤图）+ Step exec / Pipeline       │
+│           数据内容变更 → mark stale → auto rerun DAG         │
+└─────────────┬───────────────────────────┬───────────────────┘
+              │                           │
+        ┌─────▼─────┐               ┌─────▼──────┐
+        │ Document  │               │ Data Content│
+        │ 步骤/配置 │               │ 列 + 行    │
+        │ 布局/绑定 │               │ dataVersion │
+        └─────┬─────┘               └─────┬──────┘
+              │                           │
+              └─────────────┬─────────────┘
+                            │ Repository → HTTP
+┌───────────────────────────▼─────────────────────────────────┐
+│  PostgreSQL：analyses + table_snapshots + event_outbox       │
+│  （不存原始导入文件）                                         │
+│  SSE：data.changed | analysis.updated | step.*               │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────────┐
+│  Connectors：http-poll | webhook | registry | plate …        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**分层原则**
+**分层原则（已按产品拍板）**
 
-| 层 | 存什么 | 服务端落点 | 不存什么 |
+| 层 | 存什么 | 服务端落点 | 明确不存 |
 | --- | --- | --- | --- |
-| **Document** | 步骤图、视图配置、`flowchartLayout`、表 meta、源绑定 | PostgreSQL `analyses` / `dashboards`（JSONB） | 大体积行数据、原始文件字节 |
-| **Snapshot** | 某次物化结果：`tableId + dataVersion → rows/columns` | PostgreSQL `table_snapshots`（JSONB 或行表） | 步骤配置 |
-| **Blob** | 导入原始文件 | **对象存储**（S3/MinIO）；PG 只存元数据与 object key | 业务逻辑 |
+| **Document** | 步骤图、视图配置、布局、表 meta、源绑定 | `analyses` / `dashboards` JSONB | 原始文件；大表行（演进后） |
+| **Data Content** | 导入/编辑/外部同步后的 **列 + 行** | `table_snapshots` | CSV/XLSX 原始字节 |
 
-当前前端把行内联在 Document 里；上云后 **Document 只保留表 meta + `snapshot_id`，行在 Snapshot 表，文件在对象存储**。
+> 原「Blob / 对象存储保存导入文件」方案 **撤销**。导入只是把文件解析成表内容的临时手段。
 
 ---
 
@@ -99,31 +105,34 @@ interface AnalysisTable {
 }
 ```
 
-### 3.2 文件 Blob（补齐已有占位）
+### 3.2 导入：只落数据内容（不落文件）
 
-现有 `AnalysisFile` + Dexie `files` 表已声明但未写入。落地规则：
+```
+用户选择 CSV/Excel
+  → 浏览器内存解析（papaparse / xlsx）
+  → 得到 columns + rows
+  → 丢弃 File/Blob（不上传、不进 DB、不进对象存储）
+  → 事务写入：源步骤 + AnalysisTable meta + table_snapshots（数据内容）
+  → revision++
+```
+
+可选元数据（仅便于 UI 展示，非文件本体）：
 
 ```ts
-interface FileBlobRecord {
-  id: string              // = AnalysisFile.contentRef
-  analysisId: string
-  sha256?: string         // 可选内容寻址，去重
-  mime: string
-  sizeBytes: number
-  /** Blob 本体；HTTP 实现则为对象存储 key。 */
-  blob: Blob | string
-  createdAt: string
+interface ImportProvenance {
+  originalName?: string   // 如 "assay.csv"，仅显示用
+  importedAt: string
+  rowCount: number
 }
 ```
 
 **导入事务（必须原子）**
 
-1. 写 `FileBlobRecord`
-2. 写 `Analysis.files[]` 元数据
-3. 解析 → 写 Snapshot（或临时仍写 `tables[].rows`）
-4. 写对应源步骤 `upload-csv` / `import-files` / `file-to-table`
-5. `revision++`，`updatedAt = now`
-6. 失败则整事务回滚，禁止出现「表有了、文件没了」或反过来
+1. 解析得到 `columns` + `rows`（内存）
+2. 写 `table_snapshots`（数据内容）
+3. 写源步骤 + 表 meta（`snapshotId` / `dataVersion`）
+4. `revision++`
+5. 失败整单回滚——**禁止出现「步骤有了、数据内容没了」**
 
 ### 3.3 外部数据源绑定
 
@@ -165,11 +174,11 @@ interface DataSourceEvent {
 
 | StepType（建议） | 含义 |
 | --- | --- |
-| `upload-csv` / `upload-xlsx` / `import-files` | 静态导入（已有/规划） |
-| `connect-external` | 绑定 `DataSourceBinding`，输出表端口 |
-| `file-to-table` | Blob → 表（已有规划） |
+| `upload-csv` / `upload-xlsx` | 解析后写入数据内容（不保留文件） |
+| `connect-external` | 绑定外部源，输出表 = 数据内容快照 |
+| `query-sql` / `join` / … | 基于上游表内容物化新快照 |
 
-`connect-external` 的 `config` 仅存 `dataSourceId`；连接细节在 `Analysis.dataSources[]`，便于同一源被多个 Analysis 模板复用时（远期）只换绑定。
+`connect-external` 的 `config` 仅存 `dataSourceId`；连接细节在 `Analysis.dataSources[]`。
 
 ---
 
@@ -193,19 +202,13 @@ interface SnapshotRepository {
   delete(ref: string): Promise<void>
 }
 
-interface BlobRepository {
-  get(contentRef: string): Promise<Blob | undefined>
-  put(meta: AnalysisFile, data: Blob): Promise<string>  // returns contentRef
-  delete(contentRef: string): Promise<void>
-}
-
 interface TableSnapshot {
   id: string
   analysisId: string
   tableId: string
   dataVersion: string
   columns: ColumnMeta[]
-  rows: Row[]
+  rows: Row[]          // 数据内容本体
   createdAt: string
 }
 ```
@@ -213,35 +216,34 @@ interface TableSnapshot {
 **调用约定**
 
 - UI / Store 只依赖接口，不直接碰 Dexie / SQL。
-- 本地阶段：三接口由 Dexie 实现（开发与离线）。
-- 生产真相源：**PostgreSQL + 对象存储**；HTTP Repository 对接后端 API。
+- **无 BlobRepository**：不实现「保存原始导入文件」。
+- 生产真相源：**PostgreSQL**（Document + Data Content）；HTTP Repository 对接 API。
 
-### 4.2 导出 / 备份（防遗失的产品层）
+### 4.2 导出 / 备份
 
-1. **服务端 DB 为主备份面**（推荐最终态）。
-2. 过渡期 / 离线：`.insight` zip = `analysis.json` + `blobs/*` + `snapshots/*`。
-3. 上云后：PG 为主真相源，本地 Dexie 为工作副本；冲突策略 **`revision` 乐观锁**（If-Match），冲突则提示合并/覆盖。
+1. 服务端 PG 为主备份面。
+2. 过渡期：`.insight` zip = `analysis.json` + `snapshots/*`（**不含**原始文件）。
+3. 冲突策略：`revision` 乐观锁（If-Match）。
 
 ---
 
 ## 5. 服务端数据库设计（核心）
 
 > IndexedDB **不是**长期数据库，只是客户端缓存。  
-> **长期保存与跨系统调用的真相源 = PostgreSQL + 对象存储。**
+> **长期保存的真相源 = PostgreSQL（存数据内容，不存导入文件）。**
 
 ### 5.1 选型结论
 
 | 组件 | 选型 | 理由 |
 | --- | --- | --- |
-| 主库 | **PostgreSQL 15+** | JSONB 适合 Analysis 文档；事务/索引/审计成熟；易被外部系统 SQL/API 调用 |
-| 原始文件 | **S3 兼容对象存储**（MinIO / OSS / S3） | 大文件不进 PG；按 `content_ref` 寻址；可生命周期策略 |
-| 缓存（可选） | Redis | SSE 扇出、源轮询锁、热点 snapshot 缓存 |
-| 本地开发 | Dexie 模拟同一 Repository 语义；或 Docker Compose：PG + MinIO |
+| 主库 | **PostgreSQL 15+** | JSONB 存文档与表数据内容；事务/索引成熟；可被外部系统调用 |
+| 超大快照（可选） | 对象存储仅用于「压缩后的行数据备份」 | **不是**导入原文件；仅当 JSONB 过大时的行转储 |
+| 缓存（可选） | Redis | SSE 扇出、源轮询锁 |
+| 本地开发 | Dexie 或 Docker Compose：PG |
 
-**不采用**（本阶段）：
+**明确不做**：导入文件对象存储、`file_blobs` 存原始 CSV/XLSX。
 
-- 纯 MongoDB：缺强事务与成熟关系约束，跨表一致性弱。
-- 把全部行拆成「一单元格一行」的宽表：步骤物化、动态 schema 成本过高；先 JSONB 快照，行数极大时再评估列存/分区。
+**不采用**（本阶段）：纯 MongoDB；「一单元格一行」宽表。
 
 ### 5.2 逻辑库表
 
@@ -271,22 +273,9 @@ CREATE TABLE dashboards (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 导入/外部文件元数据；字节在对象存储
-CREATE TABLE file_blobs (
-  id            UUID PRIMARY KEY,       -- = content_ref
-  analysis_id   UUID NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
-  name          TEXT NOT NULL,
-  mime          TEXT NOT NULL,
-  size_bytes    BIGINT NOT NULL,
-  sha256        TEXT,
-  storage_key   TEXT NOT NULL,          -- s3://bucket/analyses/{id}/files/{uuid}
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX file_blobs_analysis ON file_blobs (analysis_id);
-CREATE UNIQUE INDEX file_blobs_sha_optional ON file_blobs (analysis_id, sha256)
-  WHERE sha256 IS NOT NULL;
+-- （不建 file_blobs：产品拍板不保存导入原始文件）
 
--- 表快照：导入结果 / 步骤物化 / 外部源同步结果
+-- 表数据内容：导入结果 / 手工编辑 / 步骤物化 / 外部源同步
 CREATE TABLE table_snapshots (
   id              UUID PRIMARY KEY,
   analysis_id     UUID NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
@@ -353,10 +342,12 @@ Document JSONB 建议形状（与前端 `Analysis` 对齐，但去掉内联 `row
   "steps": [],
   "tables": [{ "id": "…", "name": "…", "columns": [], "snapshotId": "…", "dataVersion": "…" }],
   "flowchartLayout": {},
-  "files": [{ "id": "…", "contentRef": "…", "name": "…" }],
-  "dataSources": [{ "id": "…", "kind": "http-dataset", "stepId": "…" }]
+  "dataSources": [{ "id": "…", "kind": "http-dataset", "stepId": "…" }],
+  "importProvenance": { "assay": { "originalName": "assay.csv", "importedAt": "…" } }
 }
 ```
+
+> `Analysis.files` / `contentRef` 前端占位字段可保留兼容，但**服务端不落文件字节**。
 
 ### 5.3 行数据存哪：三级策略
 
@@ -368,35 +359,45 @@ Document JSONB 建议形状（与前端 `Analysis` 对齐，但去掉内联 `row
 
 前端管道仍消费「列 + 行」数组；后端按策略拼装后经 API 返回（可分页：`?offset&limit`）。
 
-### 5.4 写入事务（导入 / 外部 sync 必须走库）
+### 5.4 写入事务（导入 / 改数 / 外部 sync）
 
-**导入 CSV/Excel（防遗失）**
+**导入 CSV/Excel（只存数据内容）**
 
 ```
+浏览器解析 File → columns + rows → 丢弃 File
 BEGIN;
-  INSERT file_blobs + PUT object storage(storage_key);   -- 原始文件先入库
-  INSERT table_snapshots (data_version, columns, rows…); -- 解析结果
+  INSERT table_snapshots (data_version, columns, rows…);  -- 数据内容
   UPDATE analyses
-    SET document = …(挂 files / tables.snapshotId / steps),
+    SET document = …(tables.snapshotId / steps / provenance 文件名可选),
         revision = revision + 1,
         updated_at = now()
-    WHERE id = $id AND revision = $expected;             -- 乐观锁
-  INSERT event_outbox (analysis.updated / source.changed);
+    WHERE id = $id AND revision = $expected;
+  INSERT event_outbox ('analysis.updated');
 COMMIT;
--- 成功后再 ACK 客户端；任一步失败整单回滚 + 删已传对象（或 GC）
 ```
 
-**外部源变更**
+**手工改表（单元格 / 增删行）—— flowchart 必须同步**
 
 ```
-Connector.sync → 得到新 rows + dataVersion
-  → INSERT 新 table_snapshots（保留旧版可选）
-  → UPDATE data_sources.last_data_version / status
-  → UPDATE analyses.document 源表 snapshotId + revision++
-  → 标记下游步骤 stale（写在 document.steps[].status）
-  → event_outbox: source.changed
-  → SSE 推客户端 → flowchart 标 stale → 可选服务端或客户端重跑子图
-  → 重跑产物再 INSERT 新 snapshots + revision++
+writeBackCell / insertRow / deleteRow
+  → 更新源表数据内容（新 snapshot 或原地更新 latest）
+  → markTableEdited：下游步骤全部 status = stale
+  → rerunStaleSteps：按拓扑序自动重跑（Filter/Join/…）
+  → 每个下游步骤写出新 table_snapshots
+  → analyses.revision++
+  → event_outbox: data.changed { tableId, analysisId, revision }
+  → SSE → 其他端 / Dashboard / Flowchart UI 刷新
+```
+
+> 现状：`DataGrid` 已调用 `markTableEdited`（仅标 stale），需升级为 **默认自动 `rerunStaleSteps`**，满足「改数后整条流同步变更」。
+
+**外部源变更（同改数路径）**
+
+```
+Connector.sync → 新 rows + dataVersion
+  → INSERT table_snapshots
+  → markDownstreamStale + auto rerunStaleSteps
+  → revision++ + outbox source.changed / data.changed
 ```
 
 ### 5.5 读取与「长期调用」
@@ -405,8 +406,7 @@ Connector.sync → 得到新 rows + dataVersion
 | --- | --- | --- |
 | Insight 前端 | `GET /analyses/:id` | `analyses` + 按需 `table_snapshots` |
 | 表格分页 | `GET /analyses/:id/tables/:tid/rows?offset&limit` | snapshot JSONB 切片或 object 流式 |
-| 原始文件下载 | `GET /files/:contentRef` | `file_blobs` → 预签名 URL |
-| 外部系统整合 | `GET /analyses/:id/export` 或只读 SQL 视图 | 同库；后续可加只读角色 |
+| 外部系统整合 | `GET /analyses/:id/export` 或只读 SQL 视图 | 导出的是**数据内容**，不是原文件 |
 | Dashboard | `GET /dashboards/:id` + 批量 `analyses?ids=` | `dashboards` + snapshots |
 
 所有稳定资源用 **UUID**；`revision` 用于缓存与并发控制（`ETag` / `If-Match`）。
@@ -414,17 +414,17 @@ Connector.sync → 得到新 rows + dataVersion
 ### 5.6 与实时通道的关系
 
 ```
-DB 事务提交
-  → event_outbox 同行写入
-  → 后台 publisher 读 outbox → SSE/WebSocket / Redis PubSub
-  → 浏览器 flowchart / dashboard 失效缓存并刷新
+数据内容写入 / 下游重跑完成（同一业务事务或紧随事务）
+  → event_outbox（data.changed / analysis.updated）
+  → publisher → SSE
+  → flowchart 节点状态与预览刷新；Dashboard widget 失效重算
 ```
 
-禁止「只推事件不写库」或「只写库不推事件」；**以 DB 提交为唯一真相，outbox 保证至少一次投递**。
+禁止「只推事件不写库」或「只写库不推事件」。
 
 ### 5.7 Dexie → PostgreSQL 迁移路径
 
-1. 前端继续 Dexie；增加「同步到服务器」：读本地 Analysis + blobs → 调用批量导入 API 写入 PG/对象存储。  
+1. 前端继续 Dexie；「同步到服务器」：读本地 Analysis + 表数据内容 → 批量写入 PG。  
 2. 切换默认 Repository 为 HTTP；Dexie 降级为离线队列。  
 3. 旧本地-only 文档提示迁移；迁移成功后可清 IDB。
 
@@ -432,10 +432,10 @@ DB 事务提交
 
 ```
 insight-api
-  ├── REST: analyses / dashboards / files / data-sources / snapshots
+  ├── REST: analyses / dashboards / data-sources / snapshots（数据内容）
   ├── SSE:  /events
-  ├── workers: connector poll、DAG rerun（可选）、outbox publisher
-  └── 依赖: PostgreSQL, Object Storage, (Redis)
+  ├── workers: connector poll、DAG auto-rerun、outbox publisher
+  └── 依赖: PostgreSQL, (Redis)；无导入文件对象存储
 ```
 
 语言不锁定；需提供 OpenAPI，与现有 `AnalysisRepository` 字段对齐。
@@ -476,22 +476,21 @@ interface SyncResult {
 ### 6.3 变更如何进入 flowchart 数流
 
 ```
-Connector sync 成功
-  → 写 Snapshot（新 dataVersion）——服务端即 INSERT table_snapshots
-  → 更新源 Step 输出表 meta
-  → 标记该源步骤 status = configured（或 running→configured）
-  → markDownstreamStale(stepId)   // 复用 modules/steps/rerun.ts 思路
-  → revision++（UPDATE analyses）
-  → 发布 analysis.updated { id, revision, reason: 'source.changed', sourceId }
-  → Flowchart 节点显示 stale 角标
-  → 策略：autoRerun ? runStaleSubgraph() : 等待用户「Run stale」
+Connector sync 成功  （与手工改表同一条路径）
+  → INSERT table_snapshots（新数据内容 + dataVersion）
+  → 更新源表 meta
+  → markDownstreamStale(stepId)
+  → **自动** rerunStaleSteps（拓扑序重跑整条下游）
+  → 下游每步写出新数据内容快照
+  → revision++ + event_outbox
+  → Flowchart / 工作区 / Dashboard 同步刷新
 ```
 
-**实时性定义（产品）**
+**实时性定义（产品拍板）**
 
-- **结构实时**：边/节点状态、stale 标记、错误信息 ≤ 数百 ms 推到打开中的客户端。
-- **数据实时**：物化重算可异步；大表允许「节点已更新、预览仍计算中」。
-- 默认建议：**自动标 stale + 可选自动重跑**（Analysis 级开关 `autoRerunOnSourceChange`，默认 true 小图、大图 false 防抖）。
+- 数据内容变更后，**默认自动重跑整条下游**（不是只标 stale 等人点 Run）。
+- 重跑可异步：节点先显示 running，完成后变 configured；预览随到随新。
+- 仅在极端大图可提供「暂停自动重跑」开关；默认开启。
 
 ---
 
@@ -522,13 +521,16 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 ### 8.1 目标路径
 
 ```
-用户选择文件 / 外部 sync
-  → 服务端：对象存储 + file_blobs（先落库）
-  → AnalysisFile 元数据挂到 analyses.document.files
-  → 解析 → INSERT table_snapshots
-  → 创建/更新 StepNode + AnalysisTable.snapshotId
-  → analyses.revision++ + event_outbox
-  （本地过渡期：等价写 Dexie blobs/snapshots）
+用户选择文件
+  → 内存解析 → columns + rows → 丢弃 File
+  → INSERT table_snapshots（数据内容）
+  → 创建源 Step + AnalysisTable.snapshotId
+  → revision++ + outbox
+手工改表 / 外部 sync
+  → 更新数据内容
+  → markTableEdited / markDownstreamStale
+  → 自动 rerunStaleSteps → 下游快照全更新
+  → revision++ + outbox（flowchart 同步）
 ```
 
 ### 8.2 对现有入口的要求
@@ -543,9 +545,9 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 ### 8.3 删除与孤儿清理
 
-- 删 Analysis：`ON DELETE CASCADE` 清 snapshots / file_blobs 元数据；对象存储异步 GC。
-- 删源步骤：若 Blob 无其他引用则删；否则仅摘引用。
-- 定期 GC：扫描无引用 `storage_key` / 过期 snapshot（若只保留 latest）。
+- 删 Analysis：`ON DELETE CASCADE` 清 `table_snapshots` / `data_sources`。
+- 删源步骤：删除其产出快照；下游标 stale 并自动重跑或提示断开。
+- 若只保留 latest：定期 GC 旧 `data_version` 快照。
 
 ---
 
@@ -553,45 +555,42 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 | 模块 | 路径 | 改动要点 |
 | --- | --- | --- |
-| 服务端 DB | 新建 `insight-api` + migration | §5 表结构；OpenAPI 对齐 Repository |
-| DB（本地） | `insight-studio/src/shared/db.ts` | 过渡：`blobs` / `snapshots`；最终降级为缓存 |
-| Types | `shared/types.ts` | `revision`、`DataSourceBinding`、`snapshotId`、`dataVersion` |
-| Repository | `shared/repository.ts` | Document/Snapshot/Blob；增加 `HttpAnalysisRepository` |
-| Import | `modules/table/commitImport.ts` | 导入事务含 Blob / 上传 API |
-| Rerun | `modules/steps/rerun.ts` | 暴露 `markDownstreamStale` / `runStaleSubgraph` |
-| Flowchart | `modules/flowchart/*` | 订阅 SSE；节点展示 dataVersion / stale |
-| Dashboard | `modules/dashboard/widgetData.ts` | 缓存键加入 `revision` / `dataVersion` |
-| Connect UI | `AddDataMenu` / Sidebar Connect | Connector 配置；同步写 `data_sources` |
+| 服务端 DB | 新建 `insight-api` + migration | `analyses` + `table_snapshots` + outbox（无 file_blobs） |
+| Types | `shared/types.ts` | `revision`、`snapshotId`、`dataVersion` |
+| Repository | `shared/repository.ts` | Document + Snapshot；`HttpAnalysisRepository` |
+| Import | `commitImport.ts` | 只持久化数据内容 |
+| 编辑联动 | `DataGrid.vue` + `rerun.ts` | `markTableEdited` 后 **自动** `rerunStaleSteps` |
+| Flowchart | `modules/flowchart/*` | 订阅 SSE；改数后节点/预览自动更新 |
+| Dashboard | `widgetData.ts` | `revision` / `dataVersion` 缓存失效 |
+| Connect | Sidebar Connect | 外部 sync → 同编辑联动路径 |
 
 ---
 
 ## 10. 分阶段交付
 
-### Phase A — 本地语义对齐（开发期）
+### Phase A — 改数驱动全链路（可先本地）
 
-1. Dexie：`blobs` + 导入写原始文件；`AnalysisFile` 填实；`revision`  
-2. 项目包导出 / 导入（`.insight`）  
-3. 单测：导入事务完整性  
+1. 编辑表后：`markTableEdited` + **自动** `rerunStaleSteps`（默认开）  
+2. Flowchart / 工作区下游表与图表随重跑结果更新  
+3. `revision++`；单测覆盖「改源表 → 下游 Join/Filter 输出变」  
 
-### Phase B — Snapshot 拆分 + 本地实时
+### Phase B — 数据内容入库语义
 
-1. 大表行迁 Snapshot；Document 瘦身  
-2. `BroadcastChannel` 跨 Tab  
-3. 源节点 Refresh + stale + Run stale  
+1. 导入只写数据内容（明确不写原始文件）  
+2. Document / Snapshot 拆分（大表）  
+3. `.insight` 导出含 snapshots，不含原文件  
 
-### Phase C — 外部源（仍可先打本地/Mock API）
+### Phase C — 外部源
 
-1. `DataSourceBinding` + `http-dataset` Connector  
+1. Connector sync → 写数据内容 → **同一套自动重跑**  
 2. `connect-external` 步骤  
-3. sync → DB 快照 → stale → 可选 auto rerun  
 
-### Phase D — **PostgreSQL + 对象存储上线**（长期保存真正落地）
+### Phase D — **PostgreSQL 上线**
 
-1. 按 §5 建库：`analyses` / `dashboards` / `file_blobs` / `table_snapshots` / `data_sources` / `event_outbox`  
-2. 对象存储接文件上传与预签名下载  
-3. HTTP Repository 切换为默认；Dexie 仅离线  
-4. outbox → SSE；Dashboard / flowchart 接服务端事件  
-5. 本地数据一键迁移到 PG  
+1. 建库：`analyses` / `dashboards` / `table_snapshots` / `data_sources` / `event_outbox`（**无 file_blobs**）  
+2. HTTP Repository 默认；Dexie 仅离线缓存  
+3. outbox → SSE；跨端 flowchart 同步  
+4. 验收：**清浏览器后数据内容仍在**；**改数后下游自动变**  
 
 ---
 
@@ -599,31 +598,29 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 | 风险 | 缓解 |
 | --- | --- |
-| 只做前端 IDB、迟迟不上 PG | Phase D 为「长期保存」硬门槛；验收以「清浏览器后仍能打开」为准 |
-| JSONB 大快照撑爆 PG | §5.3 阈值切 `object` 存储；API 分页 |
-| 对象存储与 PG 不一致 | 先写对象再写元数据事务；失败 GC；禁止只写一端 |
-| IDB 配额（过渡期） | 引导导出 / 尽快上云 |
-| 外部源 schema 漂移 | sync 列对齐报告；失败保留旧 snapshot |
-| 自动重跑打爆 CPU | Analysis 级开关；服务端 worker 限流 |
-| 密钥进库明文 | `secrets` 表 + KMS；config 只存 `secret_ref` |
+| 只做前端 IDB、迟迟不上 PG | Phase D 硬门槛；清浏览器后数据内容仍在 |
+| 改数只标 stale 不重跑 | 违反产品拍板；Phase A 必须默认 auto rerun |
+| JSONB 大快照撑爆 PG | 超大表可转储压缩行到对象存储（仍是数据内容，不是原文件） |
+| 自动重跑打爆 CPU | 防抖合并编辑；大图可暂停自动重跑；worker 限流 |
+| 外部源 schema 漂移 | 列对齐报告；失败保留旧数据内容 |
+| 密钥进库明文 | `secrets` + KMS |
 
 ---
 
 ## 12. 决策摘要（给评审）
 
-1. **长期真相源是 PostgreSQL + 对象存储**，不是 IndexedDB。  
-2. **三层落库**：Document → `analyses.document`；行 → `table_snapshots`；文件 → 对象存储 + `file_blobs`。  
-3. **导入/外部 sync 必须走 DB 事务 + outbox**，再推 SSE 驱动 flowchart。  
-4. **外部源**经 `data_sources` / Connector，变更只增 snapshot 版本。  
-5. 前端 Repository 可换；Dexie 仅为开发与离线缓存。  
+1. **不存导入文件；只存数据内容**（列 + 行）到 PostgreSQL。  
+2. **Document + Data Content** 双层：配置在 `analyses`，行在 `table_snapshots`。  
+3. **改数 / 外部 sync → 自动重跑整条 flowchart 下游**（默认开启）。  
+4. IndexedDB 只是缓存；长期真相源是 PG。  
 
 ---
 
 ## 13. 开放问题（实现前需拍板）
 
-1. 外部源变更后默认 **自动重跑** 还是 **仅标 stale**？  
+1. ~~改数后自动重跑还是只标 stale？~~ → **已拍板：自动重跑全链路**。  
 2. `table_snapshots` 是否保留历史版本（回滚），还是只留 latest？  
-3. ~~服务端用文档库还是关系库？~~ → **已拍板推荐：PostgreSQL JSONB + 对象存储**（见 §5）；若团队有强约束技术栈再复议。  
-4. `.insight` 导出是否纳入 Phase A 必做，还是等 PG 上线后只做云备份？  
-5. `workspace_id` / 多租户是否第一期就建，还是单租户硬编码后再加？  
-6. 后端语言与部署形态（单体 API vs 已有中台旁路）？
+3. `.insight` 导出是否纳入近期，还是等 PG 上线？  
+4. `workspace_id` / 多租户是否第一期就建？  
+5. 后端语言与部署形态？  
+6. 超大表自动重跑时，是否在 UI 显示进度条并允许「暂停自动更新」？

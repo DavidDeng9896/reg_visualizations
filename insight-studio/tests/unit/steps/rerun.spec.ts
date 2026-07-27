@@ -6,6 +6,7 @@ import {
   hasStaleSteps,
   markDownstreamStale,
   markTableEdited,
+  propagateTableEdit,
   rerunStaleSteps,
   stepOfTable,
 } from '../../../src/modules/steps/rerun'
@@ -95,5 +96,18 @@ describe('steps/rerun stale 状态机', () => {
     // 输出表内容按新过滤重算（v>=2 → 2 行）
     const out = a.tables.find((t) => t.id === filter.output.tables[0])!
     expect(out.rows).toHaveLength(2)
+  })
+
+  it('propagateTableEdit：改源表数据后自动重跑下游，flowchart 输出同步', () => {
+    const { a, srcTable } = makePipeline()
+    // 源表改为只剩一行 v=1 → filter(v>=2) 应变空
+    srcTable.rows = [{ __rowId: 'r1', v: 1 }]
+    const ran = propagateTableEdit(a, srcTable.id)
+    expect(ran).toBe(1)
+    const filter = a.steps.find((s) => s.id === 'flt')!
+    expect(filter.status).toBe('configured')
+    expect(hasStaleSteps(a)).toBe(false)
+    const out = a.tables.find((t) => t.id === filter.output.tables[0])!
+    expect(out.rows).toHaveLength(0)
   })
 })

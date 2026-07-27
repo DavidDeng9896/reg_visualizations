@@ -44,6 +44,16 @@ export function markTableEdited(analysis: Analysis, tableId: string): void {
   if (step) markDownstreamStale(analysis, step.id)
 }
 
+/**
+ * 数据内容变更后驱动整条 flowchart 同步：
+ * 下游标 stale，并按拓扑序自动重跑（默认行为，对齐产品拍板）。
+ * @returns 成功重跑的步骤数
+ */
+export function propagateTableEdit(analysis: Analysis, tableId: string): number {
+  markTableEdited(analysis, tableId)
+  return rerunStaleSteps(analysis)
+}
+
 /** 重跑单个步骤（仅限已实现执行逻辑的类型），返回是否成功。 */
 export function rerunStep(analysis: Analysis, step: StepNode): boolean {
   if (!IMPLEMENTED_STEP_TYPES.has(step.type)) return false

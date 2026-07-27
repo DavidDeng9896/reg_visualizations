@@ -32,7 +32,7 @@ import {
 import { conditionValid, filterSummary, operatorArity, operatorsFor, parseConditionValue } from './filterForm'
 import { TRANSFORM_TYPE_LABELS, transformSummary } from './transformForm'
 import { promoteViewToTable } from './promote'
-import { markTableEdited } from '../steps/rerun'
+import { propagateTableEdit } from '../steps/rerun'
 import FilterDialog from './FilterDialog.vue'
 import TransformDialog from './TransformDialog.vue'
 import { invalidateStructureCache } from './structure/render'
@@ -657,11 +657,13 @@ function addRow() {
   markEdited()
 }
 
-/** 编辑源表数据后，把下游步骤标记为 stale（需重新运行）。 */
+/** 编辑源表数据后：下游标 stale 并自动重跑，使 flowchart 全链路同步。 */
 function markEdited() {
   const t = table.value
   if (!t) return
-  store.mutate((a) => markTableEdited(a, t.id))
+  store.mutate((a) => {
+    propagateTableEdit(a, t.id)
+  })
 }
 
 /* ------------------------------ 单元格编辑 ------------------------------ */
