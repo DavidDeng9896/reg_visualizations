@@ -58,6 +58,7 @@ import {
   Type,
   Undo2,
   Redo2,
+  RefreshCw,
   Upload,
   Workflow,
   X,
@@ -105,6 +106,7 @@ export type IconName =
   | 'link'
   | 'undo'
   | 'redo'
+  | 'refresh'
   | 'eye'
   | 'eye-off'
   | 'sort-asc'
@@ -164,6 +166,7 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   link: Link2,
   undo: Undo2,
   redo: Redo2,
+  refresh: RefreshCw,
   eye: Eye,
   'eye-off': EyeOff,
   'sort-asc': ArrowUpNarrowWide,
