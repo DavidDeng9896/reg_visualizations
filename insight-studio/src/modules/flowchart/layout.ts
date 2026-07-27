@@ -1,24 +1,42 @@
 /**
  * 流程图布局（纯函数，可单测）。
- * 分层 DAG 布局：自左向右，源节点在左；按拓扑深度分列，同列垂直均分。
- * 不引依赖，自己实现。
+ * 分层家族树：父节点在左；子节点在右侧一列，按「视图(图) → 步骤」顺序自上而下，
+ * 使图形紧跟所属数据，加工步骤再向下/向右展开。
  */
-import type { FlowGraph } from './graph'
+import type { FlowGraph, FlowNodeData } from './graph'
 
 export interface FlowPoint {
   x: number
   y: number
 }
 
-/** 节点尺寸与间距常量（与 FlowNode.vue 卡片尺寸一致）。 */
-export const NODE_WIDTH = 200
-export const NODE_HEIGHT = 56
-export const COLUMN_GAP = 120
-export const ROW_GAP = 32
+/** 节点尺寸与间距（步骤竖卡更高，行距留足）。 */
+export const NODE_WIDTH = 240
+export const NODE_HEIGHT = 72
+export const COLUMN_GAP = 100
+export const ROW_GAP = 40
 
 const COLUMN_STEP = NODE_WIDTH + COLUMN_GAP
 const ROW_STEP = NODE_HEIGHT + ROW_GAP
 
+/**
+ * 估算节点卡片实际渲染高度（flow px）。
+ * FlowNode 步骤竖卡 = 头部 + pending/错误横幅 + Inputs/Outputs 分区（分区标题 + 端口行），
+ * 实际远高于 NODE_HEIGHT；避让/子树占位需按估算高度，否则同列卡片重叠压住端口。
+ * 无端口、无横幅的节点回退到 NODE_HEIGHT，保持既有布局间距不变。
+ */
+const BANNER_HEIGHT = 38
+const SECTION_HEADER = 34
+const PORT_ROW = 30
+
+export function estimateNodeHeight(n: FlowNodeData): number {
+  if (n.kind !== 'step') return NODE_HEIGHT
+  let h = NODE_HEIGHT
+  if (n.status === 'pending' || (n.status === 'failed' && n.error)) h += BANNER_HEIGHT
+  if (n.inputs.length) h += SECTION_HEADER + n.inputs.length * PORT_ROW
+  if (n.outputs.length) h += SECTION_HEADER + n.outputs.length * PORT_ROW
+  return h
+}
 /** 每个节点的父节点列表。 */
 function buildParentMap(graph: FlowGraph): Map<string, string[]> {
   const parents = new Map<string, string[]>()
@@ -28,6 +46,17 @@ function buildParentMap(graph: FlowGraph): Map<string, string[]> {
     else parents.set(e.target, [e.source])
   }
   return parents
+}
+
+/** 每个节点的子节点列表（按边声明序）。 */
+function buildChildrenMap(graph: FlowGraph): Map<string, string[]> {
+  const children = new Map<string, string[]>()
+  for (const e of graph.edges) {
+    const list = children.get(e.source)
+    if (list) list.push(e.target)
+    else children.set(e.source, [e.target])
+  }
+  return children
 }
 
 /**
@@ -56,23 +85,75 @@ export function computeDepths(graph: FlowGraph): Map<string, number> {
   return depths
 }
 
-/** 全自动布局：按深度分列（x），同列按声明序垂直均分（y）。 */
+/** 子节点排序：视图(图)在前，步骤在后 —— 图形紧跟数据。 */
+function sortChildren(ids: string[], byId: Map<string, FlowNodeData>): string[] {
+  return [...ids].sort((a, b) => {
+    const ka = byId.get(a)?.kind === 'view' ? 0 : 1
+    const kb = byId.get(b)?.kind === 'view' ? 0 : 1
+    if (ka !== kb) return ka - kb
+    return 0
+  })
+}
+
+/**
+ * 全自动布局：
+ * - 根节点（无入边）自上而下排在第 0 列
+ * - 每个父节点的子节点排在右侧一列，视图优先、步骤其次
+ * - 递归子树占位，避免兄弟子树重叠
+ */
 export function autoLayout(graph: FlowGraph): Record<string, FlowPoint> {
-  const depths = computeDepths(graph)
-  const columnIndex = new Map<number, number>()
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+  const parents = buildParentMap(graph)
+  const children = buildChildrenMap(graph)
   const out: Record<string, FlowPoint> = {}
-  for (const n of graph.nodes) {
-    const d = depths.get(n.id) ?? 0
-    const row = columnIndex.get(d) ?? 0
-    columnIndex.set(d, row + 1)
-    out[n.id] = { x: d * COLUMN_STEP, y: row * ROW_STEP }
+  const placed = new Set<string>()
+
+  const roots = graph.nodes.filter((n) => !(parents.get(n.id)?.length))
+
+  /** 放置子树，返回该子树占用的垂直高度（至少自身卡片高度 + 行距）。 */
+  const layoutSubtree = (id: string, x: number, y: number): number => {
+    out[id] = { x, y }
+    placed.add(id)
+    const own = estimateNodeHeight(byId.get(id)!) + ROW_GAP
+    const kids = sortChildren(children.get(id) ?? [], byId).filter((k) => !placed.has(k))
+    if (!kids.length) return own
+
+    let cursor = y
+    let total = 0
+    for (const kid of kids) {
+      const h = layoutSubtree(kid, x + COLUMN_STEP, cursor)
+      cursor += h
+      total += h
+    }
+    return Math.max(own, total)
   }
+
+  let rootY = 0
+  for (const root of roots) {
+    if (placed.has(root.id)) continue
+    const h = layoutSubtree(root.id, 0, rootY)
+    rootY += h
+  }
+
+  // 防御：有入边但因多父/环未放入的节点，追加到底部
+  for (const n of graph.nodes) {
+    if (placed.has(n.id)) continue
+    out[n.id] = { x: 0, y: rootY }
+    placed.add(n.id)
+    rootY += estimateNodeHeight(n) + ROW_GAP
+  }
+
   return out
 }
 
-/** 两节点矩形（含 padding）是否重叠。 */
-function overlaps(a: FlowPoint, b: FlowPoint): boolean {
-  return a.x < b.x + NODE_WIDTH && b.x < a.x + NODE_WIDTH && a.y < b.y + NODE_HEIGHT && b.y < a.y + NODE_HEIGHT
+/** 已落位节点矩形（含按卡片内容估算的高度）。 */
+interface PlacedRect extends FlowPoint {
+  h: number
+}
+
+/** 两节点矩形是否重叠。 */
+function overlaps(a: PlacedRect, b: PlacedRect): boolean {
+  return a.x < b.x + NODE_WIDTH && b.x < a.x + NODE_WIDTH && a.y < b.y + b.h && b.y < a.y + a.h
 }
 
 /**
@@ -88,14 +169,23 @@ export function resolvePositions(
   const depths = computeDepths(graph)
   const auto = autoLayout(graph)
   const parents = buildParentMap(graph)
-  // 父先子后处理，保证「追加在父节点右侧」时父已落位
-  const order = [...graph.nodes].sort((a, b) => (depths.get(a.id) ?? 0) - (depths.get(b.id) ?? 0))
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+  // 父先子后；同层视图优先于步骤，保证新图落在数据旁
+  const order = [...graph.nodes].sort((a, b) => {
+    const da = depths.get(a.id) ?? 0
+    const db = depths.get(b.id) ?? 0
+    if (da !== db) return da - db
+    const ka = a.kind === 'view' ? 0 : 1
+    const kb = b.kind === 'view' ? 0 : 1
+    return ka - kb
+  })
 
-  const placed: FlowPoint[] = []
+  const placed: PlacedRect[] = []
   const out: Record<string, FlowPoint> = {}
 
   for (const node of order) {
     const saved = savedLayout[node.id]
+    const h = estimateNodeHeight(node)
     let pos: FlowPoint
     if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
       pos = { x: saved.x, y: saved.y }
@@ -104,17 +194,23 @@ export function resolvePositions(
         .map((p) => out[p])
         .filter((p): p is FlowPoint => !!p)
       if (resolvedParents.length) {
-        const rightmost = resolvedParents.reduce((m, p) => (p.x > m.x ? p : m))
-        pos = { x: rightmost.x + COLUMN_STEP, y: rightmost.y }
+        const parent = resolvedParents.reduce((m, p) => (p.x > m.x ? p : m))
+        // 视图紧跟父节点右侧同起点；步骤稍向下错开，避免压住图
+        const isView = byId.get(node.id)?.kind === 'view'
+        pos = {
+          x: parent.x + COLUMN_STEP,
+          y: isView ? parent.y : parent.y + ROW_STEP,
+        }
       } else {
         pos = { ...(auto[node.id] ?? { x: 0, y: 0 }) }
       }
-      while (placed.some((p) => overlaps(p, pos))) {
+      const rect = (): PlacedRect => ({ ...pos, h })
+      while (placed.some((p) => overlaps(p, rect()))) {
         pos = { x: pos.x, y: pos.y + ROW_STEP }
       }
     }
     out[node.id] = pos
-    placed.push(pos)
+    placed.push({ ...pos, h })
   }
 
   return out

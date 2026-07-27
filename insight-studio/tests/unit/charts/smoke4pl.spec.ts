@@ -31,7 +31,7 @@ it('冒烟：plate dose-response（含 0 浓度）+ 4PL + excludeFlagged', () =>
   c.configure.regression = { model: '4pl', excludeFlagged: true, showAsymptotes: true }
   const flags = [{ rowId: 'r3', comment: 'bubble' }]
   const out = buildChartOption(vr(rows, cols), c, 'Standard Curve', flags)
-  const fits = out.option.series.filter((s: { type: string }) => s.type === 'line')
+  const fits = out.option.data.filter((s) => s.mode === 'lines' && String(s.name).endsWith(' · fit'))
   expect(fits).toHaveLength(2) // 每组一条拟合线
   expect(out.fits).toHaveLength(2)
   // 0 浓度被过滤并警告
@@ -41,10 +41,10 @@ it('冒烟：plate dose-response（含 0 浓度）+ 4PL + excludeFlagged', () =>
   const infl = drugA.variables.find((v) => v.name === 'Inflection Point')!.estimate!
   expect(Math.abs(infl - 0.5) / 0.5).toBeLessThan(0.3)
   expect(drugA.r2!).toBeGreaterThan(0.9)
-  // 渐近线 markLine
-  expect(fits[0].markLine).toBeTruthy()
+  // 渐近线 layout shapes
+  expect(out.option.layout.shapes).toHaveLength(4)
   // 打标 × 系列存在
-  expect(out.option.series.some((s: { name?: string }) => s.name === 'Flagged')).toBe(true)
+  expect(out.option.data.some((s) => s.name === 'Flagged')).toBe(true)
   // MODEL OUTPUT 行数 = 行数
   expect(drugA.output.length).toBe(48)
 })

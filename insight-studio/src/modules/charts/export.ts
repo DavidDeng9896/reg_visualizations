@@ -12,14 +12,14 @@ function triggerDownload(href: string, filename: string): void {
   a.remove()
 }
 
-/** 由 ECharts 实例导出 PNG。 */
-export function exportPng(getDataURL: () => string, filename: string): void {
-  triggerDownload(getDataURL(), filename.endsWith('.png') ? filename : `${filename}.png`)
+/** 由 Plotly 实例导出 PNG。 */
+export async function exportPng(getDataURL: () => Promise<string>, filename: string): Promise<void> {
+  triggerDownload(await getDataURL(), filename.endsWith('.png') ? filename : `${filename}.png`)
 }
 
-/** 由 ECharts 实例导出 PDF（PNG 嵌入单页）。 */
-export function exportPdf(getDataURL: () => string, filename: string): void {
-  const png = getDataURL()
+/** 由 Plotly 实例导出 PDF（PNG 嵌入单页）。 */
+export async function exportPdf(getDataURL: () => Promise<string>, filename: string): Promise<void> {
+  const png = await getDataURL()
   // 读取图片尺寸以决定 PDF 页面方向
   const img = new Image()
   img.onload = () => {

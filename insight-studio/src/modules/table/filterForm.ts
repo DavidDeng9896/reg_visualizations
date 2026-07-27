@@ -37,7 +37,12 @@ function def(op: FilterOperator): OperatorDef {
 
 /** 按列类型给出可选操作符。 */
 export function operatorsFor(dataType: DataType): OperatorDef[] {
-  const ops = dataType === 'string' ? TEXT_OPS : dataType === 'boolean' ? BOOL_OPS : NUM_OPS
+  const ops =
+    dataType === 'string' || dataType === 'structure'
+      ? TEXT_OPS
+      : dataType === 'boolean'
+        ? BOOL_OPS
+        : NUM_OPS
   return ops.map(def)
 }
 

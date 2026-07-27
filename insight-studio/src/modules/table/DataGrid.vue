@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { VxeColumn, VxeTable } from 'vxe-table'
 import 'vxe-table/es/style.css'
-import type { Analysis, AnalysisTable, CellValue, ColumnMeta, Filter, Row, Transform, TransformType } from '../../shared/types'
+import type { Analysis, AnalysisTable, CellValue, ColumnMeta, DataType, Filter, Row, Transform, TransformType } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { uuid } from '../../shared/id'
 import { compareValues, isIdentityOrSortOnly, rowIdOf, type ViewResult } from '../../shared/pipeline'
@@ -11,9 +11,10 @@ import { findTable, findView, findViewPath } from '../../shared/tree'
 import { createTransform, createViewNode, defaultViewName } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, ITooltip, IBadge, toast, type SelectOption } from '../../ui'
+import type { IconName } from '../../ui/icons'
 import { useFloatingPanel } from '../../ui/floating'
 import { useClickOutside, useEscape } from '../../ui/utils'
-import { downloadCsv, toCsv } from './csv'
+import { coerceValue, downloadCsv, toCsv } from './csv'
 import {
   buildPasteRect,
   findRowIndexById,
@@ -34,6 +35,10 @@ import { promoteViewToTable } from './promote'
 import { markTableEdited } from '../steps/rerun'
 import FilterDialog from './FilterDialog.vue'
 import TransformDialog from './TransformDialog.vue'
+import { invalidateStructureCache } from './structure/render'
+
+/** 结构列按需加载，避免无结构表也拉 RDKit WASM。 */
+const StructureCellView = defineAsyncComponent(() => import('./structure/StructureCell.vue'))
 
 /**
  * DataGrid：vxe-table 封装。
@@ -96,6 +101,22 @@ function persistHidden() {
 
 const visibleColumns = computed<ColumnMeta[]>(() => props.result.columns.filter((c) => !hiddenCols.value.has(c.field)))
 const colIndexMap = computed(() => new Map(visibleColumns.value.map((c, i) => [c.field, i])))
+const hasStructureColumn = computed(() => visibleColumns.value.some((c) => c.dataType === 'structure'))
+/** 有结构列时强制虚拟滚动，避免一次挂载整表 StructureCell。 */
+const scrollYConfig = computed(() => ({ enabled: true, gt: hasStructureColumn.value ? 0 : 100 }))
+const rowConfig = computed(() => ({
+  keyField: ROW_ID_FIELD,
+  isHover: true,
+  // 结构列单元格自带高度；不强制全表 140px，仅略增高以容纳缩略图
+  height: hasStructureColumn.value ? 132 : undefined,
+}))
+
+function columnTypeIcon(dataType: ColumnMeta['dataType']): IconName {
+  if (dataType === 'number') return 'type-number'
+  if (dataType === 'structure') return 'type-structure'
+  if (dataType === 'date' || dataType === 'datetime') return 'calendar'
+  return 'type-text'
+}
 
 function toggleColumn(field: string) {
   const next = new Set(hiddenCols.value)
@@ -418,10 +439,29 @@ function clearColumnFilter() {
 
 /* ------------------------------ 列菜单（单一弹层） ------------------------------ */
 
+const COLUMN_TYPE_OPTIONS: { value: DataType; label: string; icon: IconName }[] = [
+  { value: 'string', label: 'Text', icon: 'type-text' },
+  { value: 'number', label: 'Number', icon: 'type-number' },
+  { value: 'boolean', label: 'Boolean', icon: 'type-text' },
+  { value: 'date', label: 'Date', icon: 'calendar' },
+  { value: 'datetime', label: 'Datetime', icon: 'calendar' },
+  { value: 'structure', label: 'Structure', icon: 'type-structure' },
+]
+
+function dataTypeLabel(type: DataType): string {
+  return COLUMN_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type
+}
+
 const colMenuFor = ref<string | null>(null)
+const colTypeSubOpen = ref(false)
 const menuAnchorEl = ref<HTMLElement>()
 const menuPanelEl = ref<HTMLElement>()
 const menuOpen = computed(() => !!colMenuFor.value)
+const menuColDataType = computed(() => {
+  const f = colMenuFor.value
+  if (!f) return null
+  return table.value?.columns.find((c) => c.field === f)?.dataType ?? props.result.columns.find((c) => c.field === f)?.dataType ?? null
+})
 const { style: menuPanelStyle } = useFloatingPanel(menuOpen, menuAnchorEl, menuPanelEl, () => 'bottom-end', {
   zIndex: 'var(--is-z-popover)',
   minWidth: 180,
@@ -439,6 +479,52 @@ function openColumnMenu(field: string, ev?: Event) {
 }
 function closeColumnMenu() {
   colMenuFor.value = null
+  colTypeSubOpen.value = false
+}
+
+function setColumnDataType(field: string, next: DataType) {
+  const t = table.value
+  if (!t || !editable.value) return
+  const col = t.columns.find((c) => c.field === field)
+  if (!col || col.dataType === next) return
+  const prevType = col.dataType
+  const title = col.title
+  const prevValues = t.rows.map((r) => r[field] ?? null)
+
+  const applyTypeOnly = (dataType: DataType) => {
+    col.dataType = dataType
+  }
+  const applyWithValues = (dataType: DataType, values: (CellValue | null)[]) => {
+    col.dataType = dataType
+    t.rows.forEach((r, i) => {
+      r[field] = values[i]
+    })
+  }
+
+  const label = dataTypeLabel(next)
+  if (next === 'structure') {
+    applyTypeOnly(next)
+    store.commit({
+      label: `将「${title}」设为 ${label}`,
+      undo: () => applyTypeOnly(prevType),
+      redo: () => applyTypeOnly(next),
+    })
+  } else {
+    const coerced = t.rows.map((r) => coerceValue(String(r[field] ?? ''), next))
+    applyWithValues(next, coerced)
+    store.commit({
+      label: `将「${title}」设为 ${label}`,
+      undo: () => applyWithValues(prevType, prevValues),
+      redo: () => applyWithValues(next, coerced),
+    })
+    if (prevType === 'structure') {
+      for (const v of prevValues) {
+        if (v != null) invalidateStructureCache(String(v))
+      }
+    }
+  }
+  toast.success(`已将「${title}」设为 ${label}`)
+  markEdited()
 }
 function openColumnFilterFromMenu() {
   const f = colMenuFor.value
@@ -640,6 +726,10 @@ function commitCell(row: Row, field: string) {
   if (entry) {
     store.commit(entry)
     markEdited()
+    if (col.dataType === 'structure') {
+      if (oldValue != null) invalidateStructureCache(String(oldValue))
+      if (parsed.value != null) invalidateStructureCache(String(parsed.value))
+    }
   } else toast.error('未找到源行（可能已被过滤或删除）')
 }
 
@@ -827,7 +917,7 @@ function promote() {
               <div class="dg__colvis-list">
                 <label v-for="c in colVisList" :key="c.field" class="dg__colvis-item">
                   <input type="checkbox" :checked="!hiddenCols.has(c.field)" @change="toggleColumn(c.field)" />
-                  <IIcon :name="c.dataType === 'number' ? 'type-number' : 'type-text'" :size="12" class="dg__typeicon" />
+                  <IIcon :name="columnTypeIcon(c.dataType)" :size="12" class="dg__typeicon" />
                   <span class="is-ellipsis">{{ c.title }}</span>
                 </label>
                 <div v-if="!colVisList.length" class="dg__colvis-empty">无匹配列</div>
@@ -947,9 +1037,9 @@ function promote() {
         :auto-resize="true"
         border="none"
         :show-header="true"
-        :row-config="{ keyField: ROW_ID_FIELD, isHover: true }"
+        :row-config="rowConfig"
         :column-config="{ resizable: true }"
-        :scroll-y="{ enabled: true, gt: 500 }"
+        :scroll-y="scrollYConfig"
         :edit-config="editConfig"
         :keyboard-config="editable ? keyboardConfig : undefined"
         :mouse-config="editable ? mouseConfig : undefined"
@@ -972,7 +1062,7 @@ function promote() {
           <template #header>
             <div class="dg__th" @contextmenu.prevent="openColumnMenu(col.field, $event)">
               <IIcon
-                :name="col.dataType === 'number' ? 'type-number' : col.dataType === 'date' || col.dataType === 'datetime' ? 'calendar' : 'type-text'"
+                :name="columnTypeIcon(col.dataType)"
                 :size="13"
                 class="dg__typeicon"
               />
@@ -1008,7 +1098,16 @@ function promote() {
           </template>
 
           <template #default="{ row }">
-            <span class="dg__cell" :class="{ 'dg__cell--num': col.dataType === 'number', 'dg__cell--blank': row[col.field] === null || row[col.field] === undefined }">
+            <StructureCellView
+              v-if="col.dataType === 'structure'"
+              class="dg__cell dg__cell--structure"
+              :value="row[col.field] == null ? null : String(row[col.field])"
+            />
+            <span
+              v-else
+              class="dg__cell"
+              :class="{ 'dg__cell--num': col.dataType === 'number', 'dg__cell--blank': row[col.field] === null || row[col.field] === undefined }"
+            >
               {{ fmtCell(row, col) }}
             </span>
           </template>
@@ -1113,6 +1212,30 @@ function promote() {
             <IIcon name="plus" :size="13" /> 在右侧插入派生列
           </button>
           <template v-if="editable">
+            <div
+              class="dg__menu-item-wrap"
+              @mouseenter="colTypeSubOpen = true"
+              @mouseleave="colTypeSubOpen = false"
+            >
+              <button type="button" class="dg__menu-item dg__menu-item--sub" role="menuitem">
+                <IIcon name="type-text" :size="13" /> 列类型
+                <IIcon name="chevron-right" :size="12" class="dg__menu-item__arrow" />
+              </button>
+              <div v-if="colTypeSubOpen" class="dg__menu-submenu" role="menu">
+                <button
+                  v-for="opt in COLUMN_TYPE_OPTIONS"
+                  :key="opt.value"
+                  type="button"
+                  class="dg__menu-item"
+                  :class="{ 'dg__menu-item--checked': menuColDataType === opt.value }"
+                  role="menuitem"
+                  :disabled="menuColDataType === opt.value"
+                  @click="runColumnMenu((f) => setColumnDataType(f, opt.value))"
+                >
+                  <IIcon :name="opt.icon" :size="13" /> {{ opt.label }}
+                </button>
+              </div>
+            </div>
             <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu((f) => openRenameColumn(f))">
               <IIcon name="edit" :size="13" /> 重命名列
             </button>
@@ -1364,6 +1487,17 @@ function promote() {
 .dg__cell--blank {
   color: var(--is-text-tertiary);
 }
+.dg__cell--structure {
+  min-height: 128px;
+  overflow: visible !important;
+  white-space: normal;
+  line-height: normal;
+  text-overflow: clip;
+}
+.dg .vxe-table .vxe-body--column:has(.dg__cell--structure),
+.dg .vxe-table .vxe-cell:has(.dg__cell--structure) {
+  overflow: visible !important;
+}
 
 .dg__edit-input {
   width: 100%;
@@ -1426,6 +1560,41 @@ function promote() {
   height: 1px;
   background: var(--is-border);
   margin: 4px 6px;
+}
+.dg__menu-item-wrap {
+  position: relative;
+}
+.dg__menu-item--sub {
+  width: 100%;
+}
+.dg__menu-item__arrow {
+  margin-left: auto;
+  opacity: 0.55;
+}
+.dg__menu-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  background: var(--is-surface);
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius);
+  box-shadow: var(--is-shadow-md);
+  z-index: 1;
+}
+.dg__menu-item--checked {
+  color: var(--is-accent);
+}
+.dg__menu-item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.dg__menu-item:disabled:hover {
+  background: transparent;
 }
 
 .dg__cf-panel,

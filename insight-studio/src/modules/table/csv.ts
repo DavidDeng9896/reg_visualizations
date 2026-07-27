@@ -2,6 +2,7 @@
  * CSV 导入/导出纯函数。
  * 类型推断规则：非空值全部为数值 → number；全部为 true/false → boolean；
  * 全部匹配 YYYY-MM-DD → date；全部匹配 ISO datetime → datetime；否则 string。
+ * structure 不自动推断，由用户在导入对话框或列菜单中手动指定。
  */
 import type { CellValue, ColumnMeta, DataType, Row } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
@@ -25,7 +26,10 @@ export function normalizeHeaders(headers: string[]): string[] {
   })
 }
 
-/** 推断单列类型。空列（无非空值）按 string 处理。 */
+/**
+ * 推断单列类型。空列（无非空值）按 string 处理。
+ * 不自动推断 structure（需用户手动改类型）。
+ */
 export function inferColumnType(values: string[]): DataType {
   const nonEmpty = values.filter((v) => v.trim() !== '')
   if (nonEmpty.length === 0) return 'string'
@@ -61,6 +65,8 @@ export function coerceValue(raw: string, type: DataType): CellValue {
     case 'date':
     case 'datetime':
       return parseDateLike(s) !== null ? s : null
+    case 'structure':
+      return s
     default:
       return s
   }

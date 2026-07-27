@@ -96,7 +96,8 @@ test.describe('g) 流程图', () => {
     await expect(detail).toBeVisible()
     await expect(detail.getByText('Output chart')).toBeVisible()
     await expect(page.getByTestId('flow-chart-preview')).toBeVisible()
-    await expect(page.getByTestId('flow-chart-canvas').locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    // Plotly 渲染为 SVG（.plot-container），非 ECharts 的 canvas
+    await expect(page.getByTestId('flow-chart-canvas').locator('.plot-container').first()).toBeVisible({ timeout: 10_000 })
 
     // 点空白关闭
     await page.locator('.vue-flow__pane').click({ position: { x: 20, y: 20 }, force: true })

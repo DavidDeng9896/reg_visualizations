@@ -27,6 +27,7 @@ describe('inferColumnType', () => {
   it('string：混合或文本', () => {
     expect(inferColumnType(['abc', '1'])).toBe('string')
     expect(inferColumnType(['hello'])).toBe('string')
+    expect(inferColumnType(['hello', 'world', 'sample'])).toBe('string')
   })
   it('空值被忽略；全空列按 string', () => {
     expect(inferColumnType(['', '  ', '3'])).toBe('number')
@@ -61,6 +62,25 @@ describe('coerceValue', () => {
   it('空串 → null', () => {
     expect(coerceValue('  ', 'number')).toBe(null)
     expect(coerceValue('', 'string')).toBe(null)
+  })
+})
+
+describe('inferColumnType · structure', () => {
+  it('SMILES 列不自动推断为 structure，保持 string', () => {
+    expect(inferColumnType(['CCO', 'c1ccccc1', 'CC(=O)O', 'ClC', 'C'])).toBe('string')
+  })
+  it('普通英文单词列保持 string', () => {
+    expect(inferColumnType(['hello', 'world', 'sample', 'compound', 'aspirin'])).toBe('string')
+  })
+  it('列名参数已移除；数值仍优先于文本', () => {
+    expect(inferColumnType(['1', '2', '3'])).toBe('number')
+  })
+})
+
+describe('coerceValue · structure', () => {
+  it('trims string; empty → null', () => {
+    expect(coerceValue('  CCO  ', 'structure')).toBe('CCO')
+    expect(coerceValue('  ', 'structure')).toBe(null)
   })
 })
 

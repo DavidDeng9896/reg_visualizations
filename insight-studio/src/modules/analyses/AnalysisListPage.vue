@@ -8,6 +8,7 @@ import { createDemoAnalysis } from '../../shared/seed'
 import { countAnalysisViews } from '../../shared/tree'
 import { formatRelative } from '../../shared/datetime'
 import { IButton, IBadge, IEmptyState, IModal, IPopover, ITextField, IIcon, toast } from '../../ui'
+import HomeSegmentNav from '../home/HomeSegmentNav.vue'
 
 const router = useRouter()
 
@@ -126,9 +127,12 @@ function toggleMenu(id: string) {
 <template>
   <div class="page">
     <header class="page__header">
-      <div>
-        <h1 class="page__title">Projects</h1>
-        <p class="page__subtitle">Insight analyses</p>
+      <div class="page__header-left">
+        <HomeSegmentNav active="insight" />
+        <div>
+          <h1 class="page__title">Insight</h1>
+          <p class="page__subtitle">分析与图表工作区</p>
+        </div>
       </div>
       <div class="page__actions">
         <IButton icon="database" :loading="demoLoading" @click="createDemo">一键 Demo</IButton>
@@ -277,6 +281,11 @@ function toggleMenu(id: string) {
   padding: 20px 32px;
   background: var(--is-surface);
   border-bottom: 1px solid var(--is-border);
+}
+.page__header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 .page__title {
   font-size: 20px;

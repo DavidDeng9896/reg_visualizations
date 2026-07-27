@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import Papa from 'papaparse'
-import type { DataType, Row } from '../../shared/types'
-import { createTable, ensureRowIds } from '../../shared/factories'
-import { createStepNode } from '../steps/factory'
-import { useAnalysisStore } from '../../stores/analysisStore'
-import { IButton, IIcon, IModal, ISelect, ITextField, toast, type SelectOption } from '../../ui'
-import { coerceValue, inferColumnTypes } from './csv'
+import type { DataType } from '../../shared/types'
+import { IButton, IIcon, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
+import { commitImportedTable } from './commitImport'
+import { inferColumnTypes } from './csv'
 
 /** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。 */
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
-
-const store = useAnalysisStore()
 
 const fileName = ref('')
 const tableName = ref('')
@@ -40,6 +36,7 @@ const typeOptions: SelectOption[] = [
   { value: 'boolean', label: 'Boolean' },
   { value: 'date', label: 'Date', icon: 'calendar' },
   { value: 'datetime', label: 'Datetime', icon: 'calendar' },
+  { value: 'structure', label: 'Structure', icon: 'type-structure' },
 ]
 
 function reset() {
@@ -119,31 +116,16 @@ function setType(i: number, v: string | number) {
 }
 
 function confirm() {
-  if (!hasData.value || !store.current) return
-  const name = tableName.value.trim() || 'Untitled table'
-  const columns = inferColumnTypes(headers.value, []).map((c, i) => ({ ...c, dataType: columnTypes.value[i] }))
-  const rows: Row[] = dataRows.value.map((line) => {
-    const row: Row = {}
-    columns.forEach((c, i) => {
-      row[c.field] = coerceValue(line[i] ?? '', c.dataType)
-    })
-    return row
+  if (!hasData.value) return
+  const ok = commitImportedTable({
+    name: tableName.value,
+    headers: headers.value,
+    dataRows: dataRows.value,
+    columnTypes: columnTypes.value,
+    stepType: 'upload-csv',
+    sourceLabel: 'CSV',
   })
-  ensureRowIds(rows)
-  const table = createTable(name, columns, rows, 'csv')
-  const step = createStepNode('upload-csv', name)
-  step.config.tableName = name
-  step.status = 'configured'
-  step.output.tables = [table.id]
-  table.source = 'step'
-  table.stepId = step.id
-  store.mutate((a) => {
-    a.tables.push(table)
-    a.steps.push(step)
-  })
-  store.select({ kind: 'table', tableId: table.id })
-  toast.success(`已导入「${name}」（${rows.length} 行 × ${columns.length} 列）`)
-  close()
+  if (ok) close()
 }
 </script>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -7,9 +7,13 @@ import { analysisRepository } from '../../shared/repository'
 import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '../../ui'
 import SidebarTree from './SidebarTree.vue'
 import WorkspaceMain from './WorkspaceMain.vue'
-import FlowchartMain from './FlowchartMain.vue'
+import AddDataMenu from './AddDataMenu.vue'
 import CsvImportDialog from '../table/CsvImportDialog.vue'
+import ExcelImportDialog from '../table/ExcelImportDialog.vue'
+import SqlImportDialog from '../table/SqlImportDialog.vue'
 import CombineTablesDialog from '../table/CombineTablesDialog.vue'
+
+const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +27,9 @@ onMounted(async () => {
   if (!ok) {
     toast.error('Analysis 不存在或已被删除')
     router.replace('/')
+    return
   }
+  applyQuerySelection()
 })
 
 // 路由参数变化（例如列表页跳转）时重新加载
@@ -32,8 +38,17 @@ watch(analysisId, async (id, prev) => {
     await store.saveNow()
     const ok = await store.load(id)
     if (!ok) router.replace('/')
+    else applyQuerySelection()
   }
 })
+
+/** 看板「打开源视图」带入 ?tableId=&viewId= */
+function applyQuerySelection() {
+  const tableId = typeof route.query.tableId === 'string' ? route.query.tableId : ''
+  if (!tableId) return
+  const viewId = typeof route.query.viewId === 'string' ? route.query.viewId : undefined
+  store.select(viewId ? { kind: 'view', tableId, viewId } : { kind: 'table', tableId })
+}
 
 // 离开页面前落盘
 onBeforeUnmount(() => {
@@ -73,11 +88,21 @@ function toggleFlowchart() {
 /* Add data 菜单 */
 const addDataOpen = ref(false)
 const csvImportOpen = ref(false)
+const excelImportOpen = ref(false)
+const sqlImportOpen = ref(false)
 const combineOpen = ref(false)
 
 function openCsvImport() {
   addDataOpen.value = false
   csvImportOpen.value = true
+}
+function openExcelImport() {
+  addDataOpen.value = false
+  excelImportOpen.value = true
+}
+function openSqlImport() {
+  addDataOpen.value = false
+  sqlImportOpen.value = true
 }
 function openCombine() {
   addDataOpen.value = false
@@ -133,44 +158,24 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             <IButton variant="primary" icon="plus" @click="addDataOpen = !addDataOpen">Add data</IButton>
           </template>
           <template #default>
-            <div class="menu menu--adddata" role="menu">
-              <button type="button" class="menu__item" role="menuitem" @click="openCsvImport">
-                <IIcon name="upload" :size="14" />
-                <span>
-                  <span class="menu__item-title">Import CSV</span>
-                  <span class="menu__item-desc">上传 .csv 文件创建新表</span>
-                </span>
-              </button>
-              <button type="button" class="menu__item" role="menuitem" @click="openCombine">
-                <IIcon name="combine" :size="14" />
-                <span>
-                  <span class="menu__item-title">Combine tables</span>
-                  <span class="menu__item-desc">Join / Append 现有表</span>
-                </span>
-              </button>
-              <div class="menu__sep" role="separator" />
-              <button type="button" class="menu__item" role="menuitem" disabled aria-disabled="true">
-                <IIcon name="database" :size="14" />
-                <span>
-                  <span class="menu__item-title">From Registry</span>
-                  <span class="menu__item-desc">后续版本</span>
-                </span>
-              </button>
-              <button type="button" class="menu__item" role="menuitem" disabled aria-disabled="true">
-                <IIcon name="plate" :size="14" />
-                <span>
-                  <span class="menu__item-title">From Plate</span>
-                  <span class="menu__item-desc">后续版本</span>
-                </span>
-              </button>
-            </div>
+            <AddDataMenu
+              @import-csv="openCsvImport"
+              @import-excel="openExcelImport"
+              @import-sql="openSqlImport"
+              @combine="openCombine"
+            />
           </template>
         </IPopover>
       </div>
     </header>
 
     <div class="ws__body">
-      <SidebarTree @add-data="addDataOpen = true" />
+      <SidebarTree
+        @import-csv="openCsvImport"
+        @import-excel="openExcelImport"
+        @import-sql="openSqlImport"
+        @combine="openCombine"
+      />
       <main class="ws__main">
         <KeepAlive>
           <component :is="modeComponent" :key="mode" @add-data="addDataOpen = true" />
@@ -196,8 +201,10 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
       </template>
     </IModal>
 
-    <!-- CSV 导入 / 表合并 -->
+    <!-- 数据导入 / 表合并 -->
     <CsvImportDialog :open="csvImportOpen" @update:open="csvImportOpen = $event" />
+    <ExcelImportDialog :open="excelImportOpen" @update:open="excelImportOpen = $event" />
+    <SqlImportDialog :open="sqlImportOpen" @update:open="sqlImportOpen = $event" />
     <CombineTablesDialog :open="combineOpen" @update:open="combineOpen = $event" />
 
     <div v-if="loading" class="ws__loading">加载中…</div>
@@ -281,9 +288,6 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   flex-direction: column;
   min-width: 180px;
 }
-.menu--adddata {
-  width: 260px;
-}
 .menu__item {
   display: flex;
   align-items: center;
@@ -302,28 +306,11 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   opacity: 0.45;
   cursor: not-allowed;
 }
-.menu__item > span {
-  display: flex;
-  flex-direction: column;
-}
-.menu__item-title {
-  font-size: var(--is-text-sm);
-  font-weight: 500;
-}
-.menu__item-desc {
-  font-size: var(--is-text-xs);
-  color: var(--is-text-tertiary);
-}
 .menu__item--danger {
   color: var(--is-danger);
 }
 .menu__item--danger:hover {
   background: var(--is-danger-soft);
-}
-.menu__sep {
-  height: 1px;
-  background: var(--is-border);
-  margin: 4px 6px;
 }
 .confirm-text {
   font-size: var(--is-text-sm);

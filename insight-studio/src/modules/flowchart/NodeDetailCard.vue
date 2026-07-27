@@ -1,3 +1,8 @@
+<script lang="ts">
+/** 节点详情展示方式：悬浮 / 右侧固定 / 下侧固定。 */
+export type DetailLayout = 'float' | 'right' | 'bottom'
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IButton, IIcon } from '../../ui'
@@ -10,6 +15,7 @@ const props = defineProps<{
   node: FlowNodeData
   inputs: FlowNodeData[]
   outputs: FlowNodeData[]
+  layout: DetailLayout
 }>()
 
 const emit = defineEmits<{
@@ -18,7 +24,14 @@ const emit = defineEmits<{
   (e: 'open'): void
   (e: 'edit'): void
   (e: 'delete', stepId: string): void
+  (e: 'update:layout', layout: DetailLayout): void
 }>()
+
+const LAYOUT_OPTIONS: { value: DetailLayout; label: string; icon: IconName }[] = [
+  { value: 'float', label: '悬浮', icon: 'overlay' },
+  { value: 'right', label: '右侧固定', icon: 'panel-right' },
+  { value: 'bottom', label: '下侧固定', icon: 'panel-bottom' },
+]
 
 const isChartNode = computed(
   () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
@@ -35,9 +48,12 @@ const nodeIcon = computed<IconName>(() => {
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
   switch (n.stepType) {
     case 'upload-csv':
+    case 'upload-xlsx':
     case 'import-files':
     case 'file-to-table':
       return 'upload'
+    case 'query-sql':
+      return 'database'
     case 'join':
     case 'union':
       return 'combine'
@@ -92,7 +108,7 @@ function onDelete() {
 <template>
   <aside
     class="flow-detail"
-    :class="{ 'flow-detail--chart': isChartNode }"
+    :class="{ 'flow-detail--chart': isChartNode, 'flow-detail--docked': layout !== 'float' }"
     role="complementary"
     :aria-label="isChartNode ? '图表预览' : '节点详情'"
   >
@@ -103,6 +119,21 @@ function onDelete() {
       <div class="flow-detail__title">
         <span class="flow-detail__kind">{{ kindTitle }}</span>
         <span class="flow-detail__name is-ellipsis" :title="node.label">{{ node.label }}</span>
+      </div>
+      <div class="flow-detail__layout" role="group" aria-label="详情展示方式">
+        <button
+          v-for="opt in LAYOUT_OPTIONS"
+          :key="opt.value"
+          type="button"
+          class="flow-detail__layout-btn"
+          :class="{ 'flow-detail__layout-btn--on': layout === opt.value }"
+          :title="opt.label"
+          :aria-label="opt.label"
+          :aria-pressed="layout === opt.value"
+          @click="emit('update:layout', opt.value)"
+        >
+          <IIcon :name="opt.icon" :size="13" />
+        </button>
       </div>
       <button type="button" class="flow-detail__close" aria-label="关闭详情" @click="emit('close')">
         <IIcon name="close" :size="14" />
@@ -179,6 +210,44 @@ function onDelete() {
 }
 .flow-detail--chart {
   width: min(520px, calc(100vw - 48px));
+}
+/* 固定模式（右/下分割面板）：填满面板，去掉悬浮外壳 */
+.flow-detail--docked {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.flow-detail__layout {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-sm);
+  flex-shrink: 0;
+}
+.flow-detail__layout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: var(--is-text-tertiary);
+  transition:
+    background-color var(--is-dur-fast) var(--is-ease),
+    color var(--is-dur-fast) var(--is-ease);
+}
+.flow-detail__layout-btn:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
+.flow-detail__layout-btn--on {
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
 }
 .flow-detail__head {
   display: flex;

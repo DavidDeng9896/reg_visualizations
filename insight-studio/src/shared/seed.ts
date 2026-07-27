@@ -2,6 +2,7 @@ import type { Analysis, AnalysisTable, ColumnMeta, Row } from './types'
 import { ROW_ID_FIELD } from './types'
 import { uuid } from './id'
 import { nowIso } from './datetime'
+import { sealAnalysisRows } from './factories'
 
 /**
  * 内置 Demo Analysis 生成器（"一键 Demo"）。
@@ -148,7 +149,7 @@ export function buildWeightLengthTable(): AnalysisTable {
 /** 生成完整 Demo Analysis。 */
 export function createDemoAnalysis(): Analysis {
   const now = nowIso()
-  return {
+  return sealAnalysisRows({
     id: uuid(),
     name: 'Demo analysis',
     createdAt: now,
@@ -157,5 +158,5 @@ export function createDemoAnalysis(): Analysis {
     flowchartLayout: {},
     steps: [],
     files: [],
-  }
+  })
 }

@@ -4,6 +4,10 @@ import type {
   ChartConfig,
   ChartType,
   ColumnMeta,
+  Dashboard,
+  DashboardLayout,
+  DashboardWidget,
+  DashboardWidgetType,
   Filter,
   FilterCondition,
   FilterOperator,
@@ -15,8 +19,28 @@ import type {
 import { ROW_ID_FIELD } from './types'
 import { uuid } from './id'
 import { nowIso } from './datetime'
+import { markRaw } from 'vue'
 
 /** 领域对象工厂。 */
+
+/**
+ * 封印行数据，避免 Pinia/Vue 对上万单元格做深度响应式代理（主线程卡顿主因之一）。
+ * 行内容变更后需依赖 Analysis.updatedAt 等显式信号刷新派生计算。
+ */
+export function sealRows(rows: Row[]): Row[] {
+  for (let i = 0; i < rows.length; i++) {
+    rows[i] = markRaw(rows[i])
+  }
+  return markRaw(rows)
+}
+
+/** 加载/导入后封印分析内所有表的行数组。 */
+export function sealAnalysisRows(analysis: Analysis): Analysis {
+  for (const t of analysis.tables) {
+    t.rows = sealRows(t.rows)
+  }
+  return analysis
+}
 
 export function createEmptyAnalysis(name: string): Analysis {
   const now = nowIso()
@@ -32,13 +56,83 @@ export function createEmptyAnalysis(name: string): Analysis {
   }
 }
 
+export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
+  columns: 12,
+  rowHeight: 40,
+  gap: 8,
+}
+
+export function createDashboard(name: string): Dashboard {
+  const now = nowIso()
+  return {
+    id: uuid(),
+    name: name.trim() || '未命名看板',
+    createdAt: now,
+    updatedAt: now,
+    layout: { ...DEFAULT_DASHBOARD_LAYOUT },
+    widgets: [],
+  }
+}
+
+export function createDashboardWidget(
+  type: Exclude<DashboardWidgetType, 'link'>,
+  ref: NonNullable<DashboardWidget['ref']>,
+  grid?: Partial<DashboardWidget['grid']>,
+): DashboardWidget {
+  const defaults =
+    type === 'chart'
+      ? { x: 0, y: 0, w: 6, h: 8 }
+      : { x: 0, y: 0, w: 12, h: 10 }
+  return {
+    id: uuid(),
+    type,
+    ref: { ...ref },
+    grid: { ...defaults, ...grid },
+  }
+}
+
+/** 规范化外部链接；非法则返回 null。 */
+export function normalizeExternalUrl(raw: string): string | null {
+  const s = raw.trim()
+  if (!s) return null
+  try {
+    const withProto = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(s) ? s : `https://${s.replace(/^\/\//, '')}`
+    const u = new URL(withProto)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+    return u.toString()
+  } catch {
+    return null
+  }
+}
+
+export function createLinkWidget(
+  url: string,
+  opts?: { title?: string; grid?: Partial<DashboardWidget['grid']> },
+): DashboardWidget {
+  const normalized = normalizeExternalUrl(url)
+  if (!normalized) throw new Error('无效的外部链接')
+  let host = normalized
+  try {
+    host = new URL(normalized).hostname
+  } catch {
+    /* ignore */
+  }
+  return {
+    id: uuid(),
+    type: 'link',
+    url: normalized,
+    title: opts?.title?.trim() || host,
+    grid: { x: 0, y: 0, w: 6, h: 10, ...opts?.grid },
+  }
+}
+
 export function createTable(
   name: string,
   columns: ColumnMeta[],
   rows: Row[],
   source: AnalysisTable['source'] = 'csv',
 ): AnalysisTable {
-  return { id: uuid(), name, source, columns, rows, filters: [], views: [] }
+  return { id: uuid(), name, source, columns, rows: sealRows(ensureRowIds(rows)), filters: [], views: [] }
 }
 
 export const VIEW_TYPE_LABELS: Record<ViewType, string> = {

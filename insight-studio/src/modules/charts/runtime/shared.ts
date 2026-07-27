@@ -1,10 +1,7 @@
-/**
- * 各图种共用的 option 片段与数据工具（纯函数，不依赖 echarts 包）。
- */
+/** 各图种共用的 Plotly layout 片段与数据工具。 */
 import type { CellValue, ChartStyle, ColumnMeta, DataType, Row } from '../../../shared/types'
 import { isBlank } from '../../../shared/pipeline'
 import { paletteColor } from './palette'
-import type { ChartOption } from '../types'
 
 /* ------------------------------- 数据工具 ------------------------------- */
 
@@ -34,81 +31,87 @@ export function columnType(columns: ColumnMeta[], field: string | undefined): Da
   return columns.find((c) => c.field === field)?.dataType
 }
 
-/* ------------------------------- option 片段 ------------------------------- */
+/* ------------------------------- layout 片段 ------------------------------- */
 
 /**
  * Benchling 风格图表基底（简洁/干净/专业）：
  * 浅灰网格、无刻度突刺、灰色小标签、深灰粗体轴标题居中。
  */
-export const AXIS_LABEL_STYLE: ChartOption = { color: '#667085', fontSize: 11 }
-export const AXIS_NAME_STYLE: ChartOption = { color: '#475467', fontSize: 12, fontWeight: 600 }
-export const AXIS_LINE_SOFT: ChartOption = { show: true, lineStyle: { color: '#d9dee5' } }
-export const AXIS_TICK_HIDDEN: ChartOption = { show: false }
-export const SPLIT_LINE_SOFT: ChartOption = { show: true, lineStyle: { color: '#e9edf2' } }
-export const SPLIT_LINE_OFF: ChartOption = { show: false }
+export const AXIS_LABEL_STYLE = { color: '#667085', size: 11 }
+export const AXIS_NAME_STYLE = { color: '#475467', size: 12, weight: 600 }
+export const AXIS_STYLE: Record<string, unknown> = {
+  tickfont: AXIS_LABEL_STYLE,
+  linecolor: '#d9dee5',
+  gridcolor: '#e9edf2',
+  zeroline: false,
+  showline: true,
+  showticklabels: true,
+  ticks: '',
+  titlefont: AXIS_NAME_STYLE,
+}
+export const AXIS_NO_GRID_STYLE: Record<string, unknown> = { ...AXIS_STYLE, showgrid: false }
 
 /** 深色 tooltip 基底。 */
 export const TOOLTIP_DARK: Record<string, unknown> = {
-  backgroundColor: '#1d2939',
-  borderWidth: 0,
-  padding: [8, 12],
-  textStyle: { color: '#fff', fontSize: 12 },
-  extraCssText: 'border-radius:6px;box-shadow:0 4px 12px rgba(16,24,40,.18);',
+  bgcolor: '#1d2939',
+  bordercolor: '#1d2939',
+  font: { color: '#fff', size: 12 },
 }
 
-export function buildTitle(style: ChartStyle, defaultTitle: string): ChartOption | undefined {
+export function buildTitleLayout(style: ChartStyle, defaultTitle: string): Record<string, unknown> | undefined {
   const text = style.title ?? defaultTitle
   const subtext = style.subtitle ?? ''
   if (!text && !subtext) return undefined
   return {
-    text,
-    subtext,
-    left: 2,
-    top: 0,
-    textStyle: { fontSize: 15, fontWeight: 600, color: '#101828' },
-    subtextStyle: { fontSize: 12, color: '#667085' },
+    text: subtext ? `${text}<br><span style="font-size:12px;color:#667085">${subtext}</span>` : text,
+    x: 0,
+    xanchor: 'left',
+    font: { size: 15, color: '#101828', weight: 600 },
   }
 }
 
-export function buildLegend(style: ChartStyle, enabled: boolean): ChartOption | undefined {
-  if (!enabled || style.legend?.show === false) return undefined
+export function buildLegendLayout(style: ChartStyle, enabled: boolean): Record<string, unknown> {
+  if (!enabled || style.legend?.show === false) return { showlegend: false }
   const pos = style.legend?.position ?? 'top'
-  const base: ChartOption = {
-    show: true,
-    icon: 'circle',
-    textStyle: { fontSize: 12, color: '#475467' },
-    itemWidth: 9,
-    itemHeight: 9,
-    itemGap: 18,
-  }
-  const labels = style.legend?.labels
-  if (labels && Object.keys(labels).length) {
-    base.formatter = (name: string) => labels[name] ?? name
+  const legend: Record<string, unknown> = {
+    font: { size: 12, color: '#475467' },
+    bgcolor: 'rgba(255,255,255,0)',
   }
   switch (pos) {
     case 'bottom':
-      return { ...base, bottom: 0, left: 'center' }
+      Object.assign(legend, { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.18 })
+      break
     case 'left':
-      return { ...base, left: 0, top: 'middle', orient: 'vertical' }
+      Object.assign(legend, { orientation: 'v', x: -0.08, xanchor: 'right', y: 0.5 })
+      break
     case 'right':
-      return { ...base, right: 0, top: 'middle', orient: 'vertical' }
+      Object.assign(legend, { orientation: 'v', x: 1.02, xanchor: 'left', y: 0.5 })
+      break
     default:
-      // 左对齐放在标题下方：避开右上角常驻悬浮按钮（配置/导出/打标），窄图也不被遮挡。
-      // 标题几乎总存在（默认取视图名），固定预留标题位。
-      return { ...base, top: 30, left: 2 }
+      Object.assign(legend, { orientation: 'h', x: 0, xanchor: 'left', y: 1.08 })
+  }
+  return { showlegend: true, legend }
+}
+
+export function buildMargin(style: ChartStyle): Record<string, number> {
+  const m = style.margins
+  return {
+    t: m?.top ?? 64,
+    r: m?.right ?? 32,
+    b: m?.bottom ?? 48,
+    l: m?.left ?? 64,
   }
 }
 
-/** 四边距 → grid（含 legend 避开空间的默认值；top 预留标题+图例两行）。 */
-export function buildGrid(style: ChartStyle, extra: ChartOption = {}): ChartOption {
-  const m = style.margins
+export function baseLayout(style: ChartStyle, defaultTitle: string, opts: { legend?: boolean } = {}): Record<string, unknown> {
   return {
-    top: m?.top ?? 64,
-    right: m?.right ?? 32,
-    bottom: m?.bottom ?? 48,
-    left: m?.left ?? 64,
-    containLabel: true,
-    ...extra,
+    paper_bgcolor: '#ffffff',
+    plot_bgcolor: '#ffffff',
+    font: { family: 'Inter, system-ui, sans-serif', color: '#475467', size: 12 },
+    hoverlabel: TOOLTIP_DARK,
+    title: buildTitleLayout(style, defaultTitle),
+    margin: buildMargin(style),
+    ...buildLegendLayout(style, opts.legend ?? false),
   }
 }
 
@@ -119,69 +122,14 @@ export function seriesColor(style: ChartStyle, paletteId: string | undefined, na
 
 /* ------------------------------- 误差棒 ------------------------------- */
 
-export interface ErrorBarDatum {
-  /** 类目索引（category 轴）或 x 值（value 轴）。 */
-  x: number | string
-  low: number
-  high: number
-  /** 类目轴分组偏移（类目单位，如并排柱）。 */
-  offset?: number
-  color?: string
-}
-
-/**
- * 误差棒 custom series（竖直/水平）。
- * data: [x, low, high, offset, color]
- */
-export function errorBarSeries(opts: {
-  name: string
-  data: ErrorBarDatum[]
-  horizontal?: boolean
-  color?: string
-  capWidth?: number
-  yAxisIndex?: number
-  xAxisIndex?: number
-}): ChartOption {
-  const cap = opts.capWidth ?? 5
+export function plotlyError(values: Array<number | null>, errors: Array<number | null>, color: string): Record<string, unknown> {
   return {
-    type: 'custom',
-    name: opts.name,
-    yAxisIndex: opts.yAxisIndex ?? 0,
-    xAxisIndex: opts.xAxisIndex ?? 0,
-    z: 3,
-    silent: false,
-    data: opts.data.map((d) => [d.x, d.low, d.high, d.offset ?? 0, d.color ?? opts.color ?? '#1d2939']),
-    renderItem: (_params: unknown, api: ChartOption) => {
-      const x = api.value(0)
-      const low = api.value(1)
-      const high = api.value(2)
-      const offset = Number(api.value(3)) || 0
-      const color = api.value(4) || '#1d2939'
-      let cLow: number[]
-      let cHigh: number[]
-      if (opts.horizontal) {
-        cLow = api.coord([low, typeof x === 'number' ? x + offset : x])
-        cHigh = api.coord([high, typeof x === 'number' ? x + offset : x])
-      } else {
-        cLow = api.coord([typeof x === 'number' ? x + offset : x, low])
-        cHigh = api.coord([typeof x === 'number' ? x + offset : x, high])
-      }
-      const style = { stroke: color, lineWidth: 1.2 }
-      const children: ChartOption[] = [
-        { type: 'line', shape: { x1: cLow[0], y1: cLow[1], x2: cHigh[0], y2: cHigh[1] }, style },
-      ]
-      if (opts.horizontal) {
-        for (const c of [cLow, cHigh]) {
-          children.push({ type: 'line', shape: { x1: c[0], y1: c[1] - cap, x2: c[0], y2: c[1] + cap }, style })
-        }
-      } else {
-        for (const c of [cLow, cHigh]) {
-          children.push({ type: 'line', shape: { x1: c[0] - cap, y1: c[1], x2: c[0] + cap, y2: c[1] }, style })
-        }
-      }
-      return { type: 'group', children }
-    },
-    tooltip: { show: false },
+    type: 'data',
+    array: errors.map((e, i) => (values[i] === null ? 0 : (e ?? 0))),
+    visible: true,
+    color,
+    thickness: 1.2,
+    width: 4,
   }
 }
 
@@ -189,7 +137,11 @@ export function errorBarSeries(opts: {
 export const SHAPE_SEQUENCE = ['circle', 'triangle', 'diamond', 'rect', 'pin'] as const
 
 export function shapeFor(index: number): string {
-  return SHAPE_SEQUENCE[index % SHAPE_SEQUENCE.length]
+  return plotlyShape(index)
+}
+
+export function plotlyShape(index: number): string {
+  return ['circle', 'triangle-up', 'diamond', 'square', 'diamond-tall'][index % SHAPE_SEQUENCE.length]
 }
 
 /** 确定性伪随机（jitter 用，按索引稳定）。 */

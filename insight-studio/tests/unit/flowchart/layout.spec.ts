@@ -66,9 +66,9 @@ describe('computeDepths · 拓扑深度', () => {
   })
 })
 
-describe('autoLayout · 分层 DAG', () => {
-  it('父在左、子在右；同列垂直均分', () => {
-    const g = graph([node('t1'), node('t2'), node('v1'), node('v2')], [
+describe('autoLayout · 家族树分层（图跟在数据后）', () => {
+  it('父在左、子在右；同父子节点自上而下', () => {
+    const g = graph([node('t1', 'step'), node('t2', 'step'), node('v1'), node('v2')], [
       ['t1', 'v1'],
       ['t2', 'v2'],
     ])
@@ -77,8 +77,28 @@ describe('autoLayout · 分层 DAG', () => {
     expect(pos['v1'].x).toBe(COLUMN_STEP)
     expect(pos['t2'].x).toBe(0)
     expect(pos['t2'].y).toBe(ROW_STEP)
-    // 同列不重叠
     expect(pos['v2'].y).toBe(ROW_STEP)
+  })
+
+  it('同父下：视图(图)优先于步骤，一层层对应', () => {
+    const g = graph(
+      [node('upload', 'step'), node('chart'), node('filter', 'step'), node('chart2')],
+      [
+        ['upload', 'chart'],
+        ['upload', 'filter'],
+        ['filter', 'chart2'],
+      ],
+    )
+    const pos = autoLayout(g)
+    expect(pos['upload']).toEqual({ x: 0, y: 0 })
+    // 视图先于 filter
+    expect(pos['chart'].x).toBe(COLUMN_STEP)
+    expect(pos['chart'].y).toBe(0)
+    expect(pos['filter'].x).toBe(COLUMN_STEP)
+    expect(pos['filter'].y).toBe(ROW_STEP)
+    // filter 的图在其右侧、对齐 filter 行
+    expect(pos['chart2'].x).toBe(COLUMN_STEP * 2)
+    expect(pos['chart2'].y).toBe(pos['filter'].y)
   })
 
   it('空图返回空对象', () => {

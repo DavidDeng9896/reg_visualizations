@@ -5,6 +5,7 @@
 import type { FunctionalComponent } from 'vue'
 import {
   ArrowDownWideNarrow,
+  AlignStartHorizontal,
   ArrowLeftRight,
   ArrowRight,
   ArrowUpNarrowWide,
@@ -36,12 +37,16 @@ import {
   Grip,
   GripVertical,
   Hash,
+  Hexagon,
   Info,
   Link2,
   LoaderCircle,
   Maximize2,
   Minus,
+  PanelBottom,
+  PanelRight,
   Pencil,
+  PictureInPicture2,
   Play,
   Plus,
   Search,
@@ -53,6 +58,7 @@ import {
   Type,
   Undo2,
   Redo2,
+  RefreshCw,
   Upload,
   Workflow,
   X,
@@ -61,6 +67,7 @@ import {
 export type IconName =
   | 'type-text'
   | 'type-number'
+  | 'type-structure'
   | 'table'
   | 'bar'
   | 'line'
@@ -99,6 +106,7 @@ export type IconName =
   | 'link'
   | 'undo'
   | 'redo'
+  | 'refresh'
   | 'eye'
   | 'eye-off'
   | 'sort-asc'
@@ -108,13 +116,18 @@ export type IconName =
   | 'columns'
   | 'flag'
   | 'expand'
+  | 'arrange'
   | 'minus'
   | 'spinner'
   | 'play'
+  | 'overlay'
+  | 'panel-right'
+  | 'panel-bottom'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
   'type-number': Hash,
+  'type-structure': Hexagon,
   table: Table2,
   bar: ChartColumnBig,
   line: ChartLine,
@@ -153,6 +166,7 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   link: Link2,
   undo: Undo2,
   redo: Redo2,
+  refresh: RefreshCw,
   eye: Eye,
   'eye-off': EyeOff,
   'sort-asc': ArrowUpNarrowWide,
@@ -162,7 +176,11 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   columns: Columns3,
   flag: Flag,
   expand: Maximize2,
+  arrange: AlignStartHorizontal,
   minus: Minus,
   spinner: LoaderCircle,
   play: Play,
+  overlay: PictureInPicture2,
+  'panel-right': PanelRight,
+  'panel-bottom': PanelBottom,
 }

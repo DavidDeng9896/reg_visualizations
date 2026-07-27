@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, pickOption, selectTable } from './helpers'
+import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, pickOption, tableNode } from './helpers'
 
 /** 流程图步骤化主流程：CSV 导入 / Combine 对话框均生成 StepNode，刷新后持久保留。 */
 test.describe('步骤化主流程', () => {
@@ -159,7 +159,10 @@ test.describe('步骤化主流程', () => {
     await expect(filterNode).toContainText('2 行')
 
     // 编辑源表 left：把 id=2 改为 0，使其不再满足 id ≥ 2
-    await selectTable(page, 'left')
+    // 需求2：流程图模式下点树只定位节点、不退出流程图；编辑表格需显式切回工作区
+    await tableNode(page, 'left').click()
+    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await expect(page.getByTestId('grid-stats')).toBeVisible()
     const cell = page.locator('.vxe-body--row').nth(1).locator('.vxe-body--column').nth(1)
     await cell.dblclick()
     const input = page.locator('.dg__edit-input')

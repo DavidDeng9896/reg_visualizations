@@ -29,12 +29,15 @@ const previewLoading = ref(false)
 
 /** 打开时的配置快照（仅用于 dirty 比较；撤销恢复由画布统一做）。 */
 const snapshot = ref('')
+const inputsSnapshot = ref('')
 
 watch(() => props.step.name, (v) => { nameInput.value = v })
 
 const dirty = computed(() => {
   if (nameInput.value.trim() !== props.step.name) return true
-  return JSON.stringify(props.step.config) !== snapshot.value
+  if (JSON.stringify(props.step.config) !== snapshot.value) return true
+  if (JSON.stringify(props.step.inputs) !== inputsSnapshot.value) return true
+  return false
 })
 
 let previewTimer: ReturnType<typeof setTimeout> | null = null
@@ -57,6 +60,7 @@ function onConfigChange() {
 
 onMounted(() => {
   snapshot.value = JSON.stringify(props.step.config)
+  inputsSnapshot.value = JSON.stringify(props.step.inputs)
 })
 
 onBeforeUnmount(() => {

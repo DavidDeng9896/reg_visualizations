@@ -1,77 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import { createChartConfig } from '../../../src/shared/factories'
 import { buildPieOption } from '../../../src/modules/charts/runtime/pie'
+import { EMPTY_FIGURE } from '../../../src/modules/charts/types'
 import { catCols, r, vr } from './helpers'
 
-function cfg() {
+const cfg = () => {
   const c = createChartConfig('pie')
   c.configure.categories = { field: 'cat' }
   return c
 }
 
-describe('pie builder', () => {
-  it('默认 Count 扇区', () => {
-    const rows = [r('a', 'g1', 1), r('a', 'g1', 2), r('b', 'g1', 3)]
-    const out = buildPieOption({ result: vr(rows, catCols), config: cfg() })
-    const data = out.option.series[0].data
-    expect(data).toEqual([
-      { name: 'a', value: 2, itemStyle: { color: expect.any(String) } },
-      { name: 'b', value: 1, itemStyle: { color: expect.any(String) } },
-    ])
+describe('Plotly pie builder', () => {
+  it('输出 labels/values/色板颜色与 donut hole', () => {
+    const c = cfg()
+    c.style.pie = { ...c.style.pie, innerRadiusPct: 40, outerRadiusPct: 80 }
+    const out = buildPieOption({ result: vr([r('a', 'g1', 1), r('a', 'g1', 2), r('b', 'g1', 3)], catCols), config: c })
+    const trace = out.option.data[0]
+    expect(trace.labels).toEqual(['a', 'b'])
+    expect(trace.values).toEqual([2, 1])
+    expect((trace.marker as { colors: string[] }).colors).toEqual(['#1d3fbf', '#df5638'])
+    expect(trace.hole).toBe(0.4)
   })
 
-  it('空值 → [Blank] 扇区', () => {
-    const rows = [r('a', 'g1', 1), r(null, 'g1', 2)]
-    const out = buildPieOption({ result: vr(rows, catCols), config: cfg() })
-    const names = out.option.series[0].data.map((d: { name: string }) => d.name)
-    expect(names).toContain('[Blank]')
+  it('百分比阈值写入 text', () => {
+    const c = cfg()
+    c.style.pie = { ...c.style.pie, hideBelowPct: 40, showPercent: true }
+    c.configure.measure = { field: 'val', aggregation: 'sum' }
+    const trace = buildPieOption({ result: vr([r('a', 'g1', 1), r('b', 'g1', 9)], catCols), config: c }).option.data[0]
+    expect(trace.text).toEqual(['', '90%'])
+    expect(trace.textinfo).toBe('text')
   })
 
-  it('Measure + sum 聚合', () => {
-    const rows = [r('a', 'g1', 10), r('a', 'g1', 20), r('b', 'g1', 5)]
+  it('负值剔除并警告', () => {
     const c = cfg()
     c.configure.measure = { field: 'val', aggregation: 'sum' }
-    const out = buildPieOption({ result: vr(rows, catCols), config: c })
-    expect(out.option.series[0].data.map((d: { value: number }) => d.value)).toEqual([30, 5])
-  })
-
-  it('非 Count 聚合遇负值 → 剔除并警告', () => {
-    const rows = [r('a', 'g1', 10), r('b', 'g1', -5)]
-    const c = cfg()
-    c.configure.measure = { field: 'val', aggregation: 'sum' }
-    const out = buildPieOption({ result: vr(rows, catCols), config: c })
-    expect(out.option.series[0].data).toHaveLength(1)
+    const out = buildPieOption({ result: vr([r('a', 'g1', 10), r('b', 'g1', -5)], catCols), config: c })
+    expect(out.option.data[0].values).toEqual([10])
     expect(out.warnings.some((w) => w.includes('负值'))).toBe(true)
   })
 
-  it('Inner Radius > 0 → Donut 半径数组', () => {
-    const c = cfg()
-    c.style.pie = { ...c.style.pie, innerRadiusPct: 40, outerRadiusPct: 80 }
-    const out = buildPieOption({ result: vr([r('a', 'g1', 1)], catCols), config: c })
-    expect(out.option.series[0].radius).toEqual(['40%', '80%'])
-  })
-
-  it('Hide % 阈值过滤：formatter 小于阈值返回空', () => {
-    const c = cfg()
-    c.style.pie = { ...c.style.pie, showPercent: true, hideBelowPct: 5, percentColor: '#ffffff' }
-    const out = buildPieOption({ result: vr([r('a', 'g1', 1)], catCols), config: c })
-    const label = out.option.series[0].label
-    expect(label.position).toBe('inside')
-    expect(label.color).toBe('#ffffff')
-    expect(label.formatter({ percent: 3 })).toBe('')
-    expect(label.formatter({ percent: 12 })).toBe('12%')
-  })
-
-  it('Show Percentages 关 → 外侧类别名 + 引导线', () => {
-    const c = cfg()
-    c.style.pie = { ...c.style.pie, showPercent: false }
-    const out = buildPieOption({ result: vr([r('a', 'g1', 1)], catCols), config: c })
-    expect(out.option.series[0].label.position).toBe('outside')
-    expect(out.option.series[0].labelLine.show).toBe(true)
-  })
-
-  it('缺 Categories → 空 option', () => {
-    const out = buildPieOption({ result: vr([r('a', 'g1', 1)], catCols), config: createChartConfig('pie') })
-    expect(out.option).toEqual({})
+  it('缺映射返回 EMPTY_FIGURE', () => {
+    const out = buildPieOption({ result: vr([], catCols), config: createChartConfig('pie') })
+    expect(out.option).toEqual(EMPTY_FIGURE)
   })
 })

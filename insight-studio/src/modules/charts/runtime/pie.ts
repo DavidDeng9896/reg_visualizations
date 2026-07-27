@@ -4,15 +4,15 @@
  * 非 Count 时负值剔除并提示；Inner/Outer Radius %；Show %；Hide % < 阈值（默认 5）。
  */
 import { aggregateRows, aggregationLabel } from './aggregate'
-import { TOOLTIP_DARK, buildLegend, buildTitle, displayVal, distinctInOrder, formatNumber, seriesColor } from './shared'
-import type { BuildInput, BuildOutput, ChartOption } from '../types'
+import { baseLayout, displayVal, distinctInOrder, seriesColor } from './shared'
+import { EMPTY_FIGURE, type BuildInput, type BuildOutput } from '../types'
 
 export function buildPieOption({ result, config, viewName }: BuildInput): BuildOutput {
   const warnings: string[] = []
   const cfg = config.configure
   const style = config.style
   const catField = cfg.categories?.field
-  if (!catField) return { option: {}, warnings, seriesNames: [] }
+  if (!catField) return { option: EMPTY_FIGURE, warnings, seriesNames: [] }
 
   const rows = result.rows
   const measureField = cfg.measure?.field
@@ -20,7 +20,9 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
   const cats = distinctInOrder(rows, catField).map(displayVal)
 
   let droppedNeg = 0
-  const data: ChartOption[] = []
+  const labels: string[] = []
+  const values: number[] = []
+  const colors: string[] = []
   cats.forEach((cat, i) => {
     const subset = rows.filter((r) => displayVal(r[catField]) === cat)
     let value: number
@@ -35,7 +37,9 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
     } else {
       value = subset.filter((r) => r[catField] !== null).length
     }
-    data.push({ name: cat, value, itemStyle: { color: seriesColor(style, cfg.palette, cat, i) } })
+    labels.push(cat)
+    values.push(value)
+    colors.push(seriesColor(style, cfg.palette, cat, i))
   })
 
   if (droppedNeg > 0) warnings.push(`已剔除 ${droppedNeg} 个负值扇区（Pie 不支持负值）`)
@@ -46,42 +50,30 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
   const hideBelow = style.pie?.hideBelowPct ?? 5
   const percentColor = style.pie?.percentColor ?? '#ffffff'
 
-  const seriesNames = data.map((d) => d.name as string)
-  const total = data.reduce((a, d) => a + (d.value as number), 0)
-
-  const option: ChartOption = {
-    title: buildTitle(style, viewName ?? ''),
-    tooltip: {
-      ...TOOLTIP_DARK,
-      trigger: 'item',
-      formatter: (p: ChartOption) => {
-        const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:6px"></span>`
-        return `${dot}${p.name}: ${formatNumber(p.value)}（${p.percent}%）`
-      },
-    },
-    legend: buildLegend(style, true),
-    series: [
+  const total = values.reduce((a, b) => a + b, 0)
+  const text = values.map((value) => {
+    const pct = total ? (value / total) * 100 : 0
+    return showPercent && pct >= hideBelow ? `${Number(pct.toFixed(1))}%` : ''
+  })
+  const option = {
+    data: [
       {
         type: 'pie',
         name: measureField ? `${aggregationLabel(agg)} of ${measureField}` : 'Count',
-        radius: [`${inner}%`, `${outer}%`],
-        center: ['50%', '55%'],
-        avoidLabelOverlap: true,
-        itemStyle: { borderColor: '#fff', borderWidth: 1, opacity: style.opacity ?? 1 },
-        label: showPercent
-          ? {
-              show: true,
-              position: 'inside',
-              color: percentColor,
-              fontSize: 12,
-              formatter: (p: ChartOption) => (p.percent >= hideBelow ? `${p.percent}%` : ''),
-            }
-          : { show: true, position: 'outside', formatter: '{b}', color: '#1d2939', fontSize: 12 },
-        labelLine: { show: !showPercent },
-        data,
+        labels,
+        values,
+        marker: { colors, line: { color: '#ffffff', width: 1 } },
+        opacity: style.opacity ?? 1,
+        hole: inner / 100,
+        domain: { x: [(100 - outer) / 200, 1 - (100 - outer) / 200], y: [(100 - outer) / 200, 1 - (100 - outer) / 200] },
+        text,
+        textinfo: showPercent ? 'text' : 'label',
+        textposition: showPercent ? 'inside' : 'outside',
+        textfont: { color: showPercent ? percentColor : '#1d2939', size: 12 },
+        hovertemplate: '%{label}: %{value}<br>%{percent}<extra></extra>',
       },
     ],
+    layout: baseLayout(style, viewName ?? '', { legend: true }),
   }
-  void total
-  return { option, warnings, seriesNames }
+  return { option, warnings, seriesNames: labels }
 }

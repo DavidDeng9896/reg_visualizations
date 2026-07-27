@@ -107,7 +107,10 @@ function rebuild() {
 }
 
 const rebuildDeb = debounce(rebuild, 150)
-watch([result, previewConfig, flags], () => rebuildDeb.call(), { deep: true, immediate: true })
+// 避免对含上万行的 result 做 deep watch；result/flags 引用变化即重建，配置草稿仍 deep
+watch(result, () => rebuildDeb.call(), { immediate: true })
+watch(flags, () => rebuildDeb.call())
+watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 
 function touch() {
   rebuildDeb.call()
@@ -254,12 +257,8 @@ watch([() => view.value?.id, () => def.value.type], () => {
 })
 
 function toggleFlagMode(mode: 'flag' | 'clear') {
-  if (flagMode.value === mode) {
-    flagMode.value = 'off'
-    return
-  }
-  flagMode.value = mode
-  toast.info(mode === 'flag' ? '打标模式：在图表上套索圈选数据点（Esc 退出）' : '清除模式：套索圈选已打标（×）的点（Esc 退出）')
+  void mode
+  toast.info('Plotly 版本暂未支持套索打标')
 }
 
 function mutateFlags(arr: RowFlag[]) {
@@ -380,10 +379,10 @@ const chartRef = ref<InstanceType<typeof ChartPanel>>()
 const exportOpen = ref(false)
 function doExport(kind: 'png' | 'pdf') {
   exportOpen.value = false
-  const get = () => chartRef.value?.getDataURL() ?? ''
+  const get = () => chartRef.value?.getDataURL() ?? Promise.resolve('')
   const name = view.value?.name ?? 'chart'
-  if (kind === 'png') exportPng(get, name)
-  else exportPdf(get, name)
+  if (kind === 'png') void exportPng(get, name)
+  else void exportPdf(get, name)
 }
 
 const chips = computed(() => {
@@ -438,31 +437,34 @@ const chartHeight = computed(() => previewConfig.value.style.height)
           <!-- 加载 shimmer -->
           <div v-if="rebuilding" class="cview__loading" aria-hidden="true" />
 
-          <!-- Flag / Clear 工具条（Line/Scatter） -->
-          <div v-if="flagCapable" class="cview__flagbar">
-            <span v-if="flagCount" class="cview__flagcount" title="已打标点">{{ flagCount }} flagged</span>
-            <button
-              type="button"
-              class="cview__flagbtn"
-              :class="{ 'cview__flagbtn--active': flagMode === 'flag' }"
-              :aria-pressed="flagMode === 'flag'"
-              @click="toggleFlagMode('flag')"
-            >
-              <IIcon name="flag" :size="13" /> Flag
-            </button>
-            <button
-              type="button"
-              class="cview__flagbtn"
-              :class="{ 'cview__flagbtn--active': flagMode === 'clear' }"
-              :aria-pressed="flagMode === 'clear'"
-              @click="toggleFlagMode('clear')"
-            >
-              <IIcon name="flag" :size="13" /> Clear
-            </button>
-          </div>
+          <!-- 右上工具条：Flag / Clear / 导出 / 配置 —— 统一靠右，缺项时不留空位 -->
+          <div class="cview__toolbar">
+            <template v-if="flagCapable">
+              <span v-if="flagCount" class="cview__flagcount" title="已打标点">{{ flagCount }} flagged</span>
+              <button
+                type="button"
+                class="cview__flagbtn"
+                disabled
+                title="Plotly 版本暂未支持套索打标"
+                :class="{ 'cview__flagbtn--active': flagMode === 'flag' }"
+                :aria-pressed="flagMode === 'flag'"
+                @click="toggleFlagMode('flag')"
+              >
+                <IIcon name="flag" :size="13" /> Flag
+              </button>
+              <button
+                type="button"
+                class="cview__flagbtn"
+                disabled
+                title="Plotly 版本暂未支持套索打标"
+                :class="{ 'cview__flagbtn--active': flagMode === 'clear' }"
+                :aria-pressed="flagMode === 'clear'"
+                @click="toggleFlagMode('clear')"
+              >
+                <IIcon name="flag" :size="13" /> Clear
+              </button>
+            </template>
 
-          <!-- 悬停导出 -->
-          <div class="cview__export">
             <IPopover :open="exportOpen" placement="bottom-end" :arrow="false" @update:open="exportOpen = $event">
               <template #anchor>
                 <IButton size="sm" variant="secondary" icon="download" aria-label="导出图表" @click="exportOpen = !exportOpen" />
@@ -474,6 +476,17 @@ const chartHeight = computed(() => previewConfig.value.style.height)
                 </div>
               </template>
             </IPopover>
+
+            <button
+              v-if="!panelOpen"
+              type="button"
+              class="cview__open"
+              title="打开配置面板"
+              @click="panelOpen = true"
+            >
+              <IIcon name="gear" :size="14" />
+              配置
+            </button>
           </div>
         </template>
 
@@ -487,12 +500,6 @@ const chartHeight = computed(() => previewConfig.value.style.height)
           <IButton variant="primary" icon="gear" @click="panelOpen = true">打开配置面板</IButton>
         </IEmptyState>
       </div>
-
-      <!-- 打开配置按钮（面板关闭时） -->
-      <button v-if="!panelOpen" type="button" class="cview__open" title="打开配置面板" @click="panelOpen = true">
-        <IIcon name="gear" :size="14" />
-        配置
-      </button>
 
       <!-- MODEL TABLES 底栏（6G-1） -->
       <ModelTables
@@ -601,12 +608,13 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   background: var(--is-warning-bg);
   color: var(--is-warning-text);
 }
-.cview__flagbar {
+.cview__toolbar {
   position: absolute;
   top: 8px;
-  right: 136px;
+  right: 8px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   z-index: 5;
 }
@@ -632,8 +640,12 @@ const chartHeight = computed(() => previewConfig.value.style.height)
     background-color var(--is-dur-fast) var(--is-ease),
     color var(--is-dur-fast) var(--is-ease);
 }
-.cview__flagbtn:hover {
+.cview__flagbtn:hover:not(:disabled) {
   background: rgba(30, 42, 120, 0.06);
+}
+.cview__flagbtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .cview__flagbtn--active {
   background: var(--is-primary);
@@ -743,18 +755,6 @@ const chartHeight = computed(() => previewConfig.value.style.height)
     transform: translateX(350%);
   }
 }
-.cview__export {
-  position: absolute;
-  top: 8px;
-  right: 92px;
-  opacity: 0;
-  transition: opacity var(--is-dur-fast) var(--is-ease);
-  z-index: 5;
-}
-.cview__stage:hover .cview__export,
-.cview__export:focus-within {
-  opacity: 1;
-}
 .cview__export-menu {
   display: flex;
   flex-direction: column;
@@ -771,9 +771,6 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   background: var(--is-surface-hover);
 }
 .cview__open {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   display: inline-flex;
   align-items: center;
   gap: 5px;

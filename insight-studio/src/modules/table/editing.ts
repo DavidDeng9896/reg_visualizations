@@ -8,6 +8,7 @@ import { ROW_ID_FIELD } from '../../shared/types'
 import { uuid } from '../../shared/id'
 import { parseDateLike } from '../../shared/datetime'
 import { evaluateExpression } from '../../shared/pipeline'
+import { markRaw } from 'vue'
 
 export interface EditCommand {
   label: string
@@ -39,6 +40,8 @@ export function parseCellInput(raw: string, dataType: DataType): ParseResult {
       if (parseDateLike(s) === null) return { ok: false, error: `「${raw}」不是有效日期` }
       return { ok: true, value: s }
     }
+    case 'structure':
+      return { ok: true, value: s }
     default:
       return { ok: true, value: raw }
   }
@@ -133,7 +136,7 @@ export function makePasteCommand(table: AnalysisTable, edits: PasteEdit[]): Edit
 function blankRow(columns: ColumnMeta[]): Row {
   const row: Row = { [ROW_ID_FIELD]: uuid() }
   for (const c of columns) row[c.field] = null
-  return row
+  return markRaw(row)
 }
 
 /** 在 index 处插入空行（index 越界自动收敛）。 */

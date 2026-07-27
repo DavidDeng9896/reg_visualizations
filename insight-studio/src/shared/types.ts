@@ -12,7 +12,7 @@ export type Row = Record<string, CellValue>
 /** 行对象内部的稳定 id 键（用于编辑写回、打标）。不作为普通列展示。 */
 export const ROW_ID_FIELD = '__rowId'
 
-export type DataType = 'string' | 'number' | 'boolean' | 'date' | 'datetime'
+export type DataType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'structure'
 
 export interface ColumnMeta {
   field: string
@@ -312,6 +312,8 @@ export interface StepPort {
 /** 步骤类型（P0 仅实现带 * 的核心步骤；其余占位）。 */
 export type StepType =
   | 'upload-csv' // * 现有 CSV 导入对应的源步骤
+  | 'upload-xlsx' // * Excel 导入源步骤
+  | 'query-sql' // * SQL 查询导入源步骤
   | 'import-files' // 多文件源（P1）
   | 'file-to-table' // 文件转表（P1）
   | 'join' // * 合并步骤
@@ -401,4 +403,52 @@ export interface Analysis {
   files: AnalysisFile[]
   /** 旧数据迁移备份，便于回退与调试。 */
   __legacyTables?: AnalysisTable[]
+}
+
+/* ---------------------------------- 看板（与 Analysis 平级） ---------------------------------- */
+
+export type DashboardWidgetType = 'chart' | 'table' | 'link'
+
+export interface DashboardLayout {
+  /** 网格列数，固定 12。 */
+  columns: 12
+  /** 行高基准（px），用于换算 widget.h。 */
+  rowHeight: number
+  gap: number
+}
+
+export interface DashboardWidgetRef {
+  analysisId: string
+  tableId: string
+  /** 缺省 = 源表只读。 */
+  viewId?: string
+}
+
+export interface DashboardWidgetGrid {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface DashboardWidget {
+  id: string
+  type: DashboardWidgetType
+  /** chart / table：指向 Insight 内表/视图。 */
+  ref?: DashboardWidgetRef
+  /** link：可在看板内预览的外部 http(s) 链接。 */
+  url?: string
+  grid: DashboardWidgetGrid
+  /** 看板层展示名；默认用源 ViewNode.name / 表名 / 链接主机名。 */
+  title?: string
+}
+
+/** 顶层看板文档（与 Analysis 平级持久化）。 */
+export interface Dashboard {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  layout: DashboardLayout
+  widgets: DashboardWidget[]
 }
