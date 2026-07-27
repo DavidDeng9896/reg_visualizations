@@ -79,11 +79,11 @@ const STEP_DEFS: StepDef[] = [
     type: 'union',
     label: 'Union tables',
     category: 'combine',
-    description: 'Append multiple tables by column name or position.',
+    description: '纵向合并多表；默认以首表列结构为准（适合统一组件多表拼接）。',
     inputs: [{ name: 'Input tables', type: 'table', multiple: true }],
     outputs: [{ name: 'Output dataset', type: 'table' }],
     defaultConfig: {
-      alignBy: 'name' as 'name' | 'position',
+      alignBy: 'primary' as 'primary' | 'name' | 'position',
       fillNull: true,
       addSourceColumn: false,
     },

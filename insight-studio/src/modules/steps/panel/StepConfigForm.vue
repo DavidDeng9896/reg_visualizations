@@ -159,9 +159,21 @@ function removeJoinKey(idx: number) {
 
 /* ------------------------------ union ------------------------------ */
 
-const unionCfg = computed<{ alignBy: 'name' | 'position'; fillNull: boolean; addSourceColumn: boolean }>(() => {
-  ensureConfig({ alignBy: 'name' as 'name' | 'position', fillNull: true, addSourceColumn: false })
-  return props.step.config as { alignBy: 'name' | 'position'; fillNull: boolean; addSourceColumn: boolean }
+const unionCfg = computed<{
+  alignBy: 'primary' | 'name' | 'position'
+  fillNull: boolean
+  addSourceColumn: boolean
+}>(() => {
+  ensureConfig({
+    alignBy: 'primary' as 'primary' | 'name' | 'position',
+    fillNull: true,
+    addSourceColumn: false,
+  })
+  return props.step.config as {
+    alignBy: 'primary' | 'name' | 'position'
+    fillNull: boolean
+    addSourceColumn: boolean
+  }
 })
 
 const UNION_PORT = 'Input tables'
@@ -483,7 +495,9 @@ watch(() => props.step.type, () => {
     <template v-else-if="step.type === 'union'">
       <section class="scf__section">
         <h4 class="scf__section-title">输入表</h4>
-        <p class="scf__hint">勾选或添加至少 2 张表进行纵向合并。也可在流程图上拖线连接。</p>
+        <p class="scf__hint">
+          勾选至少 2 张表纵向拼接。合并顺序第 1 张为首表。统一组件多表请用「首表优先」，避免其它表多出的列把首表行撑出大量空单元格。
+        </p>
 
         <div v-if="selectableTables.length" class="scf__checklist">
           <label
@@ -540,22 +554,26 @@ watch(() => props.step.type, () => {
       </section>
 
       <section class="scf__section">
-        <h4 class="scf__section-title">Union settings</h4>
+        <h4 class="scf__section-title">合并设置</h4>
         <div class="scf__field">
-          <label class="scf__label">Align columns by</label>
+          <label class="scf__label">列对齐方式</label>
           <ISelect
             :model-value="unionCfg.alignBy"
             size="sm"
-            :options="[{ value: 'name', label: 'Column name' }, { value: 'position', label: 'Column position' }]"
-            @update:model-value="unionCfg.alignBy = $event as 'name' | 'position'; emit('change')"
+            :options="[
+              { value: 'primary', label: '首表优先（按列名映射，丢弃额外列）' },
+              { value: 'name', label: '列名并集（缺列补空，易产生空单元格）' },
+              { value: 'position', label: '按列位置对齐（以首表列数为准）' },
+            ]"
+            @update:model-value="unionCfg.alignBy = $event as 'primary' | 'name' | 'position'; emit('change')"
           />
         </div>
         <div class="scf__toggle-row">
-          <span class="scf__toggle-label">Fill missing values with null（关闭 = 严格模式，列必须一致）</span>
+          <span class="scf__toggle-label">缺失列填 null（关闭 = 严格模式）</span>
           <IToggle v-model="unionCfg.fillNull" aria-label="Fill missing values with null" @update:model-value="emit('change')" />
         </div>
         <div class="scf__toggle-row">
-          <span class="scf__toggle-label">Add source column</span>
+          <span class="scf__toggle-label">添加来源列（__source）</span>
           <IToggle v-model="unionCfg.addSourceColumn" aria-label="Add source column" @update:model-value="emit('change')" />
         </div>
       </section>

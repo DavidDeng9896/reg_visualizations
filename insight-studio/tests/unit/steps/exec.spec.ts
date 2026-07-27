@@ -121,6 +121,33 @@ describe('union step', () => {
     expect(ok.status).toBe('configured')
     expect(ok.outputTables![0].rows).toHaveLength(2)
   })
+
+  it('primary：以首表列为准，丢弃其它表额外列，首表行不再被撑空', () => {
+    const left = table([{ id: 'a', v: 1 }])
+    const right = table([{ id: 'b', v: 2, extra: 'noise' }])
+    const byName = executeUnion([left, right], { alignBy: 'name', fillNull: true, addSourceColumn: false }, 'U')
+    expect(byName.outputTables![0].columns.map((c) => c.field)).toEqual(
+      expect.arrayContaining(['id', 'v', 'extra']),
+    )
+    expect(byName.outputTables![0].rows[0].extra).toBeNull()
+
+    const primary = executeUnion([left, right], { alignBy: 'primary', fillNull: true, addSourceColumn: false }, 'U')
+    expect(primary.status).toBe('configured')
+    const out = primary.outputTables![0]
+    expect(out.columns.map((c) => c.field)).toEqual(['id', 'v'])
+    expect(out.rows).toHaveLength(2)
+    expect(out.rows[0]).toMatchObject({ id: 'a', v: 1 })
+    expect(out.rows[1]).toMatchObject({ id: 'b', v: 2 })
+    expect(out.rows[0]).not.toHaveProperty('extra')
+  })
+
+  it('primary + fillNull=false：缺首表列报错', () => {
+    const left = table([{ id: 'a', v: 1 }])
+    const right = table([{ id: 'b' }])
+    const bad = executeUnion([left, right], { alignBy: 'primary', fillNull: false, addSourceColumn: false }, 'U')
+    expect(bad.status).toBe('failed')
+    expect(bad.error).toContain('缺少首表列')
+  })
 })
 
 describe('join 匹配统计', () => {
