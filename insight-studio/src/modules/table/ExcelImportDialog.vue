@@ -140,8 +140,9 @@ function confirm() {
     dataRows: dataRows.value,
     columnTypes: columnTypes.value,
     stepType: 'upload-xlsx',
-    stepConfig: { fileName: fileName.value, sheetName: sheetName.value },
+    stepConfig: { sheetName: sheetName.value },
     sourceLabel: `Excel · ${sheetName.value}`,
+    originalFileName: fileName.value || undefined,
   })
   if (ok) close()
 }

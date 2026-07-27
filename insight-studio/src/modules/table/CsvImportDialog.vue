@@ -4,7 +4,7 @@ import Papa from 'papaparse'
 import type { DataType } from '../../shared/types'
 import { IButton, IIcon, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
 import { commitImportedTable } from './commitImport'
-import { inferColumnTypes } from './csv'
+import { inferColumnTypes, readCsvFileText } from './csv'
 
 /** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。 */
 defineProps<{ open: boolean }>()
@@ -19,6 +19,7 @@ const inferred = ref<DataType[]>([])
 const parseError = ref('')
 const parsing = ref(false)
 const dragging = ref(false)
+const detectedEncoding = ref('')
 
 const PREVIEW_ROWS = 50
 const LARGE_FILE = 5 * 1024 * 1024
@@ -48,6 +49,7 @@ function reset() {
   inferred.value = []
   parseError.value = ''
   parsing.value = false
+  detectedEncoding.value = ''
 }
 
 function close() {
@@ -70,7 +72,9 @@ async function handleFile(file: File) {
     await new Promise((r) => setTimeout(r, 30))
   }
   try {
-    const text = await file.text()
+    const { text, encoding } = await readCsvFileText(file)
+    detectedEncoding.value =
+      encoding === 'gb18030' ? 'GBK/GB18030' : encoding === 'utf-8' ? 'UTF-8' : encoding.toUpperCase()
     // 空文件：Papa 对空串会报 "Unable to auto-detect delimiting character"，
     // 先显式判空，给用户更准确的提示
     if (!text.trim()) {
@@ -124,6 +128,7 @@ function confirm() {
     columnTypes: columnTypes.value,
     stepType: 'upload-csv',
     sourceLabel: 'CSV',
+    originalFileName: fileName.value || undefined,
   })
   if (ok) close()
 }
@@ -142,7 +147,7 @@ function confirm() {
         <input type="file" accept=".csv,text/csv" class="csv__file" aria-label="选择 CSV 文件" @change="onPick" />
         <IIcon name="upload" :size="22" />
         <span class="csv__drop-title">{{ fileName || '拖拽 CSV 文件到这里，或点击选择' }}</span>
-        <span class="csv__drop-hint">首行作为表头；自动推断列类型</span>
+        <span class="csv__drop-hint">首行作为表头；自动推断列类型；支持 UTF-8 / GBK</span>
       </label>
 
       <p v-if="parseError" class="csv__error">{{ parseError }}</p>
@@ -151,7 +156,7 @@ function confirm() {
       <template v-if="hasData && !parsing">
         <div class="csv__meta">
           <ITextField v-model="tableName" placeholder="表名" class="csv__name" aria-label="表名" />
-          <span class="csv__stats">{{ dataRows.length }} 行 × {{ headers.length }} 列 · 预览前 {{ Math.min(PREVIEW_ROWS, dataRows.length) }} 行</span>
+          <span class="csv__stats">{{ dataRows.length }} 行 × {{ headers.length }} 列 · 预览前 {{ Math.min(PREVIEW_ROWS, dataRows.length) }} 行<span v-if="detectedEncoding"> · {{ detectedEncoding }}</span></span>
         </div>
 
         <div class="csv__preview">

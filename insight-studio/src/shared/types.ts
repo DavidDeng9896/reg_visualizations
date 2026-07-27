@@ -394,12 +394,20 @@ export interface Analysis {
   /** ISO 字符串。 */
   createdAt: string
   updatedAt: string
+  /**
+   * 单调递增版本；每次成功落盘 mutate +1。
+   * Dashboard / 多端缓存与乐观锁用。旧数据缺省，加载时 normalize 为 0。
+   */
+  revision?: number
   tables: AnalysisTable[]
   /** 流程图节点 id → 坐标。 */
   flowchartLayout: Record<string, { x: number; y: number }>
   /** 数据加工步骤图（真相源）。 */
   steps: StepNode[]
-  /** 文件源（P1 启用）。 */
+  /**
+   * 文件源占位（兼容旧模型）。
+   * 产品拍板：不持久化导入原始文件字节；可仅保留显示用元数据。
+   */
   files: AnalysisFile[]
   /** 旧数据迁移备份，便于回退与调试。 */
   __legacyTables?: AnalysisTable[]

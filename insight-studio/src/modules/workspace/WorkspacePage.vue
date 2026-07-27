@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { analysisRepository } from '../../shared/repository'
@@ -50,9 +50,14 @@ function applyQuerySelection() {
   store.select(viewId ? { kind: 'view', tableId, viewId } : { kind: 'table', tableId })
 }
 
-// 离开页面前落盘
-onBeforeUnmount(() => {
-  void store.saveNow()
+// 离开页面前等待落盘，避免防抖未完成导致配置丢失
+onBeforeRouteLeave(async () => {
+  try {
+    await store.saveNow()
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败', { title: '离开前保存失败' })
+    // 仍允许离开；dirty 保留，下次进入可再试
+  }
 })
 
 /* 顶栏 ⋯ 菜单 */

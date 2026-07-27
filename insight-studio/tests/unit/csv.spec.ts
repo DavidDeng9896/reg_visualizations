@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { coerceValue, inferColumnType, inferColumnTypes, normalizeHeaders, toCsv } from '../../src/modules/table/csv'
+import {
+  coerceValue,
+  decodeCsvBytes,
+  inferColumnType,
+  inferColumnTypes,
+  normalizeHeaders,
+  toCsv,
+} from '../../src/modules/table/csv'
 import { ROW_ID_FIELD } from '../../src/shared/types'
 
 describe('normalizeHeaders', () => {
@@ -8,6 +15,41 @@ describe('normalizeHeaders', () => {
   })
   it('重名追加后缀', () => {
     expect(normalizeHeaders(['x', 'x', 'x_2', 'x'])).toEqual(['x', 'x_2', 'x_2_2', 'x_3'])
+  })
+})
+
+describe('decodeCsvBytes', () => {
+  it('UTF-8 BOM 正常解码', () => {
+    const body = new TextEncoder().encode('姓名,年龄\n张三,18\n')
+    const withBom = new Uint8Array(3 + body.length)
+    withBom.set([0xef, 0xbb, 0xbf], 0)
+    withBom.set(body, 3)
+    const { text, encoding } = decodeCsvBytes(withBom.buffer)
+    expect(encoding).toBe('utf-8')
+    expect(text.startsWith('姓名')).toBe(true)
+    expect(text).not.toContain('\uFEFF')
+  })
+
+  it('纯 UTF-8（无 BOM）', () => {
+    const bytes = new TextEncoder().encode('col,值\n1,你好\n')
+    const { text, encoding } = decodeCsvBytes(bytes.buffer)
+    expect(encoding).toBe('utf-8')
+    expect(text).toContain('你好')
+  })
+
+  it('GBK/GB18030 中文表头不乱码', () => {
+    // "开发,编号\nA,1\n" in GB18030
+    const gbk = new TextEncoder() // can't encode gbk with TextEncoder
+    void gbk
+    const bytes = Uint8Array.from([
+      0xbf, 0xaa, 0xb7, 0xa2, 0x2c, 0xb1, 0xe0, 0xba, 0xc5, 0x0a, // 开发,编号\n
+      0x41, 0x2c, 0x31, 0x0a, // A,1\n
+    ])
+    const { text, encoding } = decodeCsvBytes(bytes.buffer)
+    expect(encoding).toBe('gb18030')
+    expect(text).toContain('开发')
+    expect(text).toContain('编号')
+    expect(text).not.toContain('\uFFFD')
   })
 })
 

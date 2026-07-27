@@ -49,6 +49,7 @@ export function createEmptyAnalysis(name: string): Analysis {
     name,
     createdAt: now,
     updatedAt: now,
+    revision: 0,
     tables: [],
     flowchartLayout: {},
     steps: [],

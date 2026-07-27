@@ -52,6 +52,30 @@ describe('migrateAnalysisToSteps', () => {
     expect(a.tables[0].source).toBe(firstTableSource)
   })
 
+  it('已有 steps 的新模型不再迁移（避免清空步骤图）', () => {
+    const t = createTable('Sales', [{ field: 'v', title: 'v', dataType: 'number' }], [{ v: 1 }], 'csv')
+    t.source = 'step'
+    t.stepId = 'step-1'
+    const a = makeAnalysis([t])
+    a.steps = [
+      {
+        id: 'step-1',
+        type: 'upload-csv',
+        name: 'Sales',
+        inputs: [],
+        config: { tableName: 'Sales' },
+        status: 'configured',
+        output: { tables: [t.id], files: [], scalars: {}, previews: {} },
+      },
+    ]
+    // 故意不设 __legacyTables：旧逻辑会误判未迁移并写空 steps
+    expect(isMigrated(a)).toBe(true)
+    migrateAnalysisToSteps(a)
+    expect(a.steps).toHaveLength(1)
+    expect(a.steps[0].id).toBe('step-1')
+    expect(a.__legacyTables).toEqual([])
+  })
+
   it('inner join 表迁移为 join 步骤', () => {
     const left = createTable('L', [{ field: 'id', title: 'id', dataType: 'string' }], [{ id: 'a' }], 'csv')
     const right = createTable('R', [{ field: 'id', title: 'id', dataType: 'string' }], [{ id: 'a' }], 'csv')
