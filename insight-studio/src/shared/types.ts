@@ -402,3 +402,48 @@ export interface Analysis {
   /** 旧数据迁移备份，便于回退与调试。 */
   __legacyTables?: AnalysisTable[]
 }
+
+/* ---------------------------------- 看板（与 Analysis 平级） ---------------------------------- */
+
+export type DashboardWidgetType = 'chart' | 'table'
+
+export interface DashboardLayout {
+  /** 网格列数，固定 12。 */
+  columns: 12
+  /** 行高基准（px），用于换算 widget.h。 */
+  rowHeight: number
+  gap: number
+}
+
+export interface DashboardWidgetRef {
+  analysisId: string
+  tableId: string
+  /** 缺省 = 源表只读。 */
+  viewId?: string
+}
+
+export interface DashboardWidgetGrid {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface DashboardWidget {
+  id: string
+  type: DashboardWidgetType
+  ref: DashboardWidgetRef
+  grid: DashboardWidgetGrid
+  /** 看板层展示名；默认用源 ViewNode.name / 表名。 */
+  title?: string
+}
+
+/** 顶层看板文档（与 Analysis 平级持久化）。 */
+export interface Dashboard {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  layout: DashboardLayout
+  widgets: DashboardWidget[]
+}

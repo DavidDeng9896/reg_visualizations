@@ -3,8 +3,18 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'analyses',
+    name: 'insights',
     component: () => import('../modules/analyses/AnalysisListPage.vue'),
+  },
+  {
+    path: '/insights',
+    redirect: '/',
+  },
+  {
+    path: '/dashboards/:id?',
+    name: 'dashboards',
+    component: () => import('../modules/dashboard/DashboardShellPage.vue'),
+    props: true,
   },
   {
     path: '/analysis/:id',

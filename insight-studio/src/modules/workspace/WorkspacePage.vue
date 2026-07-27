@@ -25,7 +25,9 @@ onMounted(async () => {
   if (!ok) {
     toast.error('Analysis 不存在或已被删除')
     router.replace('/')
+    return
   }
+  applyQuerySelection()
 })
 
 // 路由参数变化（例如列表页跳转）时重新加载
@@ -34,8 +36,17 @@ watch(analysisId, async (id, prev) => {
     await store.saveNow()
     const ok = await store.load(id)
     if (!ok) router.replace('/')
+    else applyQuerySelection()
   }
 })
+
+/** 看板「打开源视图」带入 ?tableId=&viewId= */
+function applyQuerySelection() {
+  const tableId = typeof route.query.tableId === 'string' ? route.query.tableId : ''
+  if (!tableId) return
+  const viewId = typeof route.query.viewId === 'string' ? route.query.viewId : undefined
+  store.select(viewId ? { kind: 'view', tableId, viewId } : { kind: 'table', tableId })
+}
 
 // 离开页面前落盘
 onBeforeUnmount(() => {

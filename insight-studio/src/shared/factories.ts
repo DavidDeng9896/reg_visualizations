@@ -4,6 +4,10 @@ import type {
   ChartConfig,
   ChartType,
   ColumnMeta,
+  Dashboard,
+  DashboardLayout,
+  DashboardWidget,
+  DashboardWidgetType,
   Filter,
   FilterCondition,
   FilterOperator,
@@ -49,6 +53,41 @@ export function createEmptyAnalysis(name: string): Analysis {
     flowchartLayout: {},
     steps: [],
     files: [],
+  }
+}
+
+export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
+  columns: 12,
+  rowHeight: 40,
+  gap: 8,
+}
+
+export function createDashboard(name: string): Dashboard {
+  const now = nowIso()
+  return {
+    id: uuid(),
+    name: name.trim() || '未命名看板',
+    createdAt: now,
+    updatedAt: now,
+    layout: { ...DEFAULT_DASHBOARD_LAYOUT },
+    widgets: [],
+  }
+}
+
+export function createDashboardWidget(
+  type: DashboardWidgetType,
+  ref: DashboardWidget['ref'],
+  grid?: Partial<DashboardWidget['grid']>,
+): DashboardWidget {
+  const defaults =
+    type === 'chart'
+      ? { x: 0, y: 0, w: 6, h: 8 }
+      : { x: 0, y: 0, w: 12, h: 10 }
+  return {
+    id: uuid(),
+    type,
+    ref: { ...ref },
+    grid: { ...defaults, ...grid },
   }
 }
 
