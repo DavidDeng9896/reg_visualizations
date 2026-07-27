@@ -489,7 +489,7 @@ const editingStep = ref<string | null>(null)
 /** 本次编辑是否为「拖线新建的步骤」（Cancel/Esc 时撤销节点与连线）。 */
 const editingIsNew = ref(false)
 /** 打开编辑时的草稿快照（name + config），Cancel/Esc/点空白时恢复。 */
-const editingSnapshot = ref<{ name: string; config: string } | null>(null)
+const editingSnapshot = ref<{ name: string; config: string; inputs: string } | null>(null)
 
 const editingStepData = computed(() => {
   if (!editingStep.value || !current.value) return null
@@ -501,7 +501,11 @@ function openStepEditor(stepId: string, isNew: boolean): void {
   if (!s) return
   editingStep.value = stepId
   editingIsNew.value = isNew
-  editingSnapshot.value = { name: s.name, config: JSON.stringify(s.config) }
+  editingSnapshot.value = {
+    name: s.name,
+    config: JSON.stringify(s.config),
+    inputs: JSON.stringify(s.inputs),
+  }
 }
 
 /** 关闭编辑面板；cancel=true 时恢复快照，新建的步骤连同布局一起撤销。 */
@@ -518,6 +522,7 @@ function closeStepEditor(cancel: boolean): void {
     if (s) {
       s.name = editingSnapshot.value.name
       s.config = JSON.parse(editingSnapshot.value.config)
+      s.inputs = JSON.parse(editingSnapshot.value.inputs)
     }
   }
   editingStep.value = null

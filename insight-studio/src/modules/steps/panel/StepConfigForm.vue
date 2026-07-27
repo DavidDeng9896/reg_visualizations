@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { DataType, Filter, FilterCondition, StepNode } from '../../../shared/types'
+import type { AnalysisTable, DataType, Filter, FilterCondition, StepInputRef, StepNode } from '../../../shared/types'
 import { useAnalysisStore } from '../../../stores/analysisStore'
 import { IButton, IIcon, ISelect, ITextField, IToggle, type SelectOption } from '../../../ui'
 import { getStepDef } from '../registry'
@@ -164,6 +164,110 @@ const unionCfg = computed<{ alignBy: 'name' | 'position'; fillNull: boolean; add
   return props.step.config as { alignBy: 'name' | 'position'; fillNull: boolean; addSourceColumn: boolean }
 })
 
+const UNION_PORT = 'Input tables'
+
+/** 可选作步骤输入的源表（须已有产出步骤；排除本步骤自己的输出）。 */
+const selectableTables = computed(() => {
+  const a = current.value
+  if (!a) return [] as AnalysisTable[]
+  const selfOut = new Set(props.step.output.tables)
+  return a.tables.filter((t) => t.stepId && !selfOut.has(t.id))
+})
+
+const selectableTableOptions = computed<SelectOption[]>(() =>
+  selectableTables.value
+    .filter((t) => !unionSelectedStepIds.value.includes(t.stepId!))
+    .map((t) => ({ value: t.stepId!, label: t.name, icon: 'database' as const })),
+)
+
+const unionSelectedStepIds = computed(() =>
+  props.step.inputs.filter((i) => i.port === UNION_PORT).map((i) => i.from.nodeId),
+)
+
+const unionSelectedTables = computed(() => {
+  const a = current.value
+  if (!a) return [] as AnalysisTable[]
+  return unionSelectedStepIds.value
+    .map((sid) => a.tables.find((t) => t.stepId === sid))
+    .filter((t): t is AnalysisTable => !!t)
+})
+
+const addUnionTableId = ref<string | number | null>(null)
+
+function setPortInputs(port: string, refs: StepInputRef[]) {
+  const others = props.step.inputs.filter((i) => i.port !== port)
+  props.step.inputs = [...others, ...refs]
+  emit('change')
+}
+
+function makeTableInput(port: string, producerStepId: string): StepInputRef {
+  return { port, from: { nodeId: producerStepId, port: 'Output dataset' } }
+}
+
+function addUnionTable() {
+  const sid = addUnionTableId.value == null ? '' : String(addUnionTableId.value)
+  if (!sid) return
+  if (unionSelectedStepIds.value.includes(sid)) return
+  const next = [
+    ...props.step.inputs.filter((i) => i.port === UNION_PORT),
+    makeTableInput(UNION_PORT, sid),
+  ]
+  setPortInputs(UNION_PORT, next)
+  addUnionTableId.value = null
+}
+
+function removeUnionTable(stepId: string) {
+  setPortInputs(
+    UNION_PORT,
+    props.step.inputs.filter((i) => !(i.port === UNION_PORT && i.from.nodeId === stepId)),
+  )
+}
+
+function moveUnionTable(stepId: string, dir: -1 | 1) {
+  const list = props.step.inputs.filter((i) => i.port === UNION_PORT)
+  const idx = list.findIndex((i) => i.from.nodeId === stepId)
+  const j = idx + dir
+  if (idx < 0 || j < 0 || j >= list.length) return
+  const copy = list.slice()
+  const tmp = copy[idx]!
+  copy[idx] = copy[j]!
+  copy[j] = tmp
+  setPortInputs(UNION_PORT, copy)
+}
+
+function toggleUnionTable(stepId: string) {
+  if (unionSelectedStepIds.value.includes(stepId)) removeUnionTable(stepId)
+  else {
+    const next = [
+      ...props.step.inputs.filter((i) => i.port === UNION_PORT),
+      makeTableInput(UNION_PORT, stepId),
+    ]
+    setPortInputs(UNION_PORT, next)
+  }
+}
+
+/* ------------------------------ join 表选择 ------------------------------ */
+
+function setJoinTable(port: 'Left table' | 'Right table', producerStepId: string | null) {
+  if (!producerStepId) {
+    setPortInputs(port, [])
+    return
+  }
+  setPortInputs(port, [makeTableInput(port, producerStepId)])
+  if (joinCfg.value.keys.length === 0) addJoinKey()
+}
+
+const leftProducerId = computed(
+  () => props.step.inputs.find((i) => i.port === 'Left table')?.from.nodeId ?? '',
+)
+const rightProducerId = computed(
+  () => props.step.inputs.find((i) => i.port === 'Right table')?.from.nodeId ?? '',
+)
+
+const joinTableOptions = computed<SelectOption[]>(() =>
+  selectableTables.value.map((t) => ({ value: t.stepId!, label: t.name, icon: 'database' as const })),
+)
+
 watch(() => props.step.type, () => {
   // 切换类型时重置默认配置
   const defaults = def.value.defaultConfig
@@ -175,7 +279,9 @@ watch(() => props.step.type, () => {
 
 <template>
   <div class="scf">
-    <p v-if="!inputTable && def.inputs.length > 0" class="scf__warn">无法解析输入表，请先连接输入端口。</p>
+    <p v-if="!inputTable && def.inputs.length > 0 && step.type !== 'union' && step.type !== 'join'" class="scf__warn">
+      无法解析输入表，请先连接输入端口或在下方选择表。
+    </p>
 
     <!-- Filter -->
     <template v-if="step.type === 'filter'">
@@ -307,6 +413,31 @@ watch(() => props.step.type, () => {
     <!-- Join -->
     <template v-else-if="step.type === 'join'">
       <section class="scf__section">
+        <h4 class="scf__section-title">输入表</h4>
+        <div class="scf__field">
+          <label class="scf__label">Left table</label>
+          <ISelect
+            :model-value="leftProducerId || null"
+            size="sm"
+            :options="joinTableOptions"
+            placeholder="选择左表"
+            @update:model-value="setJoinTable('Left table', $event == null ? null : String($event))"
+          />
+        </div>
+        <div class="scf__field">
+          <label class="scf__label">Right table</label>
+          <ISelect
+            :model-value="rightProducerId || null"
+            size="sm"
+            :options="joinTableOptions"
+            placeholder="选择右表"
+            @update:model-value="setJoinTable('Right table', $event == null ? null : String($event))"
+          />
+        </div>
+        <p v-if="!selectableTables.length" class="scf__hint">暂无可选表。请先导入 CSV 或创建有输出的步骤。</p>
+      </section>
+
+      <section class="scf__section">
         <h4 class="scf__section-title">Join settings</h4>
         <div class="scf__field">
           <label class="scf__label">Join type</label>
@@ -350,6 +481,64 @@ watch(() => props.step.type, () => {
 
     <!-- Union -->
     <template v-else-if="step.type === 'union'">
+      <section class="scf__section">
+        <h4 class="scf__section-title">输入表</h4>
+        <p class="scf__hint">勾选或添加至少 2 张表进行纵向合并。也可在流程图上拖线连接。</p>
+
+        <div v-if="selectableTables.length" class="scf__checklist">
+          <label
+            v-for="t in selectableTables"
+            :key="t.id"
+            class="scf__check"
+            :class="{ 'scf__check--on': unionSelectedStepIds.includes(t.stepId!) }"
+          >
+            <input
+              type="checkbox"
+              class="scf__check-input"
+              :checked="unionSelectedStepIds.includes(t.stepId!)"
+              @change="toggleUnionTable(t.stepId!)"
+            />
+            <IIcon name="database" :size="14" class="scf__check-ico" />
+            <span class="scf__check-name is-ellipsis" :title="t.name">{{ t.name }}</span>
+            <span class="scf__check-meta">{{ t.columns.length }} 列 · {{ t.rows.length }} 行</span>
+          </label>
+        </div>
+        <p v-else class="scf__warn">暂无可选表。请先导入 CSV 或跑通上游步骤。</p>
+
+        <div v-if="unionSelectedTables.length" class="scf__field">
+          <label class="scf__label">合并顺序（可调整）</label>
+          <ul class="scf__order">
+            <li v-for="(t, i) in unionSelectedTables" :key="t.id" class="scf__order-item">
+              <span class="scf__order-idx">{{ i + 1 }}</span>
+              <IIcon name="database" :size="13" />
+              <span class="scf__order-name is-ellipsis">{{ t.name }}</span>
+              <button type="button" class="scf__order-btn" title="上移" :disabled="i === 0" @click="moveUnionTable(t.stepId!, -1)">
+                <IIcon name="chevron-up" :size="14" />
+              </button>
+              <button type="button" class="scf__order-btn" title="下移" :disabled="i === unionSelectedTables.length - 1" @click="moveUnionTable(t.stepId!, 1)">
+                <IIcon name="chevron-down" :size="14" />
+              </button>
+              <button type="button" class="scf__order-btn scf__order-btn--danger" title="移除" @click="removeUnionTable(t.stepId!)">
+                <IIcon name="trash" :size="13" />
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="selectableTableOptions.length" class="scf__add-row">
+          <ISelect
+            v-model="addUnionTableId"
+            size="sm"
+            class="scf__add-select"
+            :options="selectableTableOptions"
+            placeholder="快速添加表…"
+          />
+          <IButton size="sm" variant="secondary" icon="plus" :disabled="!addUnionTableId" @click="addUnionTable">添加</IButton>
+        </div>
+
+        <p v-if="unionSelectedTables.length < 2" class="scf__warn">还需选择 {{ 2 - unionSelectedTables.length }} 张表</p>
+      </section>
+
       <section class="scf__section">
         <h4 class="scf__section-title">Union settings</h4>
         <div class="scf__field">
@@ -417,6 +606,111 @@ watch(() => props.step.type, () => {
   font-size: var(--is-text-xs);
   color: var(--is-text-tertiary);
   line-height: 1.5;
+}
+.scf__checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-sm);
+  padding: 4px;
+}
+.scf__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--is-text-sm);
+}
+.scf__check:hover {
+  background: var(--is-surface-hover);
+}
+.scf__check--on {
+  background: color-mix(in srgb, var(--is-accent, #3b82f6) 10%, transparent);
+}
+.scf__check-input {
+  margin: 0;
+  flex-shrink: 0;
+}
+.scf__check-ico {
+  flex-shrink: 0;
+  color: var(--is-text-secondary);
+}
+.scf__check-name {
+  flex: 1;
+  min-width: 0;
+}
+.scf__check-meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+}
+.scf__order {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.scf__order-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--is-border);
+  border-radius: 6px;
+  font-size: var(--is-text-sm);
+}
+.scf__order-idx {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--is-surface-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--is-text-secondary);
+  flex-shrink: 0;
+}
+.scf__order-name {
+  flex: 1;
+  min-width: 0;
+}
+.scf__order-btn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--is-text-tertiary);
+  display: inline-flex;
+}
+.scf__order-btn:hover:not(:disabled) {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
+.scf__order-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.scf__order-btn--danger:hover:not(:disabled) {
+  color: var(--is-danger);
+}
+.scf__add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.scf__add-select {
+  flex: 1;
+  min-width: 0;
 }
 .scf__placeholder {
   font-size: var(--is-text-sm);
