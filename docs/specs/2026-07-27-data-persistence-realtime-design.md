@@ -570,9 +570,10 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 ### Phase A — 改数驱动全链路（可先本地）
 
-1. 编辑表后：`markTableEdited` + **自动** `rerunStaleSteps`（默认开）  
-2. Flowchart / 工作区下游表与图表随重跑结果更新  
-3. `revision++`；单测覆盖「改源表 → 下游 Join/Filter 输出变」  
+1. 编辑表后：即时 `markTableEdited` + **200ms 防抖**后按成本自动 `rerunStaleSteps`  
+2. 超 `AUTO_RERUN_BUDGET` 只标 stale，不卡主线程  
+3. Flowchart / 工作区下游随重跑结果更新  
+4. 单测：小图同步、防抖合并、超预算降级  
 
 ### Phase B — 数据内容入库语义
 
@@ -599,9 +600,9 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 | 风险 | 缓解 |
 | --- | --- |
 | 只做前端 IDB、迟迟不上 PG | Phase D 硬门槛；清浏览器后数据内容仍在 |
-| 改数只标 stale 不重跑 | 违反产品拍板；Phase A 必须默认 auto rerun |
-| JSONB 大快照撑爆 PG | 超大表可转储压缩行到对象存储（仍是数据内容，不是原文件） |
-| 自动重跑打爆 CPU | 防抖合并编辑；大图可暂停自动重跑；worker 限流 |
+| 改数只标 stale 不重跑 | 默认 auto rerun，但受 §14 性能闸门约束 |
+| JSONB 大快照撑爆 PG | 超大表可转储压缩行；API 分页 |
+| **改数全链路重跑打爆主线程 / DB** | **§14 性能策略（必做）** |
 | 外部源 schema 漂移 | 列对齐报告；失败保留旧数据内容 |
 | 密钥进库明文 | `secrets` + KMS |
 
@@ -611,16 +612,64 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 1. **不存导入文件；只存数据内容**（列 + 行）到 PostgreSQL。  
 2. **Document + Data Content** 双层：配置在 `analyses`，行在 `table_snapshots`。  
-3. **改数 / 外部 sync → 自动重跑整条 flowchart 下游**（默认开启）。  
+3. **改数 → 同步 flowchart**：默认自动重跑下游，**防抖 + 成本预算**，超预算则 stale 降级。  
 4. IndexedDB 只是缓存；长期真相源是 PG。  
 
 ---
 
 ## 13. 开放问题（实现前需拍板）
 
-1. ~~改数后自动重跑还是只标 stale？~~ → **已拍板：自动重跑全链路**。  
+1. ~~改数后自动重跑还是只标 stale？~~ → **默认自动重跑；大图降级 stale + 手动/空闲重跑**。  
 2. `table_snapshots` 是否保留历史版本（回滚），还是只留 latest？  
 3. `.insight` 导出是否纳入近期，还是等 PG 上线？  
 4. `workspace_id` / 多租户是否第一期就建？  
 5. 后端语言与部署形态？  
-6. 超大表自动重跑时，是否在 UI 显示进度条并允许「暂停自动更新」？
+6. 自动重跑成本阈值（默认建议：`行数 × 下游步骤数 ≤ 200_000`）是否需按业务调整？
+
+---
+
+## 14. 性能策略（必做）
+
+> 「改数后 flowchart 同步」≠「每个按键同步算完整条 DAG」。  
+> 目标：编辑反馈 &lt; 50ms；防抖窗口后数据流收敛到正确结果。
+
+### 14.1 热点与预算
+
+| 热点 | 风险 | 策略 |
+| --- | --- | --- |
+| 单元格连改 | 每次全量跑 Filter/Join | **200ms 防抖合并**同一 tableId |
+| 大表 × 深 DAG | `行数 × 下游步骤` 爆炸 | 成本 &gt; `AUTO_RERUN_BUDGET`（默认 2e5）→ **只标 stale** |
+| 整份 Analysis 落盘 | 大 JSON 卡顿 | Document/Snapshot 拆分；保存 400ms 防抖；改行优先只 put snapshot |
+| Flowchart / 图表重绘 | 重跑后整图 rebuild | graph 64ms 防抖；图表 10k 采样 |
+| 外部源高频 sync | 轮询打爆 | 最小间隔、合并 dataVersion、worker 限流 |
+| PG 写入 | 每格 INSERT 新版本 | 会话内更新 latest；失焦/传播完成再升 data_version |
+
+### 14.2 两段式传播
+
+```
+单元格提交
+  ├─ 立即：写回行 + markTableEdited（下游 stale 角标）  // &lt; 几 ms
+  └─ 防抖 200ms
+        ├─ cost = 行数 × 下游步骤数 ≤ BUDGET → rerunStaleSteps（仅子图）
+        └─ cost &gt; BUDGET → 保持 stale + CTA「更新流程图」
+```
+
+### 14.3 重算怎么省
+
+1. 只跑 stale 子图（已有），不 Run all  
+2. 步骤 inputHash 未变则跳过写 snapshot（后续）  
+3. 节点预览抽样；正式物化可后台  
+4. P2：Join/Filter 进 Web Worker  
+5. 多表脏点合并进同一次拓扑重跑  
+
+### 14.4 存储 / API
+
+- 读：Document 与 Snapshot 分离；行 `offset/limit`  
+- 写：传播完成再 `revision++`；避免每格打 Document  
+- 单 snapshot JSONB 建议 &lt; 16–32MB  
+
+### 14.5 代码落点
+
+- `rerun.ts`：`estimatePropagateCost` / `schedulePropagateTableEdit`  
+- `DataGrid`：走 schedule，禁止每格同步全量 propagate  
+- 验收：连改 10 格重跑 ≤ 2 次；小图自动同步；大图不卡死主线程

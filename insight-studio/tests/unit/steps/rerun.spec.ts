@@ -1,13 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Analysis, AnalysisTable, StepNode } from '../../../src/shared/types'
 import { createTable } from '../../../src/shared/factories'
 import {
+  AUTO_RERUN_BUDGET,
+  cancelScheduledPropagate,
   downstreamStepIds,
+  estimatePropagateCost,
   hasStaleSteps,
   markDownstreamStale,
   markTableEdited,
   propagateTableEdit,
+  PROPAGATE_DEBOUNCE_MS,
   rerunStaleSteps,
+  schedulePropagateTableEdit,
+  shouldAutoRerun,
   stepOfTable,
 } from '../../../src/modules/steps/rerun'
 
@@ -56,6 +62,11 @@ function makePipeline() {
 }
 
 describe('steps/rerun stale 状态机', () => {
+  afterEach(() => {
+    cancelScheduledPropagate()
+    vi.useRealTimers()
+  })
+
   it('downstreamStepIds：BFS 找出所有下游（不含自身）', () => {
     const { a } = makePipeline()
     expect([...downstreamStepIds(a, 'src')]).toEqual(['flt'])
@@ -84,7 +95,6 @@ describe('steps/rerun stale 状态机', () => {
 
   it('rerunStaleSteps：按新输入重跑并恢复 configured', () => {
     const { a, srcTable } = makePipeline()
-    // 手动把源表数据改为全部 >= 2（3 行）
     markTableEdited(a, srcTable.id)
     const filter = a.steps.find((s) => s.id === 'flt')!
     expect(filter.status).toBe('stale')
@@ -93,21 +103,57 @@ describe('steps/rerun stale 状态机', () => {
     expect(ran).toBe(1)
     expect(filter.status).toBe('configured')
     expect(hasStaleSteps(a)).toBe(false)
-    // 输出表内容按新过滤重算（v>=2 → 2 行）
     const out = a.tables.find((t) => t.id === filter.output.tables[0])!
     expect(out.rows).toHaveLength(2)
   })
 
-  it('propagateTableEdit：改源表数据后自动重跑下游，flowchart 输出同步', () => {
+  it('propagateTableEdit：小图自动重跑下游', () => {
     const { a, srcTable } = makePipeline()
-    // 源表改为只剩一行 v=1 → filter(v>=2) 应变空
     srcTable.rows = [{ __rowId: 'r1', v: 1 }]
-    const ran = propagateTableEdit(a, srcTable.id)
-    expect(ran).toBe(1)
+    const result = propagateTableEdit(a, srcTable.id)
+    expect(result.mode).toBe('reran')
+    expect(result.ran).toBe(1)
     const filter = a.steps.find((s) => s.id === 'flt')!
     expect(filter.status).toBe('configured')
-    expect(hasStaleSteps(a)).toBe(false)
     const out = a.tables.find((t) => t.id === filter.output.tables[0])!
+    expect(out.rows).toHaveLength(0)
+  })
+
+  it('estimatePropagateCost / shouldAutoRerun：超预算只标 stale', () => {
+    const { a, srcTable } = makePipeline()
+    expect(estimatePropagateCost(a, srcTable.id)).toBe(3) // 3 行 × 1 下游
+    expect(shouldAutoRerun(3)).toBe(true)
+    expect(shouldAutoRerun(AUTO_RERUN_BUDGET + 1)).toBe(false)
+
+    srcTable.rows = Array.from({ length: 1000 }, (_, i) => ({ __rowId: `r${i}`, v: i }))
+    const result = propagateTableEdit(a, srcTable.id, 100) // 1000*1 > 100
+    expect(result.mode).toBe('stale-only')
+    expect(result.ran).toBe(0)
+    expect(a.steps.find((s) => s.id === 'flt')!.status).toBe('stale')
+  })
+
+  it('schedulePropagateTableEdit：立即 stale，防抖后合并重跑', () => {
+    vi.useFakeTimers()
+    const { a, srcTable } = makePipeline()
+    srcTable.rows = [{ __rowId: 'r1', v: 1 }]
+
+    let mutateCount = 0
+    const apply = (fn: (analysis: Analysis) => void) => {
+      mutateCount += 1
+      fn(a)
+    }
+
+    schedulePropagateTableEdit(apply, srcTable.id, { debounceMs: PROPAGATE_DEBOUNCE_MS })
+    expect(a.steps.find((s) => s.id === 'flt')!.status).toBe('stale')
+    expect(mutateCount).toBe(1) // 仅即时 mark
+
+    schedulePropagateTableEdit(apply, srcTable.id, { debounceMs: PROPAGATE_DEBOUNCE_MS })
+    expect(mutateCount).toBe(2) // 第二次仍只 mark
+
+    vi.advanceTimersByTime(PROPAGATE_DEBOUNCE_MS)
+    expect(mutateCount).toBe(3) // flush 一次重跑
+    expect(a.steps.find((s) => s.id === 'flt')!.status).toBe('configured')
+    const out = a.tables.find((t) => t.stepId === 'flt')!
     expect(out.rows).toHaveLength(0)
   })
 })
