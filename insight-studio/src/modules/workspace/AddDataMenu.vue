@@ -33,7 +33,7 @@ const emit = defineEmits<{
       <IIcon name="database" :size="14" />
       <span>
         <span class="menu__item-title">Import from SQL</span>
-        <span class="menu__item-desc">高亮 SQL 编辑器 · SELECT 导入为表</span>
+        <span class="menu__item-desc">连接 Postgres/MySQL 或查本地表</span>
       </span>
     </button>
     <button type="button" class="menu__item" role="menuitem" @click="emit('combine')">
