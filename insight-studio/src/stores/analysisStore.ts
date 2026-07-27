@@ -79,7 +79,7 @@ export const useAnalysisStore = defineStore('analysis', {
       }
     },
 
-    /** 立即落盘。 */
+    /** 立即落盘。失败时抛错并保持 dirty，便于调用方提示用户。 */
     async saveNow(repo: AnalysisRepository = analysisRepository): Promise<void> {
       if (!this.current) return
       cancelScheduledSave()
@@ -87,6 +87,10 @@ export const useAnalysisStore = defineStore('analysis', {
       try {
         await repo.put(this.current)
         this.dirty = false
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '未知错误'
+        console.error('[analysisStore.saveNow]', e)
+        throw new Error(`保存失败：${msg}`)
       } finally {
         this.saving = false
       }
@@ -96,7 +100,9 @@ export const useAnalysisStore = defineStore('analysis', {
       cancelScheduledSave()
       saveTimer = setTimeout(() => {
         saveTimer = undefined
-        void this.saveNow()
+        void this.saveNow().catch(() => {
+          /* 防抖保存失败保留 dirty；下次 mutate / 离页再试 */
+        })
       }, SAVE_DEBOUNCE_MS)
     },
 

@@ -133,7 +133,7 @@ watch(
 
 /* ------------------------------- Save / Cancel ------------------------------- */
 
-function save() {
+async function save() {
   const v = view.value
   if (!v) return
   const errors = validateChartMapping(draftModel.draft, columns.value)
@@ -144,16 +144,29 @@ function save() {
   }
   const committed = commitDraft(draftModel as ChartDraft)
   const committedType: ChartType = committed.chartType
+  const tableId = tc.selected.value?.tableId
+  const viewId = tc.selected.value?.viewId
+  let wrote = false
   store.mutate((a) => {
-    const t = a.tables.find((tb) => tb.id === tc.selected.value?.tableId)
-    const target = t && tc.selected.value?.viewId ? findView(t.views, tc.selected.value.viewId) : null
+    const t = a.tables.find((tb) => tb.id === tableId)
+    const target = t && viewId ? findView(t.views, viewId) : null
     if (target) {
       target.type = committedType
       target.chart = committed
+      wrote = true
     }
   })
+  if (!wrote) {
+    toast.error('未找到当前图表视图，配置未写入')
+    return
+  }
   saveAttempted.value = false
-  toast.success('图表配置已保存')
+  try {
+    await store.saveNow()
+    toast.success('图表配置已保存')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败', { title: '落盘失败' })
+  }
 }
 
 function cancel() {

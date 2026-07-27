@@ -67,6 +67,55 @@ describe('DexieAnalysisRepository', () => {
     expect(got?.tables[1].rows).toHaveLength(96)
   })
 
+  it('图表配置随 analysis 往返且 steps 不被迁移清空', async () => {
+    const a = createEmptyAnalysis('ChartPersist')
+    const t = createTable(
+      'Sales',
+      [
+        { field: 'cat', title: 'cat', dataType: 'string' },
+        { field: 'v', title: 'v', dataType: 'number' },
+      ],
+      [{ cat: 'a', v: 1 }],
+      'csv',
+    )
+    t.source = 'step'
+    t.stepId = 's1'
+    t.views = [
+      {
+        id: 'v1',
+        name: 'Bar',
+        type: 'bar',
+        filters: [],
+        transforms: [],
+        children: [],
+        chart: {
+          chartType: 'bar',
+          position: 'bottom',
+          configure: { x: 'cat', y: 'v' },
+          style: { title: 'My Chart' },
+        },
+      },
+    ]
+    a.tables = [t]
+    a.steps = [
+      {
+        id: 's1',
+        type: 'upload-csv',
+        name: 'Sales',
+        inputs: [],
+        config: { tableName: 'Sales' },
+        status: 'configured',
+        output: { tables: [t.id], files: [], scalars: {}, previews: {} },
+      },
+    ]
+    await repo.put(a)
+    const got = await repo.get(a.id)
+    expect(got?.steps).toHaveLength(1)
+    expect(got?.steps[0].id).toBe('s1')
+    expect(got?.tables[0].views[0].chart?.configure).toEqual({ x: 'cat', y: 'v' })
+    expect(got?.tables[0].views[0].chart?.style).toMatchObject({ title: 'My Chart' })
+  })
+
   it('transact 多步写入同事务', async () => {
     const a = createEmptyAnalysis('Tx')
     await repo.transact(async () => {
