@@ -25,7 +25,13 @@ const isView = computed(() => props.data.kind === 'view')
 
 const isDataStep = computed(() => {
   const t = props.data.stepType
-  return t === 'upload-csv' || t === 'import-files' || t === 'file-to-table'
+  return (
+    t === 'upload-csv' ||
+    t === 'upload-xlsx' ||
+    t === 'query-sql' ||
+    t === 'import-files' ||
+    t === 'file-to-table'
+  )
 })
 
 const icon = computed<IconName>(() => {
@@ -33,9 +39,12 @@ const icon = computed<IconName>(() => {
   if (d.kind === 'view') return (d.viewType ?? 'table') as IconName
   switch (d.stepType) {
     case 'upload-csv':
+    case 'upload-xlsx':
     case 'import-files':
     case 'file-to-table':
       return 'upload'
+    case 'query-sql':
+      return 'database'
     case 'join':
     case 'union':
       return 'combine'

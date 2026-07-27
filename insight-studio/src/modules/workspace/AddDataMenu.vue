@@ -7,6 +7,8 @@ import { IIcon } from '../../ui'
  */
 const emit = defineEmits<{
   (e: 'import-csv'): void
+  (e: 'import-excel'): void
+  (e: 'import-sql'): void
   (e: 'combine'): void
 }>()
 </script>
@@ -18,6 +20,20 @@ const emit = defineEmits<{
       <span>
         <span class="menu__item-title">Import CSV</span>
         <span class="menu__item-desc">上传 .csv 文件创建新表</span>
+      </span>
+    </button>
+    <button type="button" class="menu__item" role="menuitem" @click="emit('import-excel')">
+      <IIcon name="upload" :size="14" />
+      <span>
+        <span class="menu__item-title">Import Excel</span>
+        <span class="menu__item-desc">上传 .xlsx / .xls，选择工作表</span>
+      </span>
+    </button>
+    <button type="button" class="menu__item" role="menuitem" @click="emit('import-sql')">
+      <IIcon name="database" :size="14" />
+      <span>
+        <span class="menu__item-title">Import from SQL</span>
+        <span class="menu__item-desc">高亮 SQL 编辑器 · SELECT 导入为表</span>
       </span>
     </button>
     <button type="button" class="menu__item" role="menuitem" @click="emit('combine')">
@@ -53,7 +69,7 @@ const emit = defineEmits<{
   min-width: 180px;
 }
 .menu--adddata {
-  width: 260px;
+  width: 280px;
 }
 .menu__item {
   display: flex;

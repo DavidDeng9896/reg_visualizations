@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
-import Papa from 'papaparse'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { DataType } from '../../shared/types'
 import { IButton, IIcon, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
-import { commitImportedTable } from './commitImport'
 import { inferColumnTypes } from './csv'
+import { commitImportedTable } from './commitImport'
+import { listSheetInfo, parseExcelFile, type ExcelParseResult } from './excel'
 
-/** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。 */
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const fileName = ref('')
 const tableName = ref('')
+const sheetName = ref('')
+const sheetOptions = ref<SelectOption[]>([])
+const parsed = ref<ExcelParseResult | null>(null)
 const headers = ref<string[]>([])
 const dataRows = ref<string[][]>([])
 const typeOverrides = ref<(DataType | undefined)[]>([])
@@ -21,11 +23,9 @@ const parsing = ref(false)
 const dragging = ref(false)
 
 const PREVIEW_ROWS = 50
-const LARGE_FILE = 5 * 1024 * 1024
 
 const hasData = computed(() => headers.value.length > 0 && dataRows.value.length > 0)
 const previewRows = computed(() => dataRows.value.slice(0, PREVIEW_ROWS))
-
 const columnTypes = computed<DataType[]>(() =>
   headers.value.map((_, i) => typeOverrides.value[i] ?? inferred.value[i] ?? 'string'),
 )
@@ -42,6 +42,9 @@ const typeOptions: SelectOption[] = [
 function reset() {
   fileName.value = ''
   tableName.value = ''
+  sheetName.value = ''
+  sheetOptions.value = []
+  parsed.value = null
   headers.value = []
   dataRows.value = []
   typeOverrides.value = []
@@ -55,44 +58,54 @@ function close() {
   reset()
 }
 
+function applySheet(name: string) {
+  const g = parsed.value?.sheets[name]
+  if (!g) {
+    parseError.value = `工作表「${name}」不存在`
+    return
+  }
+  sheetName.value = name
+  if (!g.dataRows.length) {
+    headers.value = []
+    dataRows.value = []
+    parseError.value = `工作表「${name}」没有数据行（需要表头 + 至少一行）`
+    return
+  }
+  parseError.value = ''
+  headers.value = g.headers
+  dataRows.value = g.dataRows
+  inferred.value = inferColumnTypes(headers.value, dataRows.value).map((c) => c.dataType)
+  typeOverrides.value = headers.value.map(() => undefined)
+  if (!tableName.value.trim()) {
+    tableName.value = `${fileName.value.replace(/\.(xlsx|xls)$/i, '')}_${name}`.replace(/\s+/g, '_')
+  }
+}
+
 async function handleFile(file: File) {
   reset()
-  if (!/\.csv$/i.test(file.name) && file.type !== 'text/csv') {
-    parseError.value = '请选择 .csv 文件'
+  if (!/\.(xlsx|xls)$/i.test(file.name)) {
+    parseError.value = '请选择 .xlsx 或 .xls 文件'
     return
   }
   fileName.value = file.name
-  tableName.value = file.name.replace(/\.csv$/i, '')
-  if (file.size > LARGE_FILE) {
-    parsing.value = true
-    await nextTick()
-    // 让 loading 先渲染一帧
-    await new Promise((r) => setTimeout(r, 30))
-  }
+  tableName.value = file.name.replace(/\.(xlsx|xls)$/i, '')
+  parsing.value = true
+  await nextTick()
   try {
-    const text = await file.text()
-    // 空文件：Papa 对空串会报 "Unable to auto-detect delimiting character"，
-    // 先显式判空，给用户更准确的提示
-    if (!text.trim()) {
-      parseError.value = '文件为空'
+    const result = await parseExcelFile(file)
+    parsed.value = result
+    const infos = listSheetInfo(result)
+    sheetOptions.value = infos.map((s) => ({
+      value: s.name,
+      label: `${s.name}（${s.rowCount} 行 × ${s.colCount} 列）`,
+    }))
+    if (!result.sheetNames.length) {
+      parseError.value = '工作簿中没有工作表'
       return
     }
-    const result = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' })
-    if (result.errors.length && result.data.length === 0) {
-      parseError.value = `CSV 解析失败：${result.errors[0].message}`
-      return
-    }
-    const rows = result.data.filter((r) => Array.isArray(r) && r.length > 0)
-    if (rows.length < 2) {
-      parseError.value = rows.length === 0 ? '文件为空' : '文件只有表头，没有数据行'
-      return
-    }
-    headers.value = rows[0].map((h) => String(h ?? ''))
-    dataRows.value = rows.slice(1) as string[][]
-    inferred.value = inferColumnTypes(headers.value, dataRows.value).map((c) => c.dataType)
-    typeOverrides.value = headers.value.map(() => undefined)
+    applySheet(result.sheetNames[0])
   } catch (e) {
-    parseError.value = `CSV 解析失败：${e instanceof Error ? e.message : '未知错误'}`
+    parseError.value = `Excel 解析失败：${e instanceof Error ? e.message : '未知错误'}`
   } finally {
     parsing.value = false
   }
@@ -115,6 +128,10 @@ function setType(i: number, v: string | number) {
   typeOverrides.value[i] = v as DataType
 }
 
+function onSheetChange(v: string | number) {
+  applySheet(String(v))
+}
+
 function confirm() {
   if (!hasData.value) return
   const ok = commitImportedTable({
@@ -122,44 +139,62 @@ function confirm() {
     headers: headers.value,
     dataRows: dataRows.value,
     columnTypes: columnTypes.value,
-    stepType: 'upload-csv',
-    sourceLabel: 'CSV',
+    stepType: 'upload-xlsx',
+    stepConfig: { fileName: fileName.value, sheetName: sheetName.value },
+    sourceLabel: `Excel · ${sheetName.value}`,
   })
   if (ok) close()
 }
+
+watch(
+  () => sheetName.value,
+  () => {
+    /* sheet 切换由 ISelect 触发 */
+  },
+)
 </script>
 
 <template>
-  <IModal :open="open" title="Import CSV" :width="760" @update:open="emit('update:open', $event)">
-    <div class="csv">
+  <IModal :open="open" title="Import Excel" :width="800" @update:open="emit('update:open', $event)">
+    <div class="xlsx">
       <label
-        class="csv__drop"
-        :class="{ 'csv__drop--active': dragging }"
+        class="xlsx__drop"
+        :class="{ 'xlsx__drop--active': dragging }"
         @dragover.prevent="dragging = true"
         @dragleave.prevent="dragging = false"
         @drop.prevent="onDrop"
       >
-        <input type="file" accept=".csv,text/csv" class="csv__file" aria-label="选择 CSV 文件" @change="onPick" />
+        <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="xlsx__file" aria-label="选择 Excel 文件" @change="onPick" />
         <IIcon name="upload" :size="22" />
-        <span class="csv__drop-title">{{ fileName || '拖拽 CSV 文件到这里，或点击选择' }}</span>
-        <span class="csv__drop-hint">首行作为表头；自动推断列类型</span>
+        <span class="xlsx__drop-title">{{ fileName || '拖拽 Excel 到这里，或点击选择' }}</span>
+        <span class="xlsx__drop-hint">支持 .xlsx / .xls；首行作为表头</span>
       </label>
 
-      <p v-if="parseError" class="csv__error">{{ parseError }}</p>
-      <div v-if="parsing" class="csv__loading">正在解析大文件…</div>
+      <p v-if="parseError" class="xlsx__error">{{ parseError }}</p>
+      <div v-if="parsing" class="xlsx__loading">正在解析 Excel…</div>
 
-      <template v-if="hasData && !parsing">
-        <div class="csv__meta">
-          <ITextField v-model="tableName" placeholder="表名" class="csv__name" aria-label="表名" />
-          <span class="csv__stats">{{ dataRows.length }} 行 × {{ headers.length }} 列 · 预览前 {{ Math.min(PREVIEW_ROWS, dataRows.length) }} 行</span>
+      <template v-if="parsed && !parsing">
+        <div class="xlsx__meta">
+          <ITextField v-model="tableName" placeholder="表名" class="xlsx__name" aria-label="表名" />
+          <ISelect
+            :model-value="sheetName"
+            :options="sheetOptions"
+            size="sm"
+            class="xlsx__sheet"
+            aria-label="工作表"
+            @update:model-value="onSheetChange"
+          />
+          <span v-if="hasData" class="xlsx__stats">
+            {{ dataRows.length }} 行 × {{ headers.length }} 列 · 预览前 {{ Math.min(PREVIEW_ROWS, dataRows.length) }} 行
+          </span>
         </div>
 
-        <div class="csv__preview">
-          <table class="csv__table">
+        <div v-if="hasData" class="xlsx__preview">
+          <table class="xlsx__table">
             <thead>
               <tr>
                 <th v-for="(h, i) in headers" :key="i">
-                  <div class="csv__colhead">
+                  <div class="xlsx__colhead">
                     <span class="is-ellipsis" :title="h">{{ h || `Column ${i + 1}` }}</span>
                     <ISelect
                       :model-value="columnTypes[i]"
@@ -174,7 +209,7 @@ function confirm() {
             </thead>
             <tbody>
               <tr v-for="(line, r) in previewRows" :key="r">
-                <td v-for="(h, i) in headers" :key="i" class="csv__cell">
+                <td v-for="(h, i) in headers" :key="i" class="xlsx__cell">
                   <span class="is-ellipsis">{{ line[i] ?? '' }}</span>
                 </td>
               </tr>
@@ -192,12 +227,12 @@ function confirm() {
 </template>
 
 <style scoped>
-.csv {
+.xlsx {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.csv__drop {
+.xlsx__drop {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -209,89 +244,85 @@ function confirm() {
   border-radius: var(--is-radius);
   color: var(--is-text-secondary);
   cursor: pointer;
-  transition:
-    border-color var(--is-dur-fast) var(--is-ease),
-    background-color var(--is-dur-fast) var(--is-ease);
 }
-.csv__drop:hover,
-.csv__drop--active {
+.xlsx__drop:hover,
+.xlsx__drop--active {
   border-color: var(--is-accent);
-  background: var(--is-accent-soft);
-  color: var(--is-accent);
+  background: color-mix(in srgb, var(--is-accent) 6%, transparent);
 }
-.csv__file {
+.xlsx__file {
   position: absolute;
   inset: 0;
   opacity: 0;
   cursor: pointer;
 }
-.csv__drop-title {
-  font-size: var(--is-text-sm);
+.xlsx__drop-title {
   font-weight: 500;
+  color: var(--is-text);
 }
-.csv__drop-hint {
+.xlsx__drop-hint {
   font-size: var(--is-text-xs);
   color: var(--is-text-tertiary);
 }
-.csv__error {
+.xlsx__error {
   color: var(--is-danger);
   font-size: var(--is-text-sm);
-  background: var(--is-danger-soft);
-  border-radius: var(--is-radius-sm);
-  padding: 8px 12px;
+  margin: 0;
 }
-.csv__loading {
-  color: var(--is-text-secondary);
+.xlsx__loading {
   font-size: var(--is-text-sm);
-  text-align: center;
-  padding: 12px;
-}
-.csv__meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.csv__name {
-  width: 240px;
-}
-.csv__stats {
-  font-size: var(--is-text-xs);
   color: var(--is-text-secondary);
 }
-.csv__preview {
-  border: 1px solid var(--is-border);
-  border-radius: var(--is-radius);
-  overflow: auto;
-  max-height: 320px;
+.xlsx__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-.csv__table {
-  border-collapse: collapse;
-  width: 100%;
+.xlsx__name {
+  flex: 1;
+  min-width: 160px;
+}
+.xlsx__sheet {
+  min-width: 180px;
+}
+.xlsx__stats {
   font-size: var(--is-text-xs);
+  color: var(--is-text-tertiary);
 }
-.csv__table th {
-  position: sticky;
-  top: 0;
-  background: var(--is-surface-hover);
+.xlsx__preview {
+  overflow: auto;
+  max-height: 360px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-sm);
+}
+.xlsx__table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12px;
+}
+.xlsx__table th,
+.xlsx__table td {
   border-bottom: 1px solid var(--is-border);
+  border-right: 1px solid var(--is-border);
   padding: 6px 8px;
   text-align: left;
-  font-weight: 600;
-  min-width: 120px;
+  max-width: 180px;
 }
-.csv__colhead {
+.xlsx__table th {
+  position: sticky;
+  top: 0;
+  background: var(--is-surface-muted, #f2f4f7);
+  z-index: 1;
+}
+.xlsx__colhead {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 120px;
 }
-.csv__table td {
-  border-bottom: 1px solid var(--is-border);
-  padding: 5px 8px;
+.xlsx__cell {
   color: var(--is-text-secondary);
-  max-width: 200px;
-}
-.csv__cell span {
-  display: block;
-  max-width: 200px;
 }
 </style>

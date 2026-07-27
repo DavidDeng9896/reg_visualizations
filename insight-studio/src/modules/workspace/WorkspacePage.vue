@@ -9,6 +9,8 @@ import SidebarTree from './SidebarTree.vue'
 import WorkspaceMain from './WorkspaceMain.vue'
 import AddDataMenu from './AddDataMenu.vue'
 import CsvImportDialog from '../table/CsvImportDialog.vue'
+import ExcelImportDialog from '../table/ExcelImportDialog.vue'
+import SqlImportDialog from '../table/SqlImportDialog.vue'
 import CombineTablesDialog from '../table/CombineTablesDialog.vue'
 
 const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
@@ -86,11 +88,21 @@ function toggleFlowchart() {
 /* Add data 菜单 */
 const addDataOpen = ref(false)
 const csvImportOpen = ref(false)
+const excelImportOpen = ref(false)
+const sqlImportOpen = ref(false)
 const combineOpen = ref(false)
 
 function openCsvImport() {
   addDataOpen.value = false
   csvImportOpen.value = true
+}
+function openExcelImport() {
+  addDataOpen.value = false
+  excelImportOpen.value = true
+}
+function openSqlImport() {
+  addDataOpen.value = false
+  sqlImportOpen.value = true
 }
 function openCombine() {
   addDataOpen.value = false
@@ -146,14 +158,24 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             <IButton variant="primary" icon="plus" @click="addDataOpen = !addDataOpen">Add data</IButton>
           </template>
           <template #default>
-            <AddDataMenu @import-csv="openCsvImport" @combine="openCombine" />
+            <AddDataMenu
+              @import-csv="openCsvImport"
+              @import-excel="openExcelImport"
+              @import-sql="openSqlImport"
+              @combine="openCombine"
+            />
           </template>
         </IPopover>
       </div>
     </header>
 
     <div class="ws__body">
-      <SidebarTree @import-csv="openCsvImport" @combine="openCombine" />
+      <SidebarTree
+        @import-csv="openCsvImport"
+        @import-excel="openExcelImport"
+        @import-sql="openSqlImport"
+        @combine="openCombine"
+      />
       <main class="ws__main">
         <KeepAlive>
           <component :is="modeComponent" :key="mode" @add-data="addDataOpen = true" />
@@ -179,8 +201,10 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
       </template>
     </IModal>
 
-    <!-- CSV 导入 / 表合并 -->
+    <!-- 数据导入 / 表合并 -->
     <CsvImportDialog :open="csvImportOpen" @update:open="csvImportOpen = $event" />
+    <ExcelImportDialog :open="excelImportOpen" @update:open="excelImportOpen = $event" />
+    <SqlImportDialog :open="sqlImportOpen" @update:open="sqlImportOpen = $event" />
     <CombineTablesDialog :open="combineOpen" @update:open="combineOpen = $event" />
 
     <div v-if="loading" class="ws__loading">加载中…</div>

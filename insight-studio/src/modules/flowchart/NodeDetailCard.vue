@@ -48,9 +48,12 @@ const nodeIcon = computed<IconName>(() => {
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
   switch (n.stepType) {
     case 'upload-csv':
+    case 'upload-xlsx':
     case 'import-files':
     case 'file-to-table':
       return 'upload'
+    case 'query-sql':
+      return 'database'
     case 'join':
     case 'union':
       return 'combine'

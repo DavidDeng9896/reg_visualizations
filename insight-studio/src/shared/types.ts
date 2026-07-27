@@ -312,6 +312,8 @@ export interface StepPort {
 /** 步骤类型（P0 仅实现带 * 的核心步骤；其余占位）。 */
 export type StepType =
   | 'upload-csv' // * 现有 CSV 导入对应的源步骤
+  | 'upload-xlsx' // * Excel 导入源步骤
+  | 'query-sql' // * SQL 查询导入源步骤
   | 'import-files' // 多文件源（P1）
   | 'file-to-table' // 文件转表（P1）
   | 'join' // * 合并步骤

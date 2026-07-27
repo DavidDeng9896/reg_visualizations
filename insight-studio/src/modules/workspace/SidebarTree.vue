@@ -11,7 +11,7 @@ import type { IconName } from '../../ui'
 import SidebarTableNode from './SidebarTableNode.vue'
 import AddDataMenu from './AddDataMenu.vue'
 
-const emit = defineEmits<{ (e: 'import-csv' | 'combine'): void }>()
+const emit = defineEmits<{ (e: 'import-csv' | 'import-excel' | 'import-sql' | 'combine'): void }>()
 
 /** 侧栏「+」Add data 浮窗开关（折叠 rail 与区头共用一份状态，二者不会同时渲染）。 */
 const addMenuOpen = ref(false)
@@ -259,7 +259,12 @@ function connectExternal() {
           </button>
         </template>
         <template #default>
-          <AddDataMenu @import-csv="addMenuOpen = false; emit('import-csv')" @combine="addMenuOpen = false; emit('combine')" />
+          <AddDataMenu
+            @import-csv="addMenuOpen = false; emit('import-csv')"
+            @import-excel="addMenuOpen = false; emit('import-excel')"
+            @import-sql="addMenuOpen = false; emit('import-sql')"
+            @combine="addMenuOpen = false; emit('combine')"
+          />
         </template>
       </IPopover>
     </div>
@@ -288,7 +293,12 @@ function connectExternal() {
               </button>
             </template>
             <template #default>
-              <AddDataMenu @import-csv="addMenuOpen = false; emit('import-csv')" @combine="addMenuOpen = false; emit('combine')" />
+              <AddDataMenu
+            @import-csv="addMenuOpen = false; emit('import-csv')"
+            @import-excel="addMenuOpen = false; emit('import-excel')"
+            @import-sql="addMenuOpen = false; emit('import-sql')"
+            @combine="addMenuOpen = false; emit('combine')"
+          />
             </template>
           </IPopover>
         </div>
