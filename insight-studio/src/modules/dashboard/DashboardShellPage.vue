@@ -9,7 +9,7 @@ import HomeSegmentNav from '../home/HomeSegmentNav.vue'
 import DashboardSidebar from './DashboardSidebar.vue'
 import DashboardCanvas from './DashboardCanvas.vue'
 import AddWidgetDialog, { type AddWidgetPayload } from './AddWidgetDialog.vue'
-import { findNextSlot } from './grid'
+import { findNextSlot, type LayoutItem } from './grid'
 import type { DashboardWidget } from '../../shared/types'
 
 const route = useRoute()
@@ -57,6 +57,18 @@ function onUpdateWidget(widgetId: string, patch: Partial<DashboardWidget>) {
     const w = d.widgets.find((x) => x.id === widgetId)
     if (!w) return
     Object.assign(w, patch)
+  })
+}
+
+/** 拖放结束后一次写入全量布局（占位挤压后的结果）。 */
+function onApplyLayout(layout: LayoutItem[]) {
+  store.mutate((d) => {
+    const byId = new Map(layout.map((l) => [l.id, l]))
+    for (const w of d.widgets) {
+      const l = byId.get(w.id)
+      if (!l) continue
+      w.grid = { x: l.x, y: l.y, w: l.w, h: l.h }
+    }
   })
 }
 
@@ -134,6 +146,7 @@ function onAddWidget(payload: AddWidgetPayload) {
               :dashboard="current"
               :edit-layout="editLayout"
               @update-widget="onUpdateWidget"
+              @apply-layout="onApplyLayout"
               @remove-widget="onRemoveWidget"
             />
           </div>

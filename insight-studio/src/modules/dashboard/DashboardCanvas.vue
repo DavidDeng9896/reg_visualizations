@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import type { Dashboard, DashboardWidget } from '../../shared/types'
+import type { Dashboard, DashboardWidget, DashboardWidgetGrid } from '../../shared/types'
 import { IIcon } from '../../ui'
-import { clampWidget, GRID_COLUMNS } from './grid'
+import {
+  GRID_COLUMNS,
+  type LayoutItem,
+  moveWithPush,
+  resizeWithPush,
+  widgetsToLayout,
+} from './grid'
 import DashboardWidgetCard from './DashboardWidgetCard.vue'
 
 const props = defineProps<{
@@ -12,17 +18,24 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update-widget', widgetId: string, patch: Partial<DashboardWidget>): void
+  (e: 'apply-layout', layout: LayoutItem[]): void
   (e: 'remove-widget', widgetId: string): void
 }>()
 
-const layout = computed(() => props.dashboard.layout)
-const rowHeight = computed(() => layout.value.rowHeight || 40)
-const gap = computed(() => layout.value.gap || 8)
+const layoutMeta = computed(() => props.dashboard.layout)
+const rowHeight = computed(() => layoutMeta.value.rowHeight || 40)
+const gap = computed(() => layoutMeta.value.gap || 8)
+
+/** 拖拽过程中的全量预览布局（RGL：占位 + 挤压）。 */
+const liveLayout = ref<LayoutItem[] | null>(null)
+/** 拖拽目标格：占位块位置。 */
+const placeholder = ref<DashboardWidgetGrid | null>(null)
 
 const canvasH = computed(() => {
-  const max = props.dashboard.widgets.reduce((m, w) => Math.max(m, w.grid.y + w.grid.h), 8)
-  const liveMax = Object.values(preview.value).reduce((m, g) => Math.max(m, g.y + g.h), max)
-  return liveMax * rowHeight.value + (liveMax + 1) * gap.value + 48
+  const base = props.dashboard.widgets.reduce((m, w) => Math.max(m, w.grid.y + w.grid.h), 8)
+  const live = liveLayout.value?.reduce((m, g) => Math.max(m, g.y + g.h), 0) ?? 0
+  const max = Math.max(base, live, 8)
+  return max * rowHeight.value + (max + 1) * gap.value + 48
 })
 
 type DragMode = 'move' | 'resize'
@@ -31,16 +44,17 @@ interface DragState {
   id: string
   startX: number
   startY: number
-  orig: DashboardWidget['grid']
+  orig: DashboardWidgetGrid
+  /** 拖开始时的完整布局快照。 */
+  base: LayoutItem[]
   colW: number
   pointerId: number
 }
 
 const drag = ref<DragState | null>(null)
-const preview = ref<Record<string, DashboardWidget['grid']>>({})
 const canvasEl = ref<HTMLElement | null>(null)
 
-function gridStyle(g: DashboardWidget['grid']) {
+function gridStyle(g: DashboardWidgetGrid) {
   const left = `calc(${(g.x / GRID_COLUMNS) * 100}% + ${gap.value / 2}px)`
   const width = `calc(${(g.w / GRID_COLUMNS) * 100}% - ${gap.value}px)`
   const top = g.y * rowHeight.value + gap.value
@@ -53,8 +67,10 @@ function gridStyle(g: DashboardWidget['grid']) {
   }
 }
 
-function effectiveGrid(w: DashboardWidget) {
-  return preview.value[w.id] ?? w.grid
+function effectiveGrid(w: DashboardWidget): DashboardWidgetGrid {
+  const live = liveLayout.value?.find((l) => l.id === w.id)
+  if (live) return { x: live.x, y: live.y, w: live.w, h: live.h }
+  return w.grid
 }
 
 function onPointerDown(e: PointerEvent, w: DashboardWidget, mode: DragMode) {
@@ -65,16 +81,20 @@ function onPointerDown(e: PointerEvent, w: DashboardWidget, mode: DragMode) {
   e.stopPropagation()
   const rect = canvas.getBoundingClientRect()
   const colW = rect.width / GRID_COLUMNS
+  const base = widgetsToLayout(props.dashboard.widgets)
+  const orig = { ...w.grid }
   drag.value = {
     mode,
     id: w.id,
     startX: e.clientX,
     startY: e.clientY,
-    orig: { ...(preview.value[w.id] ?? w.grid) },
+    orig,
+    base,
     colW,
     pointerId: e.pointerId,
   }
-  preview.value = { ...preview.value, [w.id]: { ...(preview.value[w.id] ?? w.grid) } }
+  liveLayout.value = base.map((l) => ({ ...l }))
+  placeholder.value = { ...orig }
   ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
@@ -86,21 +106,26 @@ function onPointerMove(e: PointerEvent) {
   if (!d || e.pointerId !== d.pointerId) return
   const dxCols = Math.round((e.clientX - d.startX) / d.colW)
   const dyRows = Math.round((e.clientY - d.startY) / rowHeight.value)
-  let next =
-    d.mode === 'move'
-      ? { ...d.orig, x: d.orig.x + dxCols, y: d.orig.y + dyRows }
-      : { ...d.orig, w: d.orig.w + dxCols, h: d.orig.h + dyRows }
-  next = clampWidget(next, GRID_COLUMNS)
-  preview.value = { ...preview.value, [d.id]: next }
+
+  let next: LayoutItem[]
+  if (d.mode === 'move') {
+    next = moveWithPush(d.base, d.id, d.orig.x + dxCols, d.orig.y + dyRows)
+  } else {
+    next = resizeWithPush(d.base, d.id, d.orig.w + dxCols, d.orig.h + dyRows)
+  }
+  liveLayout.value = next
+  const active = next.find((l) => l.id === d.id)
+  placeholder.value = active ? { x: active.x, y: active.y, w: active.w, h: active.h } : null
 }
 
 function onPointerUp(e: PointerEvent) {
   const d = drag.value
   if (!d || (e.type !== 'pointercancel' && e.pointerId !== d.pointerId)) return
-  const g = preview.value[d.id]
-  if (g) emit('update-widget', d.id, { grid: g })
+  const finalLayout = liveLayout.value
+  if (finalLayout) emit('apply-layout', finalLayout)
   drag.value = null
-  preview.value = {}
+  liveLayout.value = null
+  placeholder.value = null
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
   window.removeEventListener('pointercancel', onPointerUp)
@@ -115,6 +140,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="canvasEl" class="dc" :class="{ 'dc--edit': editLayout }" :style="{ height: `${canvasH}px` }">
+    <!-- 占位：显示拖放落点，其它块已被挤压让位 -->
+    <div
+      v-if="editLayout && placeholder && drag"
+      class="dc__placeholder"
+      :style="gridStyle(placeholder)"
+      aria-hidden="true"
+    />
+
     <div
       v-for="w in dashboard.widgets"
       :key="w.id"
@@ -122,10 +155,10 @@ onBeforeUnmount(() => {
       :class="{
         'dc__item--edit': editLayout,
         'dc__item--dragging': drag?.id === w.id,
+        'dc__item--shifting': !!liveLayout && drag?.id !== w.id,
       }"
       :style="gridStyle(effectiveGrid(w))"
     >
-      <!-- 编辑布局：整卡可拖，顶栏把手更明显 -->
       <div
         v-if="editLayout"
         class="dc__handle"
@@ -182,6 +215,15 @@ onBeforeUnmount(() => {
   background-position: 0 0;
   border-radius: 8px;
 }
+.dc__placeholder {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 2px dashed var(--is-accent, #3b82f6);
+  background: color-mix(in srgb, var(--is-accent, #3b82f6) 12%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
 .dc__item {
   position: absolute;
   box-sizing: border-box;
@@ -189,18 +231,28 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  transition:
+    left 120ms ease,
+    top 120ms ease,
+    width 120ms ease,
+    height 120ms ease;
 }
 .dc__item--edit {
   outline: 1px dashed var(--is-border-strong, #98a2b3);
   outline-offset: -1px;
   border-radius: 8px;
   background: var(--is-surface);
+  z-index: 2;
+}
+.dc__item--shifting {
+  z-index: 2;
 }
 .dc__item--dragging {
   z-index: 20;
   outline: 2px solid var(--is-accent, #3b82f6);
   box-shadow: 0 8px 24px rgb(16 24 40 / 18%);
-  opacity: 0.96;
+  opacity: 0.92;
+  transition: none;
 }
 .dc__handle {
   display: flex;
@@ -249,9 +301,6 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   position: relative;
-}
-.dc__body--frozen {
-  /* 内容不拦截；由 dc__move-layer 负责拖动 */
 }
 .dc__move-layer {
   position: absolute;
