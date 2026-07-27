@@ -34,36 +34,52 @@ function firstCollision(items: LayoutItem[], item: LayoutItem): LayoutItem | und
   return items.find((other) => other.id !== item.id && overlaps(other, item))
 }
 
+function allCollisions(items: LayoutItem[], item: LayoutItem): LayoutItem[] {
+  return items.filter((other) => other.id !== item.id && overlaps(other, item))
+}
+
 /**
- * 垂直紧凑（React-Grid-Layout 默认策略）：
- * 按行优先排序后，尽量上移填缝，遇碰撞则下推到碰撞块下方。
+ * 垂直紧凑：保留 x，把块尽量上推填缝。
+ * `staticIds` 中的块钉死不动（拖拽中的活动块），其它块绕开它们。
+ * 从 y=0 扫描下推，避免逐步 y-- 导致大坐标卡顿。
  */
-export function compactVertical(items: LayoutItem[], columns = GRID_COLUMNS): LayoutItem[] {
-  const compareWith: LayoutItem[] = []
+export function compactVertical(
+  items: LayoutItem[],
+  columns = GRID_COLUMNS,
+  staticIds?: ReadonlySet<string>,
+): LayoutItem[] {
+  const pinned = staticIds ?? new Set<string>()
+  const pinnedItems = items
+    .filter((it) => pinned.has(it.id))
+    .map((it) => ({ id: it.id, ...clampWidget(it, columns) }))
+
+  const compareWith: LayoutItem[] = [...pinnedItems]
+  const moved: LayoutItem[] = []
+
   for (const raw of sortByRowCol(items)) {
-    const item = { ...clampWidget(raw, columns), id: raw.id }
-    // 尽量上移
-    while (item.y > 0) {
-      item.y -= 1
-      if (firstCollision(compareWith, item)) {
-        item.y += 1
-        break
-      }
+    if (pinned.has(raw.id)) continue
+    const item: LayoutItem = {
+      id: raw.id,
+      ...clampWidget({ ...raw, y: 0 }, columns),
     }
-    // 下推直到不撞
     let hit = firstCollision(compareWith, item)
     while (hit) {
       item.y = hit.y + hit.h
       hit = firstCollision(compareWith, item)
     }
     compareWith.push(item)
+    moved.push(item)
   }
-  return compareWith
+
+  const byId = new Map<string, LayoutItem>()
+  for (const p of pinnedItems) byId.set(p.id, p)
+  for (const m of moved) byId.set(m.id, m)
+  return items.map((it) => byId.get(it.id)!).filter(Boolean)
 }
 
 /**
- * 将 movingId 移到 (x,y)，并把挡住的块向下挤开，再垂直紧凑。
- * 主流看板（Grafana / RGL）默认交互。
+ * 拖拽中：把活动块钉在目标格，撞到的块往下挤，再只紧凑「非活动」块。
+ * 这样上下拖动不会被紧凑吸回去，也不会把整页洗乱。
  */
 export function moveWithPush(
   items: LayoutItem[],
@@ -71,7 +87,9 @@ export function moveWithPush(
   x: number,
   y: number,
   columns = GRID_COLUMNS,
+  opts: { pinMover?: boolean } = {},
 ): LayoutItem[] {
+  const pinMover = opts.pinMover !== false
   const layout = cloneItems(items)
   const moving = layout.find((it) => it.id === movingId)
   if (!moving) return layout
@@ -80,57 +98,73 @@ export function moveWithPush(
   moving.x = next.x
   moving.y = next.y
 
-  // 迭代把碰撞块往下推（最多 2*n 轮，避免死循环）
-  const maxIter = Math.max(8, layout.length * 4)
-  for (let i = 0; i < maxIter; i += 1) {
-    let moved = false
-    for (const other of layout) {
-      if (other.id === movingId) continue
-      if (!overlaps(moving, other)) continue
-      other.y = moving.y + moving.h
-      moved = true
-    }
-    // 连锁碰撞：被推开的块之间也可能互撞 → 再紧凑一轮局部
-    if (!moved) break
-    for (const a of sortByRowCol(layout)) {
-      if (a.id === movingId) continue
-      let hit = firstCollision(
-        layout.filter((x) => x.id !== a.id),
-        a,
-      )
-      while (hit) {
-        a.y = hit.y + hit.h
-        hit = firstCollision(
-          layout.filter((x) => x.id !== a.id),
+  // 把碰撞块（及连锁）推到活动块下方
+  const maxIter = Math.max(8, layout.length * 6)
+  for (let iter = 0; iter < maxIter; iter += 1) {
+    const hits = allCollisions(layout, moving)
+    if (!hits.length) {
+      // 非活动块之间也可能互撞
+      let cascaded = false
+      for (const a of sortByRowCol(layout)) {
+        if (a.id === movingId) continue
+        let hit = firstCollision(
+          layout.filter((o) => o.id !== a.id),
           a,
         )
+        while (hit) {
+          a.y = hit.y + hit.h
+          cascaded = true
+          hit = firstCollision(
+            layout.filter((o) => o.id !== a.id),
+            a,
+          )
+        }
       }
+      if (!cascaded) break
+      continue
+    }
+    for (const other of hits) {
+      other.y = moving.y + moving.h
     }
   }
 
+  if (pinMover) {
+    return compactVertical(layout, columns, new Set([movingId]))
+  }
   return compactVertical(layout, columns)
 }
 
-/** 调整大小后挤压并紧凑。 */
+/** 调整大小：钉住当前块，挤开碰撞后紧凑邻居。 */
 export function resizeWithPush(
   items: LayoutItem[],
   resizingId: string,
   w: number,
   h: number,
   columns = GRID_COLUMNS,
+  opts: { pinMover?: boolean } = {},
 ): LayoutItem[] {
+  const pinMover = opts.pinMover !== false
   const layout = cloneItems(items)
   const item = layout.find((it) => it.id === resizingId)
   if (!item) return layout
   const next = clampWidget({ ...item, w, h }, columns)
   item.w = next.w
   item.h = next.h
-  // 把正下方被挡住的块挤开
+
   for (const other of layout) {
     if (other.id === resizingId) continue
     if (overlaps(item, other)) other.y = item.y + item.h
   }
+
+  if (pinMover) {
+    return compactVertical(layout, columns, new Set([resizingId]))
+  }
   return compactVertical(layout, columns)
+}
+
+/** 松手后：取消钉住，全量垂直紧凑。 */
+export function finalizeLayout(items: LayoutItem[], columns = GRID_COLUMNS): LayoutItem[] {
+  return compactVertical(items, columns)
 }
 
 /** 在现有 widgets 下方找可放置的下一个空位（紧凑布局后扫描）。 */
@@ -190,5 +224,14 @@ export function applyLayoutToWidgets(
     const l = byId.get(w.id)
     if (!l) return w
     return { ...w, grid: { x: l.x, y: l.y, w: l.w, h: l.h } }
+  })
+}
+
+export function layoutsEqual(a: LayoutItem[], b: LayoutItem[]): boolean {
+  if (a.length !== b.length) return false
+  const map = new Map(b.map((l) => [l.id, l]))
+  return a.every((l) => {
+    const o = map.get(l.id)
+    return !!o && o.x === l.x && o.y === l.y && o.w === l.w && o.h === l.h
   })
 }

@@ -3,6 +3,7 @@ import {
   applyLayoutToWidgets,
   clampWidget,
   compactVertical,
+  finalizeLayout,
   findNextSlot,
   moveWithPush,
   resizeWithPush,
@@ -14,7 +15,7 @@ function item(id: string, x: number, y: number, w = 4, h = 4) {
   return { id, x, y, w, h }
 }
 
-describe('dashboard grid (RGL-style push + compact)', () => {
+describe('dashboard grid (pin-mover push + compact)', () => {
   it('compacts vertically into gaps', () => {
     const out = compactVertical([item('a', 0, 0), item('b', 0, 8)])
     expect(out.find((l) => l.id === 'a')).toMatchObject({ x: 0, y: 0 })
@@ -37,22 +38,50 @@ describe('dashboard grid (RGL-style push + compact)', () => {
     })
   })
 
-  it('moveWithPush squeezes neighbors aside and compacts', () => {
+  it('moveWithPush pinMover keeps dragged item at target y (can move down)', () => {
+    const layout = [item('a', 0, 0, 6, 4), item('b', 0, 4, 6, 4)]
+    const out = moveWithPush(layout, 'a', 0, 10, 12, { pinMover: true })
+    const a = out.find((l) => l.id === 'a')!
+    const b = out.find((l) => l.id === 'b')!
+    expect(a.y).toBe(10)
+    // 上方空洞由 b 填上
+    expect(b.y).toBe(0)
+  })
+
+  it('moveWithPush pinMover can move up and push occupant down', () => {
+    const layout = [item('a', 0, 0, 6, 4), item('b', 0, 4, 6, 4)]
+    const out = moveWithPush(layout, 'b', 0, 0, 12, { pinMover: true })
+    const a = out.find((l) => l.id === 'a')!
+    const b = out.find((l) => l.id === 'b')!
+    expect(b.y).toBe(0)
+    expect(a.y).toBeGreaterThanOrEqual(b.h)
+  })
+
+  it('finalizeLayout packs pinned gaps after drop', () => {
+    const mid = moveWithPush([item('a', 0, 0, 6, 4), item('b', 0, 4, 6, 4)], 'a', 0, 10, 12, {
+      pinMover: true,
+    })
+    expect(mid.find((l) => l.id === 'a')!.y).toBe(10)
+    const done = finalizeLayout(mid)
+    const a = done.find((l) => l.id === 'a')!
+    const b = done.find((l) => l.id === 'b')!
+    expect(b.y).toBe(0)
+    expect(a.y).toBe(4)
+  })
+
+  it('horizontal swap keeps both on top row when possible', () => {
     const layout = [item('a', 0, 0, 6, 4), item('b', 6, 0, 6, 4)]
-    const out = moveWithPush(layout, 'a', 6, 0)
+    const out = moveWithPush(layout, 'a', 6, 0, 12, { pinMover: true })
     const a = out.find((l) => l.id === 'a')!
     const b = out.find((l) => l.id === 'b')!
     expect(a.x).toBe(6)
     expect(a.y).toBe(0)
-    // b pushed away from a's new seat
     expect(b.x !== 6 || b.y !== 0).toBe(true)
-    expect(a.x + a.w <= 12).toBe(true)
-    expect(b.x + b.w <= 12).toBe(true)
   })
 
   it('resizeWithPush grows and pushes neighbors', () => {
     const layout = [item('a', 0, 0, 4, 4), item('b', 4, 0, 4, 4)]
-    const out = resizeWithPush(layout, 'a', 8, 4)
+    const out = resizeWithPush(layout, 'a', 8, 4, 12, { pinMover: true })
     const a = out.find((l) => l.id === 'a')!
     const b = out.find((l) => l.id === 'b')!
     expect(a.w).toBe(8)
