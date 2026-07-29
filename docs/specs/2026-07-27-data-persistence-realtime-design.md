@@ -431,14 +431,15 @@ Connector.sync → 新 rows + dataVersion
 ### 5.8 后端服务边界（建议）
 
 ```
-insight-api
+insight-api-go（默认，高性能）
   ├── REST: analyses / dashboards / data-sources / snapshots（数据内容）
   ├── SSE:  /events
   ├── workers: connector poll、DAG auto-rerun、outbox publisher
   └── 依赖: PostgreSQL, (Redis)；无导入文件对象存储
 ```
 
-语言不锁定；需提供 OpenAPI，与现有 `AnalysisRepository` 字段对齐。
+**语言锁定：Go**（API / SSE / Worker）。Node `insight-api` 仅作历史原型。  
+需保持与前端 `AnalysisRepository` 字段对齐；后续补 OpenAPI。
 
 ---
 
@@ -555,7 +556,7 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 | 模块 | 路径 | 改动要点 |
 | --- | --- | --- |
-| 服务端 DB | 新建 `insight-api` + migration | `analyses` + `table_snapshots` + outbox（无 file_blobs） |
+| 服务端 DB | **`insight-api-go`（Go）** + migration | `analyses` + `table_snapshots` + outbox（无 file_blobs）；Node `insight-api` legacy |
 | Types | `shared/types.ts` | `revision`、`snapshotId`、`dataVersion` |
 | Repository | `shared/repository.ts` | Document + Snapshot；`HttpAnalysisRepository` |
 | Import | `commitImport.ts` | 只持久化数据内容 |
