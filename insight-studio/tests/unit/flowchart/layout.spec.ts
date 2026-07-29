@@ -113,6 +113,13 @@ describe('resolvePositions · 持久化优先 + 新节点避让', () => {
     expect(pos['t']).toEqual({ x: 1000, y: 777 })
   })
 
+  it('全部节点均有保存坐标时直接返回（跳过 autoLayout）', () => {
+    const g = graph([node('t'), node('v')], [['t', 'v']])
+    const saved = { t: { x: 11, y: 22 }, v: { x: 33, y: 44 } }
+    const pos = resolvePositions(g, saved)
+    expect(pos).toEqual(saved)
+  })
+
   it('新节点追加在已保存父节点右侧', () => {
     const g = graph([node('t'), node('v')], [['t', 'v']])
     const pos = resolvePositions(g, { t: { x: 1000, y: 500 } })

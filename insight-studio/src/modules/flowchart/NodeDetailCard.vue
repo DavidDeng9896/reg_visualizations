@@ -5,11 +5,13 @@ export type DetailLayout = 'float' | 'right' | 'bottom'
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { defineAsyncComponent } from 'vue'
 import { IButton, IIcon } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
 import { stepTypeLabel, viewTypeLabel } from './graph'
-import FlowChartPreview from './FlowChartPreview.vue'
+
+const FlowChartPreview = defineAsyncComponent(() => import('./FlowChartPreview.vue'))
 
 const props = defineProps<{
   node: FlowNodeData
