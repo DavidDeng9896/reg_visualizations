@@ -556,8 +556,7 @@ Flowchart 订阅同一频道：收到事件后若当前打开的 Analysis 匹配
 
 | 模块 | 路径 | 改动要点 |
 | --- | --- | --- |
-| 服务端 DB | **`insight-api-go`（Go）** + migration | `analyses` + `table_snapshots` + outbox（无 file_blobs）；Node `insight-api` legacy |
-| Types | `shared/types.ts` | `revision`、`snapshotId`、`dataVersion` |
+| 服务端 DB | **`insight-api-go`（Go）** + migration | `analyses` + `table_snapshots` + outbox（无 file_blobs）；Node `insight-api` legacy || Types | `shared/types.ts` | `revision`、`snapshotId`、`dataVersion` |
 | Repository | `shared/repository.ts` | Document + Snapshot；`HttpAnalysisRepository` |
 | Import | `commitImport.ts` | 只持久化数据内容 |
 | 编辑联动 | `DataGrid.vue` + `rerun.ts` | `markTableEdited` 后 **自动** `rerunStaleSteps` |
