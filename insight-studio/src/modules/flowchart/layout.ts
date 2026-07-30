@@ -166,6 +166,22 @@ export function resolvePositions(
   graph: FlowGraph,
   savedLayout: Record<string, FlowPoint> = {},
 ): Record<string, FlowPoint> {
+  // 全部节点已有持久化坐标：直接返回，避免每次打开都跑 autoLayout
+  if (graph.nodes.length > 0) {
+    const allSaved = graph.nodes.every((n) => {
+      const p = savedLayout[n.id]
+      return !!p && Number.isFinite(p.x) && Number.isFinite(p.y)
+    })
+    if (allSaved) {
+      const out: Record<string, FlowPoint> = {}
+      for (const n of graph.nodes) {
+        const p = savedLayout[n.id]!
+        out[n.id] = { x: p.x, y: p.y }
+      }
+      return out
+    }
+  }
+
   const depths = computeDepths(graph)
   const auto = autoLayout(graph)
   const parents = buildParentMap(graph)
