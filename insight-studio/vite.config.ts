@@ -10,11 +10,19 @@ export default defineConfig({
     // allow Cloudflare / localtunnel hosts for external preview
     allowedHosts: true,
     proxy: {
+      // 更具体的路径必须写在 /api 之前，否则会被 insight-api 代理吞掉
       '/api/sql': {
         target: 'http://127.0.0.1:7120',
         changeOrigin: true,
       },
+      // 同源代理 insight-api，公网隧道只需暴露前端端口
+      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
     },
+  },
+  optimizeDeps: {
+    // Plotly 预打包，避免开发期首点图表才 optimize 造成卡顿
+    include: ['plotly.js-dist-min'],
   },
   build: {
     rollupOptions: {

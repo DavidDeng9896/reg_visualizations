@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Panel, VueFlow, useVueFlow } from '@vue-flow/core'
 import type { Connection, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
@@ -15,9 +15,12 @@ import { buildFlowGraph, downstreamOf, resolveStepSourceRef, stepNodeId, upstrea
 import { autoLayout, resolvePositions } from './layout'
 import FlowNode from './FlowNode.vue'
 import FlowEdge from './FlowEdge.vue'
-import NodeDetailCard, { type DetailLayout } from './NodeDetailCard.vue'
-import AddStepPanel from './AddStepPanel.vue'
-import StepConfigPanel from '../steps/panel/StepConfigPanel.vue'
+import type { DetailLayout } from './NodeDetailCard.vue'
+
+/** 详情/配置面板按需加载，避免首开 flowchart 连带 ChartPanel 等重模块 */
+const NodeDetailCard = defineAsyncComponent(() => import('./NodeDetailCard.vue'))
+const AddStepPanel = defineAsyncComponent(() => import('./AddStepPanel.vue'))
+const StepConfigPanel = defineAsyncComponent(() => import('../steps/panel/StepConfigPanel.vue'))
 import { canConnectPorts } from './connection'
 import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
@@ -92,7 +95,7 @@ const vfEdges = ref<CanvasEdge[]>([])
 const activeId = ref<string | null>(null)
 const hoverId = ref<string | null>(null)
 const isConnecting = ref(false)
-const minimapOpen = ref(true)
+const minimapOpen = ref(false)
 /**
  * KeepAlive deactivate 时画布 DOM 被移入隐藏容器（尺寸 0），
  * vue-flow Background/MiniMap 会算出 NaN 并刷屏 SVG 错误——非活跃期不渲染它们。
@@ -159,8 +162,21 @@ function rebuild(): void {
   }))
   if (activeId.value && !nodeById.value.has(activeId.value)) activeId.value = null
 }
+
+let rebuildPrimed = false
 const rebuildDeb = debounce(rebuild, 64)
-watch([graph, positions], () => rebuildDeb.call(), { immediate: true })
+watch([graph, positions], () => {
+  // 首次同步填充，避免 64ms 空画布 + fit-view-on-init 对空图
+  if (!rebuildPrimed) {
+    rebuildPrimed = true
+    rebuild()
+    void nextTick(() => {
+      if (!isEmpty.value) fitAll(0)
+    })
+    return
+  }
+  rebuildDeb.call()
+}, { immediate: true })
 
 /**
  * VueFlow 的 Handle 在 onMounted 时依赖节点尺寸注册 handleBounds；
@@ -293,6 +309,10 @@ function arrangeAll(): void {
 }
 
 onMounted(() => {
+  // MiniMap 延后一帧，让主图先上屏
+  requestAnimationFrame(() => {
+    minimapOpen.value = true
+  })
   const flowId = selectionToFlowId(selected.value)
   if (flowId) {
     activeId.value = flowId
@@ -645,8 +665,8 @@ function minimapNodeColor(node: { data?: unknown }): string {
       :delete-key-code="null"
       :min-zoom="0.25"
       :max-zoom="2"
-      :only-render-visible-elements="perfMode"
-      fit-view-on-init
+      :only-render-visible-elements="perfMode || graph.nodes.length > 40"
+      :fit-view-on-init="false"
       @node-click="onNodeClick"
       @node-double-click="(e: NodeMouseEvent) => openInWorkspace(e.node.id)"
       @node-drag-stop="onNodeDragStop"

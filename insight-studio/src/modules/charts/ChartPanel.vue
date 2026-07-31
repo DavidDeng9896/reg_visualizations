@@ -31,11 +31,13 @@ const el = ref<HTMLDivElement>()
 let mounted = false
 let ro: ResizeObserver | null = null
 let Plotly: PlotlyApi | null = null
+let applySeq = 0
 
 async function apply(initial = false): Promise<void> {
+  const seq = ++applySeq
   if (!mounted || !el.value) return
   Plotly ??= await loadPlotly()
-  if (!mounted || !el.value) return
+  if (!mounted || !el.value || seq !== applySeq) return
   const figure = props.option ?? { data: [], layout: {} }
   const layout = { ...figure.layout, autosize: true }
   // 关闭 Plotly 自带 modebar：应用已有 Flag/Clear/导出浮层，避免与右上角工具条叠在一起。
@@ -50,9 +52,15 @@ async function apply(initial = false): Promise<void> {
   emit('rendered')
 }
 
+/** 供外层空闲预取，避免首次打开才拉 4MB+ Plotly。 */
+export function prefetchPlotly(): Promise<void> {
+  return loadPlotly().then(() => undefined)
+}
+
 onMounted(() => {
   mounted = true
-  void apply(true)
+  // Plotly 未加载且暂无可渲染数据时，先空着；数据到了再 newPlot，避免空图闪一下
+  if (props.option || Plotly) void apply(true)
   ro = new ResizeObserver(() => {
     const div = el.value
     // 隐藏/未挂载的 plot div 上调用 resize 会抛错（如切到流程图模式后工作区图表被 KeepAlive 隐藏）

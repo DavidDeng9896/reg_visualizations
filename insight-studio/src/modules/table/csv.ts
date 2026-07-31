@@ -72,6 +72,73 @@ export function coerceValue(raw: string, type: DataType): CellValue {
   }
 }
 
+/* ------------------------------ 编码探测 ------------------------------ */
+
+export type CsvTextEncoding = 'utf-8' | 'utf-16le' | 'utf-16be' | 'gb18030'
+
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+}
+
+function tryDecode(bytes: Uint8Array, label: string, fatal: boolean): string | null {
+  try {
+    return new TextDecoder(label, { fatal }).decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+function countReplacementChars(text: string): number {
+  let n = 0
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) === 0xfffd) n += 1
+  }
+  return n
+}
+
+/**
+ * 智能解码 CSV 字节。
+ * 优先 BOM → UTF-8；若 UTF-8 非法或替换字符过多，回退 GB18030（覆盖 GBK，常见于中文 Excel 导出）。
+ */
+export function decodeCsvBytes(buffer: ArrayBuffer): { text: string; encoding: CsvTextEncoding } {
+  const bytes = new Uint8Array(buffer)
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return { text: stripBom(new TextDecoder('utf-8').decode(bytes)), encoding: 'utf-8' }
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return { text: stripBom(new TextDecoder('utf-16le').decode(bytes)), encoding: 'utf-16le' }
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return { text: stripBom(new TextDecoder('utf-16be').decode(bytes)), encoding: 'utf-16be' }
+  }
+
+  const utf8Strict = tryDecode(bytes, 'utf-8', true)
+  if (utf8Strict != null) {
+    return { text: stripBom(utf8Strict), encoding: 'utf-8' }
+  }
+
+  const utf8Loose = tryDecode(bytes, 'utf-8', false) ?? ''
+  const gbk = tryDecode(bytes, 'gb18030', false)
+  if (gbk != null) {
+    const badUtf8 = countReplacementChars(utf8Loose)
+    const badGbk = countReplacementChars(gbk)
+    const looksChinese = /[\u4e00-\u9fff]/.test(gbk)
+    if (badGbk < badUtf8 || (looksChinese && badUtf8 > 0)) {
+      return { text: stripBom(gbk), encoding: 'gb18030' }
+    }
+  }
+
+  if (utf8Loose) return { text: stripBom(utf8Loose), encoding: 'utf-8' }
+  if (gbk != null) return { text: stripBom(gbk), encoding: 'gb18030' }
+  return { text: '', encoding: 'utf-8' }
+}
+
+/** 读取本地 CSV File，自动处理 UTF-8 / GBK。 */
+export async function readCsvFileText(file: File): Promise<{ text: string; encoding: CsvTextEncoding }> {
+  const buffer = await file.arrayBuffer()
+  return decodeCsvBytes(buffer)
+}
+
 /** 表格 → CSV 文本（含表头；逗号/引号/换行转义）。 */
 export function toCsv(columns: ColumnMeta[], rows: Row[]): string {
   const esc = (v: CellValue | undefined): string => {

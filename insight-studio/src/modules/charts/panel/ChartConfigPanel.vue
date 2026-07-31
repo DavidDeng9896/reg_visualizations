@@ -55,9 +55,8 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
     </header>
 
     <div class="ccpanel__body">
-      <KeepAlive>
-        <component :is="activeSection" :key="`${def.type}-${tab}`" />
-      </KeepAlive>
+      <!-- 不用 KeepAlive：避免异步挂载 / inject 时缓存出空壳 -->
+      <component :is="activeSection" :key="`${def.type}-${tab}`" />
 
       <!-- FILTERS & TRANSFORMS（只读摘要；编辑入口在表格视图） -->
       <section class="ccpanel__ft">
@@ -82,13 +81,12 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
 
 <style scoped>
 .ccpanel {
-  width: 340px;
+  width: 100%;
   height: 100%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: var(--is-surface);
-  border-left: 1px solid var(--is-border);
   overflow: hidden;
 }
 .ccpanel__head {

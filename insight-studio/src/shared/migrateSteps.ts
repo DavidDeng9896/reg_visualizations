@@ -1,15 +1,18 @@
 /**
  * 旧 Analysis → 新步骤图模型的自动迁移。
- * 幂等：已迁移或 steps 非空的 analysis 直接返回。
+ * 幂等：已迁移（有 __legacyTables）或已有 steps 的 analysis 直接返回。
  */
 import type { Analysis, AnalysisTable, CombineInputRef, CombineSpec, StepNode, StepType } from './types'
 import { uuid } from './id'
 import { nowIso } from './datetime'
 import { emptyStepOutput } from '../modules/steps/registry'
 
-/** 判断 analysis 是否已经迁移到步骤模型。 */
+/** 判断 analysis 是否已经迁移到步骤模型 / 无需再迁移。 */
 export function isMigrated(analysis: Analysis): boolean {
-  return Array.isArray(analysis.__legacyTables)
+  if (Array.isArray(analysis.__legacyTables)) return true
+  // 新模型：已有步骤图（导入/画布产生），切勿再跑迁移以免清空 steps
+  if (Array.isArray(analysis.steps) && analysis.steps.length > 0) return true
+  return false
 }
 
 interface MigrationContext {
@@ -19,7 +22,11 @@ interface MigrationContext {
 
 /** 备份旧表并生成等价步骤图。 */
 export function migrateAnalysisToSteps(analysis: Analysis): Analysis {
-  if (isMigrated(analysis)) return analysis
+  if (isMigrated(analysis)) {
+    // 补齐标记，避免仅有 steps、无 __legacyTables 的文档每次被误判
+    if (!Array.isArray(analysis.__legacyTables)) analysis.__legacyTables = []
+    return analysis
+  }
 
   // 备份旧表（深拷贝），便于调试与潜在回退。
   analysis.__legacyTables = JSON.parse(JSON.stringify(analysis.tables)) as AnalysisTable[]
@@ -55,6 +62,22 @@ function tableToStep(
 ): StepNode | null {
   if (table.stepId && ctx.tableSteps.has(table.id)) {
     return ctx.tableSteps.get(table.id)!
+  }
+
+  // 已是步骤产物但 steps 被误清空：按源类型尽量恢复节点，保留 stepId / 视图 / 图表
+  if (table.source === 'step' || table.stepId) {
+    const step: StepNode = {
+      id: table.stepId || uuid(),
+      type: 'upload-csv',
+      name: table.name,
+      inputs: [],
+      config: { tableName: table.name },
+      status: 'configured',
+      output: { ...emptyStepOutput(), tables: [table.id] },
+    }
+    table.source = 'step'
+    table.stepId = step.id
+    return step
   }
 
   if (table.source === 'csv' || table.source === 'demo') {

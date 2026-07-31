@@ -38,26 +38,42 @@ const columns = computed(() => result.value?.columns ?? [])
 /* ------------------------------- 草稿模型 ------------------------------- */
 
 const savedConfig = computed<ChartConfig | null>(() => view.value?.chart ?? null)
-const draftModel = reactive<ChartDraft>({ saved: cloneConfig(savedConfig.value ?? fallbackConfig()), draft: cloneConfig(savedConfig.value ?? fallbackConfig()) })
+const draftModel = reactive<ChartDraft>({
+  saved: cloneConfig(savedConfig.value ?? fallbackConfig()),
+  draft: cloneConfig(savedConfig.value ?? fallbackConfig()),
+})
 
 function fallbackConfig(): ChartConfig {
-  return { chartType: 'bar', position: 'bottom', configure: {}, style: {} }
+  const t = (view.value?.type && view.value.type !== 'table' ? view.value.type : 'bar') as ChartType
+  return { chartType: t, position: 'bottom', configure: {}, style: {} }
 }
 
 const panelOpen = ref(false)
 const saveAttempted = ref(false)
 
-// 视图切换 / 外部保存后重建草稿
-watch(
-  () => [view.value?.id, view.value?.chart] as const,
-  () => {
-    const cfg = savedConfig.value
-    if (!cfg) return
+function syncDraftFromView(): void {
+  const cfg = savedConfig.value
+  if (cfg) {
     const snap = cloneConfig(cfg)
+    // 视图 type 与 chart.chartType 不一致时以视图为准，避免落到错误图种空面板
+    if (view.value && view.value.type !== 'table' && snap.chartType !== view.value.type) {
+      snap.chartType = view.value.type as ChartType
+    }
     draftModel.saved = snap
     draftModel.draft = cloneConfig(snap)
-    saveAttempted.value = false
-  },
+  } else if (view.value && view.value.type !== 'table') {
+    const snap = fallbackConfig()
+    draftModel.saved = cloneConfig(snap)
+    draftModel.draft = cloneConfig(snap)
+  }
+  saveAttempted.value = false
+}
+
+// 视图切换 / 外部保存后重建草稿（含首次）
+watch(
+  () => [view.value?.id, view.value?.type, view.value?.chart] as const,
+  () => syncDraftFromView(),
+  { immediate: true },
 )
 
 const dirty = computed(() => isDirty(draftModel as ChartDraft))
@@ -107,8 +123,16 @@ function rebuild() {
 }
 
 const rebuildDeb = debounce(rebuild, 150)
-// 避免对含上万行的 result 做 deep watch；result/flags 引用变化即重建，配置草稿仍 deep
-watch(result, () => rebuildDeb.call(), { immediate: true })
+// 首次同步重建，避免每次打开都先等 150ms 才出图
+let chartRebuildPrimed = false
+watch(result, () => {
+  if (!chartRebuildPrimed) {
+    chartRebuildPrimed = true
+    rebuild()
+    return
+  }
+  rebuildDeb.call()
+}, { immediate: true })
 watch(flags, () => rebuildDeb.call())
 watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 
@@ -133,7 +157,7 @@ watch(
 
 /* ------------------------------- Save / Cancel ------------------------------- */
 
-function save() {
+async function save() {
   const v = view.value
   if (!v) return
   const errors = validateChartMapping(draftModel.draft, columns.value)
@@ -144,16 +168,29 @@ function save() {
   }
   const committed = commitDraft(draftModel as ChartDraft)
   const committedType: ChartType = committed.chartType
+  const tableId = tc.selected.value?.tableId
+  const viewId = tc.selected.value?.viewId
+  let wrote = false
   store.mutate((a) => {
-    const t = a.tables.find((tb) => tb.id === tc.selected.value?.tableId)
-    const target = t && tc.selected.value?.viewId ? findView(t.views, tc.selected.value.viewId) : null
+    const t = a.tables.find((tb) => tb.id === tableId)
+    const target = t && viewId ? findView(t.views, viewId) : null
     if (target) {
       target.type = committedType
       target.chart = committed
+      wrote = true
     }
   })
+  if (!wrote) {
+    toast.error('未找到当前图表视图，配置未写入')
+    return
+  }
   saveAttempted.value = false
-  toast.success('图表配置已保存')
+  try {
+    await store.saveNow()
+    toast.success('图表配置已保存')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败', { title: '落盘失败' })
+  }
 }
 
 function cancel() {
@@ -512,12 +549,10 @@ const chartHeight = computed(() => previewConfig.value.style.height)
       />
     </div>
 
-    <!-- 右侧配置抽屉（v-show：开合不重建 ECharts） -->
-    <Transition name="cview-drawer">
-      <div v-show="panelOpen" class="cview__drawer">
-        <ChartConfigPanel v-if="view" :view-name="view.name" :chips="chips" @rename="rename" @cancel="cancel" @save="save" />
-      </div>
-    </Transition>
+    <!-- 右侧配置抽屉：固定宽度，禁止用 width:0 做 Transition（会被 flex 压没） -->
+    <aside v-if="panelOpen" class="cview__drawer" aria-label="图表配置">
+      <ChartConfigPanel v-if="view" :view-name="view.name" :chips="chips" @rename="rename" @cancel="cancel" @save="save" />
+    </aside>
 
     <!-- 切换视图 dirty 确认 -->
     <IModal :open="guardOpen" title="未保存的图表修改" :width="420" @update:open="guardCancel">
@@ -572,8 +607,12 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 .cview {
   height: 100%;
   min-height: 0;
+  min-width: 0;
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
   position: relative;
+  overflow: hidden;
 }
 .cview__main {
   flex: 1;
@@ -791,20 +830,15 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   border-color: var(--is-accent);
 }
 .cview__drawer {
+  width: 340px;
+  min-width: 340px;
+  max-width: 340px;
+  flex: 0 0 340px;
   height: 100%;
   overflow: hidden;
-}
-.cview-drawer-enter-active,
-.cview-drawer-leave-active {
-  transition:
-    width var(--is-dur) var(--is-ease),
-    opacity var(--is-dur) var(--is-ease);
-  width: 340px;
-}
-.cview-drawer-enter-from,
-.cview-drawer-leave-to {
-  width: 0;
-  opacity: 0;
+  background: var(--is-surface);
+  border-left: 1px solid var(--is-border);
+  z-index: 2;
 }
 .cview__guard-text {
   font-size: var(--is-text-sm);

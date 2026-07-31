@@ -13,10 +13,24 @@ const ctx = inject(CHART_DRAFT_CONTEXT)!
 
 const colType = (field: string) => ctx.columns.value.find((c) => c.field === field)?.dataType ?? 'string'
 
-const options = computed<SelectOption[]>(() =>
-  ctx.columns.value
-    .filter((c) => !props.slot.acceptTypes?.length || props.slot.acceptTypes.includes(c.dataType))
-    .map((c) => ({ value: c.field, label: c.title, icon: c.dataType === 'number' ? ('type-number' as const) : ('type-text' as const) })),
+const options = computed<SelectOption[]>(() => {
+  const cols = ctx.columns.value
+  const accept = props.slot.acceptTypes
+  const toOpt = (c: (typeof cols)[number], hint?: string): SelectOption => ({
+    value: c.field,
+    label: hint ? `${c.title}（${hint}）` : c.title,
+    icon: c.dataType === 'number' ? ('type-number' as const) : ('type-text' as const),
+  })
+  if (!accept?.length) return cols.map((c) => toOpt(c))
+  const compatible = cols.filter((c) => accept.includes(c.dataType))
+  // 有兼容列：只列兼容项；全不兼容时仍列出全部并标注，避免下拉空白无法设置
+  if (compatible.length) return compatible.map((c) => toOpt(c))
+  return cols.map((c) => toOpt(c, `需 ${accept.join('/')}`))
+})
+
+const noCompatibleColumns = computed(
+  () => ctx.columns.value.length > 0 && !!props.slot.acceptTypes?.length &&
+    !ctx.columns.value.some((c) => props.slot.acceptTypes!.includes(c.dataType)),
 )
 
 const mappings = computed<FieldMapping[]>(() => {
@@ -123,11 +137,16 @@ const capsuleAgg = (m: FieldMapping): string | undefined => {
         class="mslot__select"
         :aria-label="slot.label"
         :model-value="null"
+        :disabled="ctx.columns.value.length === 0"
         @update:model-value="slot.multiple ? addMapping($event) : setSingle($event)"
       />
     </div>
 
-    <p v-if="missingFields.size" class="mslot__msg mslot__msg--missing">
+    <p v-if="noCompatibleColumns" class="mslot__msg">
+      当前没有 {{ slot.acceptTypes?.join(' / ') }} 类型的列。可先在「编辑数据」里把数值列改为 Number，或临时选用下列字段。
+    </p>
+    <p v-else-if="ctx.columns.value.length === 0" class="mslot__msg">当前没有可用列。</p>
+    <p v-else-if="missingFields.size" class="mslot__msg mslot__msg--missing">
       列 {{ [...missingFields].map((f) => `「${f}」`).join('、') }} 已不存在，请重新绑定
     </p>
     <p v-else-if="error" class="mslot__msg">{{ error.message }}</p>

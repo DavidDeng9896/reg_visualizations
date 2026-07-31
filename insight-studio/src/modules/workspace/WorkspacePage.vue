@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { analysisRepository } from '../../shared/repository'
@@ -15,6 +15,17 @@ import CombineTablesDialog from '../table/CombineTablesDialog.vue'
 
 const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
 
+function prefetchFlowchart(): void {
+  void import('./FlowchartMain.vue')
+}
+
+async function prefetchCharts(): Promise<void> {
+  // 空闲预取 ChartView + Plotly，点开图表不再现场下载大 chunk
+  void import('../charts/ChartView.vue')
+  const mod = await import('../charts/ChartPanel.vue')
+  await mod.prefetchPlotly()
+}
+
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
@@ -23,6 +34,15 @@ const { current, mode, dirty, saving, loading } = storeToRefs(store)
 const analysisId = computed(() => String(route.params.id ?? ''))
 
 onMounted(async () => {
+  // 空闲时预取 flowchart / 图表，降低首次打开等待
+  const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
+  const prefetchAll = () => {
+    prefetchFlowchart()
+    void prefetchCharts()
+  }
+  if (typeof ric === 'function') ric(prefetchAll, { timeout: 2500 })
+  else setTimeout(prefetchAll, 800)
+
   const ok = await store.load(analysisId.value)
   if (!ok) {
     toast.error('Analysis 不存在或已被删除')
@@ -50,9 +70,14 @@ function applyQuerySelection() {
   store.select(viewId ? { kind: 'view', tableId, viewId } : { kind: 'table', tableId })
 }
 
-// 离开页面前落盘
-onBeforeUnmount(() => {
-  void store.saveNow()
+// 离开页面前等待落盘，避免防抖未完成导致配置丢失
+onBeforeRouteLeave(async () => {
+  try {
+    await store.saveNow()
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败', { title: '离开前保存失败' })
+    // 仍允许离开；dirty 保留，下次进入可再试
+  }
 })
 
 /* 顶栏 ⋯ 菜单 */
@@ -147,6 +172,8 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
             icon="flowchart"
             :aria-pressed="mode === 'flowchart'"
+            @mouseenter="prefetchFlowchart(); void prefetchCharts()"
+            @focus="prefetchFlowchart(); void prefetchCharts()"
             @click="toggleFlowchart"
           >
             Flowchart
