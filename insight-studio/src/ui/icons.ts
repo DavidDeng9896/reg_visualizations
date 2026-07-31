@@ -62,6 +62,13 @@ import {
   Upload,
   Workflow,
   X,
+  Bell,
+  CircleHelp,
+  LayoutGrid,
+  ClipboardList,
+  Send,
+  UserRound,
+  SquareChartGantt,
 } from 'lucide-vue-next'
 
 export type IconName =
@@ -123,6 +130,13 @@ export type IconName =
   | 'overlay'
   | 'panel-right'
   | 'panel-bottom'
+  | 'bell'
+  | 'help'
+  | 'apps'
+  | 'approval'
+  | 'send'
+  | 'user'
+  | 'grid'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -183,4 +197,11 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   overlay: PictureInPicture2,
   'panel-right': PanelRight,
   'panel-bottom': PanelBottom,
+  bell: Bell,
+  help: CircleHelp,
+  apps: LayoutGrid,
+  approval: ClipboardList,
+  send: Send,
+  user: UserRound,
+  grid: SquareChartGantt,
 }

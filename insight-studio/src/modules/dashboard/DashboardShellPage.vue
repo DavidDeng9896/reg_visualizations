@@ -5,10 +5,9 @@ import { storeToRefs } from 'pinia'
 import { createDashboardWidget, createLinkWidget } from '../../shared/factories'
 import { useDashboardStore } from '../../stores/dashboardStore'
 import { IButton, IEmptyState, toast } from '../../ui'
-import HomeSegmentNav from '../home/HomeSegmentNav.vue'
-import DashboardSidebar from './DashboardSidebar.vue'
 import DashboardCanvas from './DashboardCanvas.vue'
 import AddWidgetDialog, { type AddWidgetPayload } from './AddWidgetDialog.vue'
+import CategorySidebar from './CategorySidebar.vue'
 import { findNextSlot, type LayoutItem } from './grid'
 import type { DashboardWidget } from '../../shared/types'
 
@@ -19,6 +18,9 @@ const { current, currentId, saving, dirty } = storeToRefs(store)
 
 const editLayout = ref(false)
 const addOpen = ref(false)
+
+/** 分类样式侧栏开关（内嵌面板，非浮窗）。 */
+const categoryOpen = ref(false)
 
 const routeId = computed(() => {
   const id = route.params.id
@@ -101,116 +103,95 @@ function onAddWidget(payload: AddWidgetPayload) {
   })
   toast.success('已添加组件')
 }
+
+/** 分类侧栏选择：打开添加组件对话框（图表/表） */
+function onPickCategory(kind: 'table' | 'chart') {
+  addOpen.value = true
+}
 </script>
 
 <template>
-  <div class="shell">
-    <header class="shell__header">
-      <div class="shell__brand">
-        <h1 class="shell__title">Insight Studio</h1>
-        <HomeSegmentNav active="dashboard" />
-      </div>
-      <div class="shell__status">
-        <span v-if="saving" class="shell__saving">保存中…</span>
-        <span v-else-if="dirty" class="shell__dirty">未保存</span>
-      </div>
-    </header>
-    <div class="shell__body">
-      <DashboardSidebar class="shell__side" />
-      <main class="shell__main">
-        <template v-if="current">
-          <div class="shell__toolbar">
-            <h2 class="shell__dash-name is-ellipsis">{{ current.name }}</h2>
-            <div class="shell__toolbar-actions">
-              <IButton
-                size="sm"
-                :variant="editLayout ? 'primary' : 'secondary'"
-                @click="editLayout = !editLayout"
-              >
-                {{ editLayout ? '完成布局' : '编辑布局' }}
-              </IButton>
-              <IButton size="sm" variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
-            </div>
-          </div>
-          <div class="shell__canvas-wrap">
-            <IEmptyState
-              v-if="!current.widgets.length"
-              icon="plus"
-              title="还没有组件"
-              description="从多个 Insight 中选择已配置好的表或图表，拖到画布上组成总览。"
+  <div class="dash">
+    <!-- 看板画布区 -->
+    <main class="dash__main">
+      <template v-if="current">
+        <div class="dash__toolbar">
+          <h2 class="dash__name is-ellipsis">{{ current.name }}</h2>
+          <div class="dash__actions">
+            <IButton
+              size="sm"
+              :variant="categoryOpen ? 'secondary' : 'ghost'"
+              icon="sliders"
+              :aria-pressed="categoryOpen"
+              @click="categoryOpen = !categoryOpen"
             >
-              <IButton variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
-            </IEmptyState>
-            <DashboardCanvas
-              v-else
-              :dashboard="current"
-              :edit-layout="editLayout"
-              @update-widget="onUpdateWidget"
-              @apply-layout="onApplyLayout"
-              @remove-widget="onRemoveWidget"
-            />
+              分类样式
+            </IButton>
+            <IButton
+              size="sm"
+              :variant="editLayout ? 'primary' : 'secondary'"
+              @click="editLayout = !editLayout"
+            >
+              {{ editLayout ? '完成布局' : '编辑布局' }}
+            </IButton>
+            <IButton size="sm" variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
           </div>
-        </template>
-        <IEmptyState
-          v-else
-          icon="folder"
-          title="选择或新建看板"
-          description="左侧选择一个看板，或新建「细胞培养」「Assay」等主题总览。"
-        />
-      </main>
-    </div>
+        </div>
+        <div class="dash__canvas-wrap">
+          <IEmptyState
+            v-if="!current.widgets.length"
+            icon="plus"
+            title="还没有组件"
+            description="从多个 Insight 中选择已配置好的表或图表，拖到画布上组成总览。"
+          >
+            <IButton variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
+          </IEmptyState>
+          <DashboardCanvas
+            v-else
+            :dashboard="current"
+            :edit-layout="editLayout"
+            @update-widget="onUpdateWidget"
+            @apply-layout="onApplyLayout"
+            @remove-widget="onRemoveWidget"
+          />
+        </div>
+      </template>
+      <IEmptyState
+        v-else
+        icon="folder"
+        title="选择或新建看板"
+        description="左侧选择一个看板，或新建「细胞培养」「Assay」等主题总览。"
+      />
+    </main>
+
+    <!-- 分类样式侧栏（内嵌面板，非浮窗） -->
+    <aside v-if="categoryOpen && current" class="dash__cats" aria-label="分类样式">
+      <div class="dash__cats-head">
+        <span class="dash__cats-title">分类样式</span>
+        <IButton variant="ghost" size="sm" icon="close" aria-label="关闭" @click="categoryOpen = false" />
+      </div>
+      <CategorySidebar @pick="onPickCategory" />
+    </aside>
+
     <AddWidgetDialog v-model:open="addOpen" @confirm="onAddWidget" />
   </div>
 </template>
 
 <style scoped>
-.shell {
+.dash {
+  display: flex;
   height: 100%;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
-  background: var(--is-bg, #f9fafb);
 }
-.shell__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--is-surface);
-  border-bottom: 1px solid var(--is-border);
-  flex-shrink: 0;
-}
-.shell__brand {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.shell__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-.shell__status {
-  font-size: 12px;
-  color: var(--is-text-tertiary);
-}
-.shell__body {
+.dash__main {
   flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-}
-.shell__side {
-  min-height: 0;
-}
-.shell__main {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
 }
-.shell__toolbar {
+.dash__toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -223,19 +204,45 @@ function onAddWidget(payload: AddWidgetPayload) {
   top: 0;
   z-index: 2;
 }
-.shell__dash-name {
+.dash__name {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
   min-width: 0;
 }
-.shell__toolbar-actions {
+.dash__actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
 }
-.shell__canvas-wrap {
+.dash__canvas-wrap {
   padding: 16px 20px 32px;
   flex: 1;
+}
+
+/* 分类样式侧栏（内嵌） */
+.dash__cats {
+  width: 264px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--is-surface);
+  border-left: 1px solid var(--is-border);
+}
+.dash__cats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px 16px;
+  border-bottom: 1px solid var(--is-border);
+  position: sticky;
+  top: 0;
+  background: var(--is-surface);
+  z-index: 1;
+}
+.dash__cats-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--is-text);
 }
 </style>

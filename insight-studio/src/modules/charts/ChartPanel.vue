@@ -1,9 +1,4 @@
-<script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { ChartOption } from './types'
-
-export type FlagMode = 'off' | 'flag' | 'clear'
-
+<script lang="ts">
 type PlotlyApi = typeof import('plotly.js-dist-min').default
 
 let plotlyPromise: Promise<PlotlyApi> | null = null
@@ -13,6 +8,18 @@ function loadPlotly(): Promise<PlotlyApi> {
   }
   return plotlyPromise
 }
+
+/** 供外层空闲预取，避免首次打开才拉 4MB+ Plotly。 */
+export function prefetchPlotly(): Promise<void> {
+  return loadPlotly().then(() => undefined)
+}
+</script>
+
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { ChartOption } from './types'
+
+export type FlagMode = 'off' | 'flag' | 'clear'
 
 const props = withDefaults(
   defineProps<{
@@ -50,11 +57,6 @@ async function apply(initial = false): Promise<void> {
   if (initial) await Plotly.newPlot(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
   else await Plotly.react(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
   emit('rendered')
-}
-
-/** 供外层空闲预取，避免首次打开才拉 4MB+ Plotly。 */
-export function prefetchPlotly(): Promise<void> {
-  return loadPlotly().then(() => undefined)
 }
 
 onMounted(() => {
