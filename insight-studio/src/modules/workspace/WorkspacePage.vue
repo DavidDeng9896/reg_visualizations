@@ -19,6 +19,13 @@ function prefetchFlowchart(): void {
   void import('./FlowchartMain.vue')
 }
 
+async function prefetchCharts(): Promise<void> {
+  // 空闲预取 ChartView + Plotly，点开图表不再现场下载大 chunk
+  void import('../charts/ChartView.vue')
+  const mod = await import('../charts/ChartPanel.vue')
+  await mod.prefetchPlotly()
+}
+
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
@@ -27,10 +34,14 @@ const { current, mode, dirty, saving, loading } = storeToRefs(store)
 const analysisId = computed(() => String(route.params.id ?? ''))
 
 onMounted(async () => {
-  // 空闲时预取 flowchart 包，降低首次点击等待
+  // 空闲时预取 flowchart / 图表，降低首次打开等待
   const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
-  if (typeof ric === 'function') ric(() => prefetchFlowchart(), { timeout: 2000 })
-  else setTimeout(prefetchFlowchart, 800)
+  const prefetchAll = () => {
+    prefetchFlowchart()
+    void prefetchCharts()
+  }
+  if (typeof ric === 'function') ric(prefetchAll, { timeout: 2500 })
+  else setTimeout(prefetchAll, 800)
 
   const ok = await store.load(analysisId.value)
   if (!ok) {
@@ -161,8 +172,8 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
             icon="flowchart"
             :aria-pressed="mode === 'flowchart'"
-            @mouseenter="prefetchFlowchart"
-            @focus="prefetchFlowchart"
+            @mouseenter="prefetchFlowchart(); void prefetchCharts()"
+            @focus="prefetchFlowchart(); void prefetchCharts()"
             @click="toggleFlowchart"
           >
             Flowchart
