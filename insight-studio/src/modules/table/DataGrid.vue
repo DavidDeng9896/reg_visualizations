@@ -1340,11 +1340,7 @@ function promote() {
           <button type="button" class="dg__menu-item" role="menuitem" @click="runColumnMenu(() => openTransformDialog(null, 'derived'))">
             <IIcon name="plus" :size="13" /> 在右侧插入派生列
           </button>
-<<<<<<< HEAD
-          <template v-if="editable">
-=======
           <template v-if="sessionActive">
->>>>>>> use_plotly
             <div
               class="dg__menu-item-wrap"
               @mouseenter="colTypeSubOpen = true"
