@@ -123,8 +123,16 @@ function rebuild() {
 }
 
 const rebuildDeb = debounce(rebuild, 150)
-// 避免对含上万行的 result 做 deep watch；result/flags 引用变化即重建，配置草稿仍 deep
-watch(result, () => rebuildDeb.call(), { immediate: true })
+// 首次同步重建，避免每次打开都先等 150ms 才出图
+let chartRebuildPrimed = false
+watch(result, () => {
+  if (!chartRebuildPrimed) {
+    chartRebuildPrimed = true
+    rebuild()
+    return
+  }
+  rebuildDeb.call()
+}, { immediate: true })
 watch(flags, () => rebuildDeb.call())
 watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 

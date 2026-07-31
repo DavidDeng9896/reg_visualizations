@@ -20,6 +20,10 @@ export default defineConfig({
       '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
     },
   },
+  optimizeDeps: {
+    // Plotly 预打包，避免开发期首点图表才 optimize 造成卡顿
+    include: ['plotly.js-dist-min'],
+  },
   build: {
     rollupOptions: {
       output: {
