@@ -19,12 +19,24 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
   const agg = cfg.measure?.aggregation ?? (measureField ? 'sum' : 'count')
   const cats = distinctInOrder(rows, catField).map(displayVal)
 
+  // 单遍分组：cat → rows，替代每类 rows.filter 的 O(cats×N)
+  const groups = new Map<string, typeof rows>()
+  for (const r of rows) {
+    const ck = displayVal(r[catField])
+    let arr = groups.get(ck)
+    if (!arr) {
+      arr = []
+      groups.set(ck, arr)
+    }
+    arr.push(r)
+  }
+
   let droppedNeg = 0
   const labels: string[] = []
   const values: number[] = []
   const colors: string[] = []
   cats.forEach((cat, i) => {
-    const subset = rows.filter((r) => displayVal(r[catField]) === cat)
+    const subset = groups.get(cat) ?? []
     let value: number
     if (measureField) {
       const v = aggregateRows(subset, measureField, agg)
@@ -73,7 +85,7 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
         hovertemplate: '%{label}: %{value}<br>%{percent}<extra></extra>',
       },
     ],
-    layout: baseLayout(style, viewName ?? '', { legend: true }),
+    layout: baseLayout(style, '', { legend: true }),
   }
   return { option, warnings, seriesNames: labels }
 }

@@ -121,9 +121,13 @@ export const useDashboardStore = defineStore('dashboard', {
       this._scheduleSave()
     },
 
-    async create(name: string, repo: DashboardRepository = dashboardRepository): Promise<Dashboard> {
+    async create(
+      name: string,
+      org?: { project?: string; department?: string },
+      repo: DashboardRepository = dashboardRepository,
+    ): Promise<Dashboard> {
       await this.saveNow(repo)
-      const d = createDashboard(name)
+      const d = createDashboard(name, org)
       await repo.put(d)
       this.items.push(d)
       this.current = d

@@ -70,19 +70,30 @@ describe('modelOutputOf（MODEL OUTPUT）', () => {
 })
 
 describe('summarizeFit', () => {
-  it('追加 R² 行；组名与模型标签', () => {
+  it('追加 R² 与 AUC 行；组名与模型标签', () => {
     const s = summarizeFit('Group A', linearFit(), linPts)
     expect(s.group).toBe('Group A')
     expect(s.modelLabel).toBe('Linear')
-    expect(s.variables[s.variables.length - 1].name).toBe('R²')
-    expect(s.variables[s.variables.length - 1].estimate).toBeCloseTo(1, 8)
+    const names = s.variables.map((v) => v.name)
+    expect(names).toEqual(['Slope', 'Intercept', 'R²', 'AUC'])
+    expect(s.variables[2].estimate).toBeCloseTo(1, 8)
+    // 点 (1,3),(2,5),(3,7),(4,9) 梯形面积 = 4+6+8 = 18
+    expect(s.variables[3].estimate).toBeCloseTo(18, 8)
     expect(s.output).toHaveLength(4)
     expect(s.usedPoints).toBe(4)
   })
 
-  it('point-to-point 无 R² 行', () => {
+  it('point-to-point 无 R² 行，但保留经验 AUC（不拟合也可算曲线下面积）', () => {
     const s = summarizeFit('', runFit(linPts, { model: 'point-to-point' }), linPts)
-    expect(s.variables).toHaveLength(0)
+    expect(s.variables.map((v) => v.name)).toEqual(['AUC'])
+    expect(s.variables[0].estimate).toBeCloseTo(18, 8)
     expect(s.r2).toBeNull()
+  })
+
+  it('AUC 排除打标点', () => {
+    const pts = linPts.map((p, i) => ({ ...p, flagged: i === 3 }))
+    const s = summarizeFit('', linearFit(), pts)
+    // 剩余 (1,3),(2,5),(3,7) → 4+6 = 10
+    expect(s.variables.find((v) => v.name === 'AUC')?.estimate).toBeCloseTo(10, 8)
   })
 })

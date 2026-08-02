@@ -5,13 +5,8 @@ import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { analysisRepository } from '../../shared/repository'
 import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '../../ui'
-import SidebarTree from './SidebarTree.vue'
 import WorkspaceMain from './WorkspaceMain.vue'
-import AddDataMenu from './AddDataMenu.vue'
-import CsvImportDialog from '../table/CsvImportDialog.vue'
-import ExcelImportDialog from '../table/ExcelImportDialog.vue'
-import SqlImportDialog from '../table/SqlImportDialog.vue'
-import CombineTablesDialog from '../table/CombineTablesDialog.vue'
+import { useAddData } from '../shell/useAddData'
 
 const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
 
@@ -30,6 +25,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const { current, mode, dirty, saving, loading } = storeToRefs(store)
+const { openMenu: openAddData } = useAddData()
 
 const analysisId = computed(() => String(route.params.id ?? ''))
 
@@ -110,47 +106,34 @@ function toggleFlowchart() {
   store.setMode(mode.value === 'flowchart' ? 'workspace' : 'flowchart')
 }
 
-/* Add data 菜单 */
-const addDataOpen = ref(false)
-const csvImportOpen = ref(false)
-const excelImportOpen = ref(false)
-const sqlImportOpen = ref(false)
-const combineOpen = ref(false)
-
-function openCsvImport() {
-  addDataOpen.value = false
-  csvImportOpen.value = true
-}
-function openExcelImport() {
-  addDataOpen.value = false
-  excelImportOpen.value = true
-}
-function openSqlImport() {
-  addDataOpen.value = false
-  sqlImportOpen.value = true
-}
-function openCombine() {
-  addDataOpen.value = false
-  combineOpen.value = true
-}
-
 const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain : WorkspaceMain))
 </script>
 
 <template>
   <div class="ws">
     <header class="ws__header">
-      <nav class="ws__breadcrumb" aria-label="面包屑">
-        <RouterLink to="/" class="ws__crumb-link">Projects</RouterLink>
-        <IIcon name="chevron-right" :size="14" class="ws__crumb-sep" />
-        <span class="ws__crumb-current is-ellipsis">{{ current?.name ?? '…' }}</span>
+      <div class="ws__title-row">
+        <h1 class="ws__title is-ellipsis">{{ current?.name ?? '…' }}</h1>
         <span v-if="dirty" class="ws__dirty" title="有未保存更改">
           <IIcon name="dot" :size="8" />
         </span>
         <span v-if="saving" class="ws__saving">保存中…</span>
-      </nav>
+      </div>
 
       <div class="ws__header-actions">
+        <ITooltip :content="mode === 'flowchart' ? '返回工作区' : '查看流程图'">
+          <IButton
+            :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
+            icon="flowchart"
+            :aria-pressed="mode === 'flowchart'"
+            @mouseenter="prefetchFlowchart(); void prefetchCharts()"
+            @focus="prefetchFlowchart(); void prefetchCharts()"
+            @click="toggleFlowchart"
+          >
+            Flowchart
+          </IButton>
+        </ITooltip>
+
         <IPopover :open="headerMenuOpen" placement="bottom-end" :arrow="false" @update:open="headerMenuOpen = $event">
           <template #anchor>
             <IButton variant="ghost" icon="more" title="更多操作" aria-label="更多操作" @click="headerMenuOpen = !headerMenuOpen" />
@@ -166,49 +149,14 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             </div>
           </template>
         </IPopover>
-
-        <ITooltip :content="mode === 'flowchart' ? '返回工作区' : '查看流程图'">
-          <IButton
-            :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
-            icon="flowchart"
-            :aria-pressed="mode === 'flowchart'"
-            @mouseenter="prefetchFlowchart(); void prefetchCharts()"
-            @focus="prefetchFlowchart(); void prefetchCharts()"
-            @click="toggleFlowchart"
-          >
-            Flowchart
-          </IButton>
-        </ITooltip>
-
-        <IPopover :open="addDataOpen" placement="bottom-end" :arrow="true" @update:open="addDataOpen = $event">
-          <template #anchor>
-            <IButton variant="primary" icon="plus" @click="addDataOpen = !addDataOpen">Add data</IButton>
-          </template>
-          <template #default>
-            <AddDataMenu
-              @import-csv="openCsvImport"
-              @import-excel="openExcelImport"
-              @import-sql="openSqlImport"
-              @combine="openCombine"
-            />
-          </template>
-        </IPopover>
       </div>
     </header>
 
-    <div class="ws__body">
-      <SidebarTree
-        @import-csv="openCsvImport"
-        @import-excel="openExcelImport"
-        @import-sql="openSqlImport"
-        @combine="openCombine"
-      />
-      <main class="ws__main">
-        <KeepAlive>
-          <component :is="modeComponent" :key="mode" @add-data="addDataOpen = true" />
-        </KeepAlive>
-      </main>
-    </div>
+    <main class="ws__main">
+      <KeepAlive>
+        <component :is="modeComponent" :key="mode" @add-data="openAddData" />
+      </KeepAlive>
+    </main>
 
     <!-- 重命名 -->
     <IModal :open="renameOpen" title="重命名 Analysis" :width="420" @update:open="renameOpen = $event">
@@ -228,12 +176,6 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
       </template>
     </IModal>
 
-    <!-- 数据导入 / 表合并 -->
-    <CsvImportDialog :open="csvImportOpen" @update:open="csvImportOpen = $event" />
-    <ExcelImportDialog :open="excelImportOpen" @update:open="excelImportOpen = $event" />
-    <SqlImportDialog :open="sqlImportOpen" @update:open="sqlImportOpen = $event" />
-    <CombineTablesDialog :open="combineOpen" @update:open="combineOpen = $event" />
-
     <div v-if="loading" class="ws__loading">加载中…</div>
   </div>
 </template>
@@ -243,37 +185,31 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 .ws__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 52px;
-  padding: 0 16px;
+  height: 56px;
+  padding: 0 20px;
   background: var(--is-surface);
   border-bottom: 1px solid var(--is-border);
   flex-shrink: 0;
 }
-.ws__breadcrumb {
+.ws__title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  font-size: var(--is-text-sm);
 }
-.ws__crumb-link {
-  color: var(--is-text-secondary);
-}
-.ws__crumb-link:hover {
-  color: var(--is-accent);
-}
-.ws__crumb-sep {
-  color: var(--is-text-tertiary);
-}
-.ws__crumb-current {
+.ws__title {
+  margin: 0;
+  font-size: 18px;
   font-weight: 600;
-  max-width: 320px;
+  color: var(--is-text);
+  max-width: 480px;
 }
 .ws__dirty {
   color: var(--is-warning-text);
@@ -288,25 +224,32 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   align-items: center;
   gap: 8px;
 }
-.ws__body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
 .ws__main {
   flex: 1;
   min-width: 0;
   min-height: 0;
 }
 .ws__loading {
-  position: fixed;
-  inset: 0;
+  /* 只盖工作区主区域，不盖全局壳层（头部/rail/侧栏保持可见可交互）；
+     200ms 延迟淡入，快速加载不闪屏 */
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 56px;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--is-bg);
   color: var(--is-text-secondary);
-  z-index: 10;
+  z-index: 5;
+  opacity: 0;
+  animation: ws-loading-in 160ms var(--is-ease) 200ms forwards;
+}
+@keyframes ws-loading-in {
+  to {
+    opacity: 1;
+  }
 }
 
 .menu {
@@ -320,10 +263,13 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
+  border: none;
   border-radius: var(--is-radius-sm);
+  background: transparent;
   font-size: var(--is-text-sm);
   text-align: left;
   color: var(--is-text);
+  cursor: pointer;
   transition: background-color var(--is-dur-fast) var(--is-ease);
 }
 .menu__item:hover:not(:disabled) {

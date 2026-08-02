@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { ChartConfig, ChartType, RowFlag } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
@@ -14,6 +14,7 @@ import { transformSummary } from '../table/transformForm'
 import { getChartDef, buildChartOption, validateChartMapping } from './registry'
 import { migrateConfigure, migrateStyle } from './runtime/mapping'
 import { samplingNotice } from './runtime/sampling'
+import { buildMargin, buildTitleLayout } from './runtime/shared'
 import { cancelDraft, cloneConfig, commitDraft, createDraft, debounce, isDirty, type ChartDraft } from './draft'
 import { exportPdf, exportPng } from './export'
 import { addFlags, flagSetOf, removeFlags } from './flags'
@@ -87,6 +88,8 @@ const warnings = ref<string[]>([])
 const seriesNames = ref<string[]>([])
 const fits = ref<FitGroupSummary[]>([])
 const rebuilding = ref(false)
+/** 首次成功渲染后置真：之前显示图表形骨架，之后只显示 2px 重建 shimmer。 */
+const hasRendered = ref(false)
 
 /** 视图打标（存于 ViewNode.flags）。 */
 const flags = computed<RowFlag[]>(() => view.value?.flags ?? [])
@@ -135,6 +138,20 @@ watch(result, () => {
 }, { immediate: true })
 watch(flags, () => rebuildDeb.call())
 watch(previewConfig, () => rebuildDeb.call(), { deep: true })
+
+// layout-only 快路径：标题/副标题/边距改动跳过防抖与全量重建，直接 relayout（<100ms 生效）。
+// 全量重建随后仍会发生（同值幂等），此处只为即时反馈。
+watch(
+  () => [previewConfig.value.style.title, previewConfig.value.style.subtitle, previewConfig.value.style.margins],
+  () => {
+    const style = previewConfig.value.style
+    void chartRef.value?.relayout({
+      title: buildTitleLayout(style, view.value?.name ?? '') ?? '',
+      margin: buildMargin(style),
+    })
+  },
+  { deep: true },
+)
 
 function touch() {
   rebuildDeb.call()
@@ -293,11 +310,6 @@ watch([() => view.value?.id, () => def.value.type], () => {
   flagMode.value = 'off'
 })
 
-function toggleFlagMode(mode: 'flag' | 'clear') {
-  void mode
-  toast.info('Plotly 版本暂未支持套索打标')
-}
-
 function mutateFlags(arr: RowFlag[]) {
   const sel = tc.selected.value
   if (!sel) return
@@ -422,6 +434,29 @@ function doExport(kind: 'png' | 'pdf') {
   else void exportPdf(get, name)
 }
 
+/* 导出菜单键盘可达：打开聚焦首项，↑/↓ 循环移动，Esc 关闭 */
+watch(exportOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  document.querySelector<HTMLButtonElement>('.cview__export-menu [role="menuitem"]')?.focus()
+})
+function onExportMenuKeydown(e: KeyboardEvent) {
+  const menu = e.currentTarget as HTMLElement
+  const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  if (!items.length) return
+  const idx = items.indexOf(document.activeElement as HTMLButtonElement)
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    items[(idx + 1) % items.length]?.focus()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    items[(idx - 1 + items.length) % items.length]?.focus()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    exportOpen.value = false
+  }
+}
+
 const chips = computed(() => {
   const v = view.value
   if (!v) return []
@@ -468,46 +503,28 @@ const chartHeight = computed(() => previewConfig.value.style.height)
             :flag-mode="flagMode"
             class="cview__chart"
             data-testid="chart-canvas"
-            @rendered="rebuilding = false"
+            @rendered="hasRendered = true; rebuilding = false"
             @lasso="onLasso"
           />
-          <!-- 加载 shimmer -->
-          <div v-if="rebuilding" class="cview__loading" aria-hidden="true" />
+          <!-- 首绘骨架（Plotly chunk 加载/首次构建期间）：图表形 shimmer -->
+          <div v-if="!hasRendered" class="cview__skeleton" role="status" aria-label="图表加载中">
+            <div class="cview__skeleton-plot">
+              <span v-for="h in [42, 68, 30, 80, 55, 72, 38]" :key="h" class="cview__skeleton-bar" :style="{ height: `${h}%` }" />
+            </div>
+          </div>
+          <!-- 重建 shimmer（已有图之后的局部刷新） -->
+          <div v-else-if="rebuilding" class="cview__loading" role="status" aria-label="图表更新中" />
 
-          <!-- 右上工具条：Flag / Clear / 导出 / 配置 —— 统一靠右，缺项时不留空位 -->
+          <!-- 右上工具条：导出 / 配置 —— 统一靠右，缺项时不留空位 -->
           <div class="cview__toolbar">
-            <template v-if="flagCapable">
-              <span v-if="flagCount" class="cview__flagcount" title="已打标点">{{ flagCount }} flagged</span>
-              <button
-                type="button"
-                class="cview__flagbtn"
-                disabled
-                title="Plotly 版本暂未支持套索打标"
-                :class="{ 'cview__flagbtn--active': flagMode === 'flag' }"
-                :aria-pressed="flagMode === 'flag'"
-                @click="toggleFlagMode('flag')"
-              >
-                <IIcon name="flag" :size="13" /> Flag
-              </button>
-              <button
-                type="button"
-                class="cview__flagbtn"
-                disabled
-                title="Plotly 版本暂未支持套索打标"
-                :class="{ 'cview__flagbtn--active': flagMode === 'clear' }"
-                :aria-pressed="flagMode === 'clear'"
-                @click="toggleFlagMode('clear')"
-              >
-                <IIcon name="flag" :size="13" /> Clear
-              </button>
-            </template>
+            <span v-if="flagCapable && flagCount" class="cview__flagcount" title="已打标点">{{ flagCount }} flagged</span>
 
             <IPopover :open="exportOpen" placement="bottom-end" :arrow="false" @update:open="exportOpen = $event">
               <template #anchor>
                 <IButton size="sm" variant="secondary" icon="download" aria-label="导出图表" @click="exportOpen = !exportOpen" />
               </template>
               <template #default>
-                <div class="cview__export-menu" role="menu">
+                <div class="cview__export-menu" role="menu" @keydown="onExportMenuKeydown">
                   <button type="button" role="menuitem" @click="doExport('png')">导出 PNG</button>
                   <button type="button" role="menuitem" @click="doExport('pdf')">导出 PDF</button>
                 </div>
@@ -550,9 +567,11 @@ const chartHeight = computed(() => previewConfig.value.style.height)
     </div>
 
     <!-- 右侧配置抽屉：固定宽度，禁止用 width:0 做 Transition（会被 flex 压没） -->
-    <aside v-if="panelOpen" class="cview__drawer" aria-label="图表配置">
-      <ChartConfigPanel v-if="view" :view-name="view.name" :chips="chips" @rename="rename" @cancel="cancel" @save="save" />
-    </aside>
+    <Transition name="cview-drawer">
+      <aside v-if="panelOpen" class="cview__drawer" aria-label="图表配置">
+        <ChartConfigPanel v-if="view" :view-name="view.name" :chips="chips" @rename="rename" @cancel="cancel" @save="save" />
+      </aside>
+    </Transition>
 
     <!-- 切换视图 dirty 确认 -->
     <IModal :open="guardOpen" title="未保存的图表修改" :width="420" @update:open="guardCancel">
@@ -793,6 +812,64 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   100% {
     transform: translateX(350%);
   }
+}
+
+/* 首绘骨架：坐标轴 + 柱形 shimmer */
+.cview__skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  padding: 48px 32px 40px 56px;
+  background: var(--is-surface);
+  z-index: 1;
+}
+.cview__skeleton-plot {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 6%;
+  border-left: 2px solid var(--is-border);
+  border-bottom: 2px solid var(--is-border);
+  padding: 0 4% 0 2%;
+}
+.cview__skeleton-bar {
+  flex: 1;
+  max-width: 48px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(90deg, var(--is-surface-hover) 25%, #e9edf3 50%, var(--is-surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: cview-skel-shimmer 1.2s linear infinite;
+}
+@keyframes cview-skel-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 配置抽屉滑出过渡（transform，不动 width） */
+.cview-drawer-enter-active,
+.cview-drawer-leave-active {
+  transition:
+    transform 200ms var(--is-ease),
+    opacity 200ms var(--is-ease);
+}
+.cview-drawer-enter-from,
+.cview-drawer-leave-to {
+  transform: translateX(24px);
+  opacity: 0;
+}
+
+/* 焦点环统一（工具条/菜单等原生 button） */
+.cview__open:focus-visible,
+.cview__export-menu button:focus-visible,
+.cview__notice-link:focus-visible {
+  outline: none;
+  box-shadow: var(--is-ring-sm);
 }
 .cview__export-menu {
   display: flex;

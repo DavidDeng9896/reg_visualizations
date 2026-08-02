@@ -131,11 +131,48 @@ function edgeClass(source: string, target: string): string {
   return focus && (source === focus || target === focus) ? 'flow-edge--active' : ''
 }
 
+/* 重建时按内容复用未变节点/边对象，避免全量 FlowNode/FlowEdge 重渲染 */
+function samePortList(a: FlowNodeData['inputs'], b: FlowNodeData['inputs']): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].name !== b[i].name || a[i].type !== b[i].type) return false
+  }
+  return true
+}
+function sameNodeData(a: FlowNodeData | undefined, b: FlowNodeData): boolean {
+  if (!a) return false
+  return (
+    a.kind === b.kind &&
+    a.label === b.label &&
+    a.stepId === b.stepId &&
+    a.viewId === b.viewId &&
+    a.tableId === b.tableId &&
+    a.viewType === b.viewType &&
+    a.stepType === b.stepType &&
+    a.status === b.status &&
+    a.error === b.error &&
+    a.rowCount === b.rowCount &&
+    a.columnCount === b.columnCount &&
+    a.viewCount === b.viewCount &&
+    a.childCount === b.childCount &&
+    a.valid === b.valid &&
+    samePortList(a.inputs, b.inputs) &&
+    samePortList(a.outputs, b.outputs)
+  )
+}
+
 function rebuild(): void {
   const prev = new Map<string, CanvasNode>()
   for (const n of vfNodes.value) prev.set(n.id, n)
   vfNodes.value = graph.value.nodes.map((n) => {
     const old = prev.get(n.id)
+    // 数据未变：复用旧对象（保留位置与组件实例），仅按需刷新 class
+    if (old && sameNodeData(old.data, n)) {
+      const cls = nodeClass(n.id)
+      if (old.class !== cls) old.class = cls
+      return old
+    }
     return {
       id: n.id,
       type: 'flow',
@@ -146,20 +183,36 @@ function rebuild(): void {
       class: nodeClass(n.id),
     }
   })
-  vfEdges.value = graph.value.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourcePort,
-    targetHandle: e.targetPort,
-    type: 'flow',
-    selectable: false,
-    focusable: false,
-    class: edgeClass(e.source, e.target),
-    data: {
-      portType: nodeById.value.get(e.source)?.outputs.find((p) => p.name === e.sourcePort)?.type,
-    },
-  }))
+  const prevEdges = new Map<string, CanvasEdge>()
+  for (const e of vfEdges.value) prevEdges.set(e.id, e)
+  vfEdges.value = graph.value.edges.map((e) => {
+    const portType = nodeById.value.get(e.source)?.outputs.find((p) => p.name === e.sourcePort)?.type
+    const old = prevEdges.get(e.id)
+    if (
+      old &&
+      old.source === e.source &&
+      old.target === e.target &&
+      old.sourceHandle === e.sourcePort &&
+      old.targetHandle === e.targetPort &&
+      old.data?.portType === portType
+    ) {
+      const cls = edgeClass(e.source, e.target)
+      if (old.class !== cls) old.class = cls
+      return old
+    }
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourcePort,
+      targetHandle: e.targetPort,
+      type: 'flow',
+      selectable: false,
+      focusable: false,
+      class: edgeClass(e.source, e.target),
+      data: { portType },
+    }
+  })
   if (activeId.value && !nodeById.value.has(activeId.value)) activeId.value = null
 }
 
@@ -181,18 +234,27 @@ watch([graph, positions], () => {
 /**
  * VueFlow 的 Handle 在 onMounted 时依赖节点尺寸注册 handleBounds；
  * 节点尺寸由 ResizeObserver 异步测量，需延后更新，否则拖线可能不触发 connect-start。
+ * 仅在结构（节点增删/端口数变化）时更新，避免每次 graph 变化双次全量刷新。
  */
+const structureSig = computed(() => graph.value.nodes.map((n) => `${n.id}:${n.inputs.length}/${n.outputs.length}`).join('|'))
 function scheduleHandleBoundsUpdate(): void {
   void nextTick(() => {
     updateNodeInternals()
     setTimeout(() => updateNodeInternals(), 120)
   })
 }
-watch(graph, scheduleHandleBoundsUpdate, { flush: 'post' })
+watch(structureSig, scheduleHandleBoundsUpdate, { flush: 'post' })
 
+/* 高亮刷新：只在 class 实际变化时写，避免每次 hover 触发全量节点/边响应式更新 */
 function refreshHighlight(): void {
-  for (const n of vfNodes.value) n.class = nodeClass(n.id)
-  for (const e of vfEdges.value) e.class = edgeClass(e.source, e.target)
+  for (const n of vfNodes.value) {
+    const cls = nodeClass(n.id)
+    if (n.class !== cls) n.class = cls
+  }
+  for (const e of vfEdges.value) {
+    const cls = edgeClass(e.source, e.target)
+    if (e.class !== cls) e.class = cls
+  }
 }
 watch([activeId, hoverId, linkedIds], refreshHighlight)
 
@@ -217,10 +279,11 @@ function dismissBanner(): void {
 /* ------------------------------- 详情展示方式 ------------------------------- */
 
 const DETAIL_LAYOUT_KEY = 'insight-studio:flow-detail-layout'
-const detailLayout = ref<DetailLayout>('float')
+// 需求：详情面板不允许浮窗形式，默认右侧固定；旧版存储的 float 归一为 right
+const detailLayout = ref<DetailLayout>('right')
 try {
   const v = localStorage.getItem(DETAIL_LAYOUT_KEY)
-  if (v === 'float' || v === 'right' || v === 'bottom') detailLayout.value = v
+  if (v === 'right' || v === 'bottom') detailLayout.value = v
 } catch {
   /* ignore */
 }
@@ -644,7 +707,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
       class="flow-canvas__split"
       :class="[`flow-canvas__split--${detailLayout}`, { 'flow-canvas__split--solo': !detailOpen }]"
       :direction="detailLayout === 'bottom' ? 'vertical' : 'horizontal'"
-      :disabled="detailLayout === 'float'"
       :default-ratio="detailLayout === 'bottom' ? 0.6 : 0.65"
       :min-first="detailLayout === 'bottom' ? 200 : 320"
       :min-second="detailLayout === 'bottom' ? 160 : 300"
@@ -680,7 +742,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       <Background v-if="alive" variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" />
 
       <MiniMap
-        v-if="alive && minimapOpen && !isEmpty"
+        v-if="alive && minimapOpen && !isEmpty && !perfMode"
         position="bottom-right"
         :pannable="true"
         :zoomable="true"
@@ -771,29 +833,11 @@ function minimapNodeColor(node: { data?: unknown }): string {
         <IButton variant="primary" icon="plus" @click="emit('add-data')">Add data</IButton>
       </IEmptyState>
     </div>
-
-    <Transition name="flow-detail">
-      <NodeDetailCard
-        v-if="detailLayout === 'float' && activeNode && !editingStep"
-        :key="activeNode.id"
-        class="flow-canvas__detail"
-        :node="activeNode"
-        :inputs="activeInputs"
-        :outputs="activeOutputs"
-        :layout="detailLayout"
-        @update:layout="setDetailLayout"
-        @close="setActive(null)"
-        @focus="focusNode"
-        @open="openInWorkspace(activeNode.id)"
-        @edit="activeNode.stepId && openStepEditor(activeNode.stepId, false)"
-        @delete="onStepDeleted"
-      />
-    </Transition>
         </div>
       </template>
       <template #second>
         <NodeDetailCard
-          v-if="detailLayout !== 'float' && activeNode && !editingStep"
+          v-if="activeNode && !editingStep"
           :key="activeNode.id"
           :node="activeNode"
           :inputs="activeInputs"
@@ -847,13 +891,10 @@ function minimapNodeColor(node: { data?: unknown }): string {
   min-width: 0;
   min-height: 0;
 }
-.flow-canvas__split--float :deep(.is-split__divider),
-.flow-canvas__split--float :deep(.is-split__second),
 .flow-canvas__split--solo :deep(.is-split__divider),
 .flow-canvas__split--solo :deep(.is-split__second) {
   display: none;
 }
-.flow-canvas__split--float :deep(.is-split__first),
 .flow-canvas__split--solo :deep(.is-split__first) {
   flex: 1 1 auto !important;
 }
@@ -1010,24 +1051,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
   background: rgba(251, 252, 253, 0.85);
   z-index: 4;
 }
-
-.flow-canvas__detail {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 6;
-}
-.flow-detail-enter-active,
-.flow-detail-leave-active {
-  transition:
-    opacity var(--is-dur) var(--is-ease),
-    transform var(--is-dur) var(--is-ease);
-}
-.flow-detail-enter-from,
-.flow-detail-leave-to {
-  opacity: 0;
-  transform: translateX(16px);
-}
 </style>
 
 <style>
@@ -1063,6 +1086,10 @@ function minimapNodeColor(node: { data?: unknown }): string {
 }
 .flow-canvas--perf .vue-flow__edge-path {
   shape-rendering: optimizeSpeed;
+}
+/* 大图（perfMode）省略边中点 foreignObject 图标，降低 SVG/DOM 开销 */
+.flow-canvas--perf .flow-edge-icon {
+  display: none;
 }
 
 /* 点阵背景：不用 Background 的 bg-color prop（其生成的不透明矩形盖在圆点之上），

@@ -61,6 +61,17 @@ a:hover {
   border-radius: var(--is-radius-sm);
 }
 
+/*
+ * 文本输入类控件：焦点态由所在组件/容器统一绘制（如 ITextField 的
+ * wrapper border + ring）。全局环直接打在裸输入框上会嵌在容器内侧，
+ * 与容器描边之间隔出白边、左右外扩不均——「双层描边重影」。这里排除。
+ */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):focus-visible,
+textarea:focus-visible,
+[contenteditable]:focus-visible {
+  box-shadow: none;
+}
+
 /* 滚动条美化 */
 *::-webkit-scrollbar {
   width: 10px;

@@ -197,7 +197,7 @@ const visibleColumns = computed<ColumnMeta[]>(() => props.result.columns.filter(
 const colIndexMap = computed(() => new Map(visibleColumns.value.map((c, i) => [c.field, i])))
 const hasStructureColumn = computed(() => visibleColumns.value.some((c) => c.dataType === 'structure'))
 /** 有结构列时强制虚拟滚动，避免一次挂载整表 StructureCell。 */
-const scrollYConfig = computed(() => ({ enabled: true, gt: hasStructureColumn.value ? 0 : 100 }))
+const scrollYConfig = computed(() => ({ enabled: true, gt: hasStructureColumn.value ? 0 : 500 }))
 const rowConfig = computed(() => ({
   keyField: ROW_ID_FIELD,
   isHover: true,

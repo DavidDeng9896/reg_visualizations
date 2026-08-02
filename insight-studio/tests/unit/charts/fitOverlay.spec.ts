@@ -21,12 +21,24 @@ const config = (type: 'line' | 'scatter') => {
 const fitTrace = (data: Array<Record<string, unknown>>) => data.find((trace) => String(trace.name).endsWith(' · fit'))
 
 describe('Plotly fit overlays', () => {
-  it('scatter 拟合作为 dashed line trace', () => {
+  it('scatter 拟合默认实线（fitLineStyle 缺省 solid）', () => {
     const out = buildScatterOption({ result: vr(rows, columns), config: config('scatter') })
     const fit = fitTrace(out.option.data)!
     expect(fit).toMatchObject({ type: 'scatter', mode: 'lines', showlegend: false })
-    expect((fit.line as { dash: string }).dash).toBe('dash')
+    expect((fit.line as { dash: string }).dash).toBe('solid')
     expect(out.fits).toHaveLength(1)
+  })
+
+  it('fitLineStyle = dash 时拟合为虚线（line 与 scatter 一致）', () => {
+    const sc = config('scatter')
+    sc.style.fitLineStyle = 'dash'
+    const fitScatter = fitTrace(buildScatterOption({ result: vr(rows, columns), config: sc }).option.data)!
+    expect((fitScatter.line as { dash: string }).dash).toBe('dash')
+
+    const lc = config('line')
+    lc.style.fitLineStyle = 'dash'
+    const fitLine = fitTrace(buildLineOption({ result: vr(rows, columns), config: lc }).option.data)!
+    expect((fitLine.line as { dash: string }).dash).toBe('dash')
   })
 
   it('line 拟合保留 fit engine 摘要', () => {

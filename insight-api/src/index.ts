@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { InsightStore, type AnalysisDoc, type DashboardDoc } from './store.ts'
+import { registerAiRoutes } from './ai.ts'
 
 const store = new InsightStore()
 const app = new Hono()
@@ -11,9 +12,11 @@ app.use(
   cors({
     origin: (origin) => origin || '*',
     allowMethods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'If-Match'],
+    allowHeaders: ['Content-Type', 'If-Match', 'Authorization'],
   }),
 )
+
+registerAiRoutes(app, store)
 
 app.get('/health', (c) =>
   c.json({

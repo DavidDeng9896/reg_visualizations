@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, pickOption, tableNode } from './helpers'
+import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, panCanvas, pickOption, tableNode } from './helpers'
 
 /** 流程图步骤化主流程：CSV 导入 / Combine 对话框均生成 StepNode，刷新后持久保留。 */
 test.describe('步骤化主流程', () => {
@@ -39,7 +39,7 @@ test.describe('步骤化主流程', () => {
     await page.getByRole('listbox').last().getByRole('option', { name: 'right', exact: true }).click()
     await dialog.getByRole('button', { name: 'Create table' }).click()
     await expect(dialog).toBeHidden()
-    await expect(page.locator('.is-toast--success')).toContainText('已创建合并表')
+    await expect(page.locator('.is-toast--success', { hasText: '已创建合并表' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Flowchart' }).click()
     const joinNode = page.locator('.vue-flow__node').filter({ hasText: /Join tables/i }).first()
@@ -100,6 +100,9 @@ test.describe('步骤化主流程', () => {
     // 适应视图（面板打开时会为面板预留右侧空间），再拖第二根线
     await page.getByRole('button', { name: '适应视图' }).click()
     await page.waitForTimeout(600)
+    // 配置上移，确保 Join 底部的 Right table 端口落在视口内（宽画布下适应视图可能贴底）
+    await panCanvas(page, 0, -160)
+    await page.waitForTimeout(200)
 
     // 3) 从 Filter 输出拖到 Join 的 Right table 输入（不关闭配置面板，Escape 会撤销新建步骤）
     const filterId = await flowNodeIdByName(page, 'Filter table')
@@ -131,7 +134,7 @@ test.describe('步骤化主流程', () => {
     await expectCanvasInk(page)
   })
 
-  test('编辑源表 → 下游步骤变 stale → Run all 恢复 configured', async ({ page }) => {
+  test('编辑源表 → 确认修改后下游自动重算（小成本表自动重跑）', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'New analysis' }).first().click()
     await page.getByRole('textbox', { name: '例如：Binding assay analysis' }).fill('Stale test')
@@ -163,23 +166,19 @@ test.describe('步骤化主流程', () => {
     await tableNode(page, 'left').click()
     await page.getByRole('button', { name: 'Flowchart' }).click()
     await expect(page.getByTestId('grid-stats')).toBeVisible()
+    // 编辑会话：进入后改单元格，确认修改才传播下游
+    await page.getByTestId('enter-edit-btn').click()
     const cell = page.locator('.vxe-body--row').nth(1).locator('.vxe-body--column').nth(1)
     await cell.dblclick()
     const input = page.locator('.dg__edit-input')
     await expect(input).toBeVisible()
     await input.fill('0')
     await input.press('Enter')
+    await page.getByRole('button', { name: '确认修改' }).click()
 
-    // 回到流程图：Filter 应变 stale，并出现 Run all 按钮
+    // 回到流程图：小成本表在防抖后自动重跑，Filter 输出按新数据重算为 1 行（仅 id=3），stale 消失
     await page.getByRole('button', { name: 'Flowchart' }).click()
-    await page.waitForTimeout(400)
-    await expect(page.locator('.flow-node__status--stale').first()).toBeVisible()
-    const runBtn = page.getByRole('button', { name: '重新运行' })
-    await expect(runBtn).toBeVisible()
-
-    // Run all：恢复 configured，stale 图标消失，输出按新数据重算为 1 行（仅 id=3）
-    await runBtn.click()
-    await expect(page.locator('.flow-node__status--stale')).toHaveCount(0)
     await expect(filterNode).toContainText('1 行')
+    await expect(page.locator('.flow-node__status--stale')).toHaveCount(0)
   })
 })

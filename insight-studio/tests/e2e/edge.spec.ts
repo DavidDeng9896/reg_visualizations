@@ -170,12 +170,14 @@ test.describe('边界：依赖与绑定', () => {
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.locator('.is-toast--success', { hasText: '图表配置已保存' })).toBeVisible()
 
-    // 回源表删除绑定列 sepal_length
+    // 回源表删除绑定列 sepal_length（删除列在编辑会话内可用，确认修改后生效）
     await selectTable(page, 'Iris measurements')
+    await page.getByTestId('enter-edit-btn').click()
     await page.locator('.vxe-header--column', { hasText: 'sepal_length' }).first().hover()
     await page.getByLabel('sepal_length 列菜单').click()
     await page.getByRole('menuitem', { name: '删除列' }).click()
     await page.getByRole('dialog', { name: '删除列' }).getByRole('button', { name: '删除' }).click()
+    await page.getByRole('button', { name: '确认修改' }).click()
 
     // 回到图表视图：缺失警告条
     await page.getByTestId('sidebar-view').filter({ hasText: 'Bar chart' }).first().click()

@@ -1,5 +1,5 @@
 /** 各图种共用的 Plotly layout 片段与数据工具。 */
-import type { CellValue, ChartStyle, ColumnMeta, DataType, Row } from '../../../shared/types'
+import type { CellValue, ChartStyle, ColumnMeta, DataType, ReferenceLine, Row } from '../../../shared/types'
 import { isBlank } from '../../../shared/pipeline'
 import { paletteColor } from './palette'
 
@@ -104,13 +104,17 @@ export function buildMargin(style: ChartStyle): Record<string, number> {
 }
 
 export function baseLayout(style: ChartStyle, defaultTitle: string, opts: { legend?: boolean } = {}): Record<string, unknown> {
+  const title = buildTitleLayout(style, defaultTitle)
+  const margin = buildMargin(style)
+  // 无标题时顶部边距收紧，避免留白（卡片/页头已展示名称）
+  if (!title && style.margins?.top === undefined) margin.t = 32
   return {
     paper_bgcolor: '#ffffff',
     plot_bgcolor: '#ffffff',
     font: { family: 'Inter, system-ui, sans-serif', color: '#475467', size: 12 },
     hoverlabel: TOOLTIP_DARK,
-    title: buildTitleLayout(style, defaultTitle),
-    margin: buildMargin(style),
+    title,
+    margin,
     ...buildLegendLayout(style, opts.legend ?? false),
   }
 }
@@ -118,6 +122,94 @@ export function baseLayout(style: ChartStyle, defaultTitle: string, opts: { lege
 /** 系列颜色：逐系列覆盖 > 色板循环。 */
 export function seriesColor(style: ChartStyle, paletteId: string | undefined, name: string, index: number): string {
   return style.seriesColors?.[name] ?? paletteColor(paletteId, index)
+}
+
+/* ------------------------------- 参考线 shapes ------------------------------- */
+
+/** 参考线 → Plotly shapes（灰色虚线 + 可选小标签）。 */
+export function refLineShapes(lines: ReferenceLine[] | undefined): Array<Record<string, unknown>> {
+  if (!lines?.length) return []
+  const out: Array<Record<string, unknown>> = []
+  for (const l of lines) {
+    if (!Number.isFinite(l.value)) continue
+    const shape: Record<string, unknown> = {
+      type: 'line',
+      line: { color: '#98a2b3', dash: 'dash', width: 1 },
+      ...(l.axis === 'y'
+        ? { xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: l.value, y1: l.value }
+        : { yref: 'paper', y0: 0, y1: 1, xref: 'x', x0: l.value, x1: l.value }),
+    }
+    if (l.label?.trim()) {
+      shape.label = { text: l.label.trim(), font: { size: 10, color: '#667085' }, textposition: l.axis === 'y' ? 'top right' : 'top left' }
+    }
+    out.push(shape)
+  }
+  return out
+}
+
+/** 把参考线合并进 layout.shapes（无 shapes 时新建）。 */
+export function withRefLines(layout: Record<string, unknown>, style: ChartStyle): Record<string, unknown> {
+  const lines = refLineShapes(style.referenceLines)
+  if (!lines.length) return layout
+  const existing = Array.isArray(layout.shapes) ? (layout.shapes as Array<Record<string, unknown>>) : []
+  return { ...layout, shapes: [...existing, ...lines] }
+}
+
+/* ------------------------------- 拟合置信带 / 注释 ------------------------------- */
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return `rgba(46,91,255,${alpha})`
+  const n = parseInt(m[1], 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
+}
+
+/** 拟合 95% 置信带（Linear/Quadratic，引擎已产出 ciBand）：同色浅阴影，先画在下层。 */
+export function ciBandTraces(
+  fit: { ciBand?: Array<{ x: number; lower: number; upper: number }> },
+  color: string,
+  xaxis: string,
+  yaxis: string,
+): Array<Record<string, unknown>> {
+  const band = fit.ciBand
+  if (!band?.length) return []
+  const base = {
+    type: 'scatter',
+    mode: 'lines',
+    xaxis,
+    yaxis,
+    line: { width: 0 },
+    hoverinfo: 'skip',
+    showlegend: false,
+  }
+  return [
+    { ...base, x: band.map((p) => p.x), y: band.map((p) => p.upper) },
+    { ...base, x: band.map((p) => p.x), y: band.map((p) => p.lower), fill: 'tonexty', fillcolor: hexToRgba(color, 0.15) },
+  ]
+}
+
+/** 拟合注释（方程 + R²）：左上角文本块。 */
+export function fitAnnotations(items: Array<{ name: string; equation: string; r2: number | null }>): Array<Record<string, unknown>> {
+  if (!items.length) return []
+  const text = items.map((i) => `${i.name}: ${i.equation}${i.r2 !== null ? `，R²=${i.r2.toFixed(3)}` : ''}`).join('<br>')
+  return [
+    {
+      text,
+      xref: 'paper',
+      yref: 'paper',
+      x: 0.01,
+      y: 0.99,
+      xanchor: 'left',
+      yanchor: 'top',
+      showarrow: false,
+      align: 'left',
+      font: { size: 10, color: '#667085' },
+      bgcolor: 'rgba(255,255,255,0.85)',
+      bordercolor: '#e4e7ec',
+      borderwidth: 1,
+      borderpad: 4,
+    },
+  ]
 }
 
 /* ------------------------------- 误差棒 ------------------------------- */

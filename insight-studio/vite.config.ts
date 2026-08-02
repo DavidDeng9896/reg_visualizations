@@ -15,9 +15,9 @@ export default defineConfig({
         target: 'http://127.0.0.1:7120',
         changeOrigin: true,
       },
-      // 同源代理 insight-api，公网隧道只需暴露前端端口
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      // 同源代理 insight-api，公网隧道只需暴露前端端口；e2e 用 INSIGHT_API_ORIGIN 指向独立测试库
+      '/api': { target: process.env.INSIGHT_API_ORIGIN ?? 'http://127.0.0.1:8787', changeOrigin: true },
+      '/health': { target: process.env.INSIGHT_API_ORIGIN ?? 'http://127.0.0.1:8787', changeOrigin: true },
     },
   },
   optimizeDeps: {
@@ -34,7 +34,9 @@ export default defineConfig({
           if (id.includes('plotly.js')) return 'vendor-plotly'
           if (id.includes('vxe-table') || id.includes('xe-utils')) return 'vendor-vxe'
           if (id.includes('@vue-flow') || id.includes('d3-') || id.includes('@dagrejs')) return 'vendor-vue-flow'
-          if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('dompurify') || id.includes('fflate')) return 'vendor-jspdf'
+          // jspdf 系不手动分包：vendor chunk 会捕获 preload helper 变成首屏静态依赖，
+          // 交给动态 import 自然分包（export.ts 按需加载）
+          if (id.includes('@rdkit/rdkit')) return 'vendor-rdkit'
           if (id.includes('@rdkit/rdkit')) return 'vendor-rdkit'
           if (id.includes('dexie') || id.includes('papaparse')) return 'vendor-data'
           if (id.includes('pinia') || id.includes('vue-router') || id.includes('/vue/') || id.includes('@vue/')) return 'vendor-vue'

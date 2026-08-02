@@ -1,0 +1,190 @@
+/**
+ * AI 助手前端核心类型：OpenAI 消息 / 工具调用 / SSE 解析 / 配置与会话 API。
+ */
+
+/* ------------------------------- 消息类型 ------------------------------- */
+
+export interface ToolCall {
+  id: string
+  type: 'function'
+  function: { name: string; arguments: string }
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content?: string | null
+  tool_calls?: ToolCall[]
+  tool_call_id?: string
+  name?: string
+}
+
+export interface ChatPayload {
+  messages: ChatMessage[]
+  tools?: unknown[]
+  model?: string
+}
+
+/** 聚合后的 SSE delta。 */
+interface SseDelta {
+  content?: string
+  tool_calls?: Array<{
+    index: number
+    id?: string
+    type?: string
+    function?: { name?: string; arguments?: string }
+  }>
+}
+
+interface SseChunk {
+  choices?: Array<{ delta?: SseDelta; finish_reason?: string | null }>
+}
+
+/* ------------------------------- SSE 解析 ------------------------------- */
+
+/**
+ * 解析 OpenAI SSE 流：逐 chunk 回调 delta 文本与 tool_calls 增量，
+ * 返回聚合后的 assistant 消息（content + tool_calls）。
+ */
+export async function readSseStream(
+  res: Response,
+  onToken?: (text: string) => void,
+): Promise<ChatMessage> {
+  if (!res.body) throw new Error('响应无流式内容')
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let content = ''
+  const calls = new Map<number, ToolCall>()
+
+  function applyChunk(chunk: SseChunk): void {
+    const delta = chunk.choices?.[0]?.delta
+    if (!delta) return
+    if (delta.content) {
+      content += delta.content
+      onToken?.(delta.content)
+    }
+    if (delta.tool_calls) {
+      for (const part of delta.tool_calls) {
+        const idx = part.index ?? 0
+        const cur = calls.get(idx) ?? {
+          id: part.id ?? `call_${idx}`,
+          type: 'function' as const,
+          function: { name: '', arguments: '' },
+        }
+        if (part.id) cur.id = part.id
+        if (part.function?.name) cur.function.name += part.function.name
+        if (part.function?.arguments) cur.function.arguments += part.function.arguments
+        calls.set(idx, cur)
+      }
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const t = line.trim()
+      if (!t.startsWith('data:')) continue
+      const data = t.slice(5).trim()
+      if (data === '[DONE]') continue
+      try {
+        applyChunk(JSON.parse(data) as SseChunk)
+      } catch {
+        /* 忽略半包/心跳行 */
+      }
+    }
+  }
+
+  const toolCalls = [...calls.values()].filter((c) => c.function.name)
+  return {
+    role: 'assistant',
+    content: content || null,
+    ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+  }
+}
+
+/* ------------------------------- HTTP API ------------------------------- */
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+  })
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  if (!res.ok) {
+    let msg = text
+    try {
+      msg = (JSON.parse(text) as { error?: string; message?: string }).message ?? (JSON.parse(text) as { error?: string }).error ?? text
+    } catch {
+      /* 非 JSON */
+    }
+    throw new Error(`AI 服务错误（${res.status}）：${msg}`)
+  }
+  return JSON.parse(text) as T
+}
+
+export interface AiPublicConfig {
+  baseUrl: string
+  apiKeyMasked: string
+  configured: boolean
+  model: string
+  maxIterations: number
+  confirmDestructive: boolean
+}
+
+export const aiConfigApi = {
+  get: () => req<AiPublicConfig>('/api/ai/config'),
+  put: (patch: Partial<{ baseUrl: string; apiKey: string; model: string; maxIterations: number; confirmDestructive: boolean }>) =>
+    req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
+}
+
+/** 发送一轮对话（SSE）。缺配置时后端返回 409 → 抛错。 */
+export async function postChat(payload: ChatPayload, signal?: AbortSignal): Promise<Response> {
+  const res = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, stream: true }),
+    signal,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let msg = text
+    try {
+      const j = JSON.parse(text) as { error?: string; message?: string }
+      msg = j.message ?? j.error ?? text
+    } catch {
+      /* ignore */
+    }
+    if (res.status === 409) throw new Error('AI 未配置：请先在设置中填写 API Key')
+    throw new Error(`模型请求失败（${res.status}）：${String(msg).slice(0, 300)}`)
+  }
+  return res
+}
+
+/* ------------------------------- 会话 API ------------------------------- */
+
+export interface ConversationMeta {
+  id: string
+  analysisId: string | null
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ConversationDoc extends ConversationMeta {
+  messages: unknown[]
+}
+
+export const aiConvApi = {
+  list: () => req<ConversationMeta[]>('/api/ai/conversations'),
+  get: (id: string) => req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`),
+  create: (body: { analysisId?: string | null; title?: string; messages?: unknown[] }) =>
+    req<ConversationDoc>('/api/ai/conversations', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: { title?: string; messages?: unknown[]; analysisId?: string | null }) =>
+    req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id: string) => req<void>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+}

@@ -65,7 +65,7 @@ describe('migrateAnalysisToSteps', () => {
         inputs: [],
         config: { tableName: 'Sales' },
         status: 'configured',
-        output: { tables: [t.id], files: [], scalars: {}, previews: {} },
+        output: { tables: [t.id], files: [], views: [] },
       },
     ]
     // 故意不设 __legacyTables：旧逻辑会误判未迁移并写空 steps

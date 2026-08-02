@@ -106,6 +106,34 @@ const showXAxis = computed(() => type.value !== 'pie')
 const showYAxis = computed(() => !['pie'].includes(type.value))
 
 const numOr = (v: number | undefined, d: number) => v ?? d
+
+/* ------------------------------- 参考线编辑 ------------------------------- */
+interface RefLineRow {
+  axis: 'x' | 'y'
+  value?: number
+  label?: string
+}
+const refLines = computed<RefLineRow[]>({
+  get: () => (style.value.referenceLines ??= []),
+  set: (v) => {
+    style.value.referenceLines = v
+    ctx.touch()
+  },
+})
+function refLineValueText(line: RefLineRow): string {
+  return line.value === undefined ? '' : String(line.value)
+}
+function setRefLineValue(line: RefLineRow, v: string) {
+  const n = Number(v)
+  line.value = v.trim() === '' || !Number.isFinite(n) ? undefined : n
+  ctx.touch()
+}
+function addRefLine() {
+  refLines.value = [...refLines.value, { axis: 'y' as const }]
+}
+function removeRefLine(i: number) {
+  refLines.value = refLines.value.filter((_, idx) => idx !== i)
+}
 </script>
 
 <template>
@@ -147,6 +175,24 @@ const numOr = (v: number | undefined, d: number) => v ?? d
     <!-- Bar 专属 -->
     <section v-if="type === 'bar'" class="sty__sec">
       <h4 class="sty__sec-title">Bar</h4>
+      <div class="sty__row">
+        <span class="sty__label">Mode</span>
+        <ISelect
+          :model-value="bar.mode ?? 'grouped'"
+          :options="[
+            { value: 'grouped', label: '并排' },
+            { value: 'stacked', label: '堆叠' },
+            { value: 'percent', label: '100% 堆叠' },
+          ]"
+          size="sm"
+          aria-label="柱形模式"
+          @update:model-value="bar.mode = $event as 'grouped' | 'stacked' | 'percent'; ctx.touch()"
+        />
+      </div>
+      <div class="sty__row sty__row--switch">
+        <span class="sty__label">数据标签</span>
+        <IToggle :model-value="!!bar.showValues" aria-label="显示柱值" @update:model-value="bar.showValues = $event; ctx.touch()" />
+      </div>
       <div class="sty__row">
         <span class="sty__label">Line Width</span>
         <ISlider :model-value="numOr(bar.lineWidth, 0)" :min="0" :max="4" :step="0.5" aria-label="柱描边线宽" @update:model-value="bar.lineWidth = $event; ctx.touch()" />
@@ -214,6 +260,19 @@ const numOr = (v: number | undefined, d: number) => v ?? d
     <!-- Box 专属（4B：无 Jitter） -->
     <section v-if="type === 'box'" class="sty__sec">
       <h4 class="sty__sec-title">Box</h4>
+      <div class="sty__row">
+        <span class="sty__label">形态</span>
+        <ISelect
+          :model-value="box.mode ?? 'box'"
+          :options="[
+            { value: 'box', label: '箱线图' },
+            { value: 'violin', label: '小提琴图' },
+          ]"
+          size="sm"
+          aria-label="形态"
+          @update:model-value="box.mode = $event as 'box' | 'violin'; ctx.touch()"
+        />
+      </div>
       <div class="sty__row">
         <span class="sty__label">Show Points</span>
         <ISelect
@@ -306,6 +365,64 @@ const numOr = (v: number | undefined, d: number) => v ?? d
           <IToggle :model-value="!!heatmap.clusterCols" @update:model-value="heatmap.clusterCols = $event; ctx.touch()">列</IToggle>
         </div>
       </div>
+    </section>
+
+    <!-- 拟合线（Line/Scatter 回归拟合） -->
+    <section v-if="caps.regression" class="sty__sec">
+      <h4 class="sty__sec-title">拟合线</h4>
+      <div class="sty__row">
+        <span class="sty__label">线型</span>
+        <ISelect
+          :model-value="style.fitLineStyle ?? 'solid'"
+          :options="[
+            { value: 'solid', label: '实线' },
+            { value: 'dash', label: '虚线' },
+          ]"
+          size="sm"
+          aria-label="拟合线型"
+          @update:model-value="style.fitLineStyle = $event as 'solid' | 'dash'; ctx.touch()"
+        />
+      </div>
+      <div class="sty__row sty__row--switch">
+        <span class="sty__label">拟合注释</span>
+        <IToggle :model-value="!!style.fitAnnotation" aria-label="显示方程与 R²" @update:model-value="style.fitAnnotation = $event; ctx.touch()" />
+      </div>
+    </section>
+
+    <!-- 参考线（Pie 无轴不适用） -->
+    <section v-if="type !== 'pie'" class="sty__sec">
+      <h4 class="sty__sec-title">参考线</h4>
+      <div v-for="(line, i) in refLines" :key="i" class="sty__refline">
+        <ISelect
+          :model-value="line.axis"
+          :options="[
+            { value: 'y', label: 'Y 轴' },
+            { value: 'x', label: 'X 轴' },
+          ]"
+          size="sm"
+          aria-label="参考线轴向"
+          class="sty__refline-axis"
+          @update:model-value="line.axis = $event as 'x' | 'y'; ctx.touch()"
+        />
+        <ITextField
+          :model-value="refLineValueText(line)"
+          size="sm"
+          placeholder="数值"
+          aria-label="参考线数值"
+          class="sty__refline-value"
+          @update:model-value="setRefLineValue(line, $event)"
+        />
+        <ITextField
+          v-model="line.label"
+          size="sm"
+          placeholder="标签（可选）"
+          aria-label="参考线标签"
+          class="sty__refline-label"
+          @update:model-value="ctx.touch()"
+        />
+        <button type="button" class="sty__refline-del" title="删除参考线" aria-label="删除参考线" @click="removeRefLine(i)">×</button>
+      </div>
+      <IButton variant="ghost" size="sm" icon="plus" @click="addRefLine">添加参考线</IButton>
     </section>
 
     <!-- Legend -->
@@ -405,5 +522,28 @@ const numOr = (v: number | undefined, d: number) => v ?? d
 .sty__inline :deep(.is-field) {
   flex: 1;
   min-width: 0;
+}
+.sty__refline {
+  display: grid;
+  grid-template-columns: 72px 72px 1fr 24px;
+  align-items: center;
+  gap: 6px;
+}
+.sty__refline-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--is-radius-sm);
+  background: transparent;
+  color: var(--is-text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+}
+.sty__refline-del:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-danger);
 }
 </style>

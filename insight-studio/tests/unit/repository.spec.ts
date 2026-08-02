@@ -91,7 +91,7 @@ describe('DexieAnalysisRepository', () => {
         chart: {
           chartType: 'bar',
           position: 'bottom',
-          configure: { x: 'cat', y: 'v' },
+          configure: { x: { field: 'cat' }, y: { field: 'v' } },
           style: { title: 'My Chart' },
         },
       },
@@ -105,14 +105,14 @@ describe('DexieAnalysisRepository', () => {
         inputs: [],
         config: { tableName: 'Sales' },
         status: 'configured',
-        output: { tables: [t.id], files: [], scalars: {}, previews: {} },
+        output: { tables: [t.id], files: [], views: [] },
       },
     ]
     await repo.put(a)
     const got = await repo.get(a.id)
     expect(got?.steps).toHaveLength(1)
     expect(got?.steps[0].id).toBe('s1')
-    expect(got?.tables[0].views[0].chart?.configure).toEqual({ x: 'cat', y: 'v' })
+    expect(got?.tables[0].views[0].chart?.configure).toEqual({ x: { field: 'cat' }, y: { field: 'v' } })
     expect(got?.tables[0].views[0].chart?.style).toMatchObject({ title: 'My Chart' })
   })
 

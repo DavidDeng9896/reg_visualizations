@@ -6,7 +6,11 @@
   --is-primary-active: #182160;
   --is-accent: #2e5bff;
   --is-accent-hover: #1f49e0;
-  --is-accent-soft: #eef2ff;
+  --is-accent-soft: #edf1fe;
+  --is-accent-bright: #3c84f1;
+  /* 全局头部蓝色渐变（明度 header） */
+  --is-header-from: #3a80ef;
+  --is-header-to: #2062e6;
   --is-success: #1f9d66;
   --is-success-soft: #eefaf3;
   --is-danger: #d92d20;

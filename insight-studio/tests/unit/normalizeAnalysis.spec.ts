@@ -12,7 +12,7 @@ describe('normalizeAnalysis', () => {
       tables: [],
       flowchartLayout: {},
       steps: [],
-    } as Analysis
+    } as unknown as Analysis
     const a = normalizeAnalysis(raw)
     expect(a.revision).toBe(0)
     expect(a.files).toEqual([])

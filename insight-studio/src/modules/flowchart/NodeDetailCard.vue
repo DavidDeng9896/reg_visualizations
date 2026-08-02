@@ -1,6 +1,6 @@
 <script lang="ts">
-/** 节点详情展示方式：悬浮 / 右侧固定 / 下侧固定。 */
-export type DetailLayout = 'float' | 'right' | 'bottom'
+/** 节点详情展示方式：右侧固定 / 下侧固定（不允许浮窗形式）。 */
+export type DetailLayout = 'right' | 'bottom'
 </script>
 
 <script setup lang="ts">
@@ -29,7 +29,6 @@ const emit = defineEmits<{
 }>()
 
 const LAYOUT_OPTIONS: { value: DetailLayout; label: string; icon: IconName }[] = [
-  { value: 'float', label: '悬浮', icon: 'overlay' },
   { value: 'right', label: '右侧固定', icon: 'panel-right' },
   { value: 'bottom', label: '下侧固定', icon: 'panel-bottom' },
 ]
@@ -108,8 +107,8 @@ function onDelete() {
 
 <template>
   <aside
-    class="flow-detail"
-    :class="{ 'flow-detail--chart': isChartNode, 'flow-detail--docked': layout !== 'float' }"
+    class="flow-detail flow-detail--docked"
+    :class="{ 'flow-detail--chart': isChartNode }"
     role="complementary"
     :aria-label="isChartNode ? '图表预览' : '节点详情'"
   >

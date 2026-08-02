@@ -7,6 +7,8 @@ import { IButton, IIcon, IModal, IPopover, ISelect, toast } from '../../../ui'
 import { downloadCsv, toCsv } from '../../table/csv'
 import { flagSetOf, flagCommentOf } from '../flags'
 import { formatNumber } from '../runtime/shared'
+import ChartPanel from '../ChartPanel.vue'
+import type { ChartOption } from '../types'
 import type { FitGroupSummary } from '../fit/summary'
 
 /**
@@ -24,7 +26,7 @@ const props = defineProps<{
   modelSelected: boolean
 }>()
 
-type TabKey = 'source' | 'output' | 'variables'
+type TabKey = 'source' | 'output' | 'variables' | 'residual'
 
 const collapsed = ref(true)
 const tab = ref<TabKey>('source')
@@ -38,6 +40,7 @@ const tabs = computed(() => [
   { key: 'source' as TabKey, label: 'SOURCE TABLE', disabled: false },
   { key: 'output' as TabKey, label: 'MODEL OUTPUT TABLE', disabled: !hasFit.value },
   { key: 'variables' as TabKey, label: 'MODEL VARIABLES', disabled: !hasFit.value },
+  { key: 'residual' as TabKey, label: 'RESIDUAL PLOT', disabled: !hasFit.value },
 ])
 
 function selectTab(key: TabKey) {
@@ -66,6 +69,54 @@ const groupIdxModel = computed({
   set: (v: string | number) => {
     groupIdx.value = Number(v)
   },
+})
+
+/* ------------------------------- 残差图 ------------------------------- */
+/** Residual vs X 散点（含零参考线），复用 MODEL OUTPUT 的数据。 */
+const residualOption = computed<ChartOption | null>(() => {
+  const f = activeFit.value
+  if (!f) return null
+  const pts = f.output.filter((o) => Number.isFinite(o.residual))
+  if (!pts.length) return null
+  const xs = pts.map((o) => o.x)
+  const ys = pts.map((o) => o.residual)
+  const maxAbs = Math.max(1e-9, ...ys.map((y) => Math.abs(y)))
+  return {
+    data: [
+      {
+        type: 'scatter',
+        mode: 'lines',
+        x: [Math.min(...xs), Math.max(...xs)],
+        y: [0, 0],
+        line: { color: '#98a2b3', dash: 'dash', width: 1 },
+        hoverinfo: 'skip',
+        showlegend: false,
+      },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Residual',
+        x: xs,
+        y: ys,
+        marker: { color: '#2e5bff', size: 6, opacity: 0.85 },
+      },
+    ],
+    layout: {
+      margin: { t: 24, r: 24, b: 44, l: 56 },
+      xaxis: { title: { text: 'X', font: { size: 12, color: '#475467' } }, tickfont: { size: 11, color: '#667085' }, gridcolor: '#e9edf2' },
+      yaxis: {
+        title: { text: 'Residual', font: { size: 12, color: '#475467' } },
+        tickfont: { size: 11, color: '#667085' },
+        gridcolor: '#e9edf2',
+        range: [-maxAbs * 1.15, maxAbs * 1.15],
+      },
+      showlegend: false,
+      paper_bgcolor: '#ffffff',
+      plot_bgcolor: '#ffffff',
+      font: { family: 'Inter, system-ui, sans-serif', color: '#475467', size: 12 },
+      hoverlabel: { bgcolor: '#1d2939', bordercolor: '#1d2939', font: { color: '#fff', size: 12 } },
+    },
+  }
 })
 
 /* ------------------------------- 高度拖拽 ------------------------------- */
@@ -242,7 +293,7 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined || 
       </div>
 
       <!-- MODEL VARIABLES -->
-      <div v-else class="mtabs__scroll">
+      <div v-else-if="tab === 'variables'" class="mtabs__scroll">
         <table class="mtabs__table mtabs__table--vars">
           <thead>
             <tr>
@@ -263,6 +314,11 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined || 
         </table>
         <p v-if="activeFit?.converged === false" class="mtabs__cap mtabs__cap--warn">⚠ 模型未完全收敛，参数为当前最优估计</p>
         <p v-if="activeFit && activeFit.variables.length <= 1" class="mtabs__cap">Point-to-Point 为连接模型，无回归参数</p>
+      </div>
+
+      <!-- RESIDUAL PLOT -->
+      <div v-else class="mtabs__residual">
+        <ChartPanel v-if="residualOption" :option="residualOption" class="mtabs__residual-chart" />
       </div>
     </div>
 
@@ -426,6 +482,17 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined || 
   min-height: 0;
   overflow: auto;
   padding: 0 12px 10px;
+}
+.mtabs__residual {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 12px 10px;
+}
+.mtabs__residual-chart {
+  flex: 1;
+  min-height: 0;
 }
 .mtabs__table {
   width: 100%;

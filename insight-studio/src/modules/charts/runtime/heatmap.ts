@@ -1,7 +1,7 @@
 import { compareValues } from '../../../shared/pipeline'
 import { aggregateValues } from './aggregate'
 import { getContinuousPalette } from './palette'
-import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, formatNumber } from './shared'
+import { AXIS_STYLE, baseLayout, withRefLines, displayVal, distinctInOrder, formatNumber } from './shared'
 import { EMPTY_FIGURE, type BuildInput, type BuildOutput } from '../types'
 
 function impute(matrix: (number | null)[][]): number[][] {
@@ -115,11 +115,14 @@ export function buildHeatmapOption({ result, config, viewName }: BuildInput): Bu
         texttemplate: showText ? '%{text}' : undefined,
         hovertemplate: `${xField}: %{x}<br>${yField}: %{y}<br>${valueField}: %{z}<extra></extra>`,
       }],
-      layout: {
-        ...baseLayout(style, viewName ?? ''),
-        xaxis: { ...AXIS_STYLE, type: 'category', title: { text: style.xAxis?.label ?? xField, font: AXIS_STYLE.titlefont } },
-        yaxis: { ...AXIS_STYLE, type: 'category', autorange: 'reversed', title: { text: style.yAxis?.label ?? yField, font: AXIS_STYLE.titlefont } },
-      },
+      layout: withRefLines(
+        {
+          ...baseLayout(style, ''),
+          xaxis: { ...AXIS_STYLE, type: 'category', title: { text: style.xAxis?.label ?? xField, font: AXIS_STYLE.titlefont } },
+          yaxis: { ...AXIS_STYLE, type: 'category', autorange: 'reversed', title: { text: style.yAxis?.label ?? yField, font: AXIS_STYLE.titlefont } },
+        },
+        style,
+      ),
     },
     warnings,
     seriesNames: [],

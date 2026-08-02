@@ -18,6 +18,18 @@ describe('Plotly bar builder', () => {
     expect((out.option.layout.xaxis as { type: string }).type).toBe('category')
   })
 
+  it('图内标题默认置空（避免与卡片/页头重复）；显式 style.title 才显示且顶部边距放大', () => {
+    const out = buildBarOption({ result: vr(rows, catCols), config: cfg() })
+    expect(out.option.layout.title).toBeUndefined()
+    expect((out.option.layout.margin as { t: number }).t).toBe(32)
+
+    const c = cfg()
+    c.style.title = '自定义标题'
+    const out2 = buildBarOption({ result: vr(rows, catCols), config: c })
+    expect(out2.option.layout.title).toMatchObject({ text: '自定义标题' })
+    expect((out2.option.layout.margin as { t: number }).t).toBe(64)
+  })
+
   it('分组、堆叠与水平布局', () => {
     const c = cfg()
     c.configure.series = { field: 'grp' }

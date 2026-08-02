@@ -621,12 +621,36 @@ export function runPipeline(
 
 function randomSample(rows: Row[], n: number): Row[] {
   // 蓄水池采样，均匀且无偏。
+  // seed 由数据决定：同一数据每次采样结果一致，避免任意 mutation 重算后点集「跳动」。
+  const rand = mulberry32(sampleSeedOf(rows))
   const picked = rows.slice(0, n)
   for (let i = n; i < rows.length; i += 1) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(rand() * (i + 1))
     if (j < n) picked[j] = rows[i]
   }
   return picked
+}
+
+/** 采样种子：行数 + 首尾行 id 的轻量 hash（行集合不变 → 种子不变）。 */
+function sampleSeedOf(rows: Row[]): number {
+  let h = rows.length >>> 0
+  const s = `${String(rows[0]?.__rowId ?? '')}|${String(rows[rows.length - 1]?.__rowId ?? '')}`
+  for (let i = 0; i < s.length; i += 1) {
+    h = (Math.imul(h ^ s.charCodeAt(i), 2654435761) >>> 0)
+  }
+  return h >>> 0
+}
+
+/** mulberry32 确定性伪随机。 */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
 
 /**

@@ -205,6 +205,10 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
   transform: translateY(-1px);
   box-shadow: var(--is-shadow-md);
 }
+/* 拖拽中禁用 hover 位移，避免与拖拽 transform 叠加抖动 */
+:global(.vue-flow__node.dragging) .flow-node:hover {
+  transform: none;
+}
 :global(.vue-flow__node.is-active) .flow-node {
   border-color: var(--is-accent);
   box-shadow: var(--is-ring), var(--is-shadow-md);

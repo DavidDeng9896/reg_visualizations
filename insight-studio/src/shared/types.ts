@@ -179,6 +179,14 @@ export interface LegendStyle {
   labels?: Record<string, string>
 }
 
+/** 参考线（阈值/对照线）：渲染为灰色虚线 shape。 */
+export interface ReferenceLine {
+  axis: 'x' | 'y'
+  /** 未填数值的行在渲染时忽略。 */
+  value?: number
+  label?: string
+}
+
 /** 轴显示设置（STYLE X/Y-Axis 区与 CONFIGURE 齿轮弹层共用同一份存储）。 */
 export interface AxisStyleSpec {
   /** 自定义轴标题；缺省为「聚合前缀 + 字段名」。 */
@@ -205,8 +213,14 @@ export interface ChartStyle {
   yAxis?: AxisStyleSpec
   /** Line/Scatter 双 Y 轴的右轴设置。 */
   yAxisRight?: AxisStyleSpec
+  /** 拟合线型（Line/Scatter 回归拟合）：默认实线。 */
+  fitLineStyle?: 'solid' | 'dash'
+  /** 拟合注释（方程 + R² 上屏，Line/Scatter 回归拟合）。 */
+  fitAnnotation?: boolean
+  /** 参考线（阈值/对照线；Pie 无轴不适用）。 */
+  referenceLines?: ReferenceLine[]
   /** Bar 专属。 */
-  bar?: { direction?: 'vertical' | 'horizontal'; mode?: 'grouped' | 'stacked'; lineWidth?: number; lineColor?: string }
+  bar?: { direction?: 'vertical' | 'horizontal'; mode?: 'grouped' | 'stacked' | 'percent'; lineWidth?: number; lineColor?: string; showValues?: boolean }
   /** Line 专属（5B：无 Line Width / Point Size / Hide Points）。 */
   line?: { facet?: 'one' | 'per-measure'; pointShape?: string; defaultColor?: string }
   /** Scatter 专属。 */
@@ -223,6 +237,8 @@ export interface ChartStyle {
   }
   /** Box 专属（4B：无 Jitter）。 */
   box?: {
+    /** 形态：箱线图 / 小提琴图。 */
+    mode?: 'box' | 'violin'
     showPoints?: 'all' | 'outliers' | 'none'
     pointSize?: number
     pointShape?: string
@@ -394,6 +410,10 @@ export interface Analysis {
   /** ISO 字符串。 */
   createdAt: string
   updatedAt: string
+  /** 所属项目代码（见 shared/org.ts mock）。 */
+  project?: string
+  /** 所属部门 id。 */
+  department?: string
   /**
    * 单调递增版本；每次成功落盘 mutate +1。
    * Dashboard / 多端缓存与乐观锁用。旧数据缺省，加载时 normalize 为 0。
@@ -457,6 +477,10 @@ export interface Dashboard {
   name: string
   createdAt: string
   updatedAt: string
+  /** 所属项目代码（见 shared/org.ts mock）。 */
+  project?: string
+  /** 所属部门 id。 */
+  department?: string
   layout: DashboardLayout
   widgets: DashboardWidget[]
 }

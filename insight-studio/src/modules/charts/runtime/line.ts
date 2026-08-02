@@ -3,8 +3,8 @@ import { ROW_ID_FIELD } from '../../../shared/types'
 import { parseDateLike } from '../../../shared/datetime'
 import { aggregateRows, aggregationLabel } from './aggregate'
 import { dataMinOf, resolveAxis } from './axis'
-import { AXIS_NO_GRID_STYLE, AXIS_STYLE, baseLayout, columnType, displayVal, distinctInOrder, seriesColor } from './shared'
-import { runFit, type FitInputPoint } from '../fit/engine'
+import { AXIS_NO_GRID_STYLE, AXIS_STYLE, baseLayout, columnType, displayVal, distinctInOrder, seriesColor, withRefLines, ciBandTraces, fitAnnotations } from './shared'
+import { runFit, equationOf, type FitInputPoint } from '../fit/engine'
 import { summarizeFit, type FitGroupSummary } from '../fit/summary'
 import { flagSetOf } from '../flags'
 import { EMPTY_FIGURE, type BuildInput, type BuildOutput } from '../types'
@@ -37,6 +37,19 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
   const rows = result.rows
   const seriesField = cfg.series?.field
   const seriesVals = seriesField ? distinctInOrder(rows, seriesField).map(displayVal) : [null]
+  // 单遍分组：series → rows，替代每系列 rows.filter 的 O(measures×series×N)
+  const seriesGroups = new Map<string, Row[]>()
+  if (seriesField) {
+    for (const r of rows) {
+      const sk = displayVal(r[seriesField])
+      let arr = seriesGroups.get(sk)
+      if (!arr) {
+        arr = []
+        seriesGroups.set(sk, arr)
+      }
+      arr.push(r)
+    }
+  }
   const kind: XKind =
     columnType(result.columns, xField) === 'number'
       ? 'linear'
@@ -63,7 +76,7 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
         seriesField || measures.length > 1
           ? seriesColor(style, cfg.palette, name, idx)
           : (style.line?.defaultColor ?? seriesColor(style, cfg.palette, name, idx))
-      const subset = rows.filter((r) => sv === null || displayVal(r[seriesField!]) === sv)
+      const subset = seriesField ? (seriesGroups.get(sv ?? '') ?? []) : rows
       const agg = measure.aggregation ?? 'none'
       const points: Array<[number | string, number]> = []
       const customdata: string[][] = []
@@ -131,6 +144,7 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
 
   const fits: FitGroupSummary[] = []
   const shapes: Array<Record<string, unknown>> = []
+  const annotationItems: Array<{ name: string; equation: string; r2: number | null }> = []
   if (cfg.regression && cfg.regression.model !== 'none') {
     if (kind === 'category') warnings.push('拟合需要数值或时间 X 轴，当前为分类轴，未绘制拟合线')
     else {
@@ -139,6 +153,8 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
         warnings.push(...fit.warnings.map((w) => (jobs.length > 1 ? `[${job.name}] ${w}` : w)))
         if (!fit.ok) continue
         fits.push(summarizeFit(jobs.length > 1 ? job.name : '', fit, job.points))
+        // 95% 置信带画在拟合线下层（Linear/Quadratic，引擎已产出 ciBand）
+        for (const band of ciBandTraces(fit, job.color, job.xaxis, job.yaxis)) data.push(band)
         data.push({
           type: 'scatter',
           mode: 'lines',
@@ -147,9 +163,10 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
           y: fit.curve.map((p) => p.y),
           xaxis: job.xaxis,
           yaxis: job.yaxis,
-          line: { color: job.color, width: 2, dash: cfg.regression.model === 'point-to-point' ? 'solid' : 'dash' },
+          line: { color: job.color, width: 2, dash: style.fitLineStyle ?? 'solid' },
           showlegend: false,
         })
+        annotationItems.push({ name: job.name, equation: equationOf(fit), r2: fit.r2 })
         if (cfg.regression.showAsymptotes && fit.params?.kind === '4pl') {
           for (const y of [fit.params.min, fit.params.max]) {
             shapes.push({ type: 'line', xref: `${job.xaxis} domain`, yref: job.yaxis, x0: 0, x1: 1, y0: y, y1: y, line: { color: '#98a2b3', dash: 'dot', width: 1 } })
@@ -184,7 +201,10 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
     })
   })
 
-  const layout: Record<string, unknown> = { ...baseLayout(style, viewName ?? '', { legend: seriesNames.length > 1 }), shapes }
+  const layout: Record<string, unknown> = withRefLines({ ...baseLayout(style, '', { legend: seriesNames.length > 1 }), shapes }, style)
+  if (style.fitAnnotation && annotationItems.length) {
+    layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
+  }
   const xLabel = style.xAxis?.label ?? cfg.x?.label ?? xField
   const leftLabel = style.yAxis?.label ?? (measures.length === 1 ? measureLabel(measures[0]) : undefined)
   const rightLabel = style.yAxisRight?.label

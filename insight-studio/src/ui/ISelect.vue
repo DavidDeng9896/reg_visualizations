@@ -324,6 +324,7 @@ function showGroupHeader(i: number): string | null {
 }
 .is-select__search-input:focus {
   border-color: var(--is-accent);
+  box-shadow: var(--is-ring-sm);
 }
 .is-select__list {
   max-height: 240px;

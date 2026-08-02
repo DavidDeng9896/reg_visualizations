@@ -1,39 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '../../stores/dashboardStore'
 import AppHeader from './AppHeader.vue'
 import ShellNav from './ShellNav.vue'
+import ShellSidebar from './ShellSidebar.vue'
 
 /**
- * 应用壳层：全局 head（占位）+ 左侧导航（一级菜单 rail + 二级侧栏）+ 内容区。
- * 所有路由页面渲染在内容区；「数据分析」一级菜单激活，二级侧栏展示看板列表。
+ * 应用壳层：全局 head（明度风格，占位）+ 一级菜单 rail + 二级侧栏 + 内容区。
+ * 二级侧栏按路由切换：看板列表 / 分析列表 / 分析数据流节点树。
  */
-const router = useRouter()
 const dashStore = useDashboardStore()
-const { sortedItems, currentId } = storeToRefs(dashStore)
+const { sortedItems } = storeToRefs(dashStore)
 
 onMounted(() => {
   if (!sortedItems.value.length) void dashStore.loadList()
 })
-
-const dashboards = computed(() => sortedItems.value.map((d) => ({ id: d.id, name: d.name })))
-
-function onSelectDashboard(id: string) {
-  void router.push(`/dashboards/${id}`)
-}
 </script>
 
 <template>
   <div class="app-shell">
     <AppHeader />
     <div class="app-shell__body">
-      <ShellNav
-        :dashboards="dashboards"
-        :current-dashboard-id="currentId"
-        @select-dashboard="onSelectDashboard"
-      />
+      <ShellNav />
+      <ShellSidebar />
       <div class="app-shell__content">
         <slot />
       </div>

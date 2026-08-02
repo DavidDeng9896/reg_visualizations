@@ -51,6 +51,7 @@ import {
   Plus,
   Search,
   Settings,
+  Sparkles,
   SlidersHorizontal,
   Table2,
   Trash2,
@@ -137,6 +138,7 @@ export type IconName =
   | 'send'
   | 'user'
   | 'grid'
+  | 'sparkle'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -204,4 +206,5 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   send: Send,
   user: UserRound,
   grid: SquareChartGantt,
+  sparkle: Sparkles,
 }

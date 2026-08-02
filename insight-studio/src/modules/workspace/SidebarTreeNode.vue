@@ -245,6 +245,9 @@ function commitRename() {
   font-size: var(--is-text-sm);
   outline: none;
 }
+.vnode__rename:focus {
+  box-shadow: var(--is-ring-sm);
+}
 .vnode__actions {
   display: none;
   align-items: center;

@@ -11,7 +11,7 @@ import { sealAnalysisRows } from './factories'
  */
 
 /** mulberry32 确定性伪随机数。 */
-function rng(seed: number): () => number {
+export function rng(seed: number): () => number {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) | 0
@@ -22,13 +22,15 @@ function rng(seed: number): () => number {
 }
 
 /** Box-Muller 正态。 */
-function gauss(rand: () => number, mean: number, sd: number): number {
+export function gauss(rand: () => number, mean: number, sd: number): number {
   const u = Math.max(rand(), 1e-12)
   const v = rand()
   return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
 }
 
-const round = (v: number, digits = 2): number => Number(v.toFixed(digits))
+export const round2 = (v: number, digits = 2): number => Number(v.toFixed(digits))
+
+const round = round2
 
 /* --------------------------------- iris --------------------------------- */
 
@@ -154,6 +156,8 @@ export function createDemoAnalysis(): Analysis {
     name: 'Demo analysis',
     createdAt: now,
     updatedAt: now,
+    project: 'MD-BP310',
+    department: 'bio-ana',
     revision: 0,
     tables: [buildIrisTable(), buildPlateTable(), buildWeightLengthTable()],
     flowchartLayout: {},

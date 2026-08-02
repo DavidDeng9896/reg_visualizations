@@ -42,13 +42,15 @@ export function sealAnalysisRows(analysis: Analysis): Analysis {
   return analysis
 }
 
-export function createEmptyAnalysis(name: string): Analysis {
+export function createEmptyAnalysis(name: string, org?: { project?: string; department?: string }): Analysis {
   const now = nowIso()
   return {
     id: uuid(),
     name,
     createdAt: now,
     updatedAt: now,
+    project: org?.project,
+    department: org?.department,
     revision: 0,
     tables: [],
     flowchartLayout: {},
@@ -63,13 +65,15 @@ export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
   gap: 8,
 }
 
-export function createDashboard(name: string): Dashboard {
+export function createDashboard(name: string, org?: { project?: string; department?: string }): Dashboard {
   const now = nowIso()
   return {
     id: uuid(),
     name: name.trim() || '未命名看板',
     createdAt: now,
     updatedAt: now,
+    project: org?.project,
+    department: org?.department,
     layout: { ...DEFAULT_DASHBOARD_LAYOUT },
     widgets: [],
   }

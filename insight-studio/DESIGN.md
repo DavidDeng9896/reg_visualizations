@@ -32,6 +32,7 @@
 ## 2. 视觉语言（从 Benchling 截图提炼）
 
 - 主色：深蓝主按钮 `#1e2a78`（hover 稍亮），链接/强调蓝 `#2e5bff`，成功绿 `#1f9d66`，警告黄底条 `#fdf3d7`+`#8a6d1a`。
+- 壳层：全局头部为明度蓝渐变 `#3a80ef→#2062e6`；一级菜单 rail 56px（激活项浅蓝底 `#edf1fe` + 右缘蓝条 `#3c84f1`）；二级侧栏 220px，「看板/分析」分段容器 `#eaecf0`。
 - 背景：页面 `#f7f8fa`，卡片白底 + `1px #e4e7ec` 边框 + `border-radius:8px` + 极浅阴影。
 - 字体：系统栈；标题 13–14px/600，正文 13px，辅助 12px `#667085`。
 - **类型图标**：字段名前固定小标 `Aa`（分类/文本，灰色）与 `#`（数值，灰色），表格表头与图表字段胶囊一致使用。
@@ -41,13 +42,23 @@
 ## 3. 应用结构
 
 ```
-/                       Analysis 列表页（卡片/列表、新建、重命名、删除、按更新时间排序）
-/analysis/:id           工作区：顶栏（面包屑 + ⋯ + Flowchart 切换 + Add data 主按钮）
-                        左侧栏（Search + ANALYSIS DATA 树 + 底部 Connect 占位）
+全局壳层（AppShell）
+├─ 头部 AppHeader：明度蓝渐变（#3a80ef→#2062e6，48px）、白色明度 logo +「科学数据管理」、
+│   居中搜索、右侧 通知/全屏/David（全部占位）
+├─ 一级菜单 rail（ShellNav，56px）：注册/化合物/合成路线/IP路线/序列/产品/数据分析(固定激活)/设置/审计日志，
+│   除数据分析外均为占位；激活态 = 全宽 #edf1fe 底 + 右缘 3px 蓝条
+└─ 二级侧栏（ShellSidebar，220px）：顶部「看板/分析」分段切换
+    ├─ 看板：搜索 + 新建 + 看板卡片（名称/N 个组件/更新时间，hover ⋯ 重命名·删除）→ 点击切换看板
+    ├─ 分析：搜索 + 新建 + 分析卡片（名称/N 张表·M 个视图/更新时间）→ 点击进入下一级
+    └─ 分析详情：面包屑「< 分析 / 名称」+ 搜索 + Add data「+」+ 数据流节点树（表/视图）
+
+/                       分析首页（空态引导：New analysis / 一键 Demo；分析列表在左侧二级侧栏）
+/dashboards/:id?        看板页：顶栏（看板名 + ⋯ 菜单：分类样式/编辑布局/添加组件）+ 画布（#f9fafb）
+/analysis/:id           工作区：顶栏（分析名 + dirty/保存中 + Flowchart 切换 + ⋯）
                         主区（Workspace 模式 / Flowchart 模式）
 ```
 
-工作区主区在**表视图**与**流程图**之间切换；流程图只是浏览/导航/布局，不改拓扑。
+工作区主区在**表视图**与**流程图**之间切换；流程图节点详情为**右侧/下侧固定面板**（不允许浮窗形式）。
 
 ### 数据模型（与 docs/specs §3 一致）
 
@@ -87,14 +98,16 @@ ViewNode { id, name, type: 'table'|'bar'|'line'|'scatter'|'box'|'pie'|'heatmap',
 ### 4.2 共用能力 vs 图种专属（务必区分，验收见 docs/features/charts/*.md）
 
 共用（六图）：View Type 互切；Color palette（Light/Dark/Alternate 等 ≥3 套，CONFIGURE 内选）；
-Title/Subtitle；Width/Height/Margins；Opacity；Legend（显隐/位置/自定义标签）；逐系列颜色覆盖；
-悬停导出 PNG/PDF；采样警告条。
+Title/Subtitle（缺省为空，避免与外层标题重复）；Width/Height/Margins；Opacity；Legend（显隐/位置/自定义标签）；逐系列颜色覆盖；
+悬停导出 PNG/PDF；采样警告条；**参考线（X/Y 阈值线 + 标签，Pie 除外）**。
+Line/Scatter 专属共用：拟合线型（实线/虚线，默认实线）；**拟合注释（方程 + R² 上屏，开关）**；
+**95% 均值置信带（Linear/Quadratic）**；**MODEL TABLES 含 RESIDUAL PLOT（残差散点）与变量表 R²/AUC 行**。
 
 专属速查：
-- **Bar**：X*（分类）+ Y（度量可空=Count）+ Series；方向 竖/横；并排/堆叠；聚合 6 种（Mean 才开误差棒 SD/SEM）；Bar 专属样式（Opacity/Line Width/Line Color/Fill palette）
+- **Bar**：X*（分类）+ Y（度量可空=Count）+ Series；方向 竖/横；**并排/堆叠/100% 堆叠**；聚合 6 种（Mean 才开误差棒 SD/SEM）；Bar 专属样式（Opacity/Line Width/Line Color/Fill palette/**数据标签**）
 - **Line**：X*+Y*+Series；**双 Y 轴**（系列切左右轴，STYLE 分 Left/Right 栏）；拟合套件；分面 One/OnePerMeasure；**无误差棒**；点形状/默认色
 - **Scatter**：X*+Y*+Color/Shape/**Size(第三数值)**；双 Y；误差棒；拟合套件；Jitter；点大小/形状；分面
-- **Box**：Y*（仅 Y 可单箱）+ Categories + Color/Shape；Show Points（全部/仅离群/无）；须=1.5×IQR；Y 轴 Log；**无 Jitter**
+- **Box**：Y*（仅 Y 可单箱）+ Categories + Color/Shape；**形态 Box/Violin**；Show Points（全部/仅离群/无）；须=1.5×IQR；Y 轴 Log；**无 Jitter**
 - **Pie**：Categories*（默认 Count，空值=`[Blank]`）+ 可选 Measure+聚合；Inner/Outer Radius %（Donut）；Show %；Hide % < 阈值（默认 5）；负值剔除提示；无轴 Tab
 - **Heatmap**：X 列坐标 + Y 行坐标 + 连续色值列；连续色阶图例 + 位置；格内数值标注开关（默认关）；行列排序（标签/均值/度量）+ 可选层次聚类；hover 行列坐标+精确值
 - 误差棒仅 Bar/Scatter/Box；拟合仅 Line/Scatter；Series 仅 Bar/Line，Scatter/Box 用 Color+Shape（Shape 约 5 种系统形状）
@@ -140,3 +153,64 @@ Title/Subtitle；Width/Height/Margins；Opacity；Legend（显隐/位置/自定�
 - `npm run build`、`npm test`、`npm run test:e2e` 必须全绿才算完成
 - 代码组织：`src/shared`（types/db/utils）、`src/ui`（手写 UI 原语）、`src/modules/{analyses,workspace,table,charts,flowchart}`；
   图表按**图种注册表**组织（每图种一个文件：schema/defaults/option-builder/panel-sections），严禁巨型 if-else
+
+## 8. 性能机制（2026-08 优化）
+
+- **加载链**：ShellSidebar 的导入对话框/数据集树全部 `defineAsyncComponent`（xlsx/alasql/CodeMirror 不进 entry）；
+  jspdf 系不做 manualChunks（vendor chunk 会捕获 preload helper 变成首屏静态依赖），靠动态 import 自然分包。
+  首屏 eager ≈107KB gzip。测量脚本：`scripts/perf-measure.mjs`（preview + CDP）。
+- **图表 builder**：各图种单遍 `Map<key, Row[]>` 分组，禁止「每组 rows.filter」；
+  layout-only 变更（标题/副标题/边距）走 `Plotly.relayout` 快路径（<100ms），其余 150ms 防抖全量重建；
+  `Plots.resize` 100ms trailing 节流，`responsive:true` 禁用（RO 单通道）；
+  采样为数据驱动 seed 的确定性蓄水池（同数据同点集）。
+- **看板**：`widgetData` 按 analysisId 持久 promise 缓存 + `saveNow` 失效钩子 + pipeline LRU；
+  拖拽期间 body `.is-board-dragging` 挂起图表 RO，松手一次性 resize；
+  拖拽手柄键盘可达（方向键步进 1 格、Delete 移除、Esc 取消）。
+- **流程图**：`rebuild()` 按内容签名复用未变节点/边对象；高亮刷新只写变化的 class；
+  `updateNodeInternals` 仅结构签名变化时调用；>200 节点（perfMode）MiniMap 与边中点图标降级。
+
+## 9. AI 数据分析助手（2026-08 新增）
+
+平台内置 agent：自然语言驱动平台工具完成「建表 → 加工 → 配图 → 看板」全流程。
+
+### 架构（前端 ReAct loop + 后端代理）
+
+```
+浏览器（AiDrawer / aiStore）
+  │  POST /api/ai/chat（OpenAI chat/completions 负载，stream）
+  ▼
+insight-api /api/ai/*（src/ai.ts）
+  ├─ config：data/ai-config.json 服务端存储，GET 只回掩码 Key，PUT 局部更新
+  ├─ chat：SSE 原样代理到配置的 OpenAI 兼容端点（Key 不出服务端）；未配置 409 ai_not_configured
+  └─ conversations：会话/消息 CRUD（store.db 的 ai_conversations 表）
+```
+
+- **ReAct loop 在前端**（`src/modules/ai/agentLoop.ts`）：模型返回 tool_calls → 本地执行 →
+  tool 结果回灌 → 再请求，直到纯文本或达到 maxIterations（默认 8，MaxIterError 兜底）。
+  好处：工具直接操作前端 store（analysisStore/dashboardStore），撤销/持久化/视图刷新全部走现有链路，零后端业务侵入。
+- **工具集**（`tools/registry.ts` 21 个 JSON Schema + `tools/impl.ts` 实现）四组：
+  数据（list/get schema/import_csv）、步骤（filter/join/union/computed/hide/run/rerun_stale）、
+  图表（create_view/set_chart_config，写后跑 validateChartMapping 回执校验结果）、看板（建板/加组件）；
+  元工具 submit_plan/mark_step_done 驱动进展清单。危险操作（删表/视图/步骤）在 confirmDestructive
+  开启时先回 `NEEDS_CONFIRMATION`，前端确认后带 `__confirmed` 重放。
+  源表缺产出步骤时 impl 自动补 upload-csv 源步骤（与 migrateSteps 同构），保证任意分析可挂接下游。
+- **上下文**：system prompt（`prompts.ts`）+ 当前分析/表/视图摘要（`context.ts`），让模型知道「现在打开的是什么」。
+
+### 交互（全局右抽屉 480px，AppHeader sparkle 入口）
+
+- 消息流：用户/助手 markdown（自写轻量渲染，不引依赖）；
+  **计划卡**（进展逐项打勾，对齐参考图「进展」）、**轨迹卡**（「已处理 N 个操作」默认折叠，
+  展开看每步参数/摘要，失败标红，待确认给「确认执行」按钮）、**产物卡**（表/视图/看板，
+  视图带小图预览，点击 router.push 直达工作区/看板）。
+- 输入条：@ 引用当前表/视图、/ 快捷指令、模型名展示、发送/中止（AbortController）、失败重试。
+- 设置弹窗：Base URL / API Key（掩码回显）/ 模型 / 最大轮次 / 危险操作确认开关，保存即生效。
+- 多会话：历史列表 + 新会话，消息持久化在后端 sqlite，刷新不丢。
+
+### 测试
+
+- 单测 `tests/unit/ai/`：agentLoop（多轮循环/SSE 分片聚合/超轮/执行异常）、impl（真实 store 上
+  import/filter/computed/view+config/delete 确认流）。
+- e2e `tests/e2e/ai.spec.ts`：route 拦截 config（已配置态）+ chat（按 tool 轮次回放编排 SSE，
+  与 `scripts/mock-ai.mjs` 同思路），全链路验证 发送 → 进展打勾×3 → 轨迹「已处理 7 个操作」→
+  产物卡 → 点击直达（URL 带 viewId + 侧栏出现新视图）。
+- 联调：`node scripts/mock-ai.mjs 8789` 起 mock 端点，设置里填 `http://127.0.0.1:8789/v1` 即可手测。

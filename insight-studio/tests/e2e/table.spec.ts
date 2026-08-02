@@ -17,6 +17,8 @@ test.describe('b) 表格：渲染 / 编辑 / 排序 / 过滤', () => {
   })
 
   test('双击改单元格 → Ctrl+Z 撤销恢复', async ({ page }) => {
+    // 编辑会话：须先点「编辑数据」进入，双击才可改单元格
+    await page.getByTestId('enter-edit-btn').click()
     const cell = firstDataCell(page)
     const original = (await cell.innerText()).trim()
     expect(original.length).toBeGreaterThan(0)

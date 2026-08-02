@@ -47,3 +47,20 @@ describe('samplingNotice', () => {
     expect(samplingNotice(res).message).toBe('')
   })
 })
+
+describe('runPipeline · 采样确定性', () => {
+  it('同一数据两次采样结果完全一致（点集不跳动）', () => {
+    const a = makeAnalysis(SAMPLE_LIMIT + 500)
+    const r1 = runPipeline(a, 't1')
+    const r2 = runPipeline(a, 't1')
+    expect(r1.sampled).toBe(true)
+    expect(r2.sampled).toBe(true)
+    expect(r1.rows.map((r) => r.v)).toEqual(r2.rows.map((r) => r.v))
+  })
+
+  it('行数变化后重新采样', () => {
+    const r1 = runPipeline(makeAnalysis(SAMPLE_LIMIT + 500), 't1')
+    const r2 = runPipeline(makeAnalysis(SAMPLE_LIMIT + 501), 't1')
+    expect(r1.rows.map((r) => r.v)).not.toEqual(r2.rows.map((r) => r.v))
+  })
+})

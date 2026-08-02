@@ -15,7 +15,7 @@ const { selected } = storeToRefs(store)
       v-if="!selected"
       icon="database"
       title="从左侧选择一张表或视图"
-      description="或通过右上角 Add data 导入数据、合并表。"
+      description="或通过左侧 + 导入数据、合并表。"
     />
     <TableChartWorkspace v-else :key="`${selected.tableId}:${selected.viewId ?? ''}`" />
   </div>

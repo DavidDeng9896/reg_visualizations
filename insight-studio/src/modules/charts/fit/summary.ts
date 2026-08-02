@@ -81,10 +81,26 @@ export function modelOutputOf(fit: FitResult, points: FitInputPoint[]): FitOutpu
     .sort((a, b) => a.x - b.x)
 }
 
+/** 经验 AUC（梯形积分，排除打标点，按 x 排序；对齐 Prism 的 Area Under Curve）。 */
+export function aucOf(fit: FitResult, points: FitInputPoint[]): number | null {
+  if (!fit.ok) return null
+  const pts = points
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && !p.flagged)
+    .sort((a, b) => a.x - b.x)
+  if (pts.length < 2) return null
+  let auc = 0
+  for (let i = 1; i < pts.length; i += 1) {
+    auc += ((pts[i].x - pts[i - 1].x) * (pts[i].y + pts[i - 1].y)) / 2
+  }
+  return auc
+}
+
 /** 汇总一组拟合 → BuildOutput.fits 条目。 */
 export function summarizeFit(group: string, fit: FitResult, points: FitInputPoint[]): FitGroupSummary {
   const variables = modelVariablesOf(fit)
   if (fit.r2 !== null) variables.push({ name: 'R²', estimate: fit.r2, ciLow: null, ciHigh: null })
+  const auc = aucOf(fit, points)
+  if (auc !== null) variables.push({ name: 'AUC', estimate: auc, ciLow: null, ciHigh: null })
   return {
     group,
     model: fit.model,

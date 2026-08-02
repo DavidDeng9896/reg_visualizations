@@ -2,8 +2,8 @@ import type { FieldMapping, Row } from '../../../shared/types'
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { aggregateRows, aggregationLabel, errorValue, numericValues } from './aggregate'
 import { dataMinOf, resolveAxis } from './axis'
-import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, plotlyError, seriesColor, shapeFor, stableRandom } from './shared'
-import { runFit, type FitInputPoint } from '../fit/engine'
+import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, plotlyError, seriesColor, shapeFor, stableRandom, withRefLines, ciBandTraces, fitAnnotations } from './shared'
+import { runFit, equationOf, type FitInputPoint } from '../fit/engine'
 import { summarizeFit, type FitGroupSummary } from '../fit/summary'
 import { flagSetOf } from '../flags'
 import { EMPTY_FIGURE, type BuildInput, type BuildOutput } from '../types'
@@ -35,10 +35,31 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
   const flagSet = flagSetOf(flags)
   const xAll = numericValues(rows, xField)
   const yAll = measures.flatMap((m) => numericValues(rows, m.field))
-  const xRange = xAll.length ? Math.max(...xAll) - Math.min(...xAll) : 1
-  const yRange = yAll.length ? Math.max(...yAll) - Math.min(...yAll) : 1
+  // 大数组禁用 spread（栈上限风险），循环求 min/max
+  const rangeOf = (vals: number[]): number => {
+    if (!vals.length) return 1
+    let lo = Infinity
+    let hi = -Infinity
+    for (const v of vals) {
+      if (v < lo) lo = v
+      if (v > hi) hi = v
+    }
+    return hi - lo
+  }
+  const xRange = rangeOf(xAll)
+  const yRange = rangeOf(yAll)
   const sizeVals = sizeField ? numericValues(rows, sizeField) : []
-  const sizeDomain: [number, number] = sizeVals.length ? [Math.min(...sizeVals), Math.max(...sizeVals)] : [0, 1]
+  const sizeDomain: [number, number] = sizeVals.length
+    ? (() => {
+        let lo = Infinity
+        let hi = -Infinity
+        for (const v of sizeVals) {
+          if (v < lo) lo = v
+          if (v > hi) hi = v
+        }
+        return [lo, hi] as [number, number]
+      })()
+    : [0, 1]
   const sizeOf = (value: number) => {
     const [lo, hi] = sizeDomain
     const min = style.scatter?.sizeMin ?? 4
@@ -54,6 +75,22 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
   const flaggedByAxis = new Map<string, Array<{ x: number; y: number; id: string }>>()
   let dropped = 0
 
+  // 单遍分组：color|shape → rows，替代每格 rows.filter 的 O(colors×shapes×N)
+  const groupKeyOf = (row: (typeof rows)[number]): string =>
+    `${colorField ? displayVal(row[colorField]) : ''}\u0001${shapeField ? displayVal(row[shapeField]) : ''}`
+  const scatterGroups = new Map<string, typeof rows>()
+  if (colorField || shapeField) {
+    for (const row of rows) {
+      const key = groupKeyOf(row)
+      let arr = scatterGroups.get(key)
+      if (!arr) {
+        arr = []
+        scatterGroups.set(key, arr)
+      }
+      arr.push(row)
+    }
+  }
+
   measures.forEach((measure, mi) => {
     const right = measure.axis?.side === 'right'
     const grid = facet ? mi + 1 : 1
@@ -62,8 +99,10 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
     const yaxis = yIndex === 1 ? 'y' : `y${yIndex}`
     colorVals.forEach((cv) => {
       shapeVals.forEach((sv, si) => {
-        const subset = rows.filter((row) =>
-          (cv === null || displayVal(row[colorField!]) === cv) && (sv === null || displayVal(row[shapeField!]) === sv))
+        const subset =
+          colorField || shapeField
+            ? (scatterGroups.get(`${cv ?? ''}\u0001${sv ?? ''}`) ?? [])
+            : rows
         if (!subset.length) return
         const group = cv !== null && sv !== null ? `${cv} · ${sv}` : cv ?? sv
         const name = measures.length > 1 ? (group ? `${labelOf(measure)} · ${group}` : labelOf(measure)) : (group ?? labelOf(measure))
@@ -136,17 +175,21 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
 
   const fits: FitGroupSummary[] = []
   const shapes: Array<Record<string, unknown>> = []
+  const annotationItems: Array<{ name: string; equation: string; r2: number | null }> = []
   if (cfg.regression && cfg.regression.model !== 'none') {
     for (const job of jobs) {
       const fit = runFit(job.points, cfg.regression, { logX: style.xAxis?.scale === 'log' && dataMinOf(xAll) > 0, logY: job.logY })
       warnings.push(...fit.warnings.map((w) => (jobs.length > 1 ? `[${job.name}] ${w}` : w)))
       if (!fit.ok) continue
       fits.push(summarizeFit(jobs.length > 1 ? job.name : '', fit, job.points))
+      // 95% 置信带画在拟合线下层（Linear/Quadratic，引擎已产出 ciBand）
+      for (const band of ciBandTraces(fit, job.color, job.xaxis, job.yaxis)) data.push(band)
       data.push({
         type: 'scatter', mode: 'lines', name: `${job.name} · fit`,
         x: fit.curve.map((p) => p.x), y: fit.curve.map((p) => p.y), xaxis: job.xaxis, yaxis: job.yaxis,
-        line: { color: job.color, width: 2, dash: cfg.regression.model === 'point-to-point' ? 'solid' : 'dash' }, showlegend: false,
+        line: { color: job.color, width: 2, dash: style.fitLineStyle ?? 'solid' }, showlegend: false,
       })
+      annotationItems.push({ name: job.name, equation: equationOf(fit), r2: fit.r2 })
       if (cfg.regression.showAsymptotes && fit.params?.kind === '4pl') {
         for (const y of [fit.params.min, fit.params.max]) shapes.push({ type: 'line', xref: `${job.xaxis} domain`, yref: job.yaxis, x0: 0, x1: 1, y0: y, y1: y, line: { color: '#98a2b3', dash: 'dot', width: 1 } })
       }
@@ -157,7 +200,10 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
     data.push({ type: 'scatter', mode: 'markers', name: 'Flagged', x: points.map((p) => p.x), y: points.map((p) => p.y), xaxis, yaxis, marker: { symbol: 'x', color: '#d92d20', size: 11 }, customdata: points.map((p) => [p.id]), showlegend: false })
   }
 
-  const layout: Record<string, unknown> = { ...baseLayout(style, viewName ?? '', { legend: seriesNames.length > 1 }), shapes }
+  const layout: Record<string, unknown> = withRefLines({ ...baseLayout(style, '', { legend: seriesNames.length > 1 }), shapes }, style)
+  if (style.fitAnnotation && annotationItems.length) {
+    layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
+  }
   const useRight = measures.some((m) => m.axis?.side === 'right')
   for (let i = 0; i < (facet ? measures.length : 1); i += 1) {
     const suffix = i === 0 ? '' : String(i + 1)

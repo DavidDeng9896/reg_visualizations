@@ -6,7 +6,7 @@ vi.mock('../../../src/shared/repository', () => ({
 }))
 
 import { createEmptyAnalysis, createTable, createViewNode } from '../../../src/shared/factories'
-import { clearWidgetDataCache, resolveWidgetSource } from '../../../src/modules/dashboard/widgetData'
+import { clearWidgetDataCache, invalidateWidgetData, resolveWidgetSource } from '../../../src/modules/dashboard/widgetData'
 
 describe('resolveWidgetSource', () => {
   beforeEach(() => {
@@ -57,10 +57,22 @@ describe('resolveWidgetSource', () => {
     get.mockResolvedValue(a)
     await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
     await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
-    expect(get).toHaveBeenCalledTimes(2) // get 仍调用，但二次命中 cache 在 get 之后
-    // 实际上我们在 get 之后才查 cache，所以 get 总是被调用。调整：第一次后 cache 命中仍会 get。
-    // 验收：两次都 ok 即可；缓存避免重复 pipeline 对大表有意义。此处断言第二次仍 ok。
+    // analysis 文档按 id 持久缓存：同 analysis 的多次解析只读一次库
+    expect(get).toHaveBeenCalledTimes(1)
     const r2 = await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
     expect(r2.ok).toBe(true)
+  })
+
+  it('invalidateWidgetData 后重新读库', async () => {
+    const a = createEmptyAnalysis('A')
+    const t = createTable('T', [{ field: 'n', title: 'n', dataType: 'number' }], [{ n: 1 }])
+    a.tables.push(t)
+    get.mockResolvedValue(a)
+    await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
+    expect(get).toHaveBeenCalledTimes(1)
+    invalidateWidgetData(a.id)
+    const r2 = await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
+    expect(r2.ok).toBe(true)
+    expect(get).toHaveBeenCalledTimes(2)
   })
 })
