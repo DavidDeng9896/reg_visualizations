@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import type { Analysis, Dashboard } from '../../shared/types'
 import { analysisRepository } from '../../shared/repository'
 import { dashboardRepository } from '../../shared/dashboardRepository'
 import { createEmptyAnalysis } from '../../shared/factories'
+import { onAnalysesPossiblyChanged } from '../../shared/ensureProjectDemoSeed'
 import { PROJECTS, DEPARTMENTS, projectLabel, departmentLabel } from '../../shared/org'
 import { useDashboardStore } from '../../stores/dashboardStore'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -102,7 +103,14 @@ async function refreshAnalyses() {
     analysesLoading.value = false
   }
 }
-onMounted(refreshAnalyses)
+onMounted(() => {
+  void refreshAnalyses()
+})
+// AppShell seed 完成后刷新，避免与首次 list 竞态仍显示空
+const stopSeedWatch = onAnalysesPossiblyChanged(() => {
+  void refreshAnalyses()
+})
+onBeforeUnmount(stopSeedWatch)
 // 路由变化时刷新（新建/删除/重命名后回到列表能保持最新）
 watch(() => route.fullPath, () => {
   if (pane.value !== 'analysis-detail') void refreshAnalyses()
