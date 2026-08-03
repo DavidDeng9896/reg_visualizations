@@ -122,10 +122,12 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
     const body = (await c.req.json().catch(() => null)) as Partial<AiConfig> | null
     if (!body || typeof body !== 'object') return c.json({ error: 'invalid_body' }, 400)
     const cur = readConfig()
+    // apiKey：字段缺失 / null / 非字符串 → 保留；非空字符串 → 更新；空串 → 清空
+    let nextApiKey = cur.apiKey
+    if (typeof body.apiKey === 'string') nextApiKey = body.apiKey.trim()
     const next: AiConfig = {
       baseUrl: typeof body.baseUrl === 'string' && body.baseUrl.trim() ? body.baseUrl.trim().replace(/\/$/, '') : cur.baseUrl,
-      // 不传 apiKey 字段 = 保留；传非空 = 更新；传空串 = 清空
-      apiKey: body.apiKey === undefined ? cur.apiKey : body.apiKey.trim(),
+      apiKey: nextApiKey,
       model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : cur.model,
       maxIterations:
         typeof body.maxIterations === 'number' && Number.isFinite(body.maxIterations)
@@ -133,7 +135,11 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
           : cur.maxIterations,
       confirmDestructive: typeof body.confirmDestructive === 'boolean' ? body.confirmDestructive : cur.confirmDestructive,
     }
-    writeConfig(next)
+    try {
+      writeConfig(next)
+    } catch (e) {
+      return c.json({ error: 'write_failed', message: e instanceof Error ? e.message : String(e) }, 500)
+    }
     return c.json({ ok: true, configured: !!next.apiKey, apiKeyMasked: maskKey(next.apiKey) })
   })
 

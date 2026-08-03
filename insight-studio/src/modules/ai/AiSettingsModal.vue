@@ -31,13 +31,22 @@ onMounted(async () => {
 async function save(): Promise<void> {
   saving.value = true
   try {
-    await aiConfigApi.put({
+    const patch: {
+      baseUrl: string
+      model: string
+      maxIterations: number
+      confirmDestructive: boolean
+      apiKey?: string
+    } = {
       baseUrl: baseUrl.value.trim(),
       model: model.value.trim(),
-      maxIterations: maxIterations.value,
-      confirmDestructive: confirmDestructive.value,
-      ...(apiKey.value.trim() ? { apiKey: apiKey.value.trim() } : {}),
-    })
+      maxIterations: Number(maxIterations.value) || 8,
+      confirmDestructive: !!confirmDestructive.value,
+    }
+    // 仅在用户输入了新 Key 时才提交；缺省 / 空串均不带该字段（后端保留原值）
+    const key = typeof apiKey.value === 'string' ? apiKey.value.trim() : ''
+    if (key) patch.apiKey = key
+    await aiConfigApi.put(patch)
     toast.success('AI 配置已保存')
     emit('saved')
     emit('update:open', false)
