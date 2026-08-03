@@ -38,6 +38,7 @@ import {
   GripVertical,
   Hash,
   Hexagon,
+  History,
   Info,
   Link2,
   LoaderCircle,
@@ -139,6 +140,7 @@ export type IconName =
   | 'user'
   | 'grid'
   | 'sparkle'
+  | 'history'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -207,4 +209,5 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   user: UserRound,
   grid: SquareChartGantt,
   sparkle: Sparkles,
+  history: History,
 }

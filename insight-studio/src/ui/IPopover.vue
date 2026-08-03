@@ -17,6 +17,8 @@ const props = withDefaults(
     /** 点击外部是否关闭。 */
     closeOnOutside?: boolean
     panelClass?: string
+    /** 覆盖默认 popover 层级（抽屉/模态内需高于 --is-z-modal）。 */
+    zIndex?: string
   }>(),
   { placement: 'bottom-start', arrow: true, closeOnOutside: true },
 )
@@ -29,7 +31,7 @@ const openRef = computed(() => props.open)
 const placementRef = computed(() => props.placement)
 
 const { style: panelStyle } = useFloatingPanel(openRef, rootEl, panelEl, placementRef, {
-  zIndex: 'var(--is-z-popover)',
+  zIndex: props.zIndex ?? 'var(--is-z-popover)',
   minWidth: 160,
 })
 
