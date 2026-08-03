@@ -5,7 +5,8 @@ import { analysisRepository } from '../../shared/repository'
 import { createEmptyAnalysis } from '../../shared/factories'
 import { PROJECTS, DEPARTMENTS } from '../../shared/org'
 import { createDemoAnalysis } from '../../shared/seed'
-import { createProjectDemoAnalyses, LEGACY_DEMO_IDS } from '../../shared/demoProjects'
+import { createProjectDemoAnalyses } from '../../shared/demoProjects'
+import { seedProjectDemos } from '../../shared/ensureProjectDemoSeed'
 import { IButton, IEmptyState, IModal, ISelect, ITextField, toast } from '../../ui'
 
 /** 分析首页（/）：空态引导页。分析列表在左侧二级侧栏。 */
@@ -54,21 +55,17 @@ async function createDemo() {
   }
 }
 
-/* 生成项目示例数据（5 个项目各一个分析） */
+/* 生成项目示例数据（覆盖写入；与启动 ensure 共用写入路径） */
 const projectsLoading = ref(false)
 async function createProjectDemos() {
   if (projectsLoading.value) return
   projectsLoading.value = true
   try {
-    const list = createProjectDemoAnalyses()
-    for (const a of list) await analysisRepository.put(a)
-    // 清理旧版 5 项演示数据（如有；先查后删，避免 404 噪音）
-    const existing = new Set((await analysisRepository.list()).map((a) => a.id))
-    for (const id of LEGACY_DEMO_IDS) {
-      if (existing.has(id)) await analysisRepository.delete(id).catch(() => undefined)
-    }
-    toast.success(`已生成 ${list.length} 个抗体业务示例分析`)
-    router.push(`/analysis/${list[0].id}`)
+    const result = await seedProjectDemos({ force: true })
+    const count = result.count ?? 0
+    toast.success(`已生成 ${count} 个抗体业务示例分析`)
+    const firstId = createProjectDemoAnalyses()[0]?.id
+    if (firstId) router.push(`/analysis/${firstId}`)
   } finally {
     projectsLoading.value = false
   }
