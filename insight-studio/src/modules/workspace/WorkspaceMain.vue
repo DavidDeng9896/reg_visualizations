@@ -6,7 +6,7 @@ import TableChartWorkspace from '../table/TableChartWorkspace.vue'
 
 /** 工作区主区：选中表/视图 → 表+图一体化工作区（切片 S2 表格）。 */
 const store = useAnalysisStore()
-const { selected } = storeToRefs(store)
+const { current, selected } = storeToRefs(store)
 </script>
 
 <template>
@@ -17,7 +17,10 @@ const { selected } = storeToRefs(store)
       title="从左侧选择一张表或视图"
       description="或通过左侧 + 导入数据、合并表。"
     />
-    <TableChartWorkspace v-else :key="`${selected.tableId}:${selected.viewId ?? ''}`" />
+    <TableChartWorkspace
+      v-else
+      :key="`${current?.id ?? ''}:${selected.tableId}:${selected.viewId ?? ''}`"
+    />
   </div>
 </template>
 

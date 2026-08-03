@@ -26,6 +26,12 @@ const SAVE_DEBOUNCE_MS = 400
 /** 防抖定时器（模块级；单 store 实例足够）。 */
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
+/**
+ * load 世代号：快速切换分析时，先发起的 get 可能后返回。
+ * 忽略过期结果，避免 URL 已是 B 但界面仍显示 A。
+ */
+let loadSeq = 0
+
 function cancelScheduledSave(): void {
   if (saveTimer !== undefined) {
     clearTimeout(saveTimer)
@@ -64,10 +70,49 @@ export const useAnalysisStore = defineStore('analysis', {
   actions: {
     /* ------------------------------ 加载 / 保存 ------------------------------ */
 
-    async load(id: string, repo: AnalysisRepository = analysisRepository): Promise<boolean> {
+    /**
+     * 进入加载态并立刻丢掉与目标 id 不符的旧内容，避免切换间隙仍展示上一个分析。
+     * 不取消 in-flight get；由 loadSeq 丢弃过期结果。
+     */
+    beginLoad(id: string): void {
+      loadSeq += 1
       this.loading = true
+      this.selected = null
+      if (this.current?.id !== id) {
+        this.current = null
+        this.dirty = false
+        this.undoStack = []
+        this.redoStack = []
+      }
+    },
+
+    /** 离开分析路由时清空工作区，避免列表页仍挂着上一份 current/selected。 */
+    clearWorkspace(): void {
+      loadSeq += 1
+      cancelScheduledSave()
+      this.current = null
+      this.selected = null
+      this.loading = false
+      this.dirty = false
+      this.undoStack = []
+      this.redoStack = []
+      this.mode = 'workspace'
+    },
+
+    async load(id: string, repo: AnalysisRepository = analysisRepository): Promise<boolean> {
+      const seq = ++loadSeq
+      this.loading = true
+      this.selected = null
+      // 切换到另一份分析时立刻清空，避免 KeepAlive/侧栏仍渲染旧表数据
+      if (this.current?.id !== id) {
+        this.current = null
+        this.dirty = false
+        this.undoStack = []
+        this.redoStack = []
+      }
       try {
         const found = await repo.get(id)
+        if (seq !== loadSeq) return false
         this.current = found ? sealAnalysisRows(found) : null
         this.dirty = false
         this.selected = null
@@ -75,18 +120,20 @@ export const useAnalysisStore = defineStore('analysis', {
         this.redoStack = []
         return !!found
       } finally {
-        this.loading = false
+        if (seq === loadSeq) this.loading = false
       }
     },
 
     /** 立即落盘。失败时抛错并保持 dirty，便于调用方提示用户。 */
     async saveNow(repo: AnalysisRepository = analysisRepository): Promise<void> {
       if (!this.current) return
+      const snapshot = this.current
       cancelScheduledSave()
       this.saving = true
       try {
-        await repo.put(this.current)
-        this.dirty = false
+        // 用开始时的快照落盘，避免 await 期间 current 已被切到另一份分析
+        await repo.put(snapshot)
+        if (this.current?.id === snapshot.id) this.dirty = false
       } catch (e) {
         const msg = e instanceof Error ? e.message : '未知错误'
         console.error('[analysisStore.saveNow]', e)
