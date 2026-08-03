@@ -36,8 +36,8 @@ const { openMenu: openAddData } = useAddData()
 
 const analysisId = computed(() => String(route.params.id ?? ''))
 
-// 进入页立即进入 loading，避免 onMounted 前主区空白无反馈
-if (analysisId.value) store.$patch({ loading: true })
+// 进入页立刻清掉上一份分析，避免卸载组件的 in-flight load 或旧 selected 继续展示
+if (analysisId.value) store.beginLoad(analysisId.value)
 
 onMounted(async () => {
   // 空闲时预取 flowchart / 图表，降低首次打开等待
@@ -49,8 +49,10 @@ onMounted(async () => {
   if (typeof ric === 'function') ric(prefetchAll, { timeout: 2500 })
   else setTimeout(prefetchAll, 800)
 
-  if (!loading.value) store.$patch({ loading: true })
-  const ok = await store.load(analysisId.value)
+  const id = analysisId.value
+  const ok = await store.load(id)
+  // 快速切换后本实例可能已过期
+  if (analysisId.value !== id) return
   if (!ok) {
     toast.error('Analysis 不存在或已被删除')
     router.replace('/')
@@ -62,15 +64,16 @@ onMounted(async () => {
 // 路由参数变化（例如列表页跳转）时重新加载
 watch(analysisId, async (id, prev) => {
   if (id && id !== prev) {
-    // 先进入 loading，避免 saveNow 期间界面无反馈
-    store.$patch({ loading: true })
     try {
+      // 保存期间先盖 loading，但仍保留 current 以便 saveNow 落盘
+      store.$patch({ loading: true })
       await store.saveNow()
       const ok = await store.load(id)
+      if (analysisId.value !== id) return
       if (!ok) router.replace('/')
       else applyQuerySelection()
     } catch (e) {
-      store.$patch({ loading: false })
+      if (analysisId.value === id) store.$patch({ loading: false })
       toast.error(e instanceof Error ? e.message : '加载失败')
     }
   }
@@ -85,12 +88,16 @@ function applyQuerySelection() {
 }
 
 // 离开页面前等待落盘，避免防抖未完成导致配置丢失
-onBeforeRouteLeave(async () => {
+onBeforeRouteLeave(async (to) => {
   try {
     await store.saveNow()
   } catch (e) {
     toast.error(e instanceof Error ? e.message : '保存失败', { title: '离开前保存失败' })
     // 仍允许离开；dirty 保留，下次进入可再试
+  }
+  // 回到列表/看板时清空，防止下一份分析短暂显示上一份表数据
+  if (!String(to.path).startsWith('/analysis/')) {
+    store.clearWorkspace()
   }
 })
 
@@ -194,7 +201,7 @@ const loadingText = computed(() => (flowchartSwitching.value && !loading.value ?
 
     <main class="ws__main">
       <KeepAlive>
-        <component :is="modeComponent" :key="mode" @add-data="openAddData" />
+        <component :is="modeComponent" :key="`${mode}:${analysisId}`" @add-data="openAddData" />
       </KeepAlive>
     </main>
 
