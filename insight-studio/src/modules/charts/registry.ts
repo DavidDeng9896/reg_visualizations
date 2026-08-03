@@ -149,9 +149,20 @@ export function isChartType(t: string): t is ChartType {
 }
 
 /** 统一构建入口：ViewResult + ChartConfig → option + warnings。 */
-export function buildChartOption(result: ViewResult, config: ChartConfig, viewName?: string, flags?: RowFlag[]): BuildOutput {
+export function buildChartOption(
+  result: ViewResult,
+  config: ChartConfig,
+  viewName?: string,
+  flags?: RowFlag[],
+  opts?: { hideTitle?: boolean },
+): BuildOutput {
   const def = getChartDef(config.chartType)
-  return def.buildOption({ result, config: { ...config, chartType: def.type }, viewName, flags })
+  let cfg: ChartConfig = { ...config, chartType: def.type }
+  if (opts?.hideTitle) {
+    // 嵌入卡片场景：卡头已展示名称，隐藏图内标题并收紧顶部留白
+    cfg = { ...cfg, style: { ...cfg.style, title: undefined, subtitle: undefined } }
+  }
+  return def.buildOption({ result, config: cfg, viewName, flags })
 }
 
 export function validateChartMapping(config: ChartConfig, columns: ColumnMeta[]): MappingError[] {

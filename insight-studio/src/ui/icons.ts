@@ -71,6 +71,7 @@ import {
   Send,
   UserRound,
   SquareChartGantt,
+  ArrowUp,
 } from 'lucide-vue-next'
 
 export type IconName =
@@ -96,6 +97,7 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'arrow-right'
+  | 'arrow-up'
   | 'swap'
   | 'filter'
   | 'download'
@@ -165,6 +167,7 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'arrow-right': ArrowRight,
+  'arrow-up': ArrowUp,
   swap: ArrowLeftRight,
   filter: Funnel,
   download: Download,

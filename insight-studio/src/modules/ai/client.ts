@@ -27,6 +27,8 @@ export interface ChatPayload {
 /** 聚合后的 SSE delta。 */
 interface SseDelta {
   content?: string
+  /** 推理模型的思考流（如 qwen 系 reasoning_content）。 */
+  reasoning_content?: string
   tool_calls?: Array<{
     index: number
     id?: string
@@ -43,17 +45,19 @@ interface SseChunk {
 
 /**
  * 解析 OpenAI SSE 流：逐 chunk 回调 delta 文本与 tool_calls 增量，
- * 返回聚合后的 assistant 消息（content + tool_calls）。
+ * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文）。
  */
 export async function readSseStream(
   res: Response,
   onToken?: (text: string) => void,
-): Promise<ChatMessage> {
+  onReasoningToken?: (text: string) => void,
+): Promise<ChatMessage & { reasoning?: string }> {
   if (!res.body) throw new Error('响应无流式内容')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let content = ''
+  let reasoning = ''
   const calls = new Map<number, ToolCall>()
 
   function applyChunk(chunk: SseChunk): void {
@@ -62,6 +66,10 @@ export async function readSseStream(
     if (delta.content) {
       content += delta.content
       onToken?.(delta.content)
+    }
+    if (delta.reasoning_content) {
+      reasoning += delta.reasoning_content
+      onReasoningToken?.(delta.reasoning_content)
     }
     if (delta.tool_calls) {
       for (const part of delta.tool_calls) {
@@ -103,6 +111,7 @@ export async function readSseStream(
     role: 'assistant',
     content: content || null,
     ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+    ...(reasoning ? { reasoning } : {}),
   }
 }
 
@@ -132,13 +141,15 @@ export interface AiPublicConfig {
   apiKeyMasked: string
   configured: boolean
   model: string
+  /** 备选模型（输入条可切换）。 */
+  models: string[]
   maxIterations: number
   confirmDestructive: boolean
 }
 
 export const aiConfigApi = {
   get: () => req<AiPublicConfig>('/api/ai/config'),
-  put: (patch: Partial<{ baseUrl: string; apiKey: string; model: string; maxIterations: number; confirmDestructive: boolean }>) =>
+  put: (patch: Partial<{ baseUrl: string; apiKey: string; model: string; models: string[]; maxIterations: number; confirmDestructive: boolean }>) =>
     req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
 }
 

@@ -18,6 +18,8 @@ export interface AiConfig {
   baseUrl: string
   apiKey: string
   model: string
+  /** 备选模型列表（前端输入条可切换）。 */
+  models: string[]
   /** agent-loop 最大工具调用轮数（1–20）。 */
   maxIterations: number
   /** 删除类操作是否需要用户确认。 */
@@ -28,6 +30,7 @@ const DEFAULT_CONFIG: AiConfig = {
   baseUrl: 'https://api.openai.com/v1',
   apiKey: '',
   model: 'gpt-4o-mini',
+  models: [],
   maxIterations: 8,
   confirmDestructive: true,
 }
@@ -113,6 +116,7 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
       apiKeyMasked: maskKey(cfg.apiKey),
       configured: !!cfg.apiKey,
       model: cfg.model,
+      models: cfg.models,
       maxIterations: cfg.maxIterations,
       confirmDestructive: cfg.confirmDestructive,
     })
@@ -129,6 +133,9 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
       baseUrl: typeof body.baseUrl === 'string' && body.baseUrl.trim() ? body.baseUrl.trim().replace(/\/$/, '') : cur.baseUrl,
       apiKey: nextApiKey,
       model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : cur.model,
+      models: Array.isArray(body.models)
+        ? [...new Set(body.models.filter((m): m is string => typeof m === 'string' && !!m.trim()).map((m) => m.trim()))]
+        : cur.models,
       maxIterations:
         typeof body.maxIterations === 'number' && Number.isFinite(body.maxIterations)
           ? Math.min(20, Math.max(1, Math.round(body.maxIterations)))

@@ -186,31 +186,40 @@ insight-api /api/ai/*（src/ai.ts）
 ```
 
 - **ReAct loop 在前端**（`src/modules/ai/agentLoop.ts`）：模型返回 tool_calls → 本地执行 →
-  tool 结果回灌 → 再请求，直到纯文本或达到 maxIterations（默认 8，MaxIterError 兜底）。
+  tool 结果回灌 → 再请求，直到纯文本或达到 maxIterations（默认 8）。
+  超轮不硬报错：自动追加一轮**无工具收尾请求**（system 提示「直接根据已有结果总结」），
+  实在拿不到文本才抛 MaxIterError。
   好处：工具直接操作前端 store（analysisStore/dashboardStore），撤销/持久化/视图刷新全部走现有链路，零后端业务侵入。
 - **工具集**（`tools/registry.ts` 21 个 JSON Schema + `tools/impl.ts` 实现）四组：
   数据（list/get schema/import_csv）、步骤（filter/join/union/computed/hide/run/rerun_stale）、
   图表（create_view/set_chart_config，写后跑 validateChartMapping 回执校验结果）、看板（建板/加组件）；
   元工具 submit_plan/mark_step_done 驱动进展清单。危险操作（删表/视图/步骤）在 confirmDestructive
-  开启时先回 `NEEDS_CONFIRMATION`，前端确认后带 `__confirmed` 重放。
+  开启时先回 `NEEDS_CONFIRMATION`（摘要内含「不要重试、提示用户点确认」指令防模型空转），
+  前端确认后带 `__confirmed` 重放。
   源表缺产出步骤时 impl 自动补 upload-csv 源步骤（与 migrateSteps 同构），保证任意分析可挂接下游。
 - **上下文**：system prompt（`prompts.ts`）+ 当前分析/表/视图摘要（`context.ts`），让模型知道「现在打开的是什么」。
 
 ### 交互（全局右抽屉 480px，AppHeader sparkle 入口）
 
-- 消息流：用户/助手 markdown（自写轻量渲染，不引依赖）；
-  **计划卡**（进展逐项打勾，对齐参考图「进展」）、**轨迹卡**（「已处理 N 个操作」默认折叠，
-  展开看每步参数/摘要，失败标红，待确认给「确认执行」按钮）、**产物卡**（表/视图/看板，
-  视图带小图预览，点击 router.push 直达工作区/看板）。
-- 输入条：@ 引用当前表/视图、/ 快捷指令、模型名展示、发送/中止（AbortController）、失败重试。
-- 设置弹窗：Base URL / API Key（掩码回显）/ 模型 / 最大轮次 / 危险操作确认开关，保存即生效。
-- 多会话：历史列表 + 新会话，消息持久化在后端 sqlite，刷新不丢。
+- 消息流（无气泡纯文本风）：用户消息右对齐 + 时间戳；助手 markdown（自写轻量渲染：标题/粗体/行内码/代码块/列表/表格）；
+  **思考过程卡**（推理模型的 `reasoning_content` 流，流式展开、结束自动折叠，可手动回看）；
+  **计划卡**（绿底白勾逐项打勾）、**轨迹卡**（「已处理 N 个操作」纯文本行默认折叠，展开看每步参数/摘要，
+  失败标红；待确认操作**始终外露**「等待确认 + 确认执行」按钮并按摘要去重）、
+  **产物卡**（表/视图/看板，视图带小图预览，点击 router.push 直达工作区/看板）。
+- 输入条（统一圆角盒子，对齐参考交互）：自动增高输入区（≤140px，Enter 发送 / Shift+Enter 换行）+
+  工具行（「+」菜单 = 引用上下文 + 快捷指令两组；**模型选择器** = 绿点状态 + 当前模型 + 下拉切换
+  `config.models` 备选，选择持久 localStorage 并作为 payload.model 覆盖；深色方块发送/中止按钮）。
+  输入时内联触发：敲 `@` 弹过滤引用菜单、行首敲 `/` 弹指令菜单，Enter 选首项（引用成 chip，不占文本）。
+- 设置弹窗：Base URL / API Key（掩码回显）/ Model / 备选模型（逗号分隔）/ 最大轮次 / 危险操作确认开关，保存即生效。
+- 多会话：历史面板（相对时间 + 删除）+ 新会话，消息持久化在后端 sqlite，刷新不丢；切换前自动落盘当前会话。
 
 ### 测试
 
-- 单测 `tests/unit/ai/`：agentLoop（多轮循环/SSE 分片聚合/超轮/执行异常）、impl（真实 store 上
+- 单测 `tests/unit/ai/`：agentLoop（多轮循环/SSE 分片聚合/超轮收尾/执行异常）、impl（真实 store 上
   import/filter/computed/view+config/delete 确认流）。
-- e2e `tests/e2e/ai.spec.ts`：route 拦截 config（已配置态）+ chat（按 tool 轮次回放编排 SSE，
-  与 `scripts/mock-ai.mjs` 同思路），全链路验证 发送 → 进展打勾×3 → 轨迹「已处理 7 个操作」→
-  产物卡 → 点击直达（URL 带 viewId + 侧栏出现新视图）。
+- e2e `tests/e2e/ai.spec.ts`：route 拦截 config（含备选模型）+ chat（按 tool 轮次回放编排 SSE，
+  与 `scripts/mock-ai.mjs` 同思路）：①全链路 发送 → 进展打勾 → 轨迹 → 思考块 → 模型切换 →
+  产物卡直达（URL 带 viewId + 侧栏出现新视图）；②危险确认流 删除需确认 → 按钮外露 → 确认后表真实删除。
+- 真实端点验收（qwen3.8-max，Aliyun 兼容模式）：建图+拟合注释 / 导入+过滤+派生列 / 建看板+加组件 /
+  删除确认 / 中止重试 / 历史恢复 / @引用 / 模型切换 全通过。
 - 联调：`node scripts/mock-ai.mjs 8789` 起 mock 端点，设置里填 `http://127.0.0.1:8789/v1` 即可手测。

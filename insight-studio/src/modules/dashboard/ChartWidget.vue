@@ -32,7 +32,7 @@ watch(
       return
     }
     try {
-      const out = buildChartOption(src.result, src.view.chart, src.title, src.view.flags ?? [])
+      const out = buildChartOption(src.result, src.view.chart, src.title, src.view.flags ?? [], { hideTitle: true })
       option.value = out.option
     } catch (e) {
       error.value = e instanceof Error ? e.message : '图表构建失败'

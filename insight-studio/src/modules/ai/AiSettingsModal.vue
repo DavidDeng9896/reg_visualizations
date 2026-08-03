@@ -11,6 +11,7 @@ const baseUrl = ref('')
 const apiKey = ref('')
 const keyMasked = ref('')
 const model = ref('')
+const modelsText = ref('')
 const maxIterations = ref(8)
 const confirmDestructive = ref(true)
 const saving = ref(false)
@@ -21,6 +22,7 @@ onMounted(async () => {
     baseUrl.value = cfg.baseUrl
     keyMasked.value = cfg.apiKeyMasked
     model.value = cfg.model
+    modelsText.value = (cfg.models ?? []).join(', ')
     maxIterations.value = cfg.maxIterations
     confirmDestructive.value = cfg.confirmDestructive
   } catch {
@@ -34,12 +36,17 @@ async function save(): Promise<void> {
     const patch: {
       baseUrl: string
       model: string
+      models: string[]
       maxIterations: number
       confirmDestructive: boolean
       apiKey?: string
     } = {
       baseUrl: baseUrl.value.trim(),
       model: model.value.trim(),
+      models: modelsText.value
+        .split(/[,，]/)
+        .map((m) => m.trim())
+        .filter(Boolean),
       maxIterations: Number(maxIterations.value) || 8,
       confirmDestructive: !!confirmDestructive.value,
     }
@@ -72,6 +79,10 @@ async function save(): Promise<void> {
       <label class="cfg__row">
         <span class="cfg__label">Model</span>
         <ITextField v-model="model" placeholder="如 gpt-4o-mini / qwen-max" />
+      </label>
+      <label class="cfg__row">
+        <span class="cfg__label">备选模型（逗号分隔，输入条可切换）</span>
+        <ITextField v-model="modelsText" placeholder="如 qwen3.8-max, qwen-max-latest" />
       </label>
       <div class="cfg__row">
         <span class="cfg__label">最大工具调用轮数（{{ maxIterations }}）</span>

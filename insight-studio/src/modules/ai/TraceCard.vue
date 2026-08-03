@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
 
-/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情。 */
+/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认操作始终外露。 */
 const props = defineProps<{
   items: TraceItem[]
   streaming?: boolean
@@ -11,6 +11,24 @@ const props = defineProps<{
 
 const expanded = ref(false)
 const doneCount = computed(() => props.items.filter((t) => !t.running).length)
+const pending = computed(() => {
+  const seen = new Set<string>()
+  return props.items.filter((t) => {
+    if (!t.needsConfirmation || t.confirmed) return false
+    // 模型偶尔重复发起同一删除，去重避免确认按钮堆叠
+    if (seen.has(t.summary)) return false
+    seen.add(t.summary)
+    return true
+  })
+})
+watch(
+  pending,
+  (p) => {
+    // 有待确认操作时自动展开，让上下文可见
+    if (p.length) expanded.value = true
+  },
+  { immediate: true },
+)
 
 function briefArgs(t: TraceItem): string {
   if (!t.args) return ''
@@ -39,16 +57,13 @@ function briefArgs(t: TraceItem): string {
         </div>
         <div v-if="briefArgs(t)" class="trace__args">{{ briefArgs(t) }}</div>
         <div v-if="t.summary" class="trace__summary">{{ t.summary.replace(/^NEEDS_CONFIRMATION:\s*/, '') }}</div>
-        <button
-          v-if="t.needsConfirmation && !t.confirmed"
-          type="button"
-          class="trace__confirm"
-          data-testid="ai-trace-confirm"
-          @click="$emit('confirm', t)"
-        >
-          确认执行
-        </button>
       </div>
+    </div>
+    <!-- 待确认操作：折叠状态下也始终外露 -->
+    <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
+      <IIcon name="warning" :size="12" class="trace__warn" />
+      <span class="trace__pending-text">等待确认：{{ t.summary.replace(/^NEEDS_CONFIRMATION:\s*/, '') }}</span>
+      <button type="button" class="trace__confirm" data-testid="ai-trace-confirm" @click="$emit('confirm', t)">确认执行</button>
     </div>
   </div>
 </template>
@@ -61,27 +76,23 @@ export default {
 
 <style scoped>
 .trace {
-  margin: 8px 0 4px;
-  border: 1px solid var(--is-border);
-  border-radius: var(--is-radius);
-  background: var(--is-surface);
-  overflow: hidden;
+  margin: 4px 0;
 }
 .trace__head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 3px 0;
   border: none;
   background: transparent;
   font-size: var(--is-text-xs);
-  color: var(--is-text-secondary);
+  color: var(--is-text-tertiary);
   cursor: pointer;
   text-align: left;
 }
 .trace__head:hover {
-  background: var(--is-surface-hover);
+  color: var(--is-text-secondary);
 }
 .trace__chev {
   transition: transform var(--is-dur-fast) var(--is-ease);
@@ -100,11 +111,12 @@ export default {
   }
 }
 .trace__list {
-  border-top: 1px solid var(--is-border);
-  padding: 6px 10px 8px;
+  border-top: 1px dashed var(--is-border);
+  margin-top: 4px;
+  padding: 8px 0 4px 2px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   max-height: 260px;
   overflow-y: auto;
 }
@@ -162,5 +174,25 @@ export default {
 }
 .trace__confirm:hover {
   background: var(--is-accent-hover);
+}
+.trace__pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--is-warning-border);
+  border-radius: var(--is-radius-sm);
+  background: var(--is-warning-bg, #fdf6e7);
+  font-size: var(--is-text-xs);
+}
+.trace__pending-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--is-text-secondary);
+}
+.trace__pending .trace__confirm {
+  margin: 0;
+  flex-shrink: 0;
 }
 </style>

@@ -71,7 +71,28 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(evts.some((e) => e.type === 'done')).toBe(true)
   })
 
-  it('超轮 → MaxIterError', async () => {
+  it('超轮 → 无工具收尾轮直接给出总结（不硬报错）', async () => {
+    const post = async (p: ChatPayload) => {
+      // 收尾轮（消息里带「已达到最大工具调用轮数」system 提示）回纯文本
+      const isWrapUp = p.messages.some((m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('已达到最大工具调用轮数'))
+      return isWrapUp ? sseOf({ content: '基于已完成操作的总结' }) : sseOf({ toolCalls: [call('list_tables', {})] })
+    }
+    const exec: ToolExecutor = async () => ({ ok: true, summary: 'ok' })
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 2,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(evts.filter((e) => e.type === 'round')).toHaveLength(3)
+    const done = evts.find((e) => e.type === 'done')
+    expect(done && done.type === 'done' ? done.content : '').toBe('基于已完成操作的总结')
+  })
+
+  it('超轮收尾仍无文本 → MaxIterError', async () => {
     const post = async () => sseOf({ toolCalls: [call('list_tables', {})] })
     const exec: ToolExecutor = async () => ({ ok: true, summary: 'ok' })
     await expect(

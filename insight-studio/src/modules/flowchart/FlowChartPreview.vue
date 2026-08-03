@@ -65,7 +65,7 @@ function rebuild() {
     return
   }
 
-  const out = buildChartOption(result, cfg, view.name, view.flags)
+  const out = buildChartOption(result, cfg, view.name, view.flags, { hideTitle: true })
   option.value = out.option
   rowCount.value = result.rows.length
 }

@@ -23,12 +23,13 @@ function toolCall(name: string, args: Record<string, unknown>): Record<string, u
   return { index: 0, id: `call_${name}_${callSeq}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }
 }
 
-function sseOf(payload: { toolCalls?: Record<string, unknown>[]; content?: string }): string {
+function sseOf(payload: { toolCalls?: Record<string, unknown>[]; content?: string; reasoning?: string }): string {
   let body = ''
   if (payload.toolCalls) {
     body += chunk({ role: 'assistant', tool_calls: payload.toolCalls })
     body += chunk({}, 'stop')
   } else {
+    if (payload.reasoning) body += chunk({ role: 'assistant', reasoning_content: payload.reasoning })
     const parts = String(payload.content ?? '')
       .split(/(?<=。|：|\n)/)
       .filter(Boolean)
@@ -86,28 +87,47 @@ function mockSse(messages: Msg[]): string {
       return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 2 })] })
     default:
       return sseOf({
+        reasoning: '用户要散点图与拟合，我已按步骤完成视图创建与配置。',
         content:
           '已完成：\n- 查看了当前表结构\n- 创建了散点视图「AI 散点分析」并配置 X=weight_kg、Y=length_cm\n- 加了线性拟合与拟合注释\n\n产物已在下方卡片中，可直接点击打开继续编辑。',
       })
   }
 }
 
+/** 删除确认流编排：list_tables → delete_table（NEEDS_CONFIRMATION）→ 提示确认。 */
+function mockSseDelete(messages: Msg[]): string {
+  const round = messages.filter((m) => m.role === 'tool').length + 1
+  switch (round) {
+    case 1:
+      return sseOf({ toolCalls: [toolCall('list_tables', {})] })
+    case 2:
+      return sseOf({ toolCalls: [toolCall('delete_table', { tableId: extractTableId(messages, 'Iris measurements') })] })
+    default:
+      return sseOf({ content: '删除需要您确认，请点击界面上的「确认执行」按钮。' })
+  }
+}
+
+/** 注册 config/chat 拦截（chat 走给定编排）。 */
+async function mockAi(page: import('@playwright/test').Page, script: (messages: Msg[]) => string): Promise<void> {
+  await page.route('**/api/ai/config', (route) => {
+    if (route.request().method() !== 'GET') return route.continue()
+    return route.fulfill({
+      json: { baseUrl: 'https://mock.local/v1', apiKeyMasked: 'm****y', configured: true, model: 'mock-qwen', models: ['mock-qwen-pro'], maxIterations: 8, confirmDestructive: true },
+    })
+  })
+  await page.route('**/api/ai/chat', async (route) => {
+    const body = route.request().postDataJSON() as { messages?: Msg[] }
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+      body: script(body.messages ?? []),
+    })
+  })
+}
+
 test.describe('AI 助手（mock SSE 回放）', () => {
-  test('对话驱动建图：进展打勾 → 轨迹卡 → 产物卡 → 点击直达工作区视图', async ({ page }) => {
-    await page.route('**/api/ai/config', (route) => {
-      if (route.request().method() !== 'GET') return route.continue()
-      return route.fulfill({
-        json: { baseUrl: 'https://mock.local/v1', apiKeyMasked: 'm****y', configured: true, model: 'mock-qwen', maxIterations: 8, confirmDestructive: true },
-      })
-    })
-    await page.route('**/api/ai/chat', async (route) => {
-      const body = route.request().postDataJSON() as { messages?: Msg[] }
-      await route.fulfill({
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
-        body: mockSse(body.messages ?? []),
-      })
-    })
+  test('对话驱动建图：进展打勾 → 轨迹卡 → 思考块 → 产物卡 → 点击直达工作区视图', async ({ page }) => {
+    await mockAi(page, mockSse)
 
     await createDemoAndEnter(page)
 
@@ -125,8 +145,24 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 轨迹卡：7 个操作全部完成
     await expect(page.getByTestId('ai-trace')).toContainText('已处理 7 个操作（完成 7）')
 
+    // 思考过程卡（结束后折叠，展开可见 reasoning 文本）
+    const reasoning = page.getByTestId('ai-reasoning')
+    await expect(reasoning).toContainText('思考过程')
+    await reasoning.locator('.reason__head').click()
+    await expect(reasoning).toContainText('用户要散点图与拟合')
+
     // 总结文本
     await expect(page.getByTestId('ai-messages')).toContainText('已完成')
+
+    // 模型选择器：默认模型 + 备选模型切换与还原
+    const pill = page.getByTestId('ai-model')
+    await expect(pill).toContainText('mock-qwen')
+    await pill.click()
+    await page.locator('.bar__menu .bar__menu-item', { hasText: 'mock-qwen-pro' }).click()
+    await expect(pill).toContainText('mock-qwen-pro')
+    await pill.click()
+    await page.locator('.bar__menu .bar__menu-item', { hasText: 'mock-qwen' }).first().click()
+    await expect(pill).toContainText('mock-qwen')
 
     // 产物卡出现（视图），点击直达工作区
     const artifact = page.getByTestId('ai-artifact').filter({ hasText: 'AI 散点分析' }).first()
@@ -136,5 +172,26 @@ test.describe('AI 助手（mock SSE 回放）', () => {
 
     // 工作区真实生效：侧栏出现新视图节点
     await expect(viewNode(page, 'AI 散点分析')).toBeVisible()
+  })
+
+  test('危险操作确认流：delete_table → 确认按钮外露 → 确认后表真实删除', async ({ page }) => {
+    await mockAi(page, mockSseDelete)
+
+    await createDemoAndEnter(page)
+    await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
+
+    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-input').fill('删除 Iris measurements 表')
+    await page.getByTestId('ai-send').click()
+
+    // 待确认块折叠状态也外露，表未被删
+    const confirmBtn = page.getByTestId('ai-trace-confirm')
+    await expect(confirmBtn).toBeVisible()
+    await expect(page.locator('.trace__pending')).toContainText('等待确认：删除表「Iris measurements」')
+    await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
+
+    // 确认执行 → 表真实删除
+    await confirmBtn.click()
+    await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toHaveCount(0)
   })
 })

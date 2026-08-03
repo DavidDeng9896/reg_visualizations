@@ -3,14 +3,23 @@ import { computed } from 'vue'
 import PlanChecklist from './PlanChecklist.vue'
 import TraceCard from './TraceCard.vue'
 import ArtifactCard from './ArtifactCard.vue'
+import ReasoningCard from './ReasoningCard.vue'
 import type { TraceItem, UiMessage } from './aiStore'
 
-/** 消息流：用户气泡 + assistant 轻量 markdown（粗体/行内码/代码块/列表/表格）。 */
+/** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
 const props = defineProps<{
   messages: UiMessage[]
 }>()
 
 const emit = defineEmits<{ (e: 'confirm', item: TraceItem): void; (e: 'retry'): void }>()
+
+function fmtTime(at: number): string {
+  try {
+    return new Date(at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+  } catch {
+    return ''
+  }
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -91,13 +100,17 @@ function htmlOf(id: string): string {
 <template>
   <div class="msgs" data-testid="ai-messages">
     <div v-for="m in messages" :key="m.id" class="msg" :class="`msg--${m.role}`">
-      <div v-if="m.role === 'user'" class="msg__bubble msg__bubble--user">{{ m.content }}</div>
+      <div v-if="m.role === 'user'" class="msg__user">
+        <div class="msg__user-text">{{ m.content }}</div>
+        <div v-if="m.at" class="msg__time">{{ fmtTime(m.at) }}</div>
+      </div>
       <template v-else>
+        <ReasoningCard v-if="m.reasoning" :reasoning="m.reasoning" :streaming="m.streaming" />
         <PlanChecklist v-if="m.planSteps?.length" :steps="m.planSteps" :done="m.planDone ?? []" :streaming="m.streaming" />
         <TraceCard v-if="m.trace.length" :items="m.trace" :streaming="m.streaming" @confirm="emit('confirm', $event)" />
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div v-if="m.content" class="msg__bubble msg__bubble--ai md" v-html="htmlOf(m.id)" />
-        <div v-if="m.streaming && !m.content && !m.trace.length" class="msg__thinking">思考中…</div>
+        <div v-if="m.content" class="msg__ai md" v-html="htmlOf(m.id)" />
+        <div v-if="m.streaming && !m.content && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
         <ArtifactCard v-for="a in m.artifacts" :key="`${a.kind}-${a.name}`" :artifact="a" />
         <div v-if="m.error" class="msg__error">{{ m.error }}<button type="button" class="msg__retry" data-testid="ai-retry" @click="emit('retry')">重试</button></div>
       </template>
@@ -109,33 +122,36 @@ function htmlOf(id: string): string {
 .msgs {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 18px;
+  padding: 14px 14px 18px;
 }
 .msg--user {
   display: flex;
   justify-content: flex-end;
 }
-.msg__bubble {
-  max-width: 100%;
-  padding: 8px 12px;
-  border-radius: var(--is-radius-lg);
+.msg__user {
+  max-width: 92%;
+  text-align: right;
+}
+.msg__user-text {
   font-size: var(--is-text-sm);
   line-height: 1.6;
+  color: var(--is-text);
   white-space: pre-wrap;
   word-break: break-word;
+  text-align: left;
+  display: inline-block;
 }
-.msg__bubble--user {
-  background: var(--is-accent);
-  color: #fff;
-  border-bottom-right-radius: var(--is-radius-sm);
-  max-width: 88%;
+.msg__time {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--is-text-tertiary);
 }
-.msg__bubble--ai {
-  background: var(--is-surface);
-  border: 1px solid var(--is-border);
-  border-bottom-left-radius: var(--is-radius-sm);
-  white-space: normal;
+.msg__ai {
+  font-size: var(--is-text-sm);
+  line-height: 1.7;
+  color: var(--is-text);
+  word-break: break-word;
 }
 .msg__thinking {
   color: var(--is-text-tertiary);
@@ -165,11 +181,11 @@ function htmlOf(id: string): string {
 }
 
 .md :deep(.md-p) {
-  margin: 2px 0;
+  margin: 3px 0;
 }
 .md :deep(.md-h) {
   font-weight: 600;
-  margin: 8px 0 4px;
+  margin: 10px 0 4px;
 }
 .md :deep(.md-ul) {
   margin: 4px 0 4px 18px;

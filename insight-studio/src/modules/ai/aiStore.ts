@@ -28,6 +28,10 @@ export interface UiMessage {
   content: string
   trace: TraceItem[]
   artifacts: Artifact[]
+  /** 推理模型的思考全文（reasoning_content 聚合）。 */
+  reasoning?: string
+  /** 发送/生成时间（epoch ms），历史消息可能缺省。 */
+  at?: number
   planSteps?: string[]
   planDone?: number[]
   streaming?: boolean
@@ -45,11 +49,14 @@ interface AiState {
   running: boolean
   /** 切换 / 新建会话加载中 */
   switching: boolean
+  /** 输入条模型覆盖（优先于 config.model，localStorage 持久）。 */
+  modelOverride: string | null
   abort: AbortController | null
 }
 
 let uid = 0
 const nextId = () => `m-${Date.now()}-${++uid}`
+const MODEL_KEY = 'insight.ai.model'
 
 export const useAiStore = defineStore('ai', {
   state: (): AiState => ({
@@ -61,14 +68,25 @@ export const useAiStore = defineStore('ai', {
     messages: [],
     running: false,
     switching: false,
+    modelOverride: typeof localStorage !== 'undefined' ? localStorage.getItem(MODEL_KEY) : null,
     abort: null,
   }),
 
   getters: {
     configured: (s) => !!s.config?.configured,
+    /** 实际生效的模型：覆盖 > 配置。 */
+    effectiveModel: (s) => s.modelOverride || s.config?.model || '',
   },
 
   actions: {
+    setModel(m: string | null) {
+      this.modelOverride = m
+      if (typeof localStorage !== 'undefined') {
+        if (m) localStorage.setItem(MODEL_KEY, m)
+        else localStorage.removeItem(MODEL_KEY)
+      }
+    },
+
     async init() {
       try {
         this.config = await aiConfigApi.get()
@@ -139,9 +157,9 @@ export const useAiStore = defineStore('ai', {
       if (!input || this.running) return
       await this.ensureConversation()
 
-      this.messages.push({ id: nextId(), role: 'user', content: input, trace: [], artifacts: [] })
+      this.messages.push({ id: nextId(), role: 'user', content: input, trace: [], artifacts: [], at: Date.now() })
       // 必须经 store 的响应式数组取回 proxy 再改，直接改原始对象不触发视图更新
-      this.messages.push({ id: nextId(), role: 'assistant', content: '', trace: [], artifacts: [], streaming: true })
+      this.messages.push({ id: nextId(), role: 'assistant', content: '', trace: [], artifacts: [], streaming: true, at: Date.now() })
       const assistant = this.messages[this.messages.length - 1] as UiMessage
 
       this.running = true
@@ -174,10 +192,13 @@ export const useAiStore = defineStore('ai', {
           tools: OPENAI_TOOLS,
           exec,
           maxIterations: this.config?.maxIterations ?? 8,
+          model: this.modelOverride ?? undefined,
           signal: this.abort.signal,
           onEvent: (e) => {
             if (e.type === 'token') {
               assistant.content += e.text
+            } else if (e.type === 'reasoning') {
+              assistant.reasoning = (assistant.reasoning ?? '') + e.text
             } else if (e.type === 'tool_call') {
               let args: Record<string, unknown> = {}
               try {

@@ -28,7 +28,11 @@ function fail(summary: string): ToolExecResult {
   return { ok: false, summary }
 }
 function needConfirm(action: string): ToolExecResult {
-  return { ok: false, needsConfirmation: true, summary: `NEEDS_CONFIRMATION: ${action}` }
+  return {
+    ok: false,
+    needsConfirmation: true,
+    summary: `NEEDS_CONFIRMATION: ${action}。不要重试此操作：界面上已出现「确认执行」按钮，请直接用文字提示用户点击确认，用户确认后你再继续后续步骤。`,
+  }
 }
 
 function store() {

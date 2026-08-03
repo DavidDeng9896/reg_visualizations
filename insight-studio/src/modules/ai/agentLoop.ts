@@ -19,6 +19,7 @@ export type ToolExecutor = (call: ToolCall, args: Record<string, unknown>) => Pr
 
 export type AgentEvent =
   | { type: 'token'; text: string }
+  | { type: 'reasoning'; text: string }
   | { type: 'round'; n: number }
   | { type: 'tool_call'; call: ToolCall }
   | { type: 'tool_result'; id: string; name: string; ok: boolean; summary: string; artifact?: import('./types').Artifact; needsConfirmation?: boolean }
@@ -48,6 +49,8 @@ export interface RunAgentOptions {
   tools: ChatPayload['tools']
   exec: ToolExecutor
   maxIterations: number
+  /** 模型覆盖（输入条切换模型）；缺省由后端用配置的 model。 */
+  model?: string
   signal?: AbortSignal
   onEvent: (e: AgentEvent) => void
   /** 可注入用于测试；默认走后端代理。 */
@@ -71,8 +74,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     throwIfAborted()
     onEvent({ type: 'round', n: round })
 
-    const res = await post({ messages, tools: opts.tools }, signal)
-    const assistant = await readSseStream(res, (text) => onEvent({ type: 'token', text }))
+    const res = await post({ messages, tools: opts.tools, ...(opts.model ? { model: opts.model } : {}) }, signal)
+    const streamed = await readSseStream(
+      res,
+      (text) => onEvent({ type: 'token', text }),
+      (text) => onEvent({ type: 'reasoning', text }),
+    )
+    // reasoning 只用于 UI 展示，不回灌上游（兼容模式对未知字段可能 400）
+    const { reasoning: _reasoning, ...assistant } = streamed
     messages.push(assistant)
 
     const calls = assistant.tool_calls ?? []
@@ -120,6 +129,31 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       })
       messages.push({ role: 'tool', tool_call_id: call.id, name, content: result.summary })
     }
+  }
+
+  // 超轮兜底：不带工具再请一轮，让模型基于已有结果直接收尾（避免硬报错）
+  throwIfAborted()
+  onEvent({ type: 'round', n: maxIterations + 1 })
+  const wrapUp = await post(
+    {
+      messages: [
+        ...messages,
+        { role: 'system', content: '已达到最大工具调用轮数。请不要再调用任何工具，直接根据以上工具执行结果，用中文给出简洁的完成总结。' },
+      ],
+      ...(opts.model ? { model: opts.model } : {}),
+    },
+    signal,
+  )
+  const finalStream = await readSseStream(
+    wrapUp,
+    (text) => onEvent({ type: 'token', text }),
+    (text) => onEvent({ type: 'reasoning', text }),
+  )
+  const { reasoning: _r2, ...finalMsg } = finalStream
+  messages.push(finalMsg)
+  if (finalMsg.content) {
+    onEvent({ type: 'done', content: finalMsg.content })
+    return messages
   }
   throw new MaxIterError(maxIterations)
 }

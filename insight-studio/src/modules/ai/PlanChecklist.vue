@@ -21,9 +21,9 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
       :class="`plan__step--${nextIndex(i)}`"
     >
       <span class="plan__icon">
-        <IIcon v-if="nextIndex(i) === 'done'" name="check" :size="12" />
+        <span v-if="nextIndex(i) === 'done'" class="plan__circle plan__circle--done"><IIcon name="check" :size="10" /></span>
         <IIcon v-else-if="nextIndex(i) === 'doing'" name="spinner" :size="12" class="plan__spin" />
-        <span v-else class="plan__dot" />
+        <span v-else class="plan__circle" />
       </span>
       <span class="plan__text">{{ s }}</span>
     </div>
@@ -32,18 +32,15 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
 
 <style scoped>
 .plan {
-  margin: 8px 0 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--is-border);
-  border-radius: var(--is-radius);
-  background: var(--is-surface);
+  margin: 4px 0;
+  padding: 2px 0;
 }
 .plan__title {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--is-text-tertiary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .plan__step {
   display: flex;
@@ -68,17 +65,22 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
   flex-shrink: 0;
   margin-top: 1px;
 }
-.plan__step--done .plan__icon {
-  color: var(--is-success);
+.plan__circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--is-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.plan__circle--done {
+  background: var(--is-success);
+  border-color: var(--is-success);
+  color: #fff;
 }
 .plan__step--doing .plan__icon {
   color: var(--is-accent);
-}
-.plan__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--is-border-strong);
 }
 .plan__spin {
   animation: plan-spin 1s linear infinite;

@@ -34,7 +34,7 @@ function rebuild(): void {
   }
   try {
     const result = runPipeline(a, art.tableId, art.viewId)
-    option.value = buildChartOption(result, view.chart, view.name, view.flags ?? []).option
+    option.value = buildChartOption(result, view.chart, view.name, view.flags ?? [], { hideTitle: true }).option
   } catch {
     failed.value = true
   }
