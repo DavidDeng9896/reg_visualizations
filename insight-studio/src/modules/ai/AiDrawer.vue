@@ -9,16 +9,32 @@ import AiSettingsModal from './AiSettingsModal.vue'
 
 /** AI 助手全局抽屉：会话切换 + 消息流 + 输入条。 */
 const ai = useAiStore()
-const { drawerOpen, settingsOpen, conversations, currentId, messages, running } = storeToRefs(ai)
+const { drawerOpen, settingsOpen, conversations, currentId, messages, running, switching } = storeToRefs(ai)
 const historyOpen = ref(false)
+const deletingId = ref<string | null>(null)
 
 onMounted(() => {
   void ai.init()
 })
 
 async function onSelectConversation(id: string | number) {
-  if (!id) return
+  if (!id || switching.value) return
   await ai.selectConversation(String(id))
+}
+
+async function onNewConversation() {
+  if (switching.value) return
+  await ai.newConversation()
+}
+
+async function onRemoveConversation(id: string) {
+  if (deletingId.value) return
+  deletingId.value = id
+  try {
+    await ai.removeConversation(id)
+  } finally {
+    deletingId.value = null
+  }
 }
 
 async function onConfirm(item: TraceItem): Promise<void> {
@@ -60,15 +76,26 @@ async function onConfirm(item: TraceItem): Promise<void> {
                       type="button"
                       class="ai-drawer__conv-del"
                       aria-label="删除会话"
-                      @click.stop="ai.removeConversation(c.id)"
+                      :disabled="!!deletingId"
+                      :aria-busy="deletingId === c.id || undefined"
+                      @click.stop="onRemoveConversation(c.id)"
                     >
-                      <IIcon name="trash" :size="12" />
+                      <IIcon v-if="deletingId === c.id" name="spinner" :size="12" class="ai-drawer__spin" />
+                      <IIcon v-else name="trash" :size="12" />
                     </button>
                   </div>
                 </div>
               </template>
             </IPopover>
-            <button type="button" class="ai-drawer__btn" title="新会话" aria-label="新会话" data-testid="ai-newconv" @click="ai.newConversation()">
+            <button
+              type="button"
+              class="ai-drawer__btn"
+              title="新会话"
+              aria-label="新会话"
+              data-testid="ai-newconv"
+              :disabled="switching"
+              @click="onNewConversation"
+            >
               <IIcon name="plus" :size="15" />
             </button>
             <button type="button" class="ai-drawer__btn" title="AI 设置" aria-label="AI 设置" data-testid="ai-settings" @click="settingsOpen = true">
@@ -81,12 +108,15 @@ async function onConfirm(item: TraceItem): Promise<void> {
         </header>
 
         <div class="ai-drawer__body">
-          <div v-if="!messages.length" class="ai-drawer__empty">
-            <IIcon name="sparkle" :size="28" class="ai-drawer__empty-icon" />
-            <p>我是平台内置的分析助手，可以帮你建表、加工数据、配图表、做看板。</p>
-            <p class="ai-drawer__hint">试试：「把当前表画成散点图并加线性拟合」</p>
-          </div>
-          <AiMessageList v-else :messages="messages" @confirm="onConfirm" @retry="ai.retry()" />
+          <div v-if="switching" class="ai-drawer__loading" role="status">加载会话…</div>
+          <template v-else>
+            <div v-if="!messages.length" class="ai-drawer__empty">
+              <IIcon name="sparkle" :size="28" class="ai-drawer__empty-icon" />
+              <p>我是平台内置的分析助手，可以帮你建表、加工数据、配图表、做看板。</p>
+              <p class="ai-drawer__hint">试试：「把当前表画成散点图并加线性拟合」</p>
+            </div>
+            <AiMessageList v-else :messages="messages" @confirm="onConfirm" @retry="ai.retry()" />
+          </template>
           <div v-if="running" class="ai-drawer__running">正在生成…</div>
         </div>
 
@@ -172,6 +202,29 @@ async function onConfirm(item: TraceItem): Promise<void> {
   color: var(--is-text-tertiary);
   font-size: var(--is-text-xs);
 }
+.ai-drawer__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--is-text-secondary);
+  font-size: var(--is-text-sm);
+}
+.ai-drawer__loading::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--is-border-strong);
+  border-top-color: var(--is-accent);
+  border-radius: 50%;
+  animation: ai-spin 0.7s linear infinite;
+}
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .ai-drawer__running {
   padding: 0 14px 8px;
   font-size: var(--is-text-xs);
@@ -223,6 +276,9 @@ async function onConfirm(item: TraceItem): Promise<void> {
 }
 .ai-drawer__conv-del:hover {
   color: var(--is-danger);
+}
+.ai-drawer__spin {
+  animation: ai-spin 0.7s linear infinite;
 }
 
 .ai-drawer-enter-active,

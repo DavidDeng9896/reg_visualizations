@@ -47,9 +47,11 @@ const seg = computed<'dashboard' | 'analysis'>(() => (pane.value === 'dashboard'
 
 function goDashboards() {
   const id = dashStore.lastId() ?? sortedItems.value[0]?.id
+  if (id) openingId.value = id
   void router.push(id ? `/dashboards/${id}` : '/dashboards')
 }
 function goAnalyses() {
+  openingId.value = null
   void router.push('/')
 }
 
@@ -88,12 +90,20 @@ const visibleDashboards = computed(() => {
 })
 
 function selectDashboard(id: string) {
+  if (currentId.value === id && dashStore.current) {
+    openingId.value = null
+    void router.push(`/dashboards/${id}`)
+    return
+  }
+  openingId.value = id
   void router.push(`/dashboards/${id}`)
 }
 
 /* ------------------------------- 分析列表 ------------------------------- */
 const analyses = ref<Analysis[]>([])
 const analysesLoading = ref(true)
+/** 点击后等待路由/数据加载完成的卡片 id（分析或看板）。 */
+const openingId = ref<string | null>(null)
 
 async function refreshAnalyses() {
   analysesLoading.value = true
@@ -111,10 +121,31 @@ const stopSeedWatch = onAnalysesPossiblyChanged(() => {
   void refreshAnalyses()
 })
 onBeforeUnmount(stopSeedWatch)
+/** 目标路由已加载完成（或回到列表）后再清「打开中」态，避免路由先到、数据未到之间无反馈。 */
+function maybeClearOpening() {
+  if (!openingId.value) return
+  if (route.path === '/' || route.path === '/dashboards') {
+    openingId.value = null
+    return
+  }
+  const id = typeof route.params.id === 'string' ? route.params.id : ''
+  if (!id || id !== openingId.value) return
+  if (route.path.startsWith('/analysis/')) {
+    if (!analysisStore.loading && currentAnalysis.value?.id === id) openingId.value = null
+  } else if (route.path.startsWith('/dashboards/')) {
+    if (!dashStore.loading && currentId.value === id) openingId.value = null
+  }
+}
+
 // 路由变化时刷新（新建/删除/重命名后回到列表能保持最新）
 watch(() => route.fullPath, () => {
   if (pane.value !== 'analysis-detail') void refreshAnalyses()
+  maybeClearOpening()
 })
+watch(() => analysisStore.loading, maybeClearOpening)
+watch(() => dashStore.loading, maybeClearOpening)
+watch(() => currentAnalysis.value?.id, maybeClearOpening)
+watch(currentId, maybeClearOpening)
 
 const sortedAnalyses = computed(() =>
   analyses.value.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -125,6 +156,12 @@ const visibleAnalyses = computed(() => {
 })
 
 function openAnalysis(id: string) {
+  if (currentAnalysis.value?.id === id && !analysisStore.loading) {
+    openingId.value = null
+    void router.push(`/analysis/${id}`)
+    return
+  }
+  openingId.value = id
   void router.push(`/analysis/${id}`)
 }
 
@@ -151,11 +188,13 @@ async function submitCreate() {
     if (pane.value === 'dashboard') {
       const d = await dashStore.create(name, org)
       createOpen.value = false
+      openingId.value = d.id
       void router.push(`/dashboards/${d.id}`)
     } else {
       const a = createEmptyAnalysis(name, org)
       await analysisRepository.put(a)
       createOpen.value = false
+      openingId.value = a.id
       void router.push(`/analysis/${a.id}`)
     }
   } finally {
@@ -168,6 +207,7 @@ const renameOpen = ref(false)
 const renameKind = ref<'dashboard' | 'analysis'>('analysis')
 const renameId = ref('')
 const renameName = ref('')
+const renameSaving = ref(false)
 
 function openRenameDashboard(d: Dashboard) {
   renameKind.value = 'dashboard'
@@ -184,32 +224,37 @@ function openRenameAnalysis(a: Analysis) {
 
 async function submitRename() {
   const name = renameName.value.trim()
-  if (!name) return
-  if (renameKind.value === 'dashboard') {
-    if (currentId.value === renameId.value) {
-      await dashStore.rename(name)
+  if (!name || renameSaving.value) return
+  renameSaving.value = true
+  try {
+    if (renameKind.value === 'dashboard') {
+      if (currentId.value === renameId.value) {
+        await dashStore.rename(name)
+      } else {
+        const d = await dashboardRepository.get(renameId.value)
+        if (d) {
+          d.name = name
+          d.updatedAt = new Date().toISOString()
+          await dashboardRepository.put(d)
+          await dashStore.loadList()
+        }
+      }
+    } else if (currentAnalysis.value?.id === renameId.value) {
+      analysisStore.rename(name)
     } else {
-      const d = await dashboardRepository.get(renameId.value)
-      if (d) {
-        d.name = name
-        d.updatedAt = new Date().toISOString()
-        await dashboardRepository.put(d)
-        await dashStore.loadList()
+      const a = await analysisRepository.get(renameId.value)
+      if (a) {
+        a.name = name
+        a.updatedAt = new Date().toISOString()
+        await analysisRepository.put(a)
       }
     }
-  } else if (currentAnalysis.value?.id === renameId.value) {
-    analysisStore.rename(name)
-  } else {
-    const a = await analysisRepository.get(renameId.value)
-    if (a) {
-      a.name = name
-      a.updatedAt = new Date().toISOString()
-      await analysisRepository.put(a)
-    }
+    renameOpen.value = false
+    toast.success('已重命名')
+    await refreshAnalyses()
+  } finally {
+    renameSaving.value = false
   }
-  renameOpen.value = false
-  toast.success('已重命名')
-  await refreshAnalyses()
 }
 
 /* ------------------------------- 删除 ------------------------------- */
@@ -217,6 +262,7 @@ const deleteOpen = ref(false)
 const deleteKind = ref<'dashboard' | 'analysis'>('analysis')
 const deleteId = ref('')
 const deleteName = ref('')
+const deleteSaving = ref(false)
 
 function openDeleteDashboard(d: Dashboard) {
   deleteKind.value = 'dashboard'
@@ -232,17 +278,23 @@ function openDeleteAnalysis(a: Analysis) {
 }
 
 async function confirmDelete() {
-  if (deleteKind.value === 'dashboard') {
-    const wasCurrent = currentId.value === deleteId.value
-    const next = await dashStore.remove(deleteId.value)
-    if (wasCurrent) void router.push(next ? `/dashboards/${next}` : '/dashboards')
-  } else {
-    await analysisRepository.delete(deleteId.value)
-    if (currentAnalysis.value?.id === deleteId.value) void router.replace('/')
-    await refreshAnalyses()
+  if (deleteSaving.value) return
+  deleteSaving.value = true
+  try {
+    if (deleteKind.value === 'dashboard') {
+      const wasCurrent = currentId.value === deleteId.value
+      const next = await dashStore.remove(deleteId.value)
+      if (wasCurrent) void router.push(next ? `/dashboards/${next}` : '/dashboards')
+    } else {
+      await analysisRepository.delete(deleteId.value)
+      if (currentAnalysis.value?.id === deleteId.value) void router.replace('/')
+      await refreshAnalyses()
+    }
+    deleteOpen.value = false
+    toast.success(`已删除「${deleteName.value}」`)
+  } finally {
+    deleteSaving.value = false
   }
-  deleteOpen.value = false
-  toast.success(`已删除「${deleteName.value}」`)
 }
 
 /* 卡片 ⋯ 菜单 */
@@ -365,8 +417,9 @@ function openCombine() {
 
     <!-- 看板卡片列表 -->
     <div v-if="pane === 'dashboard'" class="side__list">
+      <div v-if="dashStore.loading && !visibleDashboards.length" class="side__loading" role="status">加载中…</div>
       <IEmptyState
-        v-if="!visibleDashboards.length"
+        v-else-if="!dashStore.loading && !visibleDashboards.length"
         icon="grid"
         :title="query ? '没有匹配的看板' : '还没有看板'"
         description="点击上方 + 新建看板。"
@@ -376,10 +429,11 @@ function openCombine() {
         v-for="d in visibleDashboards"
         :key="d.id"
         class="card"
-        :class="{ 'card--on': d.id === currentId }"
+        :class="{ 'card--on': d.id === currentId, 'card--opening': openingId === d.id }"
         tabindex="0"
         role="link"
         data-testid="dashboard-card"
+        :aria-busy="openingId === d.id || undefined"
         :aria-label="`打开看板 ${d.name}`"
         @click="selectDashboard(d.id)"
         @keydown.enter="selectDashboard(d.id)"
@@ -411,8 +465,9 @@ function openCombine() {
 
     <!-- 分析卡片列表 -->
     <div v-else-if="pane === 'analysis-list'" class="side__list">
+      <div v-if="analysesLoading && !visibleAnalyses.length" class="side__loading" role="status">加载中…</div>
       <IEmptyState
-        v-if="!analysesLoading && !visibleAnalyses.length"
+        v-else-if="!analysesLoading && !visibleAnalyses.length"
         icon="database"
         :title="query ? '没有匹配的分析' : '还没有分析'"
         description="点击上方 + 新建分析。"
@@ -422,9 +477,11 @@ function openCombine() {
         v-for="a in visibleAnalyses"
         :key="a.id"
         class="card"
+        :class="{ 'card--opening': openingId === a.id }"
         tabindex="0"
         role="link"
         data-testid="analysis-card"
+        :aria-busy="openingId === a.id || undefined"
         :aria-label="`打开分析 ${a.name}`"
         @click="openAnalysis(a.id)"
         @keydown.enter="openAnalysis(a.id)"
@@ -491,8 +548,8 @@ function openCombine() {
     <IModal :open="renameOpen" title="重命名" :width="420" @update:open="renameOpen = $event">
       <ITextField v-model="renameName" autofocus @enter="submitRename" />
       <template #footer>
-        <IButton @click="renameOpen = false">取消</IButton>
-        <IButton variant="primary" :disabled="!renameName.trim()" @click="submitRename">保存</IButton>
+        <IButton :disabled="renameSaving" @click="renameOpen = false">取消</IButton>
+        <IButton variant="primary" :disabled="!renameName.trim()" :loading="renameSaving" @click="submitRename">保存</IButton>
       </template>
     </IModal>
 
@@ -505,8 +562,8 @@ function openCombine() {
     >
       <p class="confirm-text">确定删除「{{ deleteName }}」吗？此操作不可撤销。</p>
       <template #footer>
-        <IButton @click="deleteOpen = false">取消</IButton>
-        <IButton variant="danger" @click="confirmDelete">删除</IButton>
+        <IButton :disabled="deleteSaving" @click="deleteOpen = false">取消</IButton>
+        <IButton variant="danger" :loading="deleteSaving" @click="confirmDelete">删除</IButton>
       </template>
     </IModal>
 
@@ -690,6 +747,29 @@ function openCombine() {
 .side__empty {
   padding: 24px 8px;
 }
+.side__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 12px;
+  font-size: var(--is-text-sm);
+  color: var(--is-text-secondary);
+}
+.side__loading::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--is-border-strong);
+  border-top-color: var(--is-accent);
+  border-radius: 50%;
+  animation: side-spin 0.7s linear infinite;
+}
+@keyframes side-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .card {
   position: relative;
   border: 1px solid #e8ecf1;
@@ -730,6 +810,24 @@ function openCombine() {
 }
 .card--on .card__name {
   color: #2f7cf6;
+}
+.card--opening {
+  border-color: #7aa7f5;
+  background: #f4f8ff;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.card--opening::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--is-border-strong);
+  border-top-color: var(--is-accent);
+  border-radius: 50%;
+  animation: side-spin 0.7s linear infinite;
 }
 .card__meta {
   margin: 4px 0 0;

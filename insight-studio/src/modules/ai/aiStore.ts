@@ -43,6 +43,8 @@ interface AiState {
   currentId: string | null
   messages: UiMessage[]
   running: boolean
+  /** 切换 / 新建会话加载中 */
+  switching: boolean
   abort: AbortController | null
 }
 
@@ -58,6 +60,7 @@ export const useAiStore = defineStore('ai', {
     currentId: null,
     messages: [],
     running: false,
+    switching: false,
     abort: null,
   }),
 
@@ -84,21 +87,32 @@ export const useAiStore = defineStore('ai', {
     },
 
     async newConversation() {
-      const analysis = useAnalysisStore().current
-      const doc = await aiConvApi.create({ analysisId: analysis?.id ?? null, title: '新会话' })
-      this.currentId = doc.id
-      this.messages = []
-      await this.refreshConversations()
+      this.switching = true
+      try {
+        const analysis = useAnalysisStore().current
+        const doc = await aiConvApi.create({ analysisId: analysis?.id ?? null, title: '新会话' })
+        this.currentId = doc.id
+        this.messages = []
+        await this.refreshConversations()
+      } finally {
+        this.switching = false
+      }
     },
 
     async selectConversation(id: string) {
-      const doc = await aiConvApi.get(id)
-      this.currentId = doc.id
-      this.messages = (doc.messages as UiMessage[]) ?? []
-      // 回看时清理瞬态
-      for (const m of this.messages) {
-        m.streaming = false
-        for (const t of m.trace) t.running = false
+      if (this.currentId === id) return
+      this.switching = true
+      try {
+        const doc = await aiConvApi.get(id)
+        this.currentId = doc.id
+        this.messages = (doc.messages as UiMessage[]) ?? []
+        // 回看时清理瞬态
+        for (const m of this.messages) {
+          m.streaming = false
+          for (const t of m.trace) t.running = false
+        }
+      } finally {
+        this.switching = false
       }
     },
 

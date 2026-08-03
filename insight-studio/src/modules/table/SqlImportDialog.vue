@@ -263,29 +263,37 @@ function setType(i: number, v: string | number) {
   typeOverrides.value[i] = v as DataType
 }
 
-function confirm() {
-  if (!hasData.value || !dataRows.value.length) return
-  const ok = commitImportedTable({
-    name: tableName.value,
-    headers: headers.value,
-    dataRows: dataRows.value,
-    columnTypes: columnTypes.value,
-    stepType: 'query-sql',
-    stepConfig: {
-      sql: lastSql.value || sql.value,
-      source: sourceMode.value,
-      ...(sourceMode.value === 'remote'
-        ? {
-            dialect: draft.value.dialect,
-            host: draft.value.host,
-            database: draft.value.database,
-            connectionName: draft.value.name,
-          }
-        : {}),
-    },
-    sourceLabel: sourceMode.value === 'remote' ? `SQL · ${draft.value.name}` : 'SQL · 本地表',
-  })
-  if (ok) close()
+const committing = ref(false)
+
+async function confirm() {
+  if (!hasData.value || !dataRows.value.length || committing.value) return
+  committing.value = true
+  await new Promise<void>((r) => requestAnimationFrame(() => r()))
+  try {
+    const ok = commitImportedTable({
+      name: tableName.value,
+      headers: headers.value,
+      dataRows: dataRows.value,
+      columnTypes: columnTypes.value,
+      stepType: 'query-sql',
+      stepConfig: {
+        sql: lastSql.value || sql.value,
+        source: sourceMode.value,
+        ...(sourceMode.value === 'remote'
+          ? {
+              dialect: draft.value.dialect,
+              host: draft.value.host,
+              database: draft.value.database,
+              connectionName: draft.value.name,
+            }
+          : {}),
+      },
+      sourceLabel: sourceMode.value === 'remote' ? `SQL · ${draft.value.name}` : 'SQL · 本地表',
+    })
+    if (ok) close()
+  } finally {
+    committing.value = false
+  }
 }
 
 watch(
@@ -408,8 +416,8 @@ watch(sourceMode, (mode) => {
             <IToggle v-model="draft.ssl" aria-label="SSL" />
           </label>
           <div class="sql__form-actions">
-            <IButton size="sm" variant="secondary" :disabled="testing" @click="testConn">
-              {{ testing ? '测试中…' : '测试并保存' }}
+            <IButton size="sm" variant="secondary" :loading="testing" @click="testConn">
+              测试并保存
             </IButton>
             <IButton size="sm" variant="ghost" @click="saveConnection">仅保存</IButton>
             <IButton size="sm" variant="ghost" :disabled="!activeId" @click="deleteConnection">删除</IButton>
@@ -458,8 +466,8 @@ watch(sourceMode, (mode) => {
         <div class="sql__main">
           <SqlEditor v-model="sql" :schema="editorSchema" @run="run" />
           <div class="sql__actions">
-            <IButton size="sm" variant="secondary" :disabled="running" @click="run">
-              {{ running ? '运行中…' : '运行' }}
+            <IButton size="sm" variant="secondary" :loading="running" @click="run">
+              运行
             </IButton>
             <ITextField v-model="tableName" size="sm" class="sql__name" placeholder="导入后的表名" aria-label="表名" />
           </div>
@@ -503,7 +511,14 @@ watch(sourceMode, (mode) => {
 
     <template #footer>
       <IButton @click="close">取消</IButton>
-      <IButton variant="primary" :disabled="!hasData || !dataRows.length || running" @click="confirm">Add table</IButton>
+      <IButton
+        variant="primary"
+        :disabled="!hasData || !dataRows.length || running"
+        :loading="committing"
+        @click="confirm"
+      >
+        Add table
+      </IButton>
     </template>
   </IModal>
 </template>

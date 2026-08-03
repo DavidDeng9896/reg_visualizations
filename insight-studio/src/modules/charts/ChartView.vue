@@ -174,14 +174,16 @@ watch(
 
 /* ------------------------------- Save / Cancel ------------------------------- */
 
-async function save() {
+const chartSaving = ref(false)
+
+async function save(): Promise<boolean> {
   const v = view.value
-  if (!v) return
+  if (!v || chartSaving.value) return false
   const errors = validateChartMapping(draftModel.draft, columns.value)
   if (errors.length) {
     saveAttempted.value = true
     toast.error(`无法保存：${errors.map((e) => e.message).join('；')}`, { title: '图表配置不完整' })
-    return
+    return false
   }
   const committed = commitDraft(draftModel as ChartDraft)
   const committedType: ChartType = committed.chartType
@@ -199,14 +201,19 @@ async function save() {
   })
   if (!wrote) {
     toast.error('未找到当前图表视图，配置未写入')
-    return
+    return false
   }
   saveAttempted.value = false
+  chartSaving.value = true
   try {
     await store.saveNow()
     toast.success('图表配置已保存')
+    return true
   } catch (e) {
     toast.error(e instanceof Error ? e.message : '保存失败', { title: '落盘失败' })
+    return false
+  } finally {
+    chartSaving.value = false
   }
 }
 
@@ -282,9 +289,11 @@ watch(
   },
 )
 
-function guardSave() {
+async function guardSave() {
+  if (chartSaving.value) return
+  const ok = await save()
+  if (!ok) return
   guardOpen.value = false
-  save()
   if (pendingSelection) store.select(pendingSelection)
   pendingSelection = null
 }
@@ -569,7 +578,15 @@ const chartHeight = computed(() => previewConfig.value.style.height)
     <!-- 右侧配置抽屉：固定宽度，禁止用 width:0 做 Transition（会被 flex 压没） -->
     <Transition name="cview-drawer">
       <aside v-if="panelOpen" class="cview__drawer" aria-label="图表配置">
-        <ChartConfigPanel v-if="view" :view-name="view.name" :chips="chips" @rename="rename" @cancel="cancel" @save="save" />
+      <ChartConfigPanel
+          v-if="view"
+          :view-name="view.name"
+          :chips="chips"
+          :saving="chartSaving"
+          @rename="rename"
+          @cancel="cancel"
+          @save="save"
+        />
       </aside>
     </Transition>
 
@@ -578,8 +595,8 @@ const chartHeight = computed(() => previewConfig.value.style.height)
       <p class="cview__guard-text">当前图表配置有未保存的修改，切换视图前要保存吗？</p>
       <template #footer>
         <IButton @click="guardCancel">取消</IButton>
-        <IButton variant="danger" @click="guardDiscard">放弃修改</IButton>
-        <IButton variant="primary" @click="guardSave">保存并切换</IButton>
+        <IButton variant="danger" :disabled="chartSaving" @click="guardDiscard">放弃修改</IButton>
+        <IButton variant="primary" :loading="chartSaving" @click="guardSave">保存并切换</IButton>
       </template>
     </IModal>
 
