@@ -18,6 +18,7 @@ const typeOverrides = ref<(DataType | undefined)[]>([])
 const inferred = ref<DataType[]>([])
 const parseError = ref('')
 const parsing = ref(false)
+const committing = ref(false)
 const dragging = ref(false)
 const detectedEncoding = ref('')
 
@@ -119,18 +120,25 @@ function setType(i: number, v: string | number) {
   typeOverrides.value[i] = v as DataType
 }
 
-function confirm() {
-  if (!hasData.value) return
-  const ok = commitImportedTable({
-    name: tableName.value,
-    headers: headers.value,
-    dataRows: dataRows.value,
-    columnTypes: columnTypes.value,
-    stepType: 'upload-csv',
-    sourceLabel: 'CSV',
-    originalFileName: fileName.value || undefined,
-  })
-  if (ok) close()
+async function confirm() {
+  if (!hasData.value || committing.value) return
+  committing.value = true
+  // 让按钮 loading 先绘制一帧，再跑同步 coerce/mutate
+  await new Promise<void>((r) => requestAnimationFrame(() => r()))
+  try {
+    const ok = commitImportedTable({
+      name: tableName.value,
+      headers: headers.value,
+      dataRows: dataRows.value,
+      columnTypes: columnTypes.value,
+      stepType: 'upload-csv',
+      sourceLabel: 'CSV',
+      originalFileName: fileName.value || undefined,
+    })
+    if (ok) close()
+  } finally {
+    committing.value = false
+  }
 }
 </script>
 
@@ -191,7 +199,7 @@ function confirm() {
 
     <template #footer>
       <IButton @click="close">取消</IButton>
-      <IButton variant="primary" :disabled="!hasData || parsing" @click="confirm">Add table</IButton>
+      <IButton variant="primary" :disabled="!hasData || parsing" :loading="committing" @click="confirm">Add table</IButton>
     </template>
   </IModal>
 </template>

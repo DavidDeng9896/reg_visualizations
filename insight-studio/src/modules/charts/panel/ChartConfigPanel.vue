@@ -14,6 +14,7 @@ defineProps<{
   viewName: string
   /** 过滤/转换 chip 摘要（只读展示；编辑在表格视图）。 */
   chips: string[]
+  saving?: boolean
 }>()
 const emit = defineEmits<{ (e: 'rename', name: string): void; (e: 'cancel'): void; (e: 'save'): void }>()
 
@@ -73,8 +74,15 @@ const activeSection = computed(() => (tab.value === 'configure' ? def.value.conf
 
     <!-- Cancel / Save -->
     <footer class="ccpanel__foot">
-      <IButton @click="emit('cancel')">Cancel</IButton>
-      <IButton variant="primary" :class="{ 'ccpanel__save--dirty': ctx.dirty.value }" @click="emit('save')">Save</IButton>
+      <IButton :disabled="saving" @click="emit('cancel')">Cancel</IButton>
+      <IButton
+        variant="primary"
+        :loading="saving"
+        :class="{ 'ccpanel__save--dirty': ctx.dirty.value }"
+        @click="emit('save')"
+      >
+        Save
+      </IButton>
     </footer>
   </aside>
 </template>

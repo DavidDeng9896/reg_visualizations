@@ -14,7 +14,7 @@ import type { DashboardWidget } from '../../shared/types'
 const route = useRoute()
 const router = useRouter()
 const store = useDashboardStore()
-const { current, currentId, saving, dirty } = storeToRefs(store)
+const { current, currentId, saving, dirty, loading } = storeToRefs(store)
 
 const editLayout = ref(false)
 const addOpen = ref(false)
@@ -175,7 +175,7 @@ function onPickCategory(kind: 'table' | 'chart') {
         </div>
       </template>
       <IEmptyState
-        v-else
+        v-else-if="!loading"
         icon="folder"
         title="选择或新建看板"
         description="左侧选择一个看板，或新建「细胞培养」「Assay」等主题总览。"
@@ -192,11 +192,17 @@ function onPickCategory(kind: 'table' | 'chart') {
     </aside>
 
     <AddWidgetDialog v-model:open="addOpen" @confirm="onAddWidget" />
+
+    <div v-if="loading" class="dash__loading" role="status">
+      <span class="dash__loading-spin" aria-hidden="true" />
+      加载中…
+    </div>
   </div>
 </template>
 
 <style scoped>
 .dash {
+  position: relative;
   display: flex;
   height: 100%;
   min-height: 0;
@@ -288,5 +294,30 @@ function onPickCategory(kind: 'table' | 'chart') {
   font-size: 13px;
   font-weight: 600;
   color: var(--is-text);
+}
+.dash__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--is-bg) 88%, transparent);
+  color: var(--is-text-secondary);
+  z-index: 5;
+  font-size: var(--is-text-sm);
+}
+.dash__loading-spin {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--is-border-strong);
+  border-top-color: var(--is-accent);
+  border-radius: 50%;
+  animation: dash-spin 0.7s linear infinite;
+}
+@keyframes dash-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

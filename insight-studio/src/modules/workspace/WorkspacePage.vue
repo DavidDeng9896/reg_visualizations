@@ -8,7 +8,14 @@ import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '.
 import WorkspaceMain from './WorkspaceMain.vue'
 import { useAddData } from '../shell/useAddData'
 
-const FlowchartMain = defineAsyncComponent(() => import('./FlowchartMain.vue'))
+const FlowchartMain = defineAsyncComponent({
+  loader: () => import('./FlowchartMain.vue'),
+  delay: 80,
+  loadingComponent: {
+    name: 'FlowchartChunkLoading',
+    template: '<div class="ws__chunk-loading" role="status">流程图加载中…</div>',
+  },
+})
 
 function prefetchFlowchart(): void {
   void import('./FlowchartMain.vue')
@@ -29,6 +36,9 @@ const { openMenu: openAddData } = useAddData()
 
 const analysisId = computed(() => String(route.params.id ?? ''))
 
+// 进入页立即进入 loading，避免 onMounted 前主区空白无反馈
+if (analysisId.value) store.$patch({ loading: true })
+
 onMounted(async () => {
   // 空闲时预取 flowchart / 图表，降低首次打开等待
   const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
@@ -39,6 +49,7 @@ onMounted(async () => {
   if (typeof ric === 'function') ric(prefetchAll, { timeout: 2500 })
   else setTimeout(prefetchAll, 800)
 
+  if (!loading.value) store.$patch({ loading: true })
   const ok = await store.load(analysisId.value)
   if (!ok) {
     toast.error('Analysis 不存在或已被删除')
@@ -51,10 +62,17 @@ onMounted(async () => {
 // 路由参数变化（例如列表页跳转）时重新加载
 watch(analysisId, async (id, prev) => {
   if (id && id !== prev) {
-    await store.saveNow()
-    const ok = await store.load(id)
-    if (!ok) router.replace('/')
-    else applyQuerySelection()
+    // 先进入 loading，避免 saveNow 期间界面无反馈
+    store.$patch({ loading: true })
+    try {
+      await store.saveNow()
+      const ok = await store.load(id)
+      if (!ok) router.replace('/')
+      else applyQuerySelection()
+    } catch (e) {
+      store.$patch({ loading: false })
+      toast.error(e instanceof Error ? e.message : '加载失败')
+    }
   }
 })
 
@@ -81,6 +99,8 @@ const headerMenuOpen = ref(false)
 const renameOpen = ref(false)
 const renameName = ref('')
 const deleteOpen = ref(false)
+const deleteSaving = ref(false)
+const flowchartSwitching = ref(false)
 
 function openRename() {
   renameName.value = current.value?.name ?? ''
@@ -94,19 +114,38 @@ function submitRename() {
 }
 
 async function confirmDelete() {
-  if (!current.value) return
-  const name = current.value.name
-  await analysisRepository.delete(current.value.id)
-  toast.success(`已删除「${name}」`)
-  router.replace('/')
+  if (!current.value || deleteSaving.value) return
+  deleteSaving.value = true
+  try {
+    const name = current.value.name
+    await analysisRepository.delete(current.value.id)
+    toast.success(`已删除「${name}」`)
+    router.replace('/')
+  } finally {
+    deleteSaving.value = false
+  }
 }
 
 /* Flowchart 切换 */
-function toggleFlowchart() {
-  store.setMode(mode.value === 'flowchart' ? 'workspace' : 'flowchart')
+async function toggleFlowchart() {
+  if (mode.value === 'flowchart') {
+    store.setMode('workspace')
+    return
+  }
+  // 首次切到 flowchart 时 chunk 可能未就绪，先显示切换中态
+  flowchartSwitching.value = true
+  try {
+    prefetchFlowchart()
+    await import('./FlowchartMain.vue')
+    store.setMode('flowchart')
+  } finally {
+    flowchartSwitching.value = false
+  }
 }
 
 const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain : WorkspaceMain))
+const showLoading = computed(() => loading.value || flowchartSwitching.value)
+const loadingText = computed(() => (flowchartSwitching.value && !loading.value ? '流程图加载中…' : '加载中…'))
 </script>
 
 <template>
@@ -126,6 +165,7 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
             :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
             icon="flowchart"
             :aria-pressed="mode === 'flowchart'"
+            :loading="flowchartSwitching"
             @mouseenter="prefetchFlowchart(); void prefetchCharts()"
             @focus="prefetchFlowchart(); void prefetchCharts()"
             @click="toggleFlowchart"
@@ -171,12 +211,15 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
     <IModal :open="deleteOpen" title="删除 Analysis" :width="420" @update:open="deleteOpen = $event">
       <p class="confirm-text">确定删除「{{ current?.name }}」吗？所有表、视图与图表配置都会被删除，此操作不可撤销。</p>
       <template #footer>
-        <IButton @click="deleteOpen = false">取消</IButton>
-        <IButton variant="danger" @click="confirmDelete">删除</IButton>
+        <IButton :disabled="deleteSaving" @click="deleteOpen = false">取消</IButton>
+        <IButton variant="danger" :loading="deleteSaving" @click="confirmDelete">删除</IButton>
       </template>
     </IModal>
 
-    <div v-if="loading" class="ws__loading">加载中…</div>
+    <div v-if="showLoading" class="ws__loading" role="status">
+      <span class="ws__loading-spin" aria-hidden="true" />
+      {{ loadingText }}
+    </div>
   </div>
 </template>
 
@@ -230,8 +273,7 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   min-height: 0;
 }
 .ws__loading {
-  /* 只盖工作区主区域，不盖全局壳层（头部/rail/侧栏保持可见可交互）；
-     200ms 延迟淡入，快速加载不闪屏 */
+  /* 只盖工作区主区域，不盖全局壳层（头部/rail/侧栏保持可见可交互） */
   position: absolute;
   left: 0;
   right: 0;
@@ -240,15 +282,31 @@ const modeComponent = computed(() => (mode.value === 'flowchart' ? FlowchartMain
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--is-bg);
+  gap: 10px;
+  background: color-mix(in srgb, var(--is-bg) 88%, transparent);
   color: var(--is-text-secondary);
   z-index: 5;
-  opacity: 0;
-  animation: ws-loading-in 160ms var(--is-ease) 200ms forwards;
+  font-size: var(--is-text-sm);
 }
-@keyframes ws-loading-in {
+.ws__loading-spin {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--is-border-strong);
+  border-top-color: var(--is-accent);
+  border-radius: 50%;
+  animation: ws-spin 0.7s linear infinite;
+}
+.ws__chunk-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--is-text-secondary);
+  font-size: var(--is-text-sm);
+}
+@keyframes ws-spin {
   to {
-    opacity: 1;
+    transform: rotate(360deg);
   }
 }
 
