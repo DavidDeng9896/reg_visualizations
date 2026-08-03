@@ -103,14 +103,21 @@ export const useAiStore = defineStore('ai', {
       if (this.currentId === id) return
       this.switching = true
       try {
+        // 切换前先落盘当前会话，避免历史里点回来丢消息
+        await this.persist()
         const doc = await aiConvApi.get(id)
         this.currentId = doc.id
-        this.messages = (doc.messages as UiMessage[]) ?? []
+        this.messages = Array.isArray(doc.messages) ? (doc.messages as UiMessage[]) : []
         // 回看时清理瞬态
         for (const m of this.messages) {
           m.streaming = false
+          if (!Array.isArray(m.trace)) m.trace = []
+          if (!Array.isArray(m.artifacts)) m.artifacts = []
           for (const t of m.trace) t.running = false
         }
+      } catch (e) {
+        console.error('[aiStore.selectConversation]', e)
+        throw e
       } finally {
         this.switching = false
       }
