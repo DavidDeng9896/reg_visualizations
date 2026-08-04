@@ -205,6 +205,9 @@ insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照
 - **Skills / MCP（一期）**：侧栏「+」旁「能力」面板（`CapabilitiesPanel.vue`）管理全局本机配置；
   Skill = `skill.json` + `SKILL.md`（不执行脚本）；MCP = SSE/HTTP + 自定义 Headers（无 stdio/OAuth）。
   对话注入已启用 Skill 目录摘要，细则按需 `read_skill`。
+  官方 Skills（`insight-api-go/skills/official/`）：`lab-data-workflow`、`antibody-discovery`、
+  `cell-line-development`、`in-vitro-bioassay`、`in-vivo-efficacy`、`chart-best-practices`。
+  科学家场景种子：`scientistSeed.ts`；真实模型冒烟：`playwright.scientist-e2e.config.ts`。
 - **上下文**：system prompt（`prompts.ts`）+ Skills 目录 + 当前分析/表/视图摘要（`context.ts`），让模型知道「现在打开的是什么」。
 
 ### 交互（全局右抽屉 480px，AppHeader sparkle 入口）
