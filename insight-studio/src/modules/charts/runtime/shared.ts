@@ -70,11 +70,12 @@ export function buildTitleLayout(style: ChartStyle, defaultTitle: string): Recor
   }
 }
 
+/** 低于此宽度时收起 Plotly 内嵌图例，改为芯片 + 浮动面板（见 ChartPanel）。 */
+export const LEGEND_COLLAPSE_WIDTH = 680
+
 /**
- * 图例布局：用 Plotly `xref/yref: 'container'` 让图例占用容器边距，
- * 而不是叠在 paper 绘图区上（条目多或画布矮时不会盖住主图）。
- *
- * 横向条目过多（≥8）时自动改为右侧纵向，避免顶栏多行挤占。
+ * 图例布局：位置 strictly 跟随 style.legend.position。
+ * 用 `xref/yref: 'container'` 占容器边距，完整宽度下不叠在主图上。
  */
 export function buildLegendLayout(
   style: ChartStyle,
@@ -83,8 +84,7 @@ export function buildLegendLayout(
 ): Record<string, unknown> {
   if (!enabled || style.legend?.show === false) return { showlegend: false }
   const itemCount = Math.max(0, opts?.itemCount ?? 0)
-  let pos = style.legend?.position ?? 'top'
-  if ((pos === 'top' || pos === 'bottom') && itemCount >= 8) pos = 'right'
+  const pos = style.legend?.position ?? 'top'
 
   const legend: Record<string, unknown> = {
     font: { size: itemCount >= 12 ? 11 : 12, color: '#475467' },
@@ -160,11 +160,9 @@ export function baseLayout(
   // 无标题时顶部边距收紧，避免留白（卡片/页头已展示名称）
   if (!title && style.margins?.top === undefined) margin.t = 32
   const legendEnabled = opts.legend ?? false
-  // container 图例会再占一层边距；给对应侧留出最小安全垫，避免首帧闪叠
+  // container 图例会再占一层边距；按配置位置给对应侧留安全垫（不改位置）
   if (legendEnabled && style.legend?.show !== false && style.margins === undefined) {
-    const itemCount = opts.legendItemCount ?? 0
-    let pos = style.legend?.position ?? 'top'
-    if ((pos === 'top' || pos === 'bottom') && itemCount >= 8) pos = 'right'
+    const pos = style.legend?.position ?? 'top'
     if (pos === 'top') margin.t = Math.max(margin.t, 48)
     else if (pos === 'bottom') margin.b = Math.max(margin.b, 56)
     else if (pos === 'left') margin.l = Math.max(margin.l, 96)
