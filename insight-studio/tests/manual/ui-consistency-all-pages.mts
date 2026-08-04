@@ -260,14 +260,10 @@ async function main() {
       const flow = page.getByRole('button', { name: /Flowchart/i }).first()
       if ((await flow.getAttribute('aria-pressed')) === 'true') await flow.click()
       // 工作区顶栏 ⋯，避免点到侧栏卡片菜单
-      const more = page.locator('.ws__actions, .ws__head, .workspace').getByRole('button', { name: '更多操作' }).first()
-      if (await more.isVisible().catch(() => false)) {
-        await more.click()
-      } else {
-        await page.getByRole('button', { name: '更多操作' }).last().click()
-      }
+      const more = page.locator('.ws__header-actions').getByRole('button', { name: '更多操作' }).first()
+      await more.click()
       await page.getByRole('menuitem', { name: /重命名/ }).click()
-      const dlg = await dialog(page, /重命名/)
+      const dlg = await dialog(page, /重命名 Analysis|重命名/)
       await dlg.waitFor({ state: 'visible' })
       return 'rename-open'
     })
@@ -366,10 +362,8 @@ async function main() {
       const back = page.getByTestId('ai-drawer').getByRole('button', { name: '返回对话' })
       if (await back.isVisible().catch(() => false)) await back.click()
       await page.getByTestId('ai-settings').click()
-      const dlg = await dialog(page, /设置|Settings|AI/)
-      await dlg.waitFor({ state: 'visible' }).catch(async () => {
-        await page.getByRole('dialog').first().waitFor({ state: 'visible' })
-      })
+      const dlg = await dialog(page, 'AI 设置')
+      await dlg.waitFor({ state: 'visible' })
       return 'settings'
     })
     await closeAllOverlays(page)
