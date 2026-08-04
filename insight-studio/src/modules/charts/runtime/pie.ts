@@ -85,7 +85,7 @@ export function buildPieOption({ result, config, viewName }: BuildInput): BuildO
         hovertemplate: '%{label}: %{value}<br>%{percent}<extra></extra>',
       },
     ],
-    layout: baseLayout(style, '', { legend: true }),
+    layout: baseLayout(style, '', { legend: true, legendItemCount: labels.length }),
   }
   return { option, warnings, seriesNames: labels }
 }

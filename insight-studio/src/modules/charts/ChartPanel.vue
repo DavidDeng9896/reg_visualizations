@@ -18,6 +18,7 @@ export function prefetchPlotly(): Promise<void> {
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ChartOption } from './types'
+import { applyLegendClearanceMargin, suggestLegendClearance, type RectLike } from './runtime/legendClearance'
 
 export type FlagMode = 'off' | 'flag' | 'clear'
 
@@ -39,9 +40,53 @@ let mounted = false
 let ro: ResizeObserver | null = null
 let Plotly: PlotlyApi | null = null
 let applySeq = 0
+/** 同一 option 下已做过的 clearance 次数，防止测量/relayout 循环。 */
+let clearancePasses = 0
+
+function toRect(r: DOMRect): RectLike {
+  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
+}
+
+/** 渲染后测量：若图例仍盖住主图，按侵入方向加大对应 margin。 */
+async function ensureLegendClearance(): Promise<void> {
+  if (!mounted || !el.value || !Plotly) return
+  if (!el.value.classList.contains('js-plotly-plot')) return
+  if (clearancePasses >= 2) return
+
+  const root = el.value
+  const legendNode = root.querySelector('.legend') as SVGGraphicsElement | null
+  if (!legendNode) return
+  // 主图区域：笛卡尔背景 / 饼图层；取第一个可见大块
+  const plotNode =
+    (root.querySelector('.bglayer .bg') as SVGGraphicsElement | null) ??
+    (root.querySelector('.pielayer') as SVGGraphicsElement | null) ??
+    (root.querySelector('.cartesianlayer') as SVGGraphicsElement | null)
+  if (!plotNode) return
+
+  const legend = toRect(legendNode.getBoundingClientRect())
+  const plot = toRect(plotNode.getBoundingClientRect())
+  const clearance = suggestLegendClearance(legend, plot)
+  if (!clearance) return
+
+  const gd = root as unknown as { layout?: { margin?: { t?: number; r?: number; b?: number; l?: number } } }
+  const cur = gd.layout?.margin ?? {}
+  const next = applyLegendClearanceMargin(cur, clearance)
+  // 无实质变化则停
+  if (
+    next.t === (cur.t ?? 0) &&
+    next.r === (cur.r ?? 0) &&
+    next.b === (cur.b ?? 0) &&
+    next.l === (cur.l ?? 0)
+  ) {
+    return
+  }
+  clearancePasses += 1
+  await Plotly.relayout(root, { margin: next })
+}
 
 async function apply(initial = false): Promise<void> {
   const seq = ++applySeq
+  clearancePasses = 0
   if (!mounted || !el.value) return
   Plotly ??= await loadPlotly()
   if (!mounted || !el.value || seq !== applySeq) return
@@ -56,6 +101,9 @@ async function apply(initial = false): Promise<void> {
   }
   if (initial) await Plotly.newPlot(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
   else await Plotly.react(el.value, figure.data as Plotly.Data[], layout as Partial<Plotly.Layout>, config as Partial<Plotly.Config>)
+  if (seq !== applySeq) return
+  await ensureLegendClearance()
+  if (seq !== applySeq) return
   emit('rendered')
 }
 
@@ -70,7 +118,8 @@ function scheduleResize(): void {
     const div = el.value
     // 隐藏/未挂载的 plot div 上调用 resize 会抛错（如切到流程图模式后工作区图表被 KeepAlive 隐藏）
     if (Plotly && div && div.isConnected && div.clientWidth > 0 && div.clientHeight > 0) {
-      void Plotly.Plots.resize(div)
+      clearancePasses = 0
+      void Plotly.Plots.resize(div).then(() => ensureLegendClearance())
     }
   }, 100)
 }
@@ -82,6 +131,8 @@ async function relayout(patch: Record<string, unknown>): Promise<void> {
   // div 尚未 newPlot（如 KeepAlive 隐藏后首次渲染前）时 relayout 会抛 _redrawFromAutoMarginCount，跳过等全量 react
   if (!mounted || !el.value || !el.value.classList.contains('js-plotly-plot')) return
   await Plotly.relayout(el.value, patch)
+  clearancePasses = 0
+  await ensureLegendClearance()
 }
 
 onMounted(() => {

@@ -93,10 +93,15 @@ export function buildHeatmapOption({ result, config, viewName }: BuildInput): Bu
   const palette = getContinuousPalette(cfg.palette)
   const colorscale = palette.stops.map((color, i) => [i / (palette.stops.length - 1), color])
   const legendPos = style.legend?.position ?? 'right'
-  const colorbar: Record<string, unknown> = { tickfont: { color: '#667085', size: 11 } }
-  if (legendPos === 'left') Object.assign(colorbar, { x: -0.12, xanchor: 'right' })
-  if (legendPos === 'bottom') Object.assign(colorbar, { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.2 })
-  if (legendPos === 'top') Object.assign(colorbar, { orientation: 'h', x: 0.5, xanchor: 'center', y: 1.15 })
+  const colorbar: Record<string, unknown> = {
+    tickfont: { color: '#667085', size: 11 },
+    xref: 'container',
+    yref: 'container',
+  }
+  if (legendPos === 'left') Object.assign(colorbar, { x: 0, xanchor: 'left', y: 0.5, yanchor: 'middle' })
+  else if (legendPos === 'bottom') Object.assign(colorbar, { orientation: 'h', x: 0.5, xanchor: 'center', y: 0, yanchor: 'bottom' })
+  else if (legendPos === 'top') Object.assign(colorbar, { orientation: 'h', x: 0.5, xanchor: 'center', y: 1, yanchor: 'top' })
+  else Object.assign(colorbar, { x: 1, xanchor: 'right', y: 0.5, yanchor: 'middle' })
 
   const showText = style.heatmap?.showCellValues ?? false
   return {

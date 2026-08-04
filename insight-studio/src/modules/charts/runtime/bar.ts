@@ -117,7 +117,10 @@ export function buildBarOption({ result, config, viewName }: BuildInput): BuildO
       data,
       layout: withRefLines(
         {
-          ...baseLayout(style, '', { legend: seriesVals.length > 1 || seriesVals[0] !== null }),
+          ...baseLayout(style, '', {
+            legend: seriesVals.length > 1 || seriesVals[0] !== null,
+            legendItemCount: seriesNames.length,
+          }),
           barmode: stacked ? 'stack' : 'group',
           xaxis: horizontal ? valueAxis : categoryAxis,
           yaxis: horizontal ? categoryAxis : valueAxis,

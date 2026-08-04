@@ -200,7 +200,10 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
     data.push({ type: 'scatter', mode: 'markers', name: 'Flagged', x: points.map((p) => p.x), y: points.map((p) => p.y), xaxis, yaxis, marker: { symbol: 'x', color: '#d92d20', size: 11 }, customdata: points.map((p) => [p.id]), showlegend: false })
   }
 
-  const layout: Record<string, unknown> = withRefLines({ ...baseLayout(style, '', { legend: seriesNames.length > 1 }), shapes }, style)
+  const layout: Record<string, unknown> = withRefLines({
+    ...baseLayout(style, '', { legend: seriesNames.length > 1, legendItemCount: seriesNames.length }),
+    shapes,
+  }, style)
   if (style.fitAnnotation && annotationItems.length) {
     layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
   }

@@ -201,7 +201,10 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
     })
   })
 
-  const layout: Record<string, unknown> = withRefLines({ ...baseLayout(style, '', { legend: seriesNames.length > 1 }), shapes }, style)
+  const layout: Record<string, unknown> = withRefLines({
+    ...baseLayout(style, '', { legend: seriesNames.length > 1, legendItemCount: seriesNames.length }),
+    shapes,
+  }, style)
   if (style.fitAnnotation && annotationItems.length) {
     layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
   }

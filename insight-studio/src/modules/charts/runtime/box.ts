@@ -145,7 +145,7 @@ export function buildBoxOption({ result, config, viewName }: BuildInput): BuildO
       data,
       layout: withRefLines(
         {
-          ...baseLayout(style, '', { legend: colorVals.length > 1 }),
+          ...baseLayout(style, '', { legend: colorVals.length > 1, legendItemCount: colorVals.length }),
           boxmode: 'group',
           xaxis: { ...AXIS_STYLE, type: 'category', title: { text: style.xAxis?.label ?? cfg.x?.label ?? xField ?? '', font: AXIS_STYLE.titlefont } },
           yaxis: { ...AXIS_STYLE, ...resolveAxis(style.yAxis, dataMinOf(allY), style.yAxis?.label ?? cfg.y?.label ?? yField, warnings, 'Y 轴') },

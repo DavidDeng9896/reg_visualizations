@@ -70,25 +70,72 @@ export function buildTitleLayout(style: ChartStyle, defaultTitle: string): Recor
   }
 }
 
-export function buildLegendLayout(style: ChartStyle, enabled: boolean): Record<string, unknown> {
+/**
+ * 图例布局：用 Plotly `xref/yref: 'container'` 让图例占用容器边距，
+ * 而不是叠在 paper 绘图区上（条目多或画布矮时不会盖住主图）。
+ *
+ * 横向条目过多（≥8）时自动改为右侧纵向，避免顶栏多行挤占。
+ */
+export function buildLegendLayout(
+  style: ChartStyle,
+  enabled: boolean,
+  opts?: { itemCount?: number },
+): Record<string, unknown> {
   if (!enabled || style.legend?.show === false) return { showlegend: false }
-  const pos = style.legend?.position ?? 'top'
+  const itemCount = Math.max(0, opts?.itemCount ?? 0)
+  let pos = style.legend?.position ?? 'top'
+  if ((pos === 'top' || pos === 'bottom') && itemCount >= 8) pos = 'right'
+
   const legend: Record<string, unknown> = {
-    font: { size: 12, color: '#475467' },
-    bgcolor: 'rgba(255,255,255,0)',
+    font: { size: itemCount >= 12 ? 11 : 12, color: '#475467' },
+    bgcolor: 'rgba(255,255,255,0.92)',
+    borderwidth: 0,
+    xref: 'container',
+    yref: 'container',
+    tracegroupgap: 4,
+    itemsizing: 'constant',
   }
+
   switch (pos) {
     case 'bottom':
-      Object.assign(legend, { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.18 })
+      Object.assign(legend, {
+        orientation: 'h',
+        x: 0,
+        xanchor: 'left',
+        y: 0,
+        yanchor: 'bottom',
+        entrywidth: 0.2,
+        entrywidthmode: 'fraction',
+      })
       break
     case 'left':
-      Object.assign(legend, { orientation: 'v', x: -0.08, xanchor: 'right', y: 0.5 })
+      Object.assign(legend, {
+        orientation: 'v',
+        x: 0,
+        xanchor: 'left',
+        y: 1,
+        yanchor: 'top',
+      })
       break
     case 'right':
-      Object.assign(legend, { orientation: 'v', x: 1.02, xanchor: 'left', y: 0.5 })
+      Object.assign(legend, {
+        orientation: 'v',
+        x: 1,
+        xanchor: 'right',
+        y: 1,
+        yanchor: 'top',
+      })
       break
     default:
-      Object.assign(legend, { orientation: 'h', x: 0, xanchor: 'left', y: 1.08 })
+      Object.assign(legend, {
+        orientation: 'h',
+        x: 0,
+        xanchor: 'left',
+        y: 1,
+        yanchor: 'top',
+        entrywidth: 0.2,
+        entrywidthmode: 'fraction',
+      })
   }
   return { showlegend: true, legend }
 }
@@ -103,11 +150,26 @@ export function buildMargin(style: ChartStyle): Record<string, number> {
   }
 }
 
-export function baseLayout(style: ChartStyle, defaultTitle: string, opts: { legend?: boolean } = {}): Record<string, unknown> {
+export function baseLayout(
+  style: ChartStyle,
+  defaultTitle: string,
+  opts: { legend?: boolean; legendItemCount?: number } = {},
+): Record<string, unknown> {
   const title = buildTitleLayout(style, defaultTitle)
   const margin = buildMargin(style)
   // 无标题时顶部边距收紧，避免留白（卡片/页头已展示名称）
   if (!title && style.margins?.top === undefined) margin.t = 32
+  const legendEnabled = opts.legend ?? false
+  // container 图例会再占一层边距；给对应侧留出最小安全垫，避免首帧闪叠
+  if (legendEnabled && style.legend?.show !== false && style.margins === undefined) {
+    const itemCount = opts.legendItemCount ?? 0
+    let pos = style.legend?.position ?? 'top'
+    if ((pos === 'top' || pos === 'bottom') && itemCount >= 8) pos = 'right'
+    if (pos === 'top') margin.t = Math.max(margin.t, 48)
+    else if (pos === 'bottom') margin.b = Math.max(margin.b, 56)
+    else if (pos === 'left') margin.l = Math.max(margin.l, 96)
+    else if (pos === 'right') margin.r = Math.max(margin.r, 96)
+  }
   return {
     paper_bgcolor: '#ffffff',
     plot_bgcolor: '#ffffff',
@@ -115,7 +177,7 @@ export function baseLayout(style: ChartStyle, defaultTitle: string, opts: { lege
     hoverlabel: TOOLTIP_DARK,
     title,
     margin,
-    ...buildLegendLayout(style, opts.legend ?? false),
+    ...buildLegendLayout(style, legendEnabled, { itemCount: opts.legendItemCount }),
   }
 }
 
