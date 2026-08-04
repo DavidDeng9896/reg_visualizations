@@ -50,6 +50,8 @@ const draft = ref<DbConnectionProfile>(defaultProfile())
 const proxyOk = ref<boolean | null>(null)
 const testing = ref(false)
 const testMsg = ref('')
+/** 连接反馈语气：成功 / 失败 / 中性 */
+const testMsgTone = ref<'ok' | 'bad' | 'neutral'>('neutral')
 const remoteTables = ref<RemoteSchemaTable[]>([])
 const schemaLoading = ref(false)
 const showConnForm = ref(true)
@@ -147,6 +149,7 @@ function newConnection() {
   showConnForm.value = true
   remoteTables.value = []
   testMsg.value = ''
+  testMsgTone.value = 'neutral'
 }
 
 function onDialectChange(v: string | number) {
@@ -155,7 +158,7 @@ function onDialectChange(v: string | number) {
   draft.value.port = DEFAULT_PORTS[d]
 }
 
-function saveConnection() {
+function saveConnection(opts?: { silent?: boolean }) {
   const p = {
     ...draft.value,
     name: draft.value.name.trim() || '未命名连接',
@@ -166,7 +169,10 @@ function saveConnection() {
   draft.value = p
   connections.value = upsertDbConnection(p)
   activeId.value = p.id
-  testMsg.value = '已保存到本机'
+  if (!opts?.silent) {
+    testMsg.value = '已保存到本机'
+    testMsgTone.value = 'ok'
+  }
 }
 
 function deleteConnection() {
@@ -185,18 +191,27 @@ async function refreshProxy() {
 async function testConn() {
   testing.value = true
   testMsg.value = ''
+  testMsgTone.value = 'neutral'
   try {
+    if (!draft.value.host.trim() || !draft.value.database.trim() || !draft.value.user.trim()) {
+      testMsg.value = '请填写 Host、Database、User'
+      testMsgTone.value = 'bad'
+      return
+    }
     await refreshProxy()
     if (!proxyOk.value) {
-      testMsg.value = 'SQL 代理未启动：请运行 npm run dev:api'
+      testMsg.value = 'SQL 代理未启动：请运行 npm run dev:api（或 npm run dev）'
+      testMsgTone.value = 'bad'
       return
     }
     const version = await testRemoteConnection(draft.value)
-    testMsg.value = `连接成功 · ${version.slice(0, 80)}`
-    saveConnection()
+    saveConnection({ silent: true })
+    testMsg.value = `连接成功 · ${version.slice(0, 80)}（已保存）`
+    testMsgTone.value = 'ok'
     await loadRemoteSchema()
   } catch (e) {
     testMsg.value = e instanceof Error ? e.message : '连接失败'
+    testMsgTone.value = 'bad'
   } finally {
     testing.value = false
   }
@@ -355,11 +370,11 @@ watch(sourceMode, (mode) => {
 
       <p class="sql__hint">
         <template v-if="sourceMode === 'remote'">
-          连接你自己的 Postgres / MySQL，用 SQL 拉数导入。需本地 SQL 代理
+          连接你自己的 Postgres / MySQL，用 SQL 拉数导入。需本机 SQL 代理
           <code>npm run dev:api</code>
           （状态：
           <span :class="proxyOk ? 'sql__ok' : 'sql__bad'">{{ proxyOk ? '已连接' : proxyOk === false ? '未启动' : '检测中…' }}</span>
-          ）。密码只保存在本机浏览器。
+          ）。Host 填数据库地址（本机库用 <code>127.0.0.1</code>）；密码只保存在本机浏览器。
         </template>
         <template v-else>
           在浏览器内对当前 Analysis 已导入的表执行只读 SELECT。快捷键 <kbd>⌘/Ctrl</kbd>+<kbd>Enter</kbd>。
@@ -422,7 +437,17 @@ watch(sourceMode, (mode) => {
             <IButton size="sm" variant="ghost" @click="saveConnection">仅保存</IButton>
             <IButton size="sm" variant="ghost" :disabled="!activeId" @click="deleteConnection">删除</IButton>
           </div>
-          <p v-if="testMsg" class="sql__test-msg">{{ testMsg }}</p>
+          <p
+            v-if="testMsg"
+            class="sql__test-msg"
+            :class="{
+              'sql__test-msg--ok': testMsgTone === 'ok',
+              'sql__test-msg--bad': testMsgTone === 'bad',
+            }"
+            role="status"
+          >
+            {{ testMsg }}
+          </p>
         </div>
       </div>
 
@@ -623,6 +648,14 @@ watch(sourceMode, (mode) => {
   margin: 0;
   font-size: 12px;
   color: var(--is-text-secondary);
+}
+.sql__test-msg--ok {
+  color: var(--is-success);
+  font-weight: 600;
+}
+.sql__test-msg--bad {
+  color: var(--is-danger);
+  font-weight: 600;
 }
 .sql__layout {
   display: grid;
