@@ -568,7 +568,7 @@ watch(sourceMode, (mode) => {
   border: 1px solid var(--is-border);
 }
 .sql__ok {
-  color: var(--is-success, #12b76a);
+  color: var(--is-success);
   font-weight: 600;
 }
 .sql__bad {

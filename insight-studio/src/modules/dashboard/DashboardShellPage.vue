@@ -243,7 +243,7 @@ function onPickCategory(kind: 'table' | 'chart') {
   padding: 16px 20px 32px;
   flex: 1;
   min-height: 320px;
-  background: #f9fafb;
+  background: var(--is-canvas-bg);
 }
 
 .menu {

@@ -595,7 +595,7 @@ function openCombine() {
   margin: 12px 12px 0;
   padding: 3px;
   border-radius: var(--is-radius);
-  background: #eaecf0;
+  background: var(--is-seg-bg);
   flex-shrink: 0;
 }
 .side__seg-item {
@@ -680,7 +680,7 @@ function openCombine() {
   height: 32px;
   padding: 0 10px;
   border-radius: var(--is-radius-sm);
-  background: #f5f6f8;
+  background: var(--is-search-bg);
 }
 .side__search:focus-within {
   box-shadow: var(--is-ring-sm);
@@ -772,7 +772,7 @@ function openCombine() {
 }
 .card {
   position: relative;
-  border: 1px solid #e8ecf1;
+  border: 1px solid var(--is-border);
   border-radius: var(--is-radius);
   background: var(--is-surface);
   padding: 12px;
@@ -787,8 +787,8 @@ function openCombine() {
 }
 .card--on,
 .card--on:hover {
-  border-color: #7aa7f5;
-  background: #f4f8ff;
+  border-color: var(--is-accent-bright);
+  background: var(--is-accent-soft);
 }
 .card__head {
   display: flex;
@@ -809,11 +809,11 @@ function openCombine() {
   word-break: break-all;
 }
 .card--on .card__name {
-  color: #2f7cf6;
+  color: var(--is-accent-bright);
 }
 .card--opening {
-  border-color: #7aa7f5;
-  background: #f4f8ff;
+  border-color: var(--is-accent-bright);
+  background: var(--is-accent-soft);
   pointer-events: none;
   opacity: 0.85;
 }

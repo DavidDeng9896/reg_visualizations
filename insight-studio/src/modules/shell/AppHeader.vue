@@ -192,7 +192,7 @@ function onSearch() {
   width: 28px;
   height: 28px;
   border-radius: var(--is-radius-full);
-  background: #fff;
+  background: var(--is-text-inverse);
   flex-shrink: 0;
 }
 .app-header__user-name {

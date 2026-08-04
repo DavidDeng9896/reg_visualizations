@@ -24,6 +24,8 @@
   --is-bg: #f7f8fa;
   --is-surface: #ffffff;
   --is-surface-hover: #f2f4f7;
+  /* 次级底（搜索框/分段轨/代码块等）；多处曾用 fallback 导致漂移 */
+  --is-surface-muted: #f2f4f7;
   --is-border: #e4e7ec;
   --is-border-strong: #d0d5dd;
 
@@ -33,6 +35,10 @@
   --is-text-inverse: #ffffff;
 
   --is-node-bg: #eefaf3;
+  /* 壳层专用 */
+  --is-seg-bg: #eaecf0;
+  --is-search-bg: #f5f6f8;
+  --is-canvas-bg: #f9fafb;
 
   /* 间距 */
   --is-space-1: 4px;

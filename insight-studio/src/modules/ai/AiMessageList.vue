@@ -192,20 +192,20 @@ function htmlOf(id: string): string {
   list-style: disc;
 }
 .md :deep(.md-pre) {
-  background: #f2f4f7;
+  background: var(--is-surface-muted);
   border-radius: var(--is-radius-sm);
   padding: 8px 10px;
   font-family: var(--is-font-mono);
-  font-size: 12px;
+  font-size: var(--is-text-xs);
   overflow-x: auto;
   white-space: pre;
 }
 .md :deep(code) {
-  background: #f2f4f7;
+  background: var(--is-surface-muted);
   border-radius: 4px;
   padding: 0 4px;
   font-family: var(--is-font-mono);
-  font-size: 12px;
+  font-size: var(--is-text-xs);
 }
 .md :deep(.md-pre code) {
   background: transparent;
