@@ -158,10 +158,11 @@ async function main() {
       await page.getByRole('button', { name: 'New analysis' }).first().click()
       const dlg = await dialog(page, '新建 Analysis')
       await dlg.waitFor({ state: 'visible' })
-      const btn = dlg.getByRole('button', { name: 'Create' })
-      await btn.waitFor({ state: 'visible' })
+      // 主按钮文案为「创建」；未填名称时 disabled，仍可抽检样式
+      const btn = dlg.getByRole('button', { name: '创建', includeHidden: true }).or(dlg.locator('button.is-btn--primary')).first()
+      await btn.waitFor({ state: 'attached' })
       const bg = await btn.evaluate((el) => getComputedStyle(el).backgroundColor)
-      if (normColor(bg) !== PRIMARY) throw new Error(`Create 按钮色 ${normColor(bg)}`)
+      if (normColor(bg) !== PRIMARY) throw new Error(`创建 按钮色 ${normColor(bg)}`)
       return `primary=${normColor(bg)}`
     })
     await closeAllOverlays(page)
@@ -323,21 +324,18 @@ async function main() {
 
     await pageCase(page, 'P17-dialog-transform', 'Transform 弹窗', async () => {
       await closeAllOverlays(page)
-      const tBtn = page.locator('button.dg__ft-add').filter({ hasText: /Add transform|Transform|转换/i }).first()
-      if (await tBtn.isVisible().catch(() => false)) {
-        await tBtn.click()
-      } else {
-        const alt = page.getByRole('button', { name: /Add transform|转换|Transform/i }).first()
-        if (!(await alt.isVisible().catch(() => false))) return 'skip-no-transform'
-        await alt.click()
-      }
+      // Transform 仅在视图模式下显示
+      const v = page.getByTestId('sidebar-view').filter({ hasText: '各步骤收率' }).first()
+      if (await v.isVisible().catch(() => false)) await v.click()
+      await page.waitForTimeout(400)
+      const tBtn = page.locator('button.dg__ft-add').filter({ hasText: 'Transform' }).first()
+      if (!(await tBtn.isVisible().catch(() => false))) return 'skip-no-transform'
+      await tBtn.click()
+      const item = page.getByRole('menuitem').first()
+      await item.waitFor({ state: 'visible', timeout: 5000 })
+      await item.click()
       const dlg = await dialog(page, /新建转换|编辑转换/)
-      if (!(await dlg.isVisible().catch(() => false))) {
-        // 抽屉也可能是 Transform 标题
-        const any = page.locator('.is-modal__panel--drawer[role="dialog"]').first()
-        if (!(await any.isVisible().catch(() => false))) return 'skip-transform-not-opened'
-        return 'transform-drawer'
-      }
+      await dlg.waitFor({ state: 'visible', timeout: 8000 })
       return 'transform-open'
     })
     await closeAllOverlays(page)
