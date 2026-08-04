@@ -6,6 +6,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore'
 import { IButton, IIcon, ISelect, ITextField, IToggle, type SelectOption } from '../../../ui'
 import { getStepDef } from '../registry'
 import { resolveStepInputs } from '../exec'
+import { uuid } from '../../../shared/id'
 import { operatorArity, operatorsFor, parseConditionValue } from '../../table/filterForm'
 
 const props = defineProps<{ step: StepNode }>()
@@ -47,7 +48,7 @@ function ensureConfig(defaults: Record<string, unknown>): Record<string, unknown
 function addFilter() {
   const cfg = ensureConfig({ filters: [] as Filter[] }) as { filters: Filter[] }
   const col = inputTable.value?.columns[0]?.field ?? ''
-  cfg.filters.push({ id: crypto.randomUUID(), combinator: 'and', conditions: [{ id: crypto.randomUUID(), column: col, operator: 'eq' }] })
+  cfg.filters.push({ id: uuid(), combinator: 'and', conditions: [{ id: uuid(), column: col, operator: 'eq' }] })
   emit('change')
 }
 
@@ -59,7 +60,7 @@ function removeFilter(idx: number) {
 
 function addCondition(filter: Filter) {
   const col = inputTable.value?.columns[0]?.field ?? ''
-  filter.conditions.push({ id: crypto.randomUUID(), column: col, operator: 'eq' })
+  filter.conditions.push({ id: uuid(), column: col, operator: 'eq' })
   emit('change')
 }
 

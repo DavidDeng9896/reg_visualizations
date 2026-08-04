@@ -6,15 +6,13 @@ import { useAnalysisStore } from '../../stores/analysisStore'
 import { analysisRepository } from '../../shared/repository'
 import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '../../ui'
 import WorkspaceMain from './WorkspaceMain.vue'
+import FlowchartChunkLoading from './FlowchartChunkLoading.vue'
 import { useAddData } from '../shell/useAddData'
 
 const FlowchartMain = defineAsyncComponent({
   loader: () => import('./FlowchartMain.vue'),
   delay: 80,
-  loadingComponent: {
-    name: 'FlowchartChunkLoading',
-    template: '<div class="ws__chunk-loading" role="status">流程图加载中…</div>',
-  },
+  loadingComponent: FlowchartChunkLoading,
 })
 
 function prefetchFlowchart(): void {

@@ -1,3 +1,5 @@
+import { uuid } from '../../shared/id'
+
 /** 外部数据库连接配置（本地持久化；密码仅存浏览器）。 */
 export type SqlDialect = 'postgres' | 'mysql'
 
@@ -23,7 +25,7 @@ export const DEFAULT_PORTS: Record<SqlDialect, number> = {
 export function defaultProfile(partial?: Partial<DbConnectionProfile>): DbConnectionProfile {
   const dialect = partial?.dialect ?? 'postgres'
   return {
-    id: partial?.id ?? crypto.randomUUID(),
+    id: partial?.id ?? uuid(),
     name: partial?.name ?? '我的数据库',
     dialect,
     host: partial?.host ?? '127.0.0.1',

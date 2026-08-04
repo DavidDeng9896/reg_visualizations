@@ -5,6 +5,7 @@
 import Papa from 'papaparse'
 import type { Analysis, AnalysisTable, ChartConfig, DashboardWidget, Filter, Row, StepNode, StepType } from '../../../shared/types'
 import { createEmptyAnalysis, createTable, createViewNode, defaultViewName, createDashboard, createDashboardWidget, sealRows } from '../../../shared/factories'
+import { uuid } from '../../../shared/id'
 import { analysisRepository } from '../../../shared/repository'
 import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
@@ -61,7 +62,7 @@ function producingStep(a: Analysis, tableId: string): StepNode {
   let step = t.stepId ? a.steps.find((s) => s.id === t.stepId) : undefined
   if (!step) {
     step = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       type: 'upload-csv',
       name: t.name,
       inputs: [],
@@ -92,7 +93,7 @@ function appendStep(opts: {
       return { port, from: { nodeId: up.id, port: 'Output dataset' } }
     })
     const step: StepNode = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       type: opts.type,
       name: opts.name,
       inputs,
@@ -122,13 +123,13 @@ function toConditions(args: Record<string, unknown>): Filter[] {
   if (!list.length) throw new Error('conditions 不能为空')
   return [
     {
-      id: crypto.randomUUID(),
+      id: uuid(),
       combinator: 'and',
       conditions: list.map((c) => {
         const cond = c as { column?: string; operator?: string; value?: unknown; value2?: unknown }
         if (!cond.column || !cond.operator) throw new Error('过滤条件缺少 column/operator')
         return {
-          id: crypto.randomUUID(),
+          id: uuid(),
           column: cond.column,
           operator: cond.operator as Filter['conditions'][number]['operator'],
           ...(cond.value !== undefined ? { value: cond.value as Filter['conditions'][number]['value'] } : {}),
@@ -198,7 +199,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     })
     const table = createTable(tableName, columns, sealRows(rows), 'demo')
     const step: StepNode = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       type: 'upload-csv',
       name: tableName,
       inputs: [],
