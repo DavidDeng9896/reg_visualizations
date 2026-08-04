@@ -1,7 +1,7 @@
 # AI Skills 与 MCP 支持设计说明
 
 **日期：** 2026-08-04  
-**状态：** 产品决策已确认，待用户审阅规格后进入实现计划  
+**状态：** 一期实现中（分支 `cursor/ai-skills-mcp-impl-a1e4`）  
 **范围：** insight-studio 前端能力管理 + 对话装配；insight-api-go 后端存储与 MCP 代调（一期）
 
 ---

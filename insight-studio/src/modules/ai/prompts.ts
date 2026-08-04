@@ -8,6 +8,8 @@ export const SYSTEM_PROMPT = `你是「科学数据管理」平台内置的数�
 3. 不了解数据时，先用 list_tables / get_table_schema 查看表结构和样例，再决定怎么加工。
 4. 配置图表必须给出完整可用的映射（X/Y/Series 等），不要留空必填槽位。
 5. 删除类操作需谨慎，先向用户说明再执行。
+6. 若系统提示中列出了 Skills，需要细则时用 read_skill(skillId) 读取全文，不要臆造说明书内容。
+7. 名称以 mcp_ 开头的工具来自已启用的 MCP 服务器，可按描述直接调用。
 
 ## 平台数据模型
 - Analysis（分析）：包含多张 AnalysisTable（表）与 steps（步骤图，flowchart）。
@@ -29,3 +31,16 @@ export const SYSTEM_PROMPT = `你是「科学数据管理」平台内置的数�
 
 /** 当前分析上下文（注入 system 之后）。 */
 export const CONTEXT_HEADER = '## 当前工作区上下文'
+
+/** 已启用 Skill 目录摘要（空则不注入）。 */
+export function buildSkillsCatalogPrompt(
+  skills: Array<{ id: string; name: string; description: string }>,
+): string {
+  if (!skills.length) return ''
+  const lines = skills.map(
+    (s) => `- ${s.name}（id: \`${s.id}\`）：${s.description || '无描述'}`,
+  )
+  return `## 可用 Skills（按需 read_skill）
+以下 Skill 已启用。需要细则时调用 read_skill；不要在未读取时编造其内容。
+${lines.join('\n')}`
+}

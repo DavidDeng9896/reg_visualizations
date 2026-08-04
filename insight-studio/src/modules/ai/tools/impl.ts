@@ -17,6 +17,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore'
 import { useDashboardStore } from '../../../stores/dashboardStore'
 import type { ToolExecResult } from '../agentLoop'
 import type { Artifact } from '../types'
+import { aiSkillsApi } from '../client'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -424,6 +425,23 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       delete analysis.flowchartLayout[`step:${step.id}`]
     })
     return ok(`已删除步骤「${step.name}」`)
+  },
+
+  async list_skills() {
+    const list = await aiSkillsApi.list()
+    if (!list.length) return ok('暂无已安装 Skill')
+    const lines = list.map(
+      (s) =>
+        `- ${s.name}（id: ${s.id}，${s.enabled ? '启用' : '停用'}，${s.source}）：${s.description || '无描述'}`,
+    )
+    return ok(`已安装 ${list.length} 个 Skill：\n${lines.join('\n')}`)
+  },
+
+  async read_skill(args) {
+    const id = String(args.skillId ?? '').trim()
+    if (!id) return fail('缺少 skillId')
+    const d = await aiSkillsApi.get(id)
+    return ok(`# ${d.name} (${d.id})\n\n${d.body}`)
   },
 }
 

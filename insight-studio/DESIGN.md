@@ -183,7 +183,9 @@ Line/Scatter 专属共用：拟合线型（实线/虚线，默认实线）；**�
 insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照）
   ├─ config：data/ai-config.json 服务端存储，GET 只回掩码 Key，PUT 局部更新
   ├─ chat：SSE 原样代理到配置的 OpenAI 兼容端点（Key 不出服务端）；未配置 409 ai_not_configured
-  └─ conversations：会话/消息 CRUD（store.db 的 ai_conversations 表）
+  ├─ conversations：会话/消息 CRUD（store.db 的 ai_conversations 表）
+  ├─ skills：本机 Skill 包（official seed + 用户 zip），`/api/ai/skills*`
+  └─ mcp：SSE/HTTP MCP 连接与代调（headers 掩码），`/api/ai/mcp*`
 ```
 
 - **ReAct loop 在前端**（`src/modules/ai/agentLoop.ts`）：模型返回 tool_calls → 本地执行 →
@@ -191,14 +193,19 @@ insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照
   超轮不硬报错：自动追加一轮**无工具收尾请求**（system 提示「直接根据已有结果总结」），
   实在拿不到文本才抛 MaxIterError。
   好处：工具直接操作前端 store（analysisStore/dashboardStore），撤销/持久化/视图刷新全部走现有链路，零后端业务侵入。
-- **工具集**（`tools/registry.ts` 21 个 JSON Schema + `tools/impl.ts` 实现）四组：
+- **工具集**（`tools/registry.ts` JSON Schema + `tools/impl.ts` 实现）四组平台工具 + Skills/MCP：
   数据（list/get schema/import_csv）、步骤（filter/join/union/computed/hide/run/rerun_stale）、
   图表（create_view/set_chart_config，写后跑 validateChartMapping 回执校验结果）、看板（建板/加组件）；
-  元工具 submit_plan/mark_step_done 驱动进展清单。危险操作（删表/视图/步骤）在 confirmDestructive
+  元工具 submit_plan/mark_step_done 驱动进展清单；**`list_skills` / `read_skill`** 读本机 Skill；
+  发送前拉取 `GET /api/ai/mcp/tools` 动态合并 MCP function（`mcpTools.ts`），调用走 Go 代发。
+  危险操作（删表/视图/步骤）在 confirmDestructive
   开启时先回 `NEEDS_CONFIRMATION`（摘要内含「不要重试、提示用户点确认」指令防模型空转），
   前端确认后带 `__confirmed` 重放。
   源表缺产出步骤时 impl 自动补 upload-csv 源步骤（与 migrateSteps 同构），保证任意分析可挂接下游。
-- **上下文**：system prompt（`prompts.ts`）+ 当前分析/表/视图摘要（`context.ts`），让模型知道「现在打开的是什么」。
+- **Skills / MCP（一期）**：侧栏「+」旁「能力」面板（`CapabilitiesPanel.vue`）管理全局本机配置；
+  Skill = `skill.json` + `SKILL.md`（不执行脚本）；MCP = SSE/HTTP + 自定义 Headers（无 stdio/OAuth）。
+  对话注入已启用 Skill 目录摘要，细则按需 `read_skill`。
+- **上下文**：system prompt（`prompts.ts`）+ Skills 目录 + 当前分析/表/视图摘要（`context.ts`），让模型知道「现在打开的是什么」。
 
 ### 交互（全局右抽屉 480px，AppHeader sparkle 入口）
 
@@ -212,15 +219,17 @@ insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照
   `config.models` 备选，选择持久 localStorage 并作为 payload.model 覆盖；深色方块发送/中止按钮）。
   输入时内联触发：敲 `@` 弹过滤引用菜单、行首敲 `/` 弹指令菜单，Enter 选首项（引用成 chip，不占文本）。
 - 设置弹窗：Base URL / API Key（掩码回显）/ Model / 备选模型（逗号分隔）/ 最大轮次 / 危险操作确认开关，保存即生效。
+- **能力面板**：Skills（导入 zip / 开关 / 预览 / 删用户包）与 MCP（CRUD / Headers / 刷新 tools / 开关）。
 - 多会话：历史面板（相对时间 + 删除）+ 新会话，消息持久化在后端 sqlite，刷新不丢；切换前自动落盘当前会话。
 
 ### 测试
 
 - 单测 `tests/unit/ai/`：agentLoop（多轮循环/SSE 分片聚合/超轮收尾/执行异常）、impl（真实 store 上
-  import/filter/computed/view+config/delete 确认流）。
+  import/filter/computed/view+config/delete 确认流）、skillsMcp（MCP 工具名合并/resolve、Skill 目录提示、registry）。
 - e2e `tests/e2e/ai.spec.ts`：route 拦截 config（含备选模型）+ chat（按 tool 轮次回放编排 SSE，
   与 `scripts/mock-ai.mjs` 同思路）：①全链路 发送 → 进展打勾 → 轨迹 → 思考块 → 模型切换 →
   产物卡直达（URL 带 viewId + 侧栏出现新视图）；②危险确认流 删除需确认 → 按钮外露 → 确认后表真实删除。
 - 真实端点验收（qwen3.8-max，Aliyun 兼容模式）：建图+拟合注释 / 导入+过滤+派生列 / 建看板+加组件 /
   删除确认 / 中止重试 / 历史恢复 / @引用 / 模型切换 全通过。
 - 联调：`node scripts/mock-ai.mjs 8789` 起 mock 端点，设置里填 `http://127.0.0.1:8789/v1` 即可手测。
+- Go：`insight-api-go` 内 `internal/skills`、`internal/mcp` 包测覆盖导入/掩码/刷新代调。

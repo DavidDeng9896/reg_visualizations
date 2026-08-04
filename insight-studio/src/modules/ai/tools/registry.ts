@@ -171,6 +171,16 @@ export const TOOL_DEFS: ToolDef[] = [
     description: '【危险】删除一个步骤及其产出表。',
     parameters: { type: 'object', properties: { stepId: str('步骤 id') }, required: ['stepId'] },
   },
+  {
+    name: 'list_skills',
+    description: '列出已安装的 AI Skills（id、名称、描述、是否启用）。需要细节时再 read_skill。',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'read_skill',
+    description: '读取某个 Skill 的完整 SKILL.md 说明书正文。',
+    parameters: { type: 'object', properties: { skillId: str('Skill id（来自 list_skills）') }, required: ['skillId'] },
+  },
 ]
 
 /** OpenAI tools 数组（可直接放进 chat payload）。 */

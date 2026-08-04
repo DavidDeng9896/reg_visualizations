@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { runAgent, MaxIterError, type ToolExecutor } from './agentLoop'
-import { aiConfigApi, aiConvApi, type AiPublicConfig, type ConversationMeta } from './client'
+import { aiConfigApi, aiConvApi, aiMcpApi, aiSkillsApi, type AiPublicConfig, type ConversationMeta } from './client'
 import type { ChatMessage, ToolCall } from './client'
 import { OPENAI_TOOLS } from './tools/registry'
 import { execTool } from './tools/impl'
 import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
-import { SYSTEM_PROMPT } from './prompts'
+import { SYSTEM_PROMPT, buildSkillsCatalogPrompt } from './prompts'
+import { buildMcpToolsBundle } from './mcpTools'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 
@@ -176,8 +177,41 @@ export const useAiStore = defineStore('ai', {
       const mentionCtx = buildMentionContext(analysis, mentions)
       if (mentionCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: mentionCtx })
 
+      // Skills 目录摘要 + MCP tools（失败时降级为空，不影响内置工具）
+      let mcpBundle = buildMcpToolsBundle([])
+      try {
+        const skills = await aiSkillsApi.list()
+        const catalog = buildSkillsCatalogPrompt(
+          skills.filter((s) => s.enabled).map((s) => ({ id: s.id, name: s.name, description: s.description })),
+        )
+        if (catalog) chatMessages.splice(1, 0, { role: 'system', content: catalog })
+      } catch {
+        /* skills 不可用时跳过 */
+      }
+      try {
+        const mcpTools = await aiMcpApi.listTools()
+        mcpBundle = buildMcpToolsBundle(mcpTools)
+      } catch {
+        /* mcp 不可用时跳过 */
+      }
+      const tools = [...OPENAI_TOOLS, ...mcpBundle.tools]
+
       const confirmDestructive = this.config?.confirmDestructive ?? true
       const exec: ToolExecutor = async (call: ToolCall, args: Record<string, unknown>) => {
+        const mcpRef = mcpBundle.resolve(call.function.name)
+        if (mcpRef) {
+          try {
+            const res = await aiMcpApi.callTool({
+              serverId: mcpRef.serverId,
+              name: mcpRef.name,
+              arguments: args,
+            })
+            const text = JSON.stringify(res.result ?? res)
+            return { ok: true, summary: text.length > 1200 ? `${text.slice(0, 1200)}…` : text }
+          } catch (e) {
+            return { ok: false, summary: e instanceof Error ? e.message : String(e) }
+          }
+        }
         const res = await execTool(call.function.name, args, { confirmDestructive })
         return res
       }
@@ -189,7 +223,7 @@ export const useAiStore = defineStore('ai', {
       try {
         await runAgent({
           messages: chatMessages,
-          tools: OPENAI_TOOLS,
+          tools,
           exec,
           maxIterations: this.config?.maxIterations ?? 8,
           model: this.modelOverride ?? undefined,

@@ -199,3 +199,105 @@ export const aiConvApi = {
     req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
   remove: (id: string) => req<void>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
+
+/* ------------------------------- Skills / MCP ------------------------------- */
+
+export interface SkillInfo {
+  id: string
+  name: string
+  version: string
+  description: string
+  tags?: string[]
+  source: 'official' | 'user' | string
+  enabled: boolean
+}
+
+export interface SkillDetail extends SkillInfo {
+  body: string
+}
+
+export const aiSkillsApi = {
+  list: () => req<SkillInfo[]>('/api/ai/skills'),
+  get: (id: string) => req<SkillDetail>(`/api/ai/skills/${encodeURIComponent(id)}`),
+  setEnabled: (id: string, enabled: boolean) =>
+    req<SkillInfo>(`/api/ai/skills/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+  remove: (id: string) =>
+    req<void>(`/api/ai/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  importZip: async (file: File): Promise<SkillInfo> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/ai/skills/import', { method: 'POST', body: fd })
+    const text = await res.text()
+    if (!res.ok) {
+      let msg = text
+      try {
+        msg = (JSON.parse(text) as { error?: string; message?: string }).message
+          ?? (JSON.parse(text) as { error?: string }).error
+          ?? text
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`导入失败（${res.status}）：${msg}`)
+    }
+    return JSON.parse(text) as SkillInfo
+  },
+}
+
+export interface McpHeaderKV {
+  key: string
+  value: string
+}
+
+export interface McpToolDef {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+export interface McpServerView {
+  id: string
+  name: string
+  url: string
+  enabled: boolean
+  headersConfigured: boolean
+  headerKeys: string[]
+  lastRefreshAt?: string
+  lastError?: string
+  cachedTools?: McpToolDef[]
+  toolCount: number
+}
+
+export interface McpEnabledTool {
+  serverId: string
+  serverName: string
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+export const aiMcpApi = {
+  listServers: () => req<McpServerView[]>('/api/ai/mcp/servers'),
+  create: (body: { name: string; url: string; headers?: McpHeaderKV[] }) =>
+    req<McpServerView>('/api/ai/mcp/servers', { method: 'POST', body: JSON.stringify(body) }),
+  patch: (
+    id: string,
+    body: { name?: string; url?: string; headers?: McpHeaderKV[]; enabled?: boolean },
+  ) =>
+    req<McpServerView>(`/api/ai/mcp/servers/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  remove: (id: string) =>
+    req<void>(`/api/ai/mcp/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  refresh: (id: string) =>
+    req<McpServerView>(`/api/ai/mcp/servers/${encodeURIComponent(id)}/refresh`, { method: 'POST' }),
+  listTools: () => req<McpEnabledTool[]>('/api/ai/mcp/tools'),
+  callTool: (body: { serverId: string; name: string; arguments?: Record<string, unknown> }) =>
+    req<{ ok: boolean; result: unknown }>('/api/ai/mcp/tools/call', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+}
