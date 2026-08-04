@@ -14,7 +14,7 @@ import { transformSummary } from '../table/transformForm'
 import { getChartDef, buildChartOption, validateChartMapping } from './registry'
 import { migrateConfigure, migrateStyle } from './runtime/mapping'
 import { samplingNotice } from './runtime/sampling'
-import { buildMargin, buildTitleLayout } from './runtime/shared'
+import { buildMargin } from './runtime/shared'
 import { cancelDraft, cloneConfig, commitDraft, createDraft, debounce, isDirty, type ChartDraft } from './draft'
 import { exportPdf, exportPng } from './export'
 import { addFlags, flagSetOf, removeFlags } from './flags'
@@ -96,7 +96,8 @@ const flags = computed<RowFlag[]>(() => view.value?.flags ?? [])
 
 let buildToken = 0
 function doBuild(r: NonNullable<typeof result.value>, cfg: ChartConfig) {
-  const out = buildChartOption(r, cfg, view.value!.name, flags.value)
+  // 工作台页头已展示视图名，与看板卡片一致隐藏图内 g-gtitle
+  const out = buildChartOption(r, cfg, view.value!.name, flags.value, { hideTitle: true })
   previewOption.value = out.option
   warnings.value = out.warnings
   seriesNames.value = out.seriesNames
@@ -139,18 +140,26 @@ watch(result, () => {
 watch(flags, () => rebuildDeb.call())
 watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 
-// layout-only 快路径：标题/副标题/边距改动跳过防抖与全量重建，直接 relayout（<100ms 生效）。
-// 全量重建随后仍会发生（同值幂等），此处只为即时反馈。
+// layout-only 快路径：边距改动跳过防抖与全量重建，直接 relayout（<100ms 生效）。
+// 工作台始终不写图内标题（hideTitle）；标题/副标题字段变更走全量 rebuild。
 watch(
-  () => [previewConfig.value.style.title, previewConfig.value.style.subtitle, previewConfig.value.style.margins],
+  () => previewConfig.value.style.margins,
   () => {
     const style = previewConfig.value.style
+    const margin = buildMargin(style)
+    // 与 baseLayout 无标题时一致：收紧顶部留白
+    if (style.margins?.top === undefined) margin.t = 32
     void chartRef.value?.relayout({
-      title: buildTitleLayout(style, view.value?.name ?? '') ?? '',
-      margin: buildMargin(style),
+      title: { text: '' },
+      margin,
     })
   },
   { deep: true },
+)
+
+watch(
+  () => [previewConfig.value.style.title, previewConfig.value.style.subtitle],
+  () => rebuildDeb.call(),
 )
 
 function touch() {
