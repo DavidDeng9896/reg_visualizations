@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { createDemoAndEnter, expectCanvasInk, lassoOnChart, mapField, pickOption, selectTable, viewNode } from './helpers'
+import { createDemoAndEnter, expectCanvasInk, lassoOnChart, mapField, openFlowchart, pickOption, selectTable, viewNode } from './helpers'
 
 test.describe('h) 持久化', () => {
   // 此流程依赖套索创建打标；Plotly 版本暂未支持。
@@ -38,7 +38,7 @@ test.describe('h) 持久化', () => {
     await expect(page.locator('.cview__flagcount')).toContainText('flagged')
 
     // 流程图拖一个节点
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     const flowNode = page.locator('.vue-flow__node', { hasText: 'Plate 96 dose-response' }).first()
     await expect(flowNode).toBeVisible()
     const nbox = (await flowNode.boundingBox())!
@@ -73,7 +73,7 @@ test.describe('h) 持久化', () => {
     ).toHaveValue('持久化标题')
 
     // 流程图布局保留（vue-flow 重载时坐标可能四舍五入，容差 2px 比对）
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     const reloaded = page.locator('.vue-flow__node', { hasText: 'Plate 96 dose-response' }).first()
     await expect(reloaded).toBeVisible()
     const translateOf = (style: string | null) => {

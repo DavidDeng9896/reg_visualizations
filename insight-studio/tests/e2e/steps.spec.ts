@@ -1,18 +1,18 @@
 import { expect, test } from '@playwright/test'
-import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, panCanvas, pickOption, tableNode } from './helpers'
+import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, openFlowchart, panCanvas, pickOption, tableNode } from './helpers'
 
 /** 流程图步骤化主流程：CSV 导入 / Combine 对话框均生成 StepNode，刷新后持久保留。 */
 test.describe('步骤化主流程', () => {
   test('Import CSV 创建 upload-csv 步骤节点', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'New analysis' }).first().click()
+    await page.getByRole('button', { name: '新建分析' }).click()
     await page.getByRole('textbox', { name: '例如：Binding assay analysis' }).fill('Step test')
     await page.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
 
     await importCsv(page, 'samples', 'id,value\na,1\nb,2')
 
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     const node = page.locator('.vue-flow__node').filter({ hasText: /Upload CSV/i }).first()
     await expect(node).toBeVisible()
     await expect(node).toContainText('samples')
@@ -21,7 +21,7 @@ test.describe('步骤化主流程', () => {
 
   test('Combine tables 创建 join 步骤节点并连线', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'New analysis' }).first().click()
+    await page.getByRole('button', { name: '新建分析' }).click()
     await page.getByRole('textbox', { name: '例如：Binding assay analysis' }).fill('Join test')
     await page.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
@@ -41,7 +41,7 @@ test.describe('步骤化主流程', () => {
     await expect(dialog).toBeHidden()
     await expect(page.locator('.is-toast--success', { hasText: '已创建合并表' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     const joinNode = page.locator('.vue-flow__node').filter({ hasText: /Join tables/i }).first()
     await expect(joinNode).toBeVisible()
     await expect(joinNode).toContainText('2 行')
@@ -52,14 +52,14 @@ test.describe('步骤化主流程', () => {
 
     // 刷新后仍保留
     await page.reload()
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     await expect(page.locator('.vue-flow__node').filter({ hasText: /Join tables/i }).first()).toBeVisible()
     await expect(page.locator('.vue-flow__edge')).toHaveCount(2)
   })
 
   test('拖线搭建 Filter → Join 管道并创建图表', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'New analysis' }).first().click()
+    await page.getByRole('button', { name: '新建分析' }).click()
     await page.getByRole('textbox', { name: '例如：Binding assay analysis' }).fill('Pipeline test')
     await page.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
@@ -69,7 +69,7 @@ test.describe('步骤化主流程', () => {
     await importCsv(page, 'left', leftCsv)
     await importCsv(page, 'right', rightCsv)
 
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     // 等画布挂载与 handleBounds 注册完成
     await page.waitForTimeout(600)
 
@@ -136,7 +136,7 @@ test.describe('步骤化主流程', () => {
 
   test('编辑源表 → 确认修改后下游自动重算（小成本表自动重跑）', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'New analysis' }).first().click()
+    await page.getByRole('button', { name: '新建分析' }).click()
     await page.getByRole('textbox', { name: '例如：Binding assay analysis' }).fill('Stale test')
     await page.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
@@ -144,7 +144,7 @@ test.describe('步骤化主流程', () => {
     await importCsv(page, 'left', 'id,x\n1,10\n2,20\n3,30')
 
     // 拖线加 Filter：id ≥ 2
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     await page.waitForTimeout(600)
     const leftId = await flowNodeIdByName(page, 'left')
     await dragConnectToBlank(page, { nodeId: leftId, port: 'Output dataset' })
@@ -164,7 +164,7 @@ test.describe('步骤化主流程', () => {
     // 编辑源表 left：把 id=2 改为 0，使其不再满足 id ≥ 2
     // 需求2：流程图模式下点树只定位节点、不退出流程图；编辑表格需显式切回工作区
     await tableNode(page, 'left').click()
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     await expect(page.getByTestId('grid-stats')).toBeVisible()
     // 编辑会话：进入后改单元格，确认修改才传播下游
     await page.getByTestId('enter-edit-btn').click()
@@ -177,7 +177,7 @@ test.describe('步骤化主流程', () => {
     await page.getByRole('button', { name: '确认修改' }).click()
 
     // 回到流程图：小成本表在防抖后自动重跑，Filter 输出按新数据重算为 1 行（仅 id=3），stale 消失
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await openFlowchart(page)
     await expect(filterNode).toContainText('1 行')
     await expect(page.locator('.flow-node__status--stale')).toHaveCount(0)
   })

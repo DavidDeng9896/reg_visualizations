@@ -1,13 +1,24 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { createDemoAnalysis } from '../../src/shared/seed'
 
 /* ------------------------------- 通用动作 ------------------------------- */
 
-/** 列表页 → 一键 Demo → 进入工作区（侧栏三张表就绪）。 */
+/** 写入 Iris Demo 并进入工作区（侧栏三张表就绪）。不依赖首页空态「一键 Demo」。 */
 export async function createDemoAndEnter(page: Page): Promise<void> {
-  await page.goto('/')
-  await page.getByRole('button', { name: '一键 Demo' }).first().click()
-  await page.waitForURL(/\/analysis\//)
+  const demo = createDemoAnalysis()
+  const res = await page.request.put(`/api/analyses/${encodeURIComponent(demo.id)}`, { data: demo })
+  expect(res.ok()).toBeTruthy()
+  await page.goto(`/analysis/${demo.id}`)
   await expect(page.getByTestId('sidebar-table').first()).toBeVisible()
+}
+
+/** 打开流程图（已在 flowchart 时不重复点击，避免切回工作区）。 */
+export async function openFlowchart(page: Page): Promise<void> {
+  const btn = page.getByRole('button', { name: 'Flowchart' })
+  if ((await btn.getAttribute('aria-pressed')) !== 'true') {
+    await btn.click()
+  }
+  await expect(page.locator('.vue-flow__node').first()).toBeVisible()
 }
 
 /** 侧栏选择表，等待表格统计出现。 */

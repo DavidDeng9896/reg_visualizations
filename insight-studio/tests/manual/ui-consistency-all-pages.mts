@@ -155,11 +155,13 @@ async function main() {
 
     await pageCase(page, 'P02-home-create-modal', '新建 Analysis 弹窗', async () => {
       await closeAllOverlays(page)
-      await page.getByRole('button', { name: 'New analysis' }).first().click()
-      const dlg = await dialog(page, '新建 Analysis')
-      await dlg.waitFor({ state: 'visible' })
-      // 主按钮文案为「创建」；未填名称时 disabled，仍可抽检样式
-      const btn = dlg.getByRole('button', { name: '创建', includeHidden: true }).or(dlg.locator('button.is-btn--primary')).first()
+      // 有数据时主区无「New analysis」，用侧栏「新建分析」
+      const sideNew = page.getByRole('button', { name: '新建分析' })
+      if (await sideNew.isVisible().catch(() => false)) await sideNew.click()
+      else await page.getByRole('button', { name: 'New analysis' }).first().click()
+      const panel = page.getByRole('dialog', { name: /新建分析|新建 Analysis/ })
+      await panel.waitFor({ state: 'visible' })
+      const btn = panel.getByRole('button', { name: '创建' }).or(panel.locator('button.is-btn--primary')).first()
       await btn.waitFor({ state: 'attached' })
       const bg = await btn.evaluate((el) => getComputedStyle(el).backgroundColor)
       if (normColor(bg) !== PRIMARY) throw new Error(`创建 按钮色 ${normColor(bg)}`)
@@ -247,7 +249,8 @@ async function main() {
 
     await pageCase(page, 'P10-analysis-flowchart', '分析·流程图模式', async () => {
       await closeAllOverlays(page)
-      await page.getByRole('button', { name: /Flowchart/i }).first().click()
+      const flow = page.getByRole('button', { name: /Flowchart/i }).first()
+      if ((await flow.getAttribute('aria-pressed')) !== 'true') await flow.click()
       await page.waitForTimeout(800)
       await Promise.race([
         page.locator('.vue-flow').first().waitFor({ state: 'visible', timeout: 12000 }),
@@ -259,8 +262,8 @@ async function main() {
     await pageCase(page, 'P11-analysis-rename-modal', '分析·重命名弹窗', async () => {
       await closeAllOverlays(page)
       const flow = page.getByRole('button', { name: /Flowchart/i }).first()
+      // 重命名在工作区顶栏；若在 flowchart 先切回
       if ((await flow.getAttribute('aria-pressed')) === 'true') await flow.click()
-      // 工作区顶栏 ⋯，避免点到侧栏卡片菜单
       const more = page.locator('.ws__header-actions').getByRole('button', { name: '更多操作' }).first()
       await more.click()
       await page.getByRole('menuitem', { name: /重命名/ }).click()

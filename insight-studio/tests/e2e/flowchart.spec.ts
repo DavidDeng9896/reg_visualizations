@@ -3,16 +3,11 @@ import {
   createDemoAndEnter,
   createView,
   expectCanvasInk,
+  openFlowchart,
   pickOption,
   selectTable,
   tableNode,
 } from './helpers'
-
-/** 进入流程图模式并等待节点渲染。 */
-async function openFlowchart(page: Page) {
-  await page.getByRole('button', { name: 'Flowchart' }).click()
-  await expect(page.locator('.vue-flow__node').first()).toBeVisible()
-}
 
 test.describe('g) 流程图', () => {
   test('节点渲染 → 拖节点 → 模式往返位置保留 → 双击跳回工作区选中', async ({ page }) => {
@@ -50,14 +45,13 @@ test.describe('g) 流程图', () => {
 
   test('空 Analysis 流程图显示空态 CTA', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'New analysis' }).first().click()
-    const dialog = page.getByRole('dialog', { name: '新建 Analysis' })
+    await page.getByRole('button', { name: '新建分析' }).click()
+    const dialog = page.getByRole('dialog', { name: '新建分析' })
     await dialog.getByPlaceholder('例如：Binding assay analysis').fill('Flow empty')
     await dialog.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
 
-    // 空 Analysis 没有任何节点，直接断言空态（不等节点渲染）
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    // 默认即流程图；空 Analysis 显示空态 CTA
     await expect(page.getByRole('heading', { name: '还没有数据' })).toBeVisible()
     await expect(page.locator('.flow-empty').getByRole('button', { name: 'Add data' })).toBeVisible()
   })
