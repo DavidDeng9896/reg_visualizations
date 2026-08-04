@@ -144,16 +144,17 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
             <p class="ai-drawer__hint">发送一条消息后会出现在这里，可随时回来继续。</p>
           </div>
           <template v-else>
-            <button
+            <div
               v-for="c in conversations"
               :key="c.id"
-              type="button"
               class="ai-drawer__hist-item"
               :class="{ 'ai-drawer__hist-item--on': c.id === currentId }"
               role="option"
+              tabindex="0"
               :aria-selected="c.id === currentId"
-              :disabled="switching"
-              @click="onSelectConversation(c.id)"
+              :aria-disabled="switching || undefined"
+              @click="!switching && onSelectConversation(c.id)"
+              @keydown.enter="!switching && onSelectConversation(c.id)"
             >
               <div class="ai-drawer__hist-main">
                 <span class="ai-drawer__hist-title is-ellipsis" :title="c.title">{{ c.title || '新会话' }}</span>
@@ -170,7 +171,7 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
                 <IIcon v-if="deletingId === c.id" name="spinner" :size="12" class="ai-drawer__spin" />
                 <IIcon v-else name="trash" :size="12" />
               </button>
-            </button>
+            </div>
           </template>
         </div>
 
@@ -343,15 +344,16 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
   cursor: pointer;
   color: var(--is-text);
 }
-.ai-drawer__hist-item:hover:not(:disabled) {
+.ai-drawer__hist-item:hover {
   background: var(--is-surface-hover);
 }
 .ai-drawer__hist-item--on {
   background: var(--is-accent-soft);
 }
-.ai-drawer__hist-item:disabled {
+.ai-drawer__hist-item[aria-disabled='true'] {
   opacity: 0.6;
   cursor: wait;
+  pointer-events: none;
 }
 .ai-drawer__hist-main {
   flex: 1;
