@@ -444,8 +444,10 @@ function downloadFull() {
 
 const chartRef = ref<InstanceType<typeof ChartPanel>>()
 const exportOpen = ref(false)
+const warnOpen = ref(false)
 function doExport(kind: 'png' | 'pdf') {
   exportOpen.value = false
+  warnOpen.value = false
   const get = () => chartRef.value?.getDataURL() ?? Promise.resolve('')
   const name = view.value?.name ?? 'chart'
   if (kind === 'png') void exportPng(get, name)
@@ -475,6 +477,13 @@ function onExportMenuKeydown(e: KeyboardEvent) {
   }
 }
 
+watch(
+  () => warnings.value.length,
+  (n) => {
+    if (!n) warnOpen.value = false
+  },
+)
+
 const chips = computed(() => {
   const v = view.value
   if (!v) return []
@@ -489,7 +498,13 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 <template>
   <div class="cview">
     <div class="cview__main">
-      <!-- 采样警告条 -->
+      <!-- 绑定列消失警告（单条关键，保留横幅） -->
+      <div v-if="missingColumns.length" class="cview__notice cview__notice--missing">
+        <IIcon name="warning" :size="14" />
+        <span>{{ missingColumns.map((e) => e.message).join('；') }}，请打开配置面板重新绑定</span>
+      </div>
+
+      <!-- 采样警告条（单条，保留横幅） -->
       <div v-if="sampling.sampled" class="cview__notice cview__notice--sample">
         <IIcon name="warning" :size="14" />
         <span>{{ sampling.message }}</span>
@@ -497,19 +512,7 @@ const chartHeight = computed(() => previewConfig.value.style.height)
         <span class="cview__notice-hint">to view the complete data.</span>
       </div>
 
-      <!-- 绑定列消失警告 -->
-      <div v-if="missingColumns.length" class="cview__notice cview__notice--missing">
-        <IIcon name="warning" :size="14" />
-        <span>{{ missingColumns.map((e) => e.message).join('；') }}，请打开配置面板重新绑定</span>
-      </div>
-
-      <!-- 构建警告（log 回退 / 拟合失败 / 负值剔除等） -->
-      <div v-for="(w, i) in warnings" :key="i" class="cview__notice cview__notice--warn">
-        <IIcon name="warning" :size="13" />
-        <span>{{ w }}</span>
-      </div>
-
-      <!-- 图表区 -->
+      <!-- 图表区（构建警告收进工具条芯片，不占图面） -->
       <div class="cview__stage">
         <template v-if="!requiredMissing">
           <ChartPanel
@@ -533,9 +536,40 @@ const chartHeight = computed(() => previewConfig.value.style.height)
           <!-- 重建 shimmer（已有图之后的局部刷新） -->
           <div v-else-if="rebuilding" class="cview__loading" role="status" aria-label="图表更新中" />
 
-          <!-- 右上工具条：导出 / 配置 —— 统一靠右，缺项时不留空位 -->
+          <!-- 右上工具条：提示 / 导出 / 配置 -->
           <div class="cview__toolbar">
             <span v-if="flagCapable && flagCount" class="cview__flagcount" title="已打标点">{{ flagCount }} flagged</span>
+
+            <IPopover
+              v-if="warnings.length"
+              :open="warnOpen"
+              placement="bottom-end"
+              :arrow="false"
+              @update:open="warnOpen = $event"
+            >
+              <template #anchor>
+                <button
+                  type="button"
+                  class="cview__warnchip"
+                  :aria-expanded="warnOpen"
+                  aria-haspopup="dialog"
+                  :title="`${warnings.length} 条图表提示`"
+                  data-testid="chart-warnings"
+                  @click="warnOpen = !warnOpen"
+                >
+                  <IIcon name="warning" :size="13" />
+                  <span>{{ warnings.length }} 条提示</span>
+                </button>
+              </template>
+              <template #default>
+                <div class="cview__warnpanel" role="dialog" aria-label="图表提示">
+                  <div class="cview__warnpanel-head">图表提示（{{ warnings.length }}）</div>
+                  <ul class="cview__warnlist">
+                    <li v-for="(w, i) in warnings" :key="i" class="cview__warnitem">{{ w }}</li>
+                  </ul>
+                </div>
+              </template>
+            </IPopover>
 
             <IPopover :open="exportOpen" placement="bottom-end" :arrow="false" @update:open="exportOpen = $event">
               <template #anchor>
@@ -691,6 +725,65 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 .cview__notice--warn {
   background: var(--is-warning-bg);
   color: var(--is-warning-text);
+}
+.cview__warnchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--is-warning-text) 28%, transparent);
+  border-radius: var(--is-radius-sm);
+  background: var(--is-warning-bg);
+  color: var(--is-warning-text);
+  font-size: var(--is-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cview__warnchip:hover {
+  filter: brightness(0.97);
+}
+.cview__warnpanel {
+  width: min(360px, 70vw);
+  max-height: min(280px, 50vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cview__warnpanel-head {
+  padding: 10px 12px 6px;
+  font-size: var(--is-text-xs);
+  font-weight: 600;
+  color: var(--is-text-secondary);
+}
+.cview__warnlist {
+  margin: 0;
+  padding: 4px 0 8px;
+  list-style: none;
+  overflow: auto;
+}
+.cview__warnitem {
+  position: relative;
+  padding: 8px 12px 8px 28px;
+  font-size: var(--is-text-xs);
+  line-height: 1.45;
+  color: var(--is-warning-text);
+  border-top: 1px solid var(--is-border);
+}
+.cview__warnitem:first-child {
+  border-top: none;
+}
+.cview__warnitem::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--is-warning-text);
+  opacity: 0.55;
 }
 .cview__toolbar {
   position: absolute;
