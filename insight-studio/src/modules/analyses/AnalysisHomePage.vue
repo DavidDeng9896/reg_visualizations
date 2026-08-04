@@ -1,16 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { analysisRepository } from '../../shared/repository'
 import { createEmptyAnalysis } from '../../shared/factories'
 import { PROJECTS, DEPARTMENTS } from '../../shared/org'
 import { createDemoAnalysis } from '../../shared/seed'
 import { createProjectDemoAnalyses } from '../../shared/demoProjects'
-import { seedProjectDemos } from '../../shared/ensureProjectDemoSeed'
+import { onAnalysesPossiblyChanged, seedProjectDemos } from '../../shared/ensureProjectDemoSeed'
 import { IButton, IEmptyState, IModal, ISelect, ITextField, toast } from '../../ui'
 
-/** 分析首页（/）：空态引导页。分析列表在左侧二级侧栏。 */
+/** 分析首页（/）：仅在没有任何分析时展示缺省引导；有数据时主区留白，从左侧列表进入。 */
 const router = useRouter()
+
+const listLoading = ref(true)
+const analysisCount = ref(0)
+const isEmpty = computed(() => !listLoading.value && analysisCount.value === 0)
+
+async function refreshCount() {
+  listLoading.value = true
+  try {
+    const list = await analysisRepository.list()
+    analysisCount.value = list.length
+  } finally {
+    listLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void refreshCount()
+})
+const stopSeedWatch = onAnalysesPossiblyChanged(() => {
+  void refreshCount()
+})
+onBeforeUnmount(stopSeedWatch)
 
 /* 新建 */
 const createOpen = ref(false)
@@ -75,6 +97,7 @@ async function createProjectDemos() {
 <template>
   <div class="home">
     <IEmptyState
+      v-if="isEmpty"
       icon="database"
       title="选择或新建分析"
       description="从左侧列表选择一个分析进入数据流，或新建空白分析开始探索。"

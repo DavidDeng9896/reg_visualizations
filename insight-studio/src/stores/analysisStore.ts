@@ -57,7 +57,7 @@ export const useAnalysisStore = defineStore('analysis', {
     saving: false,
     dirty: false,
     selected: null,
-    mode: 'workspace',
+    mode: 'flowchart',
     undoStack: [],
     redoStack: [],
   }),
@@ -78,6 +78,7 @@ export const useAnalysisStore = defineStore('analysis', {
       loadSeq += 1
       this.loading = true
       this.selected = null
+      this.mode = 'flowchart'
       if (this.current?.id !== id) {
         this.current = null
         this.dirty = false
@@ -96,7 +97,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.dirty = false
       this.undoStack = []
       this.redoStack = []
-      this.mode = 'workspace'
+      this.mode = 'flowchart'
     },
 
     async load(id: string, repo: AnalysisRepository = analysisRepository): Promise<boolean> {

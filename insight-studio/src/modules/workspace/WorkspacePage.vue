@@ -58,7 +58,7 @@ onMounted(async () => {
     router.replace('/')
     return
   }
-  applyQuerySelection()
+  applyEntryMode()
 })
 
 // 路由参数变化（例如列表页跳转）时重新加载
@@ -71,7 +71,7 @@ watch(analysisId, async (id, prev) => {
       const ok = await store.load(id)
       if (analysisId.value !== id) return
       if (!ok) router.replace('/')
-      else applyQuerySelection()
+      else applyEntryMode()
     } catch (e) {
       if (analysisId.value === id) store.$patch({ loading: false })
       toast.error(e instanceof Error ? e.message : '加载失败')
@@ -79,10 +79,13 @@ watch(analysisId, async (id, prev) => {
   }
 })
 
-/** 看板「打开源视图」带入 ?tableId=&viewId= */
-function applyQuerySelection() {
+/** 看板「打开源视图」带入 ?tableId=&viewId= 时进工作区；否则默认流程图。 */
+function applyEntryMode() {
   const tableId = typeof route.query.tableId === 'string' ? route.query.tableId : ''
-  if (!tableId) return
+  if (!tableId) {
+    store.setMode('flowchart')
+    return
+  }
   const viewId = typeof route.query.viewId === 'string' ? route.query.viewId : undefined
   store.select(viewId ? { kind: 'view', tableId, viewId } : { kind: 'table', tableId })
 }
