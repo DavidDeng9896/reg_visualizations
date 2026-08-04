@@ -262,7 +262,7 @@ export interface ChartStyle {
 
 export interface ChartConfig {
   chartType: ChartType
-  /** 表+图布局方位，默认 bottom。 */
+  /** 表+图布局方位，默认 top（图在上、数据源在下）。 */
   position: ChartPosition
   configure: ChartConfigure
   style: ChartStyle

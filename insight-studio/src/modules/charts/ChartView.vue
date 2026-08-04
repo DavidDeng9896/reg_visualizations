@@ -46,7 +46,7 @@ const draftModel = reactive<ChartDraft>({
 
 function fallbackConfig(): ChartConfig {
   const t = (view.value?.type && view.value.type !== 'table' ? view.value.type : 'bar') as ChartType
-  return { chartType: t, position: 'bottom', configure: {}, style: {} }
+  return { chartType: t, position: 'top', configure: {}, style: {} }
 }
 
 const panelOpen = ref(false)

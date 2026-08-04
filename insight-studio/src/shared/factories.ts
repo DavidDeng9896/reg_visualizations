@@ -182,7 +182,7 @@ export function createViewNode(type: ViewType, name?: string): ViewNode {
 export function createChartConfig(chartType: ChartType): ChartConfig {
   return {
     chartType,
-    position: 'bottom',
+    position: 'top',
     configure: {
       palette: chartType === 'heatmap' ? 'blues' : 'light',
       errorBars: 'none',

@@ -10,6 +10,7 @@ import DataGrid from './DataGrid.vue'
 import { TABLE_CHART_CONTEXT, type TableChartContext } from './context'
 import { promoteViewToTable } from './promote'
 import { downloadCsv, toCsv } from './csv'
+import { resolveTableCollapsedOnEnter } from './tableSourceVisibility'
 
 const ChartView = defineAsyncComponent(() => import('../charts/ChartView.vue'))
 
@@ -48,9 +49,9 @@ const pipelineState = computed(() => {
 const result = computed(() => pipelineState.value.result)
 const pipelineError = computed(() => pipelineState.value.error)
 
-/* 图表方位（默认 bottom） */
+/* 图表方位（默认 top：图在上、数据源在下） */
 const hasChart = computed(() => !!view.value && view.value.type !== 'table' && !!view.value.chart)
-const chartPosition = computed<ChartPosition>(() => view.value?.chart?.position ?? 'bottom')
+const chartPosition = computed<ChartPosition>(() => view.value?.chart?.position ?? 'top')
 
 function setPosition(p: ChartPosition) {
   store.mutate((a) => {
@@ -61,31 +62,39 @@ function setPosition(p: ChartPosition) {
   positionOpen.value = false
 }
 
-/* 源表收起：图表视图可隐藏表格，只看全幅图表；按分析+视图持久化 */
+/**
+ * 源表显隐：
+ * - 第一次进入某图表编辑：默认显示数据源（便于对照配置）
+ * - 之后再进入：默认隐藏数据源（全幅看图）；会话内可手动切换，不跨次持久化偏好
+ */
 const tableCollapsed = ref(false)
-function tableCollapseKey() {
+/** 避免同一图表下 watch 因其它依赖抖动重复套用「已访问 → 收起」 */
+let tableCollapseAppliedKey = ''
+function tableVisitedKey() {
   const a = current.value?.id ?? ''
   const v = selected.value?.viewId ?? ''
-  return `insight-studio:table-collapsed:${a}:${v}`
+  return `insight-studio:table-visited:${a}:${v}`
 }
 function loadTableCollapsed() {
   if (!hasChart.value || !selected.value?.viewId) {
     tableCollapsed.value = false
+    tableCollapseAppliedKey = ''
     return
   }
+  const key = tableVisitedKey()
+  if (key === tableCollapseAppliedKey) return
+  tableCollapseAppliedKey = key
   try {
-    tableCollapsed.value = localStorage.getItem(tableCollapseKey()) === '1'
+    const visited = localStorage.getItem(key) === '1'
+    const next = resolveTableCollapsedOnEnter(visited)
+    tableCollapsed.value = next.collapsed
+    if (next.markVisited) localStorage.setItem(key, '1')
   } catch {
     tableCollapsed.value = false
   }
 }
 function toggleTableCollapsed() {
   tableCollapsed.value = !tableCollapsed.value
-  try {
-    localStorage.setItem(tableCollapseKey(), tableCollapsed.value ? '1' : '0')
-  } catch {
-    /* ignore quota / private mode */
-  }
 }
 watch(
   () => [current.value?.id, selected.value?.viewId, hasChart.value] as const,
@@ -125,8 +134,8 @@ const renameOpen = ref(false)
 const renameName = ref('')
 
 const POSITIONS: { value: ChartPosition; label: string; icon: 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' }[] = [
-  { value: 'top', label: '图表在上', icon: 'chevron-up' },
-  { value: 'bottom', label: '图表在下（默认）', icon: 'chevron-down' },
+  { value: 'top', label: '图表在上（默认）', icon: 'chevron-up' },
+  { value: 'bottom', label: '图表在下', icon: 'chevron-down' },
   { value: 'left', label: '图表在左', icon: 'chevron-left' },
   { value: 'right', label: '图表在右', icon: 'chevron-right' },
 ]

@@ -143,7 +143,8 @@ Line/Scatter 专属共用：拟合线型（实线/虚线，默认实线）；**�
 - 编辑：双击进编辑、Tab/Enter 导航、Ctrl+C/V 多单元格粘贴、行增删、Undo/Redo；**禁止合并单元格**
 - 行选择 checkbox 列（为打标/后续联动预留）
 - 过滤：「+ Add filter」蓝色链接 → 弹窗（单列多条件 And/Or）（截图 14）；过滤 chip 可点编辑
-- 表+图布局：`chartPosition: top|bottom|left|right`（默认 bottom）+ 分隔条拖拽（记住比例）+ 窄屏左右自动降级上下
+- 表+图布局：`chartPosition: top|bottom|left|right`（默认 top，图在上、数据源在下）+ 分隔条拖拽（记住比例）+ 窄屏左右自动降级上下
+- 源表显隐：首次进入某图表编辑默认显示数据源；之后再进入默认隐藏（会话内可手动切换）
 
 ## 7. 工程与测试要求
 
