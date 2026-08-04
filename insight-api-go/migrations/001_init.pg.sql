@@ -68,3 +68,14 @@ CREATE TABLE IF NOT EXISTS event_outbox (
 );
 CREATE INDEX IF NOT EXISTS event_outbox_pending ON event_outbox (created_at)
   WHERE published_at IS NULL;
+
+-- AI assistant conversations (config lives in ai-config.json)
+CREATE TABLE IF NOT EXISTS ai_conversations (
+  id            TEXT PRIMARY KEY,
+  analysis_id   TEXT,
+  title         TEXT NOT NULL DEFAULT '',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  messages      JSONB NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations (updated_at DESC);

@@ -180,7 +180,7 @@ Line/Scatter 专属共用：拟合线型（实线/虚线，默认实线）；**�
 浏览器（AiDrawer / aiStore）
   │  POST /api/ai/chat（OpenAI chat/completions 负载，stream）
   ▼
-insight-api /api/ai/*（src/ai.ts）
+insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照）
   ├─ config：data/ai-config.json 服务端存储，GET 只回掩码 Key，PUT 局部更新
   ├─ chat：SSE 原样代理到配置的 OpenAI 兼容端点（Key 不出服务端）；未配置 409 ai_not_configured
   └─ conversations：会话/消息 CRUD（store.db 的 ai_conversations 表）

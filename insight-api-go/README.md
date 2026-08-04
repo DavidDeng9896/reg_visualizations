@@ -46,6 +46,10 @@ docker compose up -d
 | GET/PUT/DELETE | `/api/analyses/:id` | Analysis 文档（含表数据内容） |
 | GET | `/api/analyses/:id/tables/:tableId/snapshot` | 最新数据内容快照 |
 | GET/PUT/DELETE | `/api/dashboards/:id` | 看板 |
+| GET/PUT | `/api/ai/config` | AI 配置（apiKey 仅回掩码） |
+| POST | `/api/ai/chat` | OpenAI 兼容 SSE 代理 |
+| GET/POST | `/api/ai/conversations` | 会话列表 / 新建 |
+| GET/PUT/DELETE | `/api/ai/conversations/:id` | 会话读写删 |
 
 `PUT /api/analyses/:id` 事务写入 `analyses` + `table_snapshots` + `event_outbox`。  
 可选头 `If-Match: <revision>` 乐观锁。

@@ -11,12 +11,17 @@ import (
 )
 
 type Server struct {
-	Store *store.Store
-	Mux   *http.ServeMux
+	Store      *store.Store
+	Mux        *http.ServeMux
+	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
 }
 
 func New(s *store.Store) *Server {
-	srv := &Server{Store: s, Mux: http.NewServeMux()}
+	return NewWithConfigPath(s, "")
+}
+
+func NewWithConfigPath(s *store.Store, configPath string) *Server {
+	srv := &Server{Store: s, Mux: http.NewServeMux(), ConfigPath: configPath}
 	srv.routes()
 	return srv
 }
@@ -32,6 +37,15 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("GET /api/dashboards/{id}", s.getDashboard)
 	s.Mux.HandleFunc("PUT /api/dashboards/{id}", s.putDashboard)
 	s.Mux.HandleFunc("DELETE /api/dashboards/{id}", s.deleteDashboard)
+
+	s.Mux.HandleFunc("GET /api/ai/config", s.getAiConfig)
+	s.Mux.HandleFunc("PUT /api/ai/config", s.putAiConfig)
+	s.Mux.HandleFunc("POST /api/ai/chat", s.postAiChat)
+	s.Mux.HandleFunc("GET /api/ai/conversations", s.listAiConversations)
+	s.Mux.HandleFunc("POST /api/ai/conversations", s.createAiConversation)
+	s.Mux.HandleFunc("GET /api/ai/conversations/{id}", s.getAiConversation)
+	s.Mux.HandleFunc("PUT /api/ai/conversations/{id}", s.putAiConversation)
+	s.Mux.HandleFunc("DELETE /api/ai/conversations/{id}", s.deleteAiConversation)
 }
 
 func withCORS(next http.Handler) http.Handler {

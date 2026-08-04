@@ -120,6 +120,16 @@ func (s *Store) migrate() error {
         created_at TEXT NOT NULL,
         published_at TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS ai_conversations (
+        id TEXT PRIMARY KEY,
+        analysis_id TEXT,
+        title TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        messages TEXT NOT NULL DEFAULT '[]'
+      );
+      CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations(updated_at DESC);
     `)
 	return err
 }
