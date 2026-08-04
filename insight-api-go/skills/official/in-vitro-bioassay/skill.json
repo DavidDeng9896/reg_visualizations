@@ -1,0 +1,7 @@
+{
+  "id": "in-vitro-bioassay",
+  "name": "In vitro bioassay",
+  "version": "1.0.0",
+  "description": "体外试验：剂量反应、4PL/EC50、孔板热图与效价比较",
+  "tags": ["bioassay", "4PL", "EC50", "plate"]
+}

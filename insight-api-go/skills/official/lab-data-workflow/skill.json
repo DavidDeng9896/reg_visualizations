@@ -1,0 +1,7 @@
+{
+  "id": "lab-data-workflow",
+  "name": "Lab data workflow",
+  "version": "1.0.0",
+  "description": "实验室数据分析通用流程：探查、清洗、连接、作图与可复现结论",
+  "tags": ["workflow", "lab", "general"]
+}

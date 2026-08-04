@@ -1,0 +1,7 @@
+{
+  "id": "cell-line-development",
+  "name": "Cell line development",
+  "version": "1.0.0",
+  "description": "细胞株构建：转染后滴度、活率、克隆筛选与稳定性趋势",
+  "tags": ["cell-line", "titer", "CHO", "clone"]
+}

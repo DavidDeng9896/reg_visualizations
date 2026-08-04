@@ -1,0 +1,7 @@
+{
+  "id": "in-vivo-efficacy",
+  "name": "In vivo efficacy & tolerability",
+  "version": "1.0.0",
+  "description": "体内试验：瘤体积/药效曲线、体重耐受、分组比较",
+  "tags": ["in-vivo", "PDX", "efficacy", "tolerability"]
+}

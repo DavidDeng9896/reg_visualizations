@@ -1,0 +1,7 @@
+{
+  "id": "antibody-discovery",
+  "name": "Antibody discovery analysis",
+  "version": "1.0.0",
+  "description": "抗体发现：结合筛选、SPR/BLI 动力学、克隆排序与候选推荐",
+  "tags": ["antibody", "SPR", "ELISA", "discovery"]
+}
