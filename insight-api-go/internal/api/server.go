@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
 )
 
@@ -14,14 +16,20 @@ type Server struct {
 	Store      *store.Store
 	Mux        *http.ServeMux
 	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
+	Skills     *skills.Store
+	MCP        *mcp.Store
 }
 
 func New(s *store.Store) *Server {
-	return NewWithConfigPath(s, "")
+	return NewWithOptions(s, "", nil, nil)
 }
 
 func NewWithConfigPath(s *store.Store, configPath string) *Server {
-	srv := &Server{Store: s, Mux: http.NewServeMux(), ConfigPath: configPath}
+	return NewWithOptions(s, configPath, nil, nil)
+}
+
+func NewWithOptions(s *store.Store, configPath string, sk *skills.Store, mcpStore *mcp.Store) *Server {
+	srv := &Server{Store: s, Mux: http.NewServeMux(), ConfigPath: configPath, Skills: sk, MCP: mcpStore}
 	srv.routes()
 	return srv
 }
@@ -46,6 +54,20 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("GET /api/ai/conversations/{id}", s.getAiConversation)
 	s.Mux.HandleFunc("PUT /api/ai/conversations/{id}", s.putAiConversation)
 	s.Mux.HandleFunc("DELETE /api/ai/conversations/{id}", s.deleteAiConversation)
+
+	s.Mux.HandleFunc("GET /api/ai/skills", s.listSkills)
+	s.Mux.HandleFunc("GET /api/ai/skills/{id}", s.getSkill)
+	s.Mux.HandleFunc("POST /api/ai/skills/import", s.importSkill)
+	s.Mux.HandleFunc("PATCH /api/ai/skills/{id}", s.patchSkill)
+	s.Mux.HandleFunc("DELETE /api/ai/skills/{id}", s.deleteSkill)
+
+	s.Mux.HandleFunc("GET /api/ai/mcp/servers", s.listMcpServers)
+	s.Mux.HandleFunc("POST /api/ai/mcp/servers", s.createMcpServer)
+	s.Mux.HandleFunc("PATCH /api/ai/mcp/servers/{id}", s.patchMcpServer)
+	s.Mux.HandleFunc("DELETE /api/ai/mcp/servers/{id}", s.deleteMcpServer)
+	s.Mux.HandleFunc("POST /api/ai/mcp/servers/{id}/refresh", s.refreshMcpServer)
+	s.Mux.HandleFunc("GET /api/ai/mcp/tools", s.listMcpTools)
+	s.Mux.HandleFunc("POST /api/ai/mcp/tools/call", s.callMcpTool)
 }
 
 func withCORS(next http.Handler) http.Handler {
@@ -55,7 +77,7 @@ func withCORS(next http.Handler) http.Handler {
 			origin = "*"
 		}
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Match")
 		w.Header().Set("Vary", "Origin")
 		if r.Method == http.MethodOptions {

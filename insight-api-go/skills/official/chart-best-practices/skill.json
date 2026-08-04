@@ -1,0 +1,7 @@
+{
+  "id": "chart-best-practices",
+  "name": "Chart best practices",
+  "version": "1.0.0",
+  "description": "如何用现有图表工具做常见配置与排版",
+  "tags": ["chart", "plotly"]
+}
