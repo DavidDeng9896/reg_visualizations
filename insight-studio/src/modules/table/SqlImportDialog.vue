@@ -434,7 +434,7 @@ watch(sourceMode, (mode) => {
             <IButton size="sm" variant="secondary" :loading="testing" @click="testConn">
               测试并保存
             </IButton>
-            <IButton size="sm" variant="ghost" @click="saveConnection">仅保存</IButton>
+            <IButton size="sm" variant="ghost" @click="() => saveConnection()">仅保存</IButton>
             <IButton size="sm" variant="ghost" :disabled="!activeId" @click="deleteConnection">删除</IButton>
           </div>
           <p

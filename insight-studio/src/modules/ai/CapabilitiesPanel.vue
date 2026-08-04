@@ -233,7 +233,7 @@ async function removeServer(s: McpServerView): Promise<void> {
             </div>
             <IToggle
               :model-value="s.enabled"
-              :label="`启用 ${s.name}`"
+              label="启用"
               @update:model-value="toggleSkill(s, $event)"
             />
           </li>
@@ -297,7 +297,7 @@ async function removeServer(s: McpServerView): Promise<void> {
             </div>
             <IToggle
               :model-value="s.enabled"
-              :label="`启用 ${s.name}`"
+              label="启用"
               @update:model-value="toggleServer(s, $event)"
             />
           </li>
