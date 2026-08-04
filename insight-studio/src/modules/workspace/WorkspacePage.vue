@@ -293,7 +293,8 @@ const loadingText = computed(() => (flowchartSwitching.value && !loading.value ?
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: color-mix(in srgb, var(--is-bg) 88%, transparent);
+  /* 不透明，避免下方空态文案透出造成「没有 loading」的观感 */
+  background: var(--is-bg);
   color: var(--is-text-secondary);
   z-index: 5;
   font-size: var(--is-text-sm);

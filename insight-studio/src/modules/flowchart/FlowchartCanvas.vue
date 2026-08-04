@@ -40,7 +40,7 @@ import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 const emit = defineEmits<{ (e: 'add-data'): void }>()
 
 const store = useAnalysisStore()
-const { current, selected } = storeToRefs(store)
+const { current, selected, loading } = storeToRefs(store)
 
 /* --------------------------------- 数据派生 --------------------------------- */
 
@@ -49,7 +49,8 @@ const graph = computed<FlowGraph>(() =>
 )
 const nodeById = computed(() => new Map(graph.value.nodes.map((n) => [n.id, n])))
 const positions = computed(() => resolvePositions(graph.value, current.value?.flowchartLayout ?? {}))
-const isEmpty = computed(() => graph.value.nodes.length === 0)
+/** 加载中或尚无 current 时不展示空态，避免半透明 loading 下透出「还没有数据」。 */
+const isEmpty = computed(() => !loading.value && !!current.value && graph.value.nodes.length === 0)
 const perfMode = computed(() => graph.value.nodes.length > 200)
 const staleCount = computed(() => (current.value ? current.value.steps.filter((s) => s.status === 'stale').length : 0))
 const hasStale = computed(() => (current.value ? hasStaleSteps(current.value) : false))

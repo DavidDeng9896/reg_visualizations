@@ -156,7 +156,7 @@ function onPickCategory(kind: 'table' | 'chart') {
         </div>
         <div class="dash__canvas-wrap">
           <IEmptyState
-            v-if="!current.widgets.length"
+            v-if="!loading && !current.widgets.length"
             icon="plus"
             title="还没有组件"
             description="从多个 Insight 中选择已配置好的表或图表，拖到画布上组成总览。"
@@ -164,7 +164,7 @@ function onPickCategory(kind: 'table' | 'chart') {
             <IButton variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
           </IEmptyState>
           <DashboardCanvas
-            v-else
+            v-else-if="current.widgets.length"
             :dashboard="current"
             :edit-layout="editLayout"
             @update-widget="onUpdateWidget"
@@ -302,7 +302,7 @@ function onPickCategory(kind: 'table' | 'chart') {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: color-mix(in srgb, var(--is-bg) 88%, transparent);
+  background: var(--is-bg);
   color: var(--is-text-secondary);
   z-index: 5;
   font-size: var(--is-text-sm);

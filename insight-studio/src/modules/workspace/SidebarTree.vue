@@ -223,7 +223,7 @@ function pickViewType(type: ViewType) {
   <div class="tree-wrap">
     <div class="tree" role="tree">
       <div v-if="!tableForest.length" class="tree__empty">
-        {{ loading ? '加载中…' : search ? '无匹配结果' : '还没有数据，点击上方 + 添加数据' }}
+        {{ loading || !current ? '加载中…' : search ? '无匹配结果' : '还没有数据，点击上方 + 添加数据' }}
       </div>
 
       <SidebarTableNode
