@@ -100,7 +100,8 @@ async function onRefreshSql(): Promise<void> {
   refreshingSql.value = true
   try {
     const r = await refreshSqlSourceStep(props.step.id)
-    toast.success(`数据源已刷新（${r.rowCount} 行）`)
+    if (r.mode === 'unchanged') toast.success('数据源无变化')
+    else toast.success(`数据源已刷新（${r.rowCount} 行）`)
   } catch (e) {
     toast.error(e instanceof Error ? e.message : '刷新失败')
   } finally {

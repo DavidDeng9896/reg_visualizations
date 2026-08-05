@@ -156,6 +156,10 @@ async function onRefreshSql(): Promise<void> {
   refreshing.value = true
   try {
     const r = await refreshSqlSourceStep(props.node.stepId)
+    if (r.mode === 'unchanged') {
+      toast.success('数据源无变化，下游未重跑')
+      return
+    }
     const extra =
       r.mode === 'reran' ? `，下游已重跑 ${r.ran} 步` : r.mode === 'stale-only' ? '，下游已标 stale（请点 Run stale）' : ''
     toast.success(`数据源已刷新（${r.rowCount} 行）${extra}`)

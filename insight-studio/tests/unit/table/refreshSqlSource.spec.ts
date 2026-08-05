@@ -134,4 +134,65 @@ describe('refreshSqlSource helpers', () => {
     expect(filtered.rows.every((row) => Number(row.v) > 15)).toBe(true)
     expect(filtered.rows.map((row) => Number(row.id)).sort()).toEqual([2, 3, 4])
   })
+
+  it('内容未变时 mode=unchanged 且不重跑下游', async () => {
+    const { refreshSqlSourceStep, snapshotFingerprint } = await import(
+      '../../../src/modules/table/refreshSqlSource'
+    )
+    const store = useAnalysisStore()
+    const a = sealAnalysisRows(createEmptyAnalysis('demo2'))
+    const drive = createTable(
+      'drive',
+      [
+        { field: 'id', title: 'id', dataType: 'number' },
+        { field: 'v', title: 'v', dataType: 'number' },
+      ],
+      [{ id: 1, v: 10 }],
+      'csv',
+    )
+    const src = createTable(
+      'raw',
+      [
+        { field: 'id', title: 'id', dataType: 'number' },
+        { field: 'v', title: 'v', dataType: 'number' },
+      ],
+      [{ id: 1, v: 10 }],
+      'csv',
+    )
+    const sqlStep = createStepNode('query-sql', 'from drive')
+    sqlStep.config = {
+      sql: 'SELECT * FROM drive',
+      source: 'local',
+      contentFingerprint: snapshotFingerprint(['id', 'v'], [{ id: 1, v: 10 }]),
+    }
+    sqlStep.status = 'configured'
+    sqlStep.output.tables = [src.id]
+    src.source = 'step'
+    src.stepId = sqlStep.id
+
+    const filter = createStepNode('filter', 'all')
+    filter.status = 'configured'
+    filter.inputs = [{ port: 'Input dataset', from: { nodeId: sqlStep.id, port: 'Output dataset' } }]
+    filter.config = { filters: [] }
+    const out = createTable(
+      'filtered',
+      [
+        { field: 'id', title: 'id', dataType: 'number' },
+        { field: 'v', title: 'v', dataType: 'number' },
+      ],
+      [{ id: 1, v: 10 }],
+      'step',
+    )
+    filter.output.tables = [out.id]
+    out.stepId = filter.id
+
+    a.tables = [drive, src, out]
+    a.steps = [sqlStep, filter]
+    store.current = a
+
+    const r = await refreshSqlSourceStep(sqlStep.id)
+    expect(r.mode).toBe('unchanged')
+    expect(r.ran).toBe(0)
+    expect(filter.status).toBe('configured')
+  })
 })

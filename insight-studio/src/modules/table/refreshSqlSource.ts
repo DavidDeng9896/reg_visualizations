@@ -18,7 +18,7 @@ export type RefreshSqlResult = {
   tableId: string
   rowCount: number
   columnCount: number
-  mode: 'reran' | 'stale-only' | 'noop'
+  mode: 'reran' | 'stale-only' | 'noop' | 'unchanged'
   ran: number
 }
 
@@ -27,6 +27,15 @@ export class RefreshSqlError extends Error {
     super(message)
     this.name = 'RefreshSqlError'
   }
+}
+
+/** 内容指纹：列序 + 行值（不含行 id），用于判断库数据是否真变了。 */
+export function snapshotFingerprint(headers: string[], rows: Record<string, unknown>[]): string {
+  const cols = headers.join('\0')
+  const body = rows
+    .map((r) => headers.map((h) => (r[h] == null ? '' : String(r[h]))).join('\0'))
+    .join('\n')
+  return `${cols}\n${body}`
 }
 
 /** 按 connectionId 或 connectionName 解析本机连接档案。 */
@@ -148,10 +157,32 @@ export async function refreshSqlSourceStep(stepId: string): Promise<RefreshSqlRe
     if (!headers.length && objectRows.length) {
       const grid = objectRowsToGrid(objectRows)
       headers = grid.headers
-      // objectRows already fine
     }
 
-    let propagate: { mode: RefreshSqlResult['mode']; ran: number } = { mode: 'noop', ran: 0 }
+    const fp = snapshotFingerprint(headers, objectRows)
+    const prevFp = typeof step.config.contentFingerprint === 'string' ? step.config.contentFingerprint : ''
+    if (prevFp && prevFp === fp) {
+      store.mutate((a) => {
+        const s = a.steps.find((x) => x.id === stepId)
+        if (!s) return
+        s.config.lastSyncedAt = new Date().toISOString()
+        s.status = 'configured'
+        s.error = undefined
+      })
+      const t = store.current?.tables.find((x) => x.id === tableId)
+      return {
+        tableId,
+        rowCount: t?.rows.length ?? 0,
+        columnCount: t?.columns.length ?? 0,
+        mode: 'unchanged',
+        ran: 0,
+      }
+    }
+
+    let propagate: { mode: Exclude<RefreshSqlResult['mode'], 'unchanged'>; ran: number } = {
+      mode: 'noop',
+      ran: 0,
+    }
     store.mutate((a) => {
       const s = a.steps.find((x) => x.id === stepId)
       const t = a.tables.find((x) => x.id === tableId)
@@ -159,6 +190,7 @@ export async function refreshSqlSourceStep(stepId: string): Promise<RefreshSqlRe
       applySnapshotToTable(t, headers, objectRows)
       s.config.lastSyncedAt = new Date().toISOString()
       s.config.lastRowCount = t.rows.length
+      s.config.contentFingerprint = fp
       s.status = 'configured'
       s.error = undefined
       propagate = propagateTableEdit(a, tableId)
@@ -197,8 +229,8 @@ export async function refreshAutoSqlSources(): Promise<number> {
   let n = 0
   for (const s of targets) {
     try {
-      await refreshSqlSourceStep(s.id)
-      n += 1
+      const r = await refreshSqlSourceStep(s.id)
+      if (r.mode !== 'unchanged') n += 1
     } catch {
       /* 单个失败不阻断其余 */
     }
