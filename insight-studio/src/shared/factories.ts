@@ -148,6 +148,7 @@ export const VIEW_TYPE_LABELS: Record<ViewType, string> = {
   box: 'Box plot',
   pie: 'Pie chart',
   heatmap: 'Heatmap',
+  bignumber: 'Big number',
 }
 
 export function defaultViewName(type: ViewType, existing: ViewNode[] = []): string {
@@ -219,6 +220,18 @@ export function createChartConfig(chartType: ChartType): ChartConfig {
         : {}),
       ...(chartType === 'heatmap'
         ? { heatmap: { showCellValues: false, rowSort: 'label' as const, colSort: 'label' as const, clusterRows: false, clusterCols: false } }
+        : {}),
+      ...(chartType === 'bignumber'
+        ? {
+            legend: { show: false, position: 'top' as const },
+            bignumber: {
+              layout: 'row' as const,
+              valueFontSize: 42,
+              labelFontSize: 13,
+              showLabel: true,
+              compact: false,
+            },
+          }
         : {}),
     },
   }

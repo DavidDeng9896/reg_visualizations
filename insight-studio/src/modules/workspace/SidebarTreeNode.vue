@@ -44,6 +44,7 @@ const VIEW_ICON: Record<ViewType, IconName> = {
   box: 'box',
   pie: 'pie',
   heatmap: 'heatmap',
+  bignumber: 'bignumber',
 }
 
 const isExpanded = computed(() => props.expanded.has(props.node.id))

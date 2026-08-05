@@ -1,12 +1,15 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
   createDemoAndEnter,
+  createView,
+  ensureWorkspace,
   expectCanvasInk,
   expectNoErrorToast,
   lassoOnChart,
   mapField,
   pickOption,
   selectTable,
+  viewNode,
 } from './helpers'
 
 /** 建 scatter 视图（plate：concentration × response），面板自动打开。 */
@@ -102,7 +105,7 @@ test.describe('e) 拟合 + 套索打标', () => {
 })
 
 test.describe('f) 六图种切换', () => {
-  test('同一视图切 bar/line/scatter/box/pie/heatmap 均能出图且无错误', async ({ page }) => {
+  test('同一视图切 bar/line/scatter/box/pie/heatmap/bignumber 均能出图且无错误', async ({ page }) => {
     await createDemoAndEnter(page)
     await selectTable(page, 'Iris measurements')
     await page.getByRole('button', { name: '创建图表' }).click()
@@ -153,6 +156,50 @@ test.describe('f) 六图种切换', () => {
       await mapField(page, 'Color value', 'sepal_length')
     }
     await expectCanvasInk(page)
+    await expectNoErrorToast(page)
+
+    // bignumber：Categories → 每个类别一个大号数字
+    await pickOption(typeSelect, 'Big number')
+    if (await emptyState.isVisible()) {
+      await mapField(page, 'Categories', 'species')
+    }
+    await expectCanvasInk(page)
+    await expectNoErrorToast(page)
+  })
+})
+
+test.describe('g) Big number 指标卡', () => {
+  test('演示视图各阶段分子数：三类大号数字可见', async ({ page }) => {
+    const { createProjectDemoAnalyses } = await import('../../src/shared/demoProjects')
+    const showcase = createProjectDemoAnalyses().find((a) => a.id === 'demo-chart-features')
+    expect(showcase).toBeTruthy()
+    const res = await page.request.put(`/api/analyses/${encodeURIComponent(showcase!.id)}`, { data: showcase })
+    expect(res.ok()).toBeTruthy()
+
+    await page.goto(`/analysis/${showcase!.id}`)
+    await expect(page.getByTestId('sidebar-table').first()).toBeVisible()
+    await ensureWorkspace(page)
+
+    await viewNode(page, '各阶段分子数').click()
+    await expectCanvasInk(page)
+
+    const plot = page.getByTestId('chart-canvas')
+    await expect(plot).toContainText('开发中')
+    await expect(plot).toContainText('评估中')
+    await expect(plot).toContainText('CRO测试')
+    // 演示数据：开发中 4、评估中 3、CRO测试 3
+    await expect(plot).toContainText('4')
+    await expect(plot.getByText('3').first()).toBeVisible()
+    await expectNoErrorToast(page)
+  })
+
+  test('新建 Big number → 映射 Categories → 出图', async ({ page }) => {
+    await createDemoAndEnter(page)
+    await createView(page, 'Iris measurements', 'bignumber')
+    await expect(page.getByRole('combobox', { name: 'Chart type' })).toBeVisible()
+    await mapField(page, 'Categories', 'species')
+    await expectCanvasInk(page)
+    await expect(page.getByTestId('chart-canvas')).toContainText('setosa')
     await expectNoErrorToast(page)
   })
 })

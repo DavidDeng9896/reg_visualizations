@@ -192,6 +192,7 @@ const TILE_GROUPS: { title: string; items: { type: ViewType; label: string; icon
       { type: 'box', label: 'Box', icon: 'box' },
       { type: 'pie', label: 'Pie', icon: 'pie' },
       { type: 'heatmap', label: 'Heatmap', icon: 'heatmap' },
+      { type: 'bignumber', label: 'Big number', icon: 'bignumber' },
     ],
   },
 ]

@@ -85,6 +85,7 @@ export type IconName =
   | 'box'
   | 'pie'
   | 'heatmap'
+  | 'bignumber'
   | 'gear'
   | 'sliders'
   | 'close'
@@ -155,6 +156,7 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   box: ChartCandlestick,
   pie: ChartPie,
   heatmap: Grid3X3,
+  bignumber: Hash,
   gear: Settings,
   sliders: SlidersHorizontal,
   close: X,

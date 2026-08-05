@@ -86,6 +86,8 @@ export function viewTypeLabel(t: ViewType): string {
       return 'Pie chart'
     case 'heatmap':
       return 'Heatmap'
+    case 'bignumber':
+      return 'Big number'
   }
 }
 
