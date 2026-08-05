@@ -64,6 +64,11 @@ export interface RunAgentOptions {
   onEvent: (e: AgentEvent) => void
   /** ask_user 作答通道：挂起直到用户作答/取消/中止；缺省时直接兜底跳过。 */
   askUser?: (req: AskRequest, signal?: AbortSignal) => Promise<string>
+  /**
+   * 危险操作确认通道：工具返回 needsConfirmation 时挂起 loop，
+   * 直到用户批准/拒绝；返回值回灌为 tool 消息内容。缺省则视为拒绝。
+   */
+  waitConfirm?: (req: { id: string; name: string; summary: string }, signal?: AbortSignal) => Promise<string>
   /** 可注入用于测试；默认走后端代理。 */
   postChatFn?: (payload: ChatPayload, signal?: AbortSignal) => Promise<Response>
 }
@@ -144,6 +149,35 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       } catch (e) {
         result = { ok: false, summary: `工具执行失败：${e instanceof Error ? e.message : String(e)}` }
       }
+
+      // 危险操作：先通知 UI 展示确认按钮，再挂起 loop 等待用户决定（与 ask_user 同构）
+      if (result.needsConfirmation) {
+        onEvent({
+          type: 'tool_result',
+          id: call.id,
+          name,
+          ok: false,
+          summary: result.summary,
+          artifact: result.artifact,
+          needsConfirmation: true,
+        })
+        const resolved = opts.waitConfirm
+          ? await opts.waitConfirm({ id: call.id, name, summary: result.summary }, signal)
+          : '用户未确认该危险操作（前端未接入确认通道）。不要重试；请改用其他方案。'
+        throwIfAborted()
+        const ok = !resolved.includes('拒绝') && !resolved.includes('未确认')
+        onEvent({
+          type: 'tool_result',
+          id: call.id,
+          name,
+          ok,
+          summary: resolved,
+          needsConfirmation: false,
+        })
+        messages.push({ role: 'tool', tool_call_id: call.id, name, content: resolved })
+        continue
+      }
+
       onEvent({
         type: 'tool_result',
         id: call.id,

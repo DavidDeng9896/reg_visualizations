@@ -158,6 +158,46 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(evts.some((e) => e.type === 'done' && e.content === '收到，继续。')).toBe(true)
   })
 
+  it('needsConfirmation：挂起 waitConfirm，批准后同一 loop 续跑并收尾', async () => {
+    let posts = 0
+    const post = async (p: ChatPayload) => {
+      posts += 1
+      const tools = p.messages.filter((m) => m.role === 'tool')
+      if (!tools.length) return sseOf({ toolCalls: [call('delete_table', { tableId: 't1' }, 'call_del')] })
+      const last = tools[tools.length - 1]
+      expect(String(last.content)).toContain('用户已批准')
+      return sseOf({ content: '已删除并完成' })
+    }
+    const exec: ToolExecutor = async () => ({
+      ok: false,
+      needsConfirmation: true,
+      summary: 'NEEDS_CONFIRMATION: 删除表',
+    })
+    const evts = events()
+    let confirmSeen = false
+    await runAgent({
+      messages: [{ role: 'user', content: '删表' }],
+      tools: [],
+      exec,
+      maxIterations: 8,
+      waitConfirm: async (req) => {
+        confirmSeen = true
+        expect(req.id).toBe('call_del')
+        expect(req.summary).toContain('NEEDS_CONFIRMATION')
+        return '用户已批准并执行该操作，执行结果：已删除表'
+      },
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(confirmSeen).toBe(true)
+    expect(posts).toBe(2)
+    const confirms = evts.filter((e) => e.type === 'tool_result' && e.id === 'call_del')
+    expect(confirms.length).toBe(2)
+    expect(confirms[0].needsConfirmation).toBe(true)
+    expect(confirms[1].needsConfirmation).toBe(false)
+    expect(evts.some((e) => e.type === 'done' && e.content.includes('完成'))).toBe(true)
+  })
+
   it('ask_user 无作答通道 → 兜底跳过不中断', async () => {
     const post = async (p: ChatPayload) => {
       const n = p.messages.filter((m) => m.role === 'tool').length

@@ -33,7 +33,7 @@ function needConfirm(action: string): ToolExecResult {
   return {
     ok: false,
     needsConfirmation: true,
-    summary: `NEEDS_CONFIRMATION: ${action}。不要重试此操作：界面上已出现「确认执行」按钮，请直接用文字提示用户点击确认，用户确认后你再继续后续步骤。`,
+    summary: `NEEDS_CONFIRMATION: ${action}。界面已出现确认按钮；会话会挂起等待用户批准，批准后自动继续，不要重试该危险操作。`,
   }
 }
 

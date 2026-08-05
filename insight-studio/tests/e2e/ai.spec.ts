@@ -11,6 +11,7 @@ import { createDemoAndEnter, viewNode } from './helpers'
 interface Msg {
   role: string
   content?: string
+  name?: string
 }
 
 function chunk(delta: Record<string, unknown>, finish: string | null = null): string {
@@ -94,9 +95,14 @@ function mockSse(messages: Msg[]): string {
   }
 }
 
-/** 删除确认流编排：list_tables → delete_table（NEEDS_CONFIRMATION）→ 提示确认。 */
+/** 删除确认流编排：list_tables → delete_table（挂起确认）→ 批准后续跑收尾。 */
 function mockSseDelete(messages: Msg[]): string {
-  const round = messages.filter((m) => m.role === 'tool').length + 1
+  const tools = messages.filter((m) => m.role === 'tool')
+  const deleteResult = tools.find((m) => m.name === 'delete_table')
+  if (deleteResult && !String(deleteResult.content ?? '').includes('NEEDS_CONFIRMATION')) {
+    return sseOf({ content: '已按您的确认删除表，任务完成。' })
+  }
+  const round = tools.length + 1
   switch (round) {
     case 1:
       return sseOf({ toolCalls: [toolCall('list_tables', {})] })
@@ -212,9 +218,11 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await expect(page.locator('.trace__pending')).toContainText('删除表「Iris measurements」')
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
 
-    // 确认执行 → 表真实删除
+    // 确认执行 → 表真实删除，且同一会话自动续跑给出总结
     await confirmBtn.click()
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toHaveCount(0)
+    await expect(page.getByTestId('ai-messages')).toContainText('已按您的确认删除表', { timeout: 15_000 })
+    await expect(page.getByTestId('ai-trace-confirm')).toHaveCount(0)
   })
 
   test('ask_user 选择卡：选项单选 → 提交后续轮；输入区显示上下文量与压缩入口', async ({ page }) => {

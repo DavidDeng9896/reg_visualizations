@@ -71,6 +71,9 @@ let uid = 0
 const nextId = () => `m-${Date.now()}-${++uid}`
 /** ask_user 挂起 Promise 的结算函数（作答/取消/中止/切会话共用）。 */
 let pendingAskResolve: ((answer: string) => void) | null = null
+/** 危险操作确认挂起：与 ask_user 同构，保持 agent-loop 存活直到用户决定。 */
+let pendingConfirmResolve: ((resultText: string) => void) | null = null
+let pendingConfirmId: string | null = null
 const MODEL_KEY = 'insight.ai.model'
 
 export const useAiStore = defineStore('ai', {
@@ -143,6 +146,7 @@ export const useAiStore = defineStore('ai', {
       this.switching = true
       try {
         this.settleAsk('（会话已切换，提问已取消）')
+        this.settleConfirm('用户切换了会话，危险操作未执行。')
         // 切换前先落盘当前会话，避免历史里点回来丢消息
         await this.persist()
         const doc = await aiConvApi.get(id)
@@ -226,6 +230,7 @@ export const useAiStore = defineStore('ai', {
           model: this.modelOverride ?? undefined,
           signal: this.abort.signal,
           askUser: this.makeAskUser(this.abort.signal),
+          waitConfirm: this.makeWaitConfirm(this.abort.signal),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -278,13 +283,19 @@ export const useAiStore = defineStore('ai', {
       return { tools, exec }
     },
 
-    /** 确认 / 拒绝待确认的危险操作，并把真实结果回灌模型续轮（会话不再中断）。 */
+    /**
+     * 确认 / 拒绝待确认的危险操作。
+     * - 若 agent-loop 正挂起等待（waitConfirm）：结算 Promise，同一 loop 内继续（不中断会话）。
+     * - 否则回退到 resumeLoop（兼容旧会话 / rawTail 重入）。
+     */
     async decideTrace(traceId: string, decision: 'confirm' | 'reject'): Promise<void> {
       const assistant = [...this.messages]
         .reverse()
         .find((m) => m.role === 'assistant' && m.trace.some((t) => t.id === traceId))
       const item = assistant?.trace.find((t) => t.id === traceId)
-      if (!assistant || !item || !item.needsConfirmation || item.confirmed || item.rejected || this.running) return
+      if (!assistant || !item || !item.needsConfirmation || item.confirmed || item.rejected) return
+      // 正在跑其他任务且并非等待本条确认时，忽略
+      if (this.running && pendingConfirmId !== traceId) return
 
       let resultText: string
       if (decision === 'confirm') {
@@ -294,15 +305,28 @@ export const useAiStore = defineStore('ai', {
         item.running = false
         item.ok = res.ok
         item.summary = res.summary
+        item.needsConfirmation = false
         if (res.artifact) pushArtifactSafe(assistant, res.artifact)
         resultText = `用户已批准并执行该操作，执行结果：${res.summary}`
       } else {
         item.rejected = true
         item.ok = false
         item.summary = '用户已拒绝执行该操作'
+        item.needsConfirmation = false
         resultText = '用户已拒绝执行该操作。不要重试此操作；向用户简短说明并给出替代方案。'
       }
       await this.persist()
+
+      // 优先：挂起中的 loop 直接续跑
+      if (pendingConfirmResolve && pendingConfirmId === traceId) {
+        const resolve = pendingConfirmResolve
+        pendingConfirmResolve = null
+        pendingConfirmId = null
+        resolve(resultText)
+        return
+      }
+
+      // 回退：loop 已结束时用 rawTail 重入
       await this.resumeLoop(assistant, traceId, resultText)
     },
 
@@ -331,6 +355,7 @@ export const useAiStore = defineStore('ai', {
           model: this.modelOverride ?? undefined,
           signal: this.abort.signal,
           askUser: this.makeAskUser(this.abort.signal),
+          waitConfirm: this.makeWaitConfirm(this.abort.signal),
           onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -388,6 +413,32 @@ export const useAiStore = defineStore('ai', {
       this.settleAsk(answer?.trim() ? answer.trim() : '（用户取消了本次提问）')
     },
 
+    /** 危险操作确认通道：挂起 agent-loop 直到用户批准/拒绝（保持 running，会话不中断）。 */
+    makeWaitConfirm(signal?: AbortSignal): (req: { id: string; name: string; summary: string }) => Promise<string> {
+      return (req) =>
+        new Promise<string>((resolve) => {
+          pendingConfirmId = req.id
+          pendingConfirmResolve = (resultText) => {
+            pendingConfirmResolve = null
+            pendingConfirmId = null
+            resolve(resultText)
+          }
+          signal?.addEventListener(
+            'abort',
+            () => {
+              if (pendingConfirmId === req.id) {
+                pendingConfirmResolve?.('用户中止了本次生成，危险操作未执行。')
+              }
+            },
+            { once: true },
+          )
+        })
+    },
+
+    settleConfirm(resultText: string): void {
+      pendingConfirmResolve?.(resultText)
+    },
+
     /** 压缩上下文：最近 2 个用户轮保留，更早历史折叠为一条摘要消息（随会话持久化）。 */
     async compressContext(): Promise<boolean> {
       const userIdxs = this.messages.map((m, i) => (m.role === 'user' ? i : -1)).filter((i) => i >= 0)
@@ -410,6 +461,7 @@ export const useAiStore = defineStore('ai', {
     stop() {
       this.abort?.abort()
       this.settleAsk('（用户中止了本次生成）')
+      this.settleConfirm('用户中止了本次生成，危险操作未执行。')
     },
 
     async retry(): Promise<void> {
@@ -474,8 +526,9 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
         running: true,
         summary: '',
       })
-    } else if (e.type === 'tool_result') {
-      // 同 id 重复（模型偶发复用 call id）时优先匹配仍在 running 的那条
+    } else     if (e.type === 'tool_result') {
+      // 同 id 重复（模型偶发复用 call id）时优先匹配仍在 running 的那条；
+      // 确认通道会二次发 tool_result（先 needsConfirmation，再最终结果）。
       const item =
         assistant.trace.find((t) => t.id === e.id && t.running) ??
         assistant.trace.find((t) => t.id === e.id) ??
@@ -486,6 +539,9 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
         item.summary = e.summary
         item.artifact = e.artifact
         item.needsConfirmation = e.needsConfirmation
+        if (e.needsConfirmation === false && item.confirmed) {
+          /* 保持 confirmed */
+        }
       }
       pushArtifact(e.artifact)
     } else if (e.type === 'ask') {
