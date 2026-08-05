@@ -9,6 +9,7 @@ import { resolveStepInputs } from '../exec'
 import { uuid } from '../../../shared/id'
 import { operatorArity, operatorsFor, parseConditionValue } from '../../table/filterForm'
 import PythonEditor, { type PythonCompletionSource } from './PythonEditor.vue'
+import CustomCodeAiAssist from './CustomCodeAiAssist.vue'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../customCodeTemplate'
 
 const props = defineProps<{ step: StepNode }>()
@@ -178,6 +179,18 @@ const customCodeErrorLine = computed(() => {
 })
 const customCodeStdout = computed(() => String(props.step.config.__stdout ?? ''))
 const customCodeStderr = computed(() => String(props.step.config.__stderr ?? ''))
+
+const customCodeInputsSummary = computed(() => {
+  if (!customCodeInputs.value.length) return '（暂无已连接的 Input dataset）'
+  return customCodeInputs.value
+    .map((t, i) => `inputs[${i}] name="${t.name}" 列: ${t.columns.map((c) => c.field).join(', ')}`)
+    .join('\n')
+})
+
+function applyAiCode(code: string) {
+  customCodeCfg.value.code = code
+  emit('change')
+}
 
 /* ------------------------------ join ------------------------------ */
 
@@ -485,6 +498,13 @@ watch(() => props.step.type, () => {
     <template v-else-if="step.type === 'custom-code'">
       <section class="scf__section scf__section--code">
         <h4 class="scf__section-title">Code</h4>
+        <CustomCodeAiAssist
+          :step="step"
+          :code="customCodeCfg.code"
+          :inputs-summary="customCodeInputsSummary"
+          :last-error="step.error"
+          @apply="applyAiCode"
+        />
         <div class="scf__toolbar">
           <ISelect
             :model-value="null"
