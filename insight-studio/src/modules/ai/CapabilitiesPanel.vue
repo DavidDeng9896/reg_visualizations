@@ -9,10 +9,13 @@ import {
   type SkillDetail,
   type SkillInfo,
 } from './client'
+import { useCurrentUser } from '../shell/currentUser'
 
-/** 侧栏「能力」面板：Skills | MCP 管理（全局本机）。 */
+/** 侧栏「能力」面板：Skills | MCP 管理（按当前模拟用户隔离）。 */
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+
+const { currentId: currentUserId } = useCurrentUser()
 
 const tabs: TabItem[] = [
   { key: 'skills', label: 'Skills' },
@@ -69,6 +72,13 @@ watch(
     preview.value = null
   },
 )
+
+watch(currentUserId, () => {
+  if (!props.open) return
+  preview.value = null
+  void loadSkills()
+  void loadMcp()
+})
 
 async function toggleSkill(s: SkillInfo, enabled: boolean): Promise<void> {
   try {

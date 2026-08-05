@@ -441,6 +441,15 @@ export const useAiStore = defineStore('ai', {
       }
       await this.refreshConversations()
     },
+
+    /** Header 切换模拟用户：中止进行中对话，清空当前会话并重载列表。 */
+    async onUserSwitch(): Promise<void> {
+      this.stop()
+      this.currentId = null
+      this.messages = []
+      this.conversations = []
+      await this.refreshConversations()
+    },
   },
 })
 

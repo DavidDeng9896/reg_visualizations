@@ -2,6 +2,8 @@
  * AI 助手前端核心类型：OpenAI 消息 / 工具调用 / SSE 解析 / 配置与会话 API。
  */
 
+import { getCurrentUserId, USER_ID_HEADER } from '../shell/currentUser'
+
 /* ------------------------------- 消息类型 ------------------------------- */
 
 export interface ToolCall {
@@ -117,10 +119,19 @@ export async function readSseStream(
 
 /* ------------------------------- HTTP API ------------------------------- */
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+function userHeaders(): Record<string, string> {
+  return { [USER_ID_HEADER]: getCurrentUserId() }
+}
+
+async function req<T>(path: string, init?: RequestInit, opts?: { withUser?: boolean }): Promise<T> {
+  const withUser = opts?.withUser === true
   const res = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(withUser ? userHeaders() : {}),
+      ...(init?.headers ?? {}),
+    },
   })
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -191,13 +202,14 @@ export interface ConversationDoc extends ConversationMeta {
 }
 
 export const aiConvApi = {
-  list: () => req<ConversationMeta[]>('/api/ai/conversations'),
-  get: (id: string) => req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`),
+  list: () => req<ConversationMeta[]>('/api/ai/conversations', undefined, { withUser: true }),
+  get: (id: string) => req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, undefined, { withUser: true }),
   create: (body: { analysisId?: string | null; title?: string; messages?: unknown[] }) =>
-    req<ConversationDoc>('/api/ai/conversations', { method: 'POST', body: JSON.stringify(body) }),
+    req<ConversationDoc>('/api/ai/conversations', { method: 'POST', body: JSON.stringify(body) }, { withUser: true }),
   update: (id: string, body: { title?: string; messages?: unknown[]; analysisId?: string | null }) =>
-    req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
-  remove: (id: string) => req<void>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, { withUser: true }),
+  remove: (id: string) =>
+    req<void>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
 }
 
 /* ------------------------------- Skills / MCP ------------------------------- */
@@ -217,19 +229,23 @@ export interface SkillDetail extends SkillInfo {
 }
 
 export const aiSkillsApi = {
-  list: () => req<SkillInfo[]>('/api/ai/skills'),
-  get: (id: string) => req<SkillDetail>(`/api/ai/skills/${encodeURIComponent(id)}`),
+  list: () => req<SkillInfo[]>('/api/ai/skills', undefined, { withUser: true }),
+  get: (id: string) => req<SkillDetail>(`/api/ai/skills/${encodeURIComponent(id)}`, undefined, { withUser: true }),
   setEnabled: (id: string, enabled: boolean) =>
     req<SkillInfo>(`/api/ai/skills/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
-    }),
+    }, { withUser: true }),
   remove: (id: string) =>
-    req<void>(`/api/ai/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    req<void>(`/api/ai/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
   importZip: async (file: File): Promise<SkillInfo> => {
     const fd = new FormData()
     fd.append('file', file)
-    const res = await fetch('/api/ai/skills/import', { method: 'POST', body: fd })
+    const res = await fetch('/api/ai/skills/import', {
+      method: 'POST',
+      body: fd,
+      headers: userHeaders(),
+    })
     const text = await res.text()
     if (!res.ok) {
       let msg = text
@@ -279,9 +295,9 @@ export interface McpEnabledTool {
 }
 
 export const aiMcpApi = {
-  listServers: () => req<McpServerView[]>('/api/ai/mcp/servers'),
+  listServers: () => req<McpServerView[]>('/api/ai/mcp/servers', undefined, { withUser: true }),
   create: (body: { name: string; url: string; headers?: McpHeaderKV[] }) =>
-    req<McpServerView>('/api/ai/mcp/servers', { method: 'POST', body: JSON.stringify(body) }),
+    req<McpServerView>('/api/ai/mcp/servers', { method: 'POST', body: JSON.stringify(body) }, { withUser: true }),
   patch: (
     id: string,
     body: { name?: string; url?: string; headers?: McpHeaderKV[]; enabled?: boolean },
@@ -289,15 +305,15 @@ export const aiMcpApi = {
     req<McpServerView>(`/api/ai/mcp/servers/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
-    }),
+    }, { withUser: true }),
   remove: (id: string) =>
-    req<void>(`/api/ai/mcp/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    req<void>(`/api/ai/mcp/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
   refresh: (id: string) =>
-    req<McpServerView>(`/api/ai/mcp/servers/${encodeURIComponent(id)}/refresh`, { method: 'POST' }),
-  listTools: () => req<McpEnabledTool[]>('/api/ai/mcp/tools'),
+    req<McpServerView>(`/api/ai/mcp/servers/${encodeURIComponent(id)}/refresh`, { method: 'POST' }, { withUser: true }),
+  listTools: () => req<McpEnabledTool[]>('/api/ai/mcp/tools', undefined, { withUser: true }),
   callTool: (body: { serverId: string; name: string; arguments?: Record<string, unknown> }) =>
     req<{ ok: boolean; result: unknown }>('/api/ai/mcp/tools/call', {
       method: 'POST',
       body: JSON.stringify(body),
-    }),
+    }, { withUser: true }),
 }
