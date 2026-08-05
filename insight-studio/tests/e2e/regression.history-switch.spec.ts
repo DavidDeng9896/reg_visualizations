@@ -62,7 +62,7 @@ test.describe('回归：分析切换 / AI 历史', () => {
     const doc = (await created.json()) as { id: string }
 
     await createDemoAndEnter(page)
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
     await expect(page.getByTestId('ai-drawer')).toBeVisible()
 
     await page.getByTestId('ai-history').click()

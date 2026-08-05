@@ -13,8 +13,19 @@ import {
 } from './client'
 import { useCurrentUser } from '../shell/currentUser'
 
-/** 侧栏「能力」面板：Skills | MCP | 记忆（按当前模拟用户隔离）。 */
-const props = defineProps<{ open: boolean }>()
+/** 侧栏「能力」面板 / AI 设置嵌入：Skills | MCP | 记忆（按当前模拟用户隔离）。 */
+const props = withDefaults(
+  defineProps<{
+    open?: boolean
+    /** 嵌入设置 Modal 时不包 IModal */
+    embedded?: boolean
+    /** 嵌入时是否处于可见（用于加载） */
+    active?: boolean
+    /** 嵌入时由外层 Tab 控制：skills | mcp | memory */
+    initialTab?: string
+  }>(),
+  { open: false, embedded: false, active: false, initialTab: 'skills' },
+)
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const { currentId: currentUserId } = useCurrentUser()
@@ -25,6 +36,14 @@ const tabs: TabItem[] = [
   { key: 'memory', label: '记忆' },
 ]
 const tab = ref('skills')
+
+watch(
+  () => props.initialTab,
+  (v) => {
+    if (props.embedded && (v === 'skills' || v === 'mcp' || v === 'memory')) tab.value = v
+  },
+  { immediate: true },
+)
 
 const skills = ref<SkillInfo[]>([])
 const loadingSkills = ref(false)
@@ -86,23 +105,36 @@ async function loadMemories(): Promise<void> {
   }
 }
 
-watch(
-  () => props.open,
-  (v) => {
-    if (!v) return
-    void loadSkills()
-    void loadMcp()
-    void loadMemories()
-    preview.value = null
-  },
-)
-
-watch(currentUserId, () => {
-  if (!props.open) return
-  preview.value = null
+function reloadAll(): void {
   void loadSkills()
   void loadMcp()
   void loadMemories()
+  preview.value = null
+}
+
+watch(
+  () => props.open,
+  (v) => {
+    if (props.embedded || !v) return
+    reloadAll()
+  },
+)
+
+watch(
+  () => [props.embedded, props.active] as const,
+  ([embedded, active]) => {
+    if (embedded && active) reloadAll()
+  },
+  { immediate: true },
+)
+
+watch(currentUserId, () => {
+  if (props.embedded) {
+    if (!props.active) return
+  } else if (!props.open) {
+    return
+  }
+  reloadAll()
 })
 
 async function toggleSkill(s: SkillInfo, enabled: boolean): Promise<void> {
@@ -307,7 +339,13 @@ async function removeMemory(m: AiMemory): Promise<void> {
 </script>
 
 <template>
-  <IModal :open="props.open" :title="title" :width="440" @update:open="emit('update:open', $event)">
+  <IModal
+    v-if="!embedded"
+    :open="!!props.open"
+    :title="title"
+    :width="440"
+    @update:open="emit('update:open', $event)"
+  >
     <div class="cap">
       <ITabs v-model="tab" :tabs="tabs" />
 
@@ -352,7 +390,6 @@ async function removeMemory(m: AiMemory): Promise<void> {
             />
           </li>
         </ul>
-
         <div v-if="preview" class="cap__preview">
           <div class="cap__preview-head">
             <strong>{{ preview.name }}</strong>
@@ -399,7 +436,6 @@ async function removeMemory(m: AiMemory): Promise<void> {
             </IButton>
           </div>
         </div>
-
         <p v-if="loadingMcp" class="cap__empty">加载中…</p>
         <p v-else-if="!servers.length" class="cap__empty">暂无 MCP 连接。</p>
         <ul v-else class="cap__list">
@@ -467,8 +503,150 @@ async function removeMemory(m: AiMemory): Promise<void> {
           </li>
         </ul>
       </div>
+
     </div>
   </IModal>
+  <div v-else class="cap">
+
+      <div v-if="tab === 'skills'" class="cap__pane">
+        <div class="cap__toolbar">
+          <IButton size="sm" :loading="importing" @click="pickZip">导入 zip</IButton>
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".zip,application/zip"
+            class="cap__file"
+            @change="onZipPicked"
+          />
+          <span class="cap__hint">仅 skill.json + SKILL.md</span>
+        </div>
+        <p v-if="loadingSkills" class="cap__empty">加载中…</p>
+        <p v-else-if="!skills.length" class="cap__empty">暂无 Skill。可导入 zip 或等待官方示例 seed。</p>
+        <ul v-else class="cap__list">
+          <li v-for="s in skills" :key="s.id" class="cap__item">
+            <div class="cap__item-main">
+              <div class="cap__item-title">
+                <strong>{{ s.name }}</strong>
+                <span class="cap__meta">{{ s.version }} · {{ s.source }}</span>
+              </div>
+              <p class="cap__desc">{{ s.description || '—' }}</p>
+              <div class="cap__actions">
+                <button type="button" class="cap__link" @click="openPreview(s)">预览</button>
+                <button
+                  v-if="s.source !== 'official'"
+                  type="button"
+                  class="cap__link cap__link--danger"
+                  @click="removeSkill(s)"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+            <IToggle
+              :model-value="s.enabled"
+              label="启用"
+              @update:model-value="toggleSkill(s, $event)"
+            />
+          </li>
+        </ul>
+        <div v-if="preview" class="cap__preview">
+          <div class="cap__preview-head">
+            <strong>{{ preview.name }}</strong>
+            <button type="button" class="cap__link" @click="preview = null">关闭</button>
+          </div>
+          <pre class="cap__preview-body">{{ preview.body }}</pre>
+        </div>
+      </div>
+
+      <div v-else-if="tab === 'mcp'" class="cap__pane">
+        <div class="cap__form">
+          <label class="cap__field">
+            <span>名称</span>
+            <ITextField v-model="formName" placeholder="如 Internal Docs MCP" />
+          </label>
+          <label class="cap__field">
+            <span>URL（SSE / HTTP）</span>
+            <ITextField v-model="formUrl" placeholder="https://…" />
+          </label>
+          <div class="cap__field">
+            <span>Headers</span>
+            <div v-for="(h, i) in formHeaders" :key="i" class="cap__hdr">
+              <ITextField v-model="h.key" placeholder="Key" />
+              <ITextField v-model="h.value" placeholder="Value" type="password" />
+              <button type="button" class="cap__link" @click="removeHeaderRow(i)">−</button>
+            </div>
+            <button type="button" class="cap__link" @click="addHeaderRow">+ 添加 Header</button>
+          </div>
+          <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">添加连接</IButton>
+        </div>
+        <p v-if="loadingMcp" class="cap__empty">加载中…</p>
+        <p v-else-if="!servers.length" class="cap__empty">暂无 MCP 连接。</p>
+        <ul v-else class="cap__list">
+          <li v-for="s in servers" :key="s.id" class="cap__item">
+            <div class="cap__item-main">
+              <div class="cap__item-title">
+                <strong>{{ s.name }}</strong>
+                <span class="cap__meta">{{ s.toolCount }} tools</span>
+              </div>
+              <p class="cap__desc cap__desc--mono">{{ s.url }}</p>
+              <p v-if="s.lastError" class="cap__err">{{ s.lastError }}</p>
+              <div class="cap__actions">
+                <button
+                  type="button"
+                  class="cap__link"
+                  :disabled="refreshingId === s.id"
+                  @click="refreshServer(s)"
+                >
+                  {{ refreshingId === s.id ? '刷新中…' : '刷新 tools' }}
+                </button>
+                <button type="button" class="cap__link cap__link--danger" @click="removeServer(s)">
+                  删除
+                </button>
+              </div>
+            </div>
+            <IToggle
+              :model-value="s.enabled"
+              label="启用"
+              @update:model-value="toggleServer(s, $event)"
+            />
+          </li>
+        </ul>
+      </div>
+
+      <div v-else class="cap__pane" data-testid="ai-memories">
+        <p class="cap__hint">记录纠正过的分析思路；下次对话会自动注入，避免重复旧做法。</p>
+        <div class="cap__form">
+          <label class="cap__field">
+            <span>新记忆</span>
+            <ITextField v-model="memoryDraft" placeholder="例如：类别对比先聚合再柱状图，勿直接散点" />
+          </label>
+          <IButton
+            variant="primary"
+            size="sm"
+            :loading="savingMemory"
+            data-testid="ai-memory-add"
+            @click="addMemory"
+          >
+            添加
+          </IButton>
+        </div>
+        <p v-if="loadingMemories" class="cap__empty">加载中…</p>
+        <p v-else-if="!memories.length" class="cap__empty">暂无记忆。也可在对话中让 AI 调用 save_memory。</p>
+        <ul v-else class="cap__list">
+          <li v-for="m in memories" :key="m.id" class="cap__item">
+            <div class="cap__item-main">
+              <p class="cap__desc">{{ m.content }}</p>
+              <div class="cap__actions">
+                <button type="button" class="cap__link cap__link--danger" @click="removeMemory(m)">
+                  删除
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+  </div>
 </template>
 
 <style scoped>

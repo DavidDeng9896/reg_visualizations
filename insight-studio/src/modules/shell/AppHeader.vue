@@ -7,8 +7,8 @@ import { useCurrentUser } from './currentUser'
 import logoUrl from '../../assets/mingdu-logo.png'
 
 /**
- * 全局头部（明度风格）：logo + 「科学数据管理」、居中搜索、右侧 AI 助手/通知/全屏/用户。
- * 用户芯片为模拟双用户切换（david / dengxiaowei），供 Skills/MCP/会话隔离联调。
+ * 全局头部（明度风格）：logo + 「科学数据管理」、居中搜索、右侧通知/全屏/用户。
+ * AI 入口为右下角全局 FAB（见 AiFab）；用户芯片为模拟双用户切换。
  */
 const ai = useAiStore()
 const query = ref('')
@@ -66,16 +66,6 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
     </div>
 
     <div class="app-header__right">
-      <button
-        type="button"
-        class="app-header__icon-btn app-header__icon-btn--ai"
-        aria-label="AI 助手"
-        title="AI 助手"
-        data-testid="ai-entry"
-        @click="ai.toggleDrawer()"
-      >
-        <IIcon name="sparkle" :size="17" />
-      </button>
       <button
         type="button"
         class="app-header__icon-btn"

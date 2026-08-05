@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { IButton, IModal, ISlider, ITextField, IToggle, toast } from '../../ui'
+import { onMounted, ref, watch } from 'vue'
+import { IButton, IModal, ISlider, ITabs, ITextField, IToggle, toast, type TabItem } from '../../ui'
 import { aiConfigApi } from './client'
+import CapabilitiesPanel from './CapabilitiesPanel.vue'
 
-/** AI 设置：Base URL / API Key / Model / 最大轮数 / 删除需确认。 */
+/** AI 设置：模型 | Skills | MCP | 记忆。 */
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'saved'): void }>()
+
+const settingsTabs: TabItem[] = [
+  { key: 'model', label: '模型' },
+  { key: 'skills', label: 'Skills' },
+  { key: 'mcp', label: 'MCP' },
+  { key: 'memory', label: '记忆' },
+]
+const tab = ref('model')
 
 const baseUrl = ref('')
 const apiKey = ref('')
@@ -16,7 +25,7 @@ const maxIterations = ref(100)
 const confirmDestructive = ref(true)
 const saving = ref(false)
 
-onMounted(async () => {
+async function loadConfig(): Promise<void> {
   try {
     const cfg = await aiConfigApi.get()
     baseUrl.value = cfg.baseUrl
@@ -28,7 +37,21 @@ onMounted(async () => {
   } catch {
     /* 后端不可达时保持默认 */
   }
+}
+
+onMounted(() => {
+  void loadConfig()
 })
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v) {
+      tab.value = 'model'
+      void loadConfig()
+    }
+  },
+)
 
 async function save(): Promise<void> {
   saving.value = true
@@ -50,7 +73,6 @@ async function save(): Promise<void> {
       maxIterations: Number(maxIterations.value) || 100,
       confirmDestructive: !!confirmDestructive.value,
     }
-    // 仅在用户输入了新 Key 时才提交；缺省 / 空串均不带该字段（后端保留原值）
     const key = typeof apiKey.value === 'string' ? apiKey.value.trim() : ''
     if (key) patch.apiKey = key
     await aiConfigApi.put(patch)
@@ -66,34 +88,45 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <IModal :open="props.open" title="AI 设置" :width="460" @update:open="emit('update:open', $event)">
+  <IModal :open="props.open" title="AI 设置" :width="520" @update:open="emit('update:open', $event)">
     <div class="cfg">
-      <label class="cfg__row">
-        <span class="cfg__label">Base URL</span>
-        <ITextField v-model="baseUrl" placeholder="https://api.openai.com/v1 或兼容端点" />
-      </label>
-      <label class="cfg__row">
-        <span class="cfg__label">API Key{{ keyMasked ? `（当前 ${keyMasked}）` : '' }}</span>
-        <ITextField v-model="apiKey" type="password" :placeholder="keyMasked ? '留空保持不变' : 'sk-…'" />
-      </label>
-      <label class="cfg__row">
-        <span class="cfg__label">Model</span>
-        <ITextField v-model="model" placeholder="如 gpt-4o-mini / qwen-max" />
-      </label>
-      <label class="cfg__row">
-        <span class="cfg__label">备选模型（逗号分隔，输入条可切换）</span>
-        <ITextField v-model="modelsText" placeholder="如 qwen3.8-max, qwen-max-latest" />
-      </label>
-      <div class="cfg__row">
-        <span class="cfg__label">最大工具调用轮数（{{ maxIterations }}）</span>
-        <ISlider v-model="maxIterations" :min="1" :max="100" :step="1" aria-label="最大轮数" />
+      <ITabs v-model="tab" :tabs="settingsTabs" />
+
+      <div v-if="tab === 'model'" class="cfg__model">
+        <label class="cfg__row">
+          <span class="cfg__label">Base URL</span>
+          <ITextField v-model="baseUrl" placeholder="https://api.openai.com/v1 或兼容端点" />
+        </label>
+        <label class="cfg__row">
+          <span class="cfg__label">API Key{{ keyMasked ? `（当前 ${keyMasked}）` : '' }}</span>
+          <ITextField v-model="apiKey" type="password" :placeholder="keyMasked ? '留空保持不变' : 'sk-…'" />
+        </label>
+        <label class="cfg__row">
+          <span class="cfg__label">Model</span>
+          <ITextField v-model="model" placeholder="如 gpt-4o-mini / qwen-max" />
+        </label>
+        <label class="cfg__row">
+          <span class="cfg__label">备选模型（逗号分隔，输入条可切换）</span>
+          <ITextField v-model="modelsText" placeholder="如 qwen3.8-max, qwen-max-latest" />
+        </label>
+        <div class="cfg__row">
+          <span class="cfg__label">最大工具调用轮数（{{ maxIterations }}）</span>
+          <ISlider v-model="maxIterations" :min="1" :max="100" :step="1" aria-label="最大轮数" />
+        </div>
+        <div class="cfg__row cfg__row--switch">
+          <span class="cfg__label">删除类操作需要用户确认</span>
+          <IToggle v-model="confirmDestructive" aria-label="删除需确认" />
+        </div>
       </div>
-      <div class="cfg__row cfg__row--switch">
-        <span class="cfg__label">删除类操作需要用户确认</span>
-        <IToggle v-model="confirmDestructive" aria-label="删除需确认" />
-      </div>
+
+      <CapabilitiesPanel
+        v-else
+        embedded
+        :active="props.open"
+        :initial-tab="tab"
+      />
     </div>
-    <template #footer>
+    <template v-if="tab === 'model'" #footer>
       <IButton @click="emit('update:open', false)">取消</IButton>
       <IButton variant="primary" :loading="saving" @click="save">保存</IButton>
     </template>
@@ -102,6 +135,11 @@ async function save(): Promise<void> {
 
 <style scoped>
 .cfg {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cfg__model {
   display: flex;
   flex-direction: column;
   gap: 14px;
