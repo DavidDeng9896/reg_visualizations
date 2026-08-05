@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
   title         TEXT NOT NULL DEFAULT '',
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  messages      JSONB NOT NULL DEFAULT '[]'
+  messages      JSONB NOT NULL DEFAULT '[]',
+  user_id       TEXT NOT NULL DEFAULT 'david'
 );
 CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations (user_id, updated_at DESC);

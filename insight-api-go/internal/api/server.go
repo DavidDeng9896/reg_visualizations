@@ -16,20 +16,32 @@ type Server struct {
 	Store      *store.Store
 	Mux        *http.ServeMux
 	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
-	Skills     *skills.Store
+	DataDir    string // when set, Skills/MCP resolve under users/<id>/
+	SkillsSeed string // official skills seed source
+	Skills     *skills.Store // legacy single-store fallback (tests / DataDir empty)
 	MCP        *mcp.Store
+	stores     *userStores
 }
 
 func New(s *store.Store) *Server {
-	return NewWithOptions(s, "", nil, nil)
+	return NewWithOptions(s, "", "", "", nil, nil)
 }
 
 func NewWithConfigPath(s *store.Store, configPath string) *Server {
-	return NewWithOptions(s, configPath, nil, nil)
+	return NewWithOptions(s, configPath, "", "", nil, nil)
 }
 
-func NewWithOptions(s *store.Store, configPath string, sk *skills.Store, mcpStore *mcp.Store) *Server {
-	srv := &Server{Store: s, Mux: http.NewServeMux(), ConfigPath: configPath, Skills: sk, MCP: mcpStore}
+// NewWithUserData wires per-user Skills/MCP under dataDir/users/<userId>/.
+func NewWithUserData(s *store.Store, configPath, dataDir, skillsSeed string) *Server {
+	return NewWithOptions(s, configPath, dataDir, skillsSeed, nil, nil)
+}
+
+func NewWithOptions(s *store.Store, configPath, dataDir, skillsSeed string, sk *skills.Store, mcpStore *mcp.Store) *Server {
+	srv := &Server{
+		Store: s, Mux: http.NewServeMux(), ConfigPath: configPath,
+		DataDir: dataDir, SkillsSeed: skillsSeed, Skills: sk, MCP: mcpStore,
+		stores: newUserStores(),
+	}
 	srv.routes()
 	return srv
 }
@@ -78,7 +90,7 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Match")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Match, X-User-Id")
 		w.Header().Set("Vary", "Origin")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

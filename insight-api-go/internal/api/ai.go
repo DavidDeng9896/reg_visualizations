@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userid"
 	"github.com/google/uuid"
 )
 
@@ -268,10 +269,11 @@ type conversationDoc struct {
 	Messages   []any  `json:"messages,omitempty"`
 }
 
-func (s *Server) listAiConversations(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) listAiConversations(w http.ResponseWriter, r *http.Request) {
+	uid := userid.FromRequest(r)
 	rows, err := s.Store.DB.Query(
 		`SELECT id, analysis_id, title, created_at, updated_at
-		 FROM ai_conversations ORDER BY updated_at DESC LIMIT 100`)
+		 FROM ai_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100`, uid)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
@@ -300,6 +302,7 @@ func (s *Server) listAiConversations(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) createAiConversation(w http.ResponseWriter, r *http.Request) {
+	uid := userid.FromRequest(r)
 	var body struct {
 		AnalysisID *string `json:"analysisId"`
 		Title      string  `json:"title"`
@@ -320,9 +323,9 @@ func (s *Server) createAiConversation(w http.ResponseWriter, r *http.Request) {
 		aid = *body.AnalysisID
 	}
 	_, err := s.Store.DB.Exec(
-		`INSERT INTO ai_conversations (id, analysis_id, title, created_at, updated_at, messages)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		id, aid, body.Title, now, now, string(msgRaw),
+		`INSERT INTO ai_conversations (id, analysis_id, title, created_at, updated_at, messages, user_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, aid, body.Title, now, now, string(msgRaw), uid,
 	)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
@@ -335,11 +338,13 @@ func (s *Server) createAiConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getAiConversation(w http.ResponseWriter, r *http.Request) {
+	uid := userid.FromRequest(r)
 	id := r.PathValue("id")
 	var title, createdAt, updatedAt, messages string
 	var analysisID *string
 	err := s.Store.DB.QueryRow(
-		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ?`, id,
+		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
+		id, uid,
 	).Scan(&analysisID, &title, &createdAt, &updatedAt, &messages)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found")
@@ -361,11 +366,13 @@ func (s *Server) getAiConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
+	uid := userid.FromRequest(r)
 	id := r.PathValue("id")
 	var title, createdAt, updatedAt, messages string
 	var analysisID *string
 	err := s.Store.DB.QueryRow(
-		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ?`, id,
+		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
+		id, uid,
 	).Scan(&analysisID, &title, &createdAt, &updatedAt, &messages)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found")
@@ -410,8 +417,8 @@ func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
 	updatedAt = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	msgRaw, _ := json.Marshal(msgs)
 	_, err = s.Store.DB.Exec(
-		`UPDATE ai_conversations SET title = ?, analysis_id = ?, updated_at = ?, messages = ? WHERE id = ?`,
-		title, aid, updatedAt, string(msgRaw), id,
+		`UPDATE ai_conversations SET title = ?, analysis_id = ?, updated_at = ?, messages = ? WHERE id = ? AND user_id = ?`,
+		title, aid, updatedAt, string(msgRaw), id, uid,
 	)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
@@ -424,8 +431,9 @@ func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteAiConversation(w http.ResponseWriter, r *http.Request) {
+	uid := userid.FromRequest(r)
 	id := r.PathValue("id")
-	res, err := s.Store.DB.Exec(`DELETE FROM ai_conversations WHERE id = ?`, id)
+	res, err := s.Store.DB.Exec(`DELETE FROM ai_conversations WHERE id = ? AND user_id = ?`, id, uid)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
