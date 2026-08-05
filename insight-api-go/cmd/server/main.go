@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/api"
-	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
-	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userscope"
 )
 
 func main() {
@@ -32,25 +31,16 @@ func main() {
 	}
 	defer st.Close()
 
-	skillStore, err := skills.NewStore(dataDir)
-	if err != nil {
-		log.Fatalf("skills store: %v", err)
-	}
 	officialSeed := os.Getenv("INSIGHT_SKILLS_SEED")
 	if officialSeed == "" {
 		officialSeed = filepath.Join("skills", "official")
 	}
-	if err := skillStore.SeedOfficial(officialSeed); err != nil {
-		log.Printf("warn: seed official skills: %v", err)
-	}
-
-	mcpStore, err := mcp.NewStore(dataDir)
-	if err != nil {
-		log.Fatalf("mcp store: %v", err)
+	if err := userscope.MigrateOnce(dataDir, officialSeed); err != nil {
+		log.Printf("warn: user scope migrate: %v", err)
 	}
 
 	cfgPath := filepath.Join(dataDir, "ai-config.json")
-	srv := api.NewWithOptions(st, cfgPath, skillStore, mcpStore)
+	srv := api.NewWithUserData(st, cfgPath, dataDir, officialSeed)
 	addr := "0.0.0.0:" + port
 	log.Printf("[insight-api-go] listening on http://127.0.0.1:%s (data=%s)", port, dataDir)
 	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {

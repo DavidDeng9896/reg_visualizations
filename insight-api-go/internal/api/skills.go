@@ -10,12 +10,13 @@ import (
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
 )
 
-func (s *Server) listSkills(w http.ResponseWriter, _ *http.Request) {
-	if s.Skills == nil {
+func (s *Server) listSkills(w http.ResponseWriter, r *http.Request) {
+	st, err := s.skillsFor(r)
+	if err != nil || st == nil {
 		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
-	list, err := s.Skills.List()
+	list, err := st.List()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
@@ -24,11 +25,12 @@ func (s *Server) listSkills(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) getSkill(w http.ResponseWriter, r *http.Request) {
-	if s.Skills == nil {
+	st, err := s.skillsFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	d, err := s.Skills.Get(r.PathValue("id"))
+	d, err := st.Get(r.PathValue("id"))
 	if errors.Is(err, skills.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -41,7 +43,8 @@ func (s *Server) getSkill(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
-	if s.Skills == nil {
+	st, err := s.skillsFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusInternalServerError, "skills_unavailable")
 		return
 	}
@@ -64,7 +67,7 @@ func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "zip_too_large"})
 		return
 	}
-	info, err := s.Skills.ImportZip(bytes.NewReader(raw), int64(len(raw)))
+	info, err := st.ImportZip(bytes.NewReader(raw), int64(len(raw)))
 	if errors.Is(err, skills.ErrConflict) {
 		writeErr(w, http.StatusConflict, "skill_id_conflict")
 		return
@@ -81,7 +84,8 @@ func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) patchSkill(w http.ResponseWriter, r *http.Request) {
-	if s.Skills == nil {
+	st, err := s.skillsFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
@@ -92,7 +96,7 @@ func (s *Server) patchSkill(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	err := s.Skills.SetEnabled(r.PathValue("id"), *body.Enabled)
+	err = st.SetEnabled(r.PathValue("id"), *body.Enabled)
 	if errors.Is(err, skills.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -101,7 +105,7 @@ func (s *Server) patchSkill(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
-	d, err := s.Skills.Get(r.PathValue("id"))
+	d, err := st.Get(r.PathValue("id"))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
@@ -110,11 +114,12 @@ func (s *Server) patchSkill(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteSkill(w http.ResponseWriter, r *http.Request) {
-	if s.Skills == nil {
+	st, err := s.skillsFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	err := s.Skills.Delete(r.PathValue("id"))
+	err = st.Delete(r.PathValue("id"))
 	if errors.Is(err, skills.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return

@@ -8,12 +8,13 @@ import (
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
 )
 
-func (s *Server) listMcpServers(w http.ResponseWriter, _ *http.Request) {
-	if s.MCP == nil {
+func (s *Server) listMcpServers(w http.ResponseWriter, r *http.Request) {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
-	list, err := s.MCP.List()
+	list, err := st.List()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
@@ -22,7 +23,8 @@ func (s *Server) listMcpServers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) createMcpServer(w http.ResponseWriter, r *http.Request) {
-	if s.MCP == nil {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusInternalServerError, "mcp_unavailable")
 		return
 	}
@@ -35,7 +37,7 @@ func (s *Server) createMcpServer(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	v, err := s.MCP.Create(body.Name, body.URL, body.Headers)
+	v, err := st.Create(body.Name, body.URL, body.Headers)
 	if errors.Is(err, mcp.ErrBadInput) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
@@ -48,7 +50,8 @@ func (s *Server) createMcpServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) patchMcpServer(w http.ResponseWriter, r *http.Request) {
-	if s.MCP == nil {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
@@ -62,7 +65,7 @@ func (s *Server) patchMcpServer(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	v, err := s.MCP.Patch(r.PathValue("id"), body.Name, body.URL, body.Headers, body.Enabled)
+	v, err := st.Patch(r.PathValue("id"), body.Name, body.URL, body.Headers, body.Enabled)
 	if errors.Is(err, mcp.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -75,11 +78,12 @@ func (s *Server) patchMcpServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteMcpServer(w http.ResponseWriter, r *http.Request) {
-	if s.MCP == nil {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	err := s.MCP.Delete(r.PathValue("id"))
+	err = st.Delete(r.PathValue("id"))
 	if errors.Is(err, mcp.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -92,16 +96,16 @@ func (s *Server) deleteMcpServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) refreshMcpServer(w http.ResponseWriter, r *http.Request) {
-	if s.MCP == nil {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	v, err := s.MCP.Refresh(r.PathValue("id"))
+	v, err := st.Refresh(r.PathValue("id"))
 	if errors.Is(err, mcp.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
 	}
-	// refresh may return view + error (probe failed but state saved)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "refresh_failed", "message": err.Error(), "server": v})
 		return
@@ -109,12 +113,13 @@ func (s *Server) refreshMcpServer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
-func (s *Server) listMcpTools(w http.ResponseWriter, _ *http.Request) {
-	if s.MCP == nil {
+func (s *Server) listMcpTools(w http.ResponseWriter, r *http.Request) {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
-	tools, err := s.MCP.EnabledTools()
+	tools, err := st.EnabledTools()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
@@ -123,7 +128,8 @@ func (s *Server) listMcpTools(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) callMcpTool(w http.ResponseWriter, r *http.Request) {
-	if s.MCP == nil {
+	st, err := s.mcpFor(r)
+	if err != nil || st == nil {
 		writeErr(w, http.StatusInternalServerError, "mcp_unavailable")
 		return
 	}
@@ -136,7 +142,7 @@ func (s *Server) callMcpTool(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	res, err := s.MCP.Call(body.ServerID, body.Name, body.Arguments)
+	res, err := st.Call(body.ServerID, body.Name, body.Arguments)
 	if errors.Is(err, mcp.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
