@@ -111,7 +111,7 @@ export type TransformType = Transform['type']
 
 /* ---------------------------------- 图表 ---------------------------------- */
 
-export type ChartType = 'bar' | 'line' | 'scatter' | 'box' | 'pie' | 'heatmap'
+export type ChartType = 'bar' | 'line' | 'scatter' | 'box' | 'pie' | 'heatmap' | 'bignumber'
 
 export type ViewType = 'table' | ChartType
 
@@ -257,6 +257,16 @@ export interface ChartStyle {
     clusterCols?: boolean
     /** @deprecated 旧字段：等价于 clusterRows && clusterCols。 */
     cluster?: boolean
+  }
+  /** Big number 专属（大号指标数字）。 */
+  bignumber?: {
+    /** 多指标排布：横排 / 网格。 */
+    layout?: 'row' | 'grid'
+    valueFontSize?: number
+    labelFontSize?: number
+    showLabel?: boolean
+    /** SI 缩写（1.2k）。 */
+    compact?: boolean
   }
 }
 

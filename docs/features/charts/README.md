@@ -6,7 +6,7 @@
 | --- | --- |
 | [common.md](./common.md) | 共性 CONFIGURE/STYLE、误差棒、拟合 |
 | [bar-charts.md](./bar-charts.md) · [box-plots.md](./box-plots.md) · [line-charts.md](./line-charts.md) | Bar / Box / Line |
-| [pie-charts.md](./pie-charts.md) · [scatter-plots.md](./scatter-plots.md) · [heatmaps.md](./heatmaps.md) | Pie / Scatter / Heatmap |
+| [pie-charts.md](./pie-charts.md) · [scatter-plots.md](./scatter-plots.md) · [heatmaps.md](./heatmaps.md) · [bignumber-charts.md](./bignumber-charts.md) | Pie / Scatter / Heatmap / Big number |
 
 溯源：[archive/labkey-charts](../../archive/labkey-charts/) · [archive/benchling-charts](../../archive/benchling-charts/)  
 相关需求：[table-chart-integration.md](../../requirements/table-chart-integration.md)

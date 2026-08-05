@@ -1,5 +1,5 @@
 /**
- * 图种注册表：六图种各注册一个定义。
+ * 图种注册表：各图种各注册一个定义。
  * 新增图种 = 加一个定义 + 此处注册一行。
  */
 import type { ChartConfig, ChartType, ColumnMeta, RowFlag } from '../../shared/types'
@@ -11,6 +11,7 @@ import { buildScatterOption } from './runtime/scatter'
 import { buildBoxOption } from './runtime/box'
 import { buildPieOption } from './runtime/pie'
 import { buildHeatmapOption } from './runtime/heatmap'
+import { buildBignumberOption } from './runtime/bignumber'
 import { validateMappingWith } from './runtime/mapping'
 import BarConfigure from './panel/configure/BarConfigure.vue'
 import LineConfigure from './panel/configure/LineConfigure.vue'
@@ -18,12 +19,14 @@ import ScatterConfigure from './panel/configure/ScatterConfigure.vue'
 import BoxConfigure from './panel/configure/BoxConfigure.vue'
 import PieConfigure from './panel/configure/PieConfigure.vue'
 import HeatmapConfigure from './panel/configure/HeatmapConfigure.vue'
+import BigNumberConfigure from './panel/configure/BigNumberConfigure.vue'
 import BarStyle from './panel/style/BarStyle.vue'
 import LineStyle from './panel/style/LineStyle.vue'
 import ScatterStyle from './panel/style/ScatterStyle.vue'
 import BoxStyle from './panel/style/BoxStyle.vue'
 import PieStyle from './panel/style/PieStyle.vue'
 import HeatmapStyle from './panel/style/HeatmapStyle.vue'
+import BigNumberStyle from './panel/style/BigNumberStyle.vue'
 import type { BuildInput, BuildOutput, ChartTypeDefinition, MappingError } from './types'
 
 function makeDef(
@@ -129,6 +132,38 @@ const heatmapDef = makeDef({
   styleSection: HeatmapStyle,
 })
 
+const bignumberSlots = [
+  { key: 'values' as const, label: 'Metrics', multiple: true, aggregatable: true, acceptTypes: ['number' as const] },
+  { key: 'categories' as const, label: 'Categories' },
+  { key: 'measure' as const, label: 'Measure', aggregatable: true, acceptTypes: ['number' as const] },
+]
+
+const bignumberDef: ChartTypeDefinition = {
+  ...makeDef({
+    type: 'bignumber',
+    label: 'Big number',
+    icon: 'bignumber',
+    mappingSlots: bignumberSlots,
+    capabilities: {},
+    buildOption: (input: BuildInput) => buildBignumberOption(input),
+    configureSection: BigNumberConfigure,
+    styleSection: BigNumberStyle,
+  }),
+  validateMapping: (config: ChartConfig, columns: ColumnMeta[]) => {
+    const errors = validateMappingWith({ mappingSlots: bignumberSlots }, config, columns)
+    const hasValues = (config.configure.values ?? []).some((m) => !!m.field)
+    const hasCats = !!config.configure.categories?.field
+    if (!hasValues && !hasCats) {
+      errors.push({
+        slot: 'values',
+        kind: 'required',
+        message: '请至少映射 Metrics 或 Categories',
+      })
+    }
+    return errors
+  },
+}
+
 const DEFS: Record<ChartType, ChartTypeDefinition> = {
   bar: barDef,
   line: lineDef,
@@ -136,9 +171,10 @@ const DEFS: Record<ChartType, ChartTypeDefinition> = {
   box: boxDef,
   pie: pieDef,
   heatmap: heatmapDef,
+  bignumber: bignumberDef,
 }
 
-export const CHART_DEFS: ChartTypeDefinition[] = [barDef, lineDef, scatterDef, boxDef, pieDef, heatmapDef]
+export const CHART_DEFS: ChartTypeDefinition[] = [barDef, lineDef, scatterDef, boxDef, pieDef, heatmapDef, bignumberDef]
 
 export function getChartDef(type: ChartType): ChartTypeDefinition {
   return DEFS[type] ?? DEFS.bar

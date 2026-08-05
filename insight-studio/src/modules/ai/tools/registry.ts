@@ -132,12 +132,12 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'create_view',
-    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap）。',
+    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。',
     parameters: { type: 'object', properties: { tableId: str('表 id'), type: str('视图类型'), name: str('视图名（可选）') }, required: ['tableId', 'type'] },
   },
   {
     name: 'set_chart_config',
-    description: '配置图表视图：图种、映射（x/y/values/series/color/shape/categories/measure）、聚合、误差棒、回归（model: none/point-to-point/linear/quadratic/4pl）、样式（标题/图例/边距/透明度/线型/拟合注释/参考线/柱模式/箱形态）。',
+    description: '配置图表视图：图种、映射（x/y/values/series/color/shape/categories/measure）、聚合、误差棒、回归（model: none/point-to-point/linear/quadratic/4pl）、样式（标题/图例/边距/透明度/线型/拟合注释/参考线/柱模式/箱形态/bignumber 布局）。',
     parameters: {
       type: 'object',
       properties: {

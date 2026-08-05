@@ -10,7 +10,7 @@ import { rng, gauss, round2 as round } from './seed'
  * 3 个分析条目，每个都是完整的抗体业务分析：
  * - 真实步骤管线（upload → filter/join/computed-column），流程图有完整分析过程
  * - 数据表丰富且步骤产物与步骤定义一致（重跑结果不变）
- * - 预置图表覆盖六图种（bar/line/scatter/box/pie/heatmap）
+ * - 预置图表覆盖图种（bar/line/scatter/box/pie/heatmap/bignumber）
  * id 固定（demo-*），重复生成 = 覆盖，不产生重复条目。
  */
 
@@ -521,7 +521,15 @@ function buildShowcase(): Analysis {
     mkTable('demo-t-feat-t3', 'Signal by group', t3Cols, t3Rows, [
       makeView('box', '小提琴图', { y: { field: 'signal' }, x: { field: 'group' } }, { box: { mode: 'violin', showPoints: 'all' } }, 'demo-v-feat-box'),
     ], up3.id),
-    mkTable('demo-t-feat-t4', 'Compound library', t4Cols, t4Rows, [], up4.id),
+    mkTable('demo-t-feat-t4', 'Compound library', t4Cols, t4Rows, [
+      makeView(
+        'bignumber',
+        '各阶段分子数',
+        { categories: { field: 'stage' } },
+        { bignumber: { layout: 'row', valueFontSize: 42, showLabel: true } },
+        'demo-v-feat-bignumber',
+      ),
+    ], up4.id),
   ]
 
   const now = nowIso()

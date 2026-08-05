@@ -46,7 +46,7 @@ export function viewNode(page: Page, name: string): Locator {
 }
 
 /** 在指定表上新建视图（picker tiles）。 */
-export async function createView(page: Page, tableName: string, type: 'table' | 'bar' | 'line' | 'scatter' | 'box' | 'pie' | 'heatmap'): Promise<void> {
+export async function createView(page: Page, tableName: string, type: 'table' | 'bar' | 'line' | 'scatter' | 'box' | 'pie' | 'heatmap' | 'bignumber'): Promise<void> {
   const row = tableNode(page, tableName)
   await row.hover()
   await row.getByLabel('新建视图').click()

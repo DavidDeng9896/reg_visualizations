@@ -29,6 +29,7 @@ const VIEW_ICON: Record<ViewType, IconName> = {
   box: 'box',
   pie: 'pie',
   heatmap: 'heatmap',
+  bignumber: 'bignumber',
 }
 
 const VIEW_KIND: Record<ViewType, string> = {
@@ -39,6 +40,7 @@ const VIEW_KIND: Record<ViewType, string> = {
   box: '箱线图',
   pie: '饼图',
   heatmap: '热图',
+  bignumber: '指标卡',
 }
 
 const forest = computed(() => (props.analysis ? buildTableForest(props.analysis) : []))

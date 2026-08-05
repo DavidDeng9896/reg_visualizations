@@ -54,6 +54,7 @@ const scatter = computed(() => (style.value.scatter ??= {}))
 const box = computed(() => (style.value.box ??= {}))
 const pie = computed(() => (style.value.pie ??= {}))
 const heatmap = computed(() => (style.value.heatmap ??= {}))
+const bignumber = computed(() => (style.value.bignumber ??= {}))
 
 const SHAPES = [
   { value: 'circle', label: '● Circle' },
@@ -86,8 +87,8 @@ const legendPos = computed({
 /* 轴区可见性 */
 const xScaleTypes = ['line', 'scatter']
 const yScaleTypes = ['bar', 'line', 'scatter', 'box']
-const showXAxis = computed(() => type.value !== 'pie')
-const showYAxis = computed(() => !['pie'].includes(type.value))
+const showXAxis = computed(() => type.value !== 'pie' && type.value !== 'bignumber')
+const showYAxis = computed(() => !['pie', 'bignumber'].includes(type.value))
 
 const numOr = (v: number | undefined, d: number) => v ?? d
 
@@ -343,6 +344,40 @@ function removeRefLine(i: number) {
       </div>
     </section>
 
+    <!-- Big number 专属 -->
+    <section v-if="type === 'bignumber'" class="sty__sec">
+      <h4 class="sty__sec-title">Big number</h4>
+      <div class="sty__row">
+        <span class="sty__label">Layout</span>
+        <ISelect
+          :model-value="bignumber.layout ?? 'row'"
+          :options="[
+            { value: 'row', label: '横排' },
+            { value: 'grid', label: '网格' },
+          ]"
+          size="sm"
+          aria-label="指标排布"
+          @update:model-value="bignumber.layout = $event as 'row' | 'grid'; ctx.touch()"
+        />
+      </div>
+      <div class="sty__row">
+        <span class="sty__label">数字字号</span>
+        <ISlider :model-value="numOr(bignumber.valueFontSize, 42)" :min="24" :max="72" aria-label="数字字号" @update:model-value="bignumber.valueFontSize = $event; ctx.touch()" />
+      </div>
+      <div class="sty__row">
+        <span class="sty__label">标签字号</span>
+        <ISlider :model-value="numOr(bignumber.labelFontSize, 13)" :min="10" :max="24" aria-label="标签字号" @update:model-value="bignumber.labelFontSize = $event; ctx.touch()" />
+      </div>
+      <div class="sty__row sty__row--switch">
+        <span class="sty__label">显示标签</span>
+        <IToggle :model-value="bignumber.showLabel !== false" aria-label="显示标签" @update:model-value="bignumber.showLabel = $event; ctx.touch()" />
+      </div>
+      <div class="sty__row sty__row--switch">
+        <span class="sty__label">紧凑数字</span>
+        <IToggle :model-value="!!bignumber.compact" aria-label="SI 缩写" @update:model-value="bignumber.compact = $event; ctx.touch()" />
+      </div>
+    </section>
+
     <!-- 拟合线（Line/Scatter 回归拟合） -->
     <section v-if="caps.regression" class="sty__sec">
       <h4 class="sty__sec-title">拟合线</h4>
@@ -365,8 +400,8 @@ function removeRefLine(i: number) {
       </div>
     </section>
 
-    <!-- 参考线（Pie 无轴不适用） -->
-    <section v-if="type !== 'pie'" class="sty__sec">
+    <!-- 参考线（Pie / Big number 无轴不适用） -->
+    <section v-if="type !== 'pie' && type !== 'bignumber'" class="sty__sec">
       <h4 class="sty__sec-title">参考线</h4>
       <div v-for="(line, i) in refLines" :key="i" class="sty__refline">
         <ISelect
