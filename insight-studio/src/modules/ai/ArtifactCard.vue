@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { IIcon } from '../../ui'
+import { useAiStore } from './aiStore'
 import AiChartCard from './AiChartCard.vue'
 import type { Artifact } from './types'
 
@@ -11,6 +12,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const ai = useAiStore()
 
 const typeMeta = computed(() => {
   switch (props.artifact.kind) {
@@ -31,6 +33,8 @@ const typeMeta = computed(() => {
 
 function open(): void {
   const a = props.artifact
+  // 先关抽屉，避免遮住工作区；预览图 pointer-events:none，整卡可点
+  ai.drawerOpen = false
   if (a.kind === 'dashboard' && a.dashboardId) {
     void router.push(`/dashboards/${a.dashboardId}`)
     return
@@ -107,5 +111,7 @@ function open(): void {
 }
 .art__chart {
   border-top: 1px solid var(--is-border);
+  /* Plotly 会吃掉点击；预览仅展示，交互交给外层产物卡 */
+  pointer-events: none;
 }
 </style>

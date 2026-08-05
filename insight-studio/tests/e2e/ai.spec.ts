@@ -191,11 +191,14 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await page.locator('.bar__menu .bar__menu-item', { hasText: 'mock-qwen' }).first().click()
     await expect(pill).toContainText('mock-qwen')
 
-    // 产物卡出现（视图），点击直达工作区
+    // 产物卡出现（视图）；点图表预览区也应打开（pointer-events 穿透）并关闭抽屉
     const artifact = page.getByTestId('ai-artifact').filter({ hasText: 'AI 散点分析' }).first()
     await expect(artifact).toBeVisible()
-    await artifact.click()
+    const chartCard = artifact.getByTestId('ai-chart-card')
+    await expect(chartCard).toBeVisible({ timeout: 15_000 })
+    await chartCard.click()
     await expect(page).toHaveURL(/viewId=/)
+    await expect(page.getByTestId('ai-drawer')).toHaveCount(0)
 
     // 工作区真实生效：侧栏出现新视图节点
     await expect(viewNode(page, 'AI 散点分析')).toBeVisible()

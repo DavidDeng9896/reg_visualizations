@@ -74,6 +74,8 @@ const chartType = computed(() => props.artifact.viewType ?? 'chart')
   border-radius: var(--is-radius-sm);
   overflow: hidden;
   background: #fff;
+  /* 预览不可交互，点击穿透到 ArtifactCard 打开工作区 */
+  pointer-events: none;
 }
 .acc__chart {
   width: 100%;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { IIcon, toast } from '../../ui'
 import { useAiStore, type TraceItem } from './aiStore'
@@ -16,14 +16,43 @@ const deletingId = ref<string | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
 /** 用户未主动上滚时，新内容自动跟随到底部 */
 const stickToBottom = ref(true)
+/** 内容（含图表预览）晚到增高时，重开抽屉仍能贴底 */
+let bodyRo: ResizeObserver | null = null
 
 onMounted(() => {
   void ai.init()
 })
 
+onBeforeUnmount(() => {
+  bodyRo?.disconnect()
+  bodyRo = null
+})
+
 function scrollBottom() {
   const el = bodyEl.value
   if (el) el.scrollTop = el.scrollHeight
+}
+
+/** 双 rAF：等布局/Teleport 与图表预览首帧后再贴底 */
+function scrollBottomSoon() {
+  void nextTick(() => {
+    scrollBottom()
+    requestAnimationFrame(() => {
+      scrollBottom()
+      requestAnimationFrame(scrollBottom)
+    })
+  })
+}
+
+function ensureBodyResizeObserver() {
+  const el = bodyEl.value
+  if (!el) return
+  bodyRo?.disconnect()
+  bodyRo = new ResizeObserver(() => {
+    if (stickToBottom.value) scrollBottom()
+  })
+  const child = el.firstElementChild
+  bodyRo.observe(child ?? el)
 }
 
 function onBodyScroll() {
@@ -35,28 +64,31 @@ function onBodyScroll() {
 watch(drawerOpen, (open) => {
   if (!open) {
     historyOpen.value = false
+    bodyRo?.disconnect()
+    bodyRo = null
     return
   }
   stickToBottom.value = true
-  void nextTick(scrollBottom)
+  scrollBottomSoon()
+  void nextTick(ensureBodyResizeObserver)
 })
 
 watch(historyOpen, (open) => {
   if (!open) {
     stickToBottom.value = true
-    void nextTick(scrollBottom)
+    scrollBottomSoon()
   }
 })
 
 watch(currentId, () => {
   stickToBottom.value = true
-  void nextTick(scrollBottom)
+  scrollBottomSoon()
 })
 
 watch(
   messages,
   () => {
-    if (stickToBottom.value) scrollBottom()
+    if (stickToBottom.value) scrollBottomSoon()
   },
   { deep: true, flush: 'post' },
 )
