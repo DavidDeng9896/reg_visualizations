@@ -8,6 +8,8 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  // 这两个 spec 依赖 Go 后端（Skills/MCP）与真实模型，走各自独立 config，见 spec 头部注释
+  testIgnore: ['**/skills-mcp-panel.spec.ts', '**/scientist-skills-e2e.spec.ts'],
   globalSetup: './tests/e2e/global-setup.ts',
   timeout: 90_000,
   expect: { timeout: 15_000 },

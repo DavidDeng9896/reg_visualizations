@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { IIcon, IPopover } from '../../ui'
+import { IIcon, IPopover, toast } from '../../ui'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { useAiStore } from './aiStore'
+import { CONTEXT_TOKEN_LIMIT, formatTokens } from './tokens'
 import type { MentionTarget } from './context'
 
 /**
@@ -109,6 +110,12 @@ const modelOptions = computed(() => {
 
 function pickModel(m: string): void {
   ai.setModel(m === config.value?.model ? null : m)
+}
+
+/** 手动压缩上下文（保留最近 2 个用户轮，更早历史折叠为摘要）。 */
+async function onCompress(): Promise<void> {
+  const done = await ai.compressContext()
+  if (done) toast.success('上下文已压缩：更早历史已折叠为摘要')
 }
 
 /* ------------------------------- 输入行为 ------------------------------- */
@@ -231,6 +238,24 @@ watch(
               <IIcon name="chevron-down" :size="12" />
             </button>
             <span class="bar__spacer" />
+            <span
+              class="bar__ctx"
+              data-testid="ai-ctx"
+              :title="`模型可见上下文约 ${ai.contextTokens} tokens；达到上限 80% 时自动压缩，也可手动压缩`"
+            >
+              上下文 {{ formatTokens(ai.contextTokens) }}/{{ formatTokens(CONTEXT_TOKEN_LIMIT) }}
+            </span>
+            <button
+              type="button"
+              class="bar__compress"
+              :disabled="!ai.compressible || running"
+              title="压缩上下文：保留最近 2 轮对话，更早历史折叠为摘要"
+              aria-label="压缩上下文"
+              data-testid="ai-compress"
+              @click="onCompress"
+            >
+              压缩
+            </button>
             <button v-if="running" type="button" class="bar__send" title="中止" aria-label="中止" data-testid="ai-stop" @click="ai.stop()">
               <span class="bar__stop" />
             </button>
@@ -416,6 +441,31 @@ watch(
 }
 .bar__spacer {
   flex: 1;
+}
+.bar__ctx {
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+  white-space: nowrap;
+  cursor: default;
+  flex-shrink: 0;
+}
+.bar__compress {
+  padding: 3px 8px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-full);
+  background: transparent;
+  color: var(--is-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bar__compress:hover:not(:disabled) {
+  border-color: var(--is-accent);
+  color: var(--is-accent);
+}
+.bar__compress:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* 发送 / 中止：深色方块 */

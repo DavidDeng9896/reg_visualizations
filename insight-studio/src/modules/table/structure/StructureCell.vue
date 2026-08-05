@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
  * 结构列单元格：视口内才渲染 RDKit SVG；点击浮层查看大图 + SMILES。
+ * compact：紧凑缩略图（看板表格组件等高密度表格）。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { IIcon, IPopover } from '../../../ui'
@@ -8,13 +9,20 @@ import {
   renderStructureSvg,
   STRUCTURE_PREVIEW_HEIGHT,
   STRUCTURE_PREVIEW_WIDTH,
+  STRUCTURE_THUMB_COMPACT_HEIGHT,
+  STRUCTURE_THUMB_COMPACT_WIDTH,
   STRUCTURE_THUMB_HEIGHT,
   STRUCTURE_THUMB_WIDTH,
 } from './render'
 
 const props = defineProps<{
   value: string | null
+  /** 紧凑缩略图（看板等高密度表格）；默认标准尺寸。 */
+  compact?: boolean
 }>()
+
+const thumbWidth = computed(() => (props.compact ? STRUCTURE_THUMB_COMPACT_WIDTH : STRUCTURE_THUMB_WIDTH))
+const thumbHeight = computed(() => (props.compact ? STRUCTURE_THUMB_COMPACT_HEIGHT : STRUCTURE_THUMB_HEIGHT))
 
 const rootEl = ref<HTMLElement | null>(null)
 const inView = ref(false)
@@ -44,8 +52,8 @@ async function loadThumb() {
   loading.value = true
   error.value = null
   const result = await renderStructureSvg(text, {
-    width: STRUCTURE_THUMB_WIDTH,
-    height: STRUCTURE_THUMB_HEIGHT,
+    width: thumbWidth.value,
+    height: thumbHeight.value,
   })
   if (gen !== generation) return
   loading.value = false
@@ -182,8 +190,8 @@ onBeforeUnmount(() => {
   padding: 0;
   border-radius: var(--is-radius-sm);
   cursor: pointer;
-  width: v-bind('STRUCTURE_THUMB_WIDTH + "px"');
-  height: v-bind('STRUCTURE_THUMB_HEIGHT + "px"');
+  width: v-bind('thumbWidth + "px"');
+  height: v-bind('thumbHeight + "px"');
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--is-border);

@@ -3,7 +3,7 @@ import { ROW_ID_FIELD } from '../../../shared/types'
 import { parseDateLike } from '../../../shared/datetime'
 import { aggregateRows, aggregationLabel } from './aggregate'
 import { dataMinOf, resolveAxis } from './axis'
-import { AXIS_NO_GRID_STYLE, AXIS_STYLE, baseLayout, columnType, displayVal, distinctInOrder, seriesColor, withRefLines, ciBandTraces, fitAnnotations } from './shared'
+import { AXIS_NO_GRID_STYLE, AXIS_STYLE, baseLayout, columnType, displayVal, distinctInOrder, plotlySymbol, seriesColor, withRefLines, ciBandTraces, fitAnnotations } from './shared'
 import { runFit, equationOf, type FitInputPoint } from '../fit/engine'
 import { summarizeFit, type FitGroupSummary } from '../fit/summary'
 import { flagSetOf } from '../flags'
@@ -132,7 +132,7 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
         xaxis,
         yaxis,
         line: { color, width: 2 },
-        marker: { color, size: 6, symbol: style.line?.pointShape ?? 'circle', opacity: style.opacity ?? 1 },
+        marker: { color, size: 6, symbol: plotlySymbol(style.line?.pointShape ?? 'circle'), opacity: style.opacity ?? 1 },
         customdata,
       })
       if (cfg.regression?.model !== 'none' && fitPoints.length) {

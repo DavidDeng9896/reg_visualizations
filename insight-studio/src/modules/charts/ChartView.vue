@@ -141,7 +141,7 @@ watch(flags, () => rebuildDeb.call())
 watch(previewConfig, () => rebuildDeb.call(), { deep: true })
 
 // layout-only 快路径：边距改动跳过防抖与全量重建，直接 relayout（<100ms 生效）。
-// 工作台始终不写图内标题（hideTitle）；标题/副标题字段变更走全量 rebuild。
+// 工作台始终不写图内标题（hideTitle），与页头/看板卡片保持一致。
 watch(
   () => previewConfig.value.style.margins,
   () => {
@@ -155,11 +155,6 @@ watch(
     })
   },
   { deep: true },
-)
-
-watch(
-  () => [previewConfig.value.style.title, previewConfig.value.style.subtitle],
-  () => rebuildDeb.call(),
 )
 
 function touch() {
@@ -270,7 +265,6 @@ provide(CHART_DRAFT_CONTEXT, {
   errors: previewErrors,
   saveAttempted,
   seriesNames: computed(() => seriesNames.value),
-  defaultTitle: computed(() => view.value?.name ?? ''),
   touch,
   dirty,
   changeType,

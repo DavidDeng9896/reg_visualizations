@@ -56,7 +56,8 @@ onMounted(async () => {
     router.replace('/')
     return
   }
-  applyEntryMode()
+  // 加载期间用户已手动选择节点时不覆盖其选择
+  if (!store.selected) applyEntryMode()
 })
 
 // 路由参数变化（例如列表页跳转）时重新加载
@@ -69,13 +70,24 @@ watch(analysisId, async (id, prev) => {
       const ok = await store.load(id)
       if (analysisId.value !== id) return
       if (!ok) router.replace('/')
-      else applyEntryMode()
+      // 加载期间用户已手动选择节点时不覆盖其选择
+      else if (!store.selected) applyEntryMode()
     } catch (e) {
       if (analysisId.value === id) store.$patch({ loading: false })
       toast.error(e instanceof Error ? e.message : '加载失败')
     }
   }
 })
+
+// 同一分析内 query 变化（AI 产物卡/看板「打开源视图」点击）时同步选中态；
+// analysisId 变化由上面的 load 流程统一 applyEntryMode，这里跳过避免对旧 current 误选
+watch(
+  () => [route.query.tableId ?? '', route.query.viewId ?? ''] as const,
+  () => {
+    if (current.value?.id !== analysisId.value) return
+    applyEntryMode()
+  },
+)
 
 /** 看板「打开源视图」带入 ?tableId=&viewId= 时进工作区；否则默认流程图。 */
 function applyEntryMode() {

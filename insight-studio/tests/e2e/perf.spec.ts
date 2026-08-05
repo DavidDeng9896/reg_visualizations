@@ -53,14 +53,12 @@ test.describe('性能：大表与大图', () => {
     console.log(`[perf] 5000 点 scatter 渲染耗时: ${renderMs}ms`)
     expect(renderMs).toBeLessThanOrEqual(3000)
 
-    // 面板输入防抖（150ms 预览重建）下不丢字
+    // 面板输入防抖（150ms 预览重建）下不丢字（STYLE 的 Title 死控件已移除，改用参考线标签自由文本）
     await page.getByRole('tab', { name: 'STYLE' }).click()
-    const titleInput = page
-      .locator('.sty__row')
-      .filter({ has: page.locator('.sty__label', { hasText: /^Title$/ }) })
-      .locator('input')
-    await titleInput.pressSequentially('性能测试 abc123', { delay: 30 })
-    await expect(titleInput).toHaveValue('性能测试 abc123')
+    await page.getByText('添加参考线', { exact: true }).click()
+    const labelInput = page.locator('.sty__refline-label input').first()
+    await labelInput.pressSequentially('性能测试 abc123', { delay: 30 })
+    await expect(labelInput).toHaveValue('性能测试 abc123')
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
   })
 })

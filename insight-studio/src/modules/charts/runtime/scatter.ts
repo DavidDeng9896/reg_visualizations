@@ -2,7 +2,7 @@ import type { FieldMapping, Row } from '../../../shared/types'
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { aggregateRows, aggregationLabel, errorValue, numericValues } from './aggregate'
 import { dataMinOf, resolveAxis } from './axis'
-import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, plotlyError, seriesColor, shapeFor, stableRandom, withRefLines, ciBandTraces, fitAnnotations } from './shared'
+import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, plotlyError, plotlySymbol, seriesColor, shapeFor, stableRandom, withRefLines, ciBandTraces, fitAnnotations } from './shared'
 import { runFit, equationOf, type FitInputPoint } from '../fit/engine'
 import { summarizeFit, type FitGroupSummary } from '../fit/summary'
 import { flagSetOf } from '../flags'
@@ -107,7 +107,7 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
         const group = cv !== null && sv !== null ? `${cv} · ${sv}` : cv ?? sv
         const name = measures.length > 1 ? (group ? `${labelOf(measure)} · ${group}` : labelOf(measure)) : (group ?? labelOf(measure))
         const color = seriesColor(style, cfg.palette, name, colorField && cv !== null ? colorVals.indexOf(cv) : seriesNames.length)
-        const symbol = shapeField && sv !== null ? shapeFor(si) : (style.scatter?.pointShape ?? 'circle')
+        const symbol = shapeField && sv !== null ? shapeFor(si) : plotlySymbol(style.scatter?.pointShape ?? 'circle')
         const agg = measure.aggregation ?? 'none'
         const points: Array<{ x: number; y: number; ids: string[]; size?: number; error?: number | null }> = []
         const fitPoints: FitInputPoint[] = []

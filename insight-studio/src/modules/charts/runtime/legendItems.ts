@@ -10,7 +10,11 @@ export interface LegendItem {
   visible: boolean
 }
 
-export function shouldCollapseLegend(containerWidth: number, threshold = LEGEND_COLLAPSE_WIDTH): boolean {
+/** 图例项数超过该值时默认收起为芯片 + 浮动面板，避免大图例吃掉主图。 */
+export const LEGEND_COLLAPSE_ITEM_COUNT = 8
+
+export function shouldCollapseLegend(containerWidth: number, itemCount = 0, threshold = LEGEND_COLLAPSE_WIDTH): boolean {
+  if (itemCount > LEGEND_COLLAPSE_ITEM_COUNT) return true
   return containerWidth > 0 && containerWidth < threshold
 }
 

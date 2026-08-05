@@ -22,24 +22,22 @@ async function setupPlateScatter(page: Page): Promise<void> {
   await expectCanvasInk(page)
 }
 
-test.describe('d) 图表：scatter 配置 + STYLE 标题', () => {
-  test('plate 建 scatter → 映射 x/y → canvas 有墨迹 → STYLE 改标题 → Save', async ({ page }) => {
+test.describe('d) 图表：scatter 配置 + STYLE 样式', () => {
+  test('plate 建 scatter → 映射 x/y → canvas 有墨迹 → STYLE 改点形状 → Save', async ({ page }) => {
     await setupPlateScatter(page)
 
     const plot = page.getByTestId('chart-canvas')
-    // Plotly 3 分层渲染：标题在独立的 main-svg 层（首个 main-svg 仅数据层），
-    // 预览探针需覆盖整个绘图区，否则标题改动观测不到
     const svgBefore = await plot.innerHTML()
 
-    // STYLE → Title
+    // STYLE → Point Shape（标题/副标题为死控件已移除，预览以 marker symbol 变化验证）
     await page.getByRole('tab', { name: 'STYLE' }).click()
-    const titleInput = page
+    const shapeSelect = page
       .locator('.sty__row')
-      .filter({ has: page.locator('.sty__label', { hasText: /^Title$/ }) })
-      .locator('input')
-    await titleInput.fill('Dose response E2E')
+      .filter({ has: page.locator('.sty__label', { hasText: /^Point Shape$/ }) })
+      .getByRole('combobox')
+    await pickOption(shapeSelect, '▲ Triangle')
 
-    // 实时预览：Plotly SVG 内容变化（新标题已绘制）
+    // 实时预览：Plotly SVG 内容变化（marker symbol 改变）
     await expect
       .poll(async () => plot.innerHTML())
       .not.toBe(svgBefore)

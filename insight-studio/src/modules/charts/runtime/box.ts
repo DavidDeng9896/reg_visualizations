@@ -1,7 +1,7 @@
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { fiveNumber } from './aggregate'
 import { dataMinOf, resolveAxis } from './axis'
-import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, seriesColor, shapeFor, withRefLines } from './shared'
+import { AXIS_STYLE, baseLayout, displayVal, distinctInOrder, plotlySymbol, seriesColor, shapeFor, withRefLines } from './shared'
 import { EMPTY_FIGURE, type BuildInput, type BuildOutput } from '../types'
 
 export function buildBoxOption({ result, config, viewName }: BuildInput): BuildOutput {
@@ -89,7 +89,7 @@ export function buildBoxOption({ result, config, viewName }: BuildInput): BuildO
         const shape = shapeField ? displayVal(row[shapeField]) : ''
         const shapeIndex = shapeField ? shapeVals.indexOf(shape) : -1
         const key = shape
-        const group = pointGroups.get(key) ?? { x: [], y: [], ids: [], symbol: shapeIndex >= 0 ? shapeFor(shapeIndex) : (style.box?.pointShape ?? 'circle') }
+        const group = pointGroups.get(key) ?? { x: [], y: [], ids: [], symbol: shapeIndex >= 0 ? shapeFor(shapeIndex) : plotlySymbol(style.box?.pointShape ?? 'circle') }
         group.x.push(cat || name)
         group.y.push(value)
         group.ids.push([String(row[ROW_ID_FIELD] ?? '')])

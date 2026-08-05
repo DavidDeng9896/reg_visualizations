@@ -296,6 +296,12 @@ export function plotlyShape(index: number): string {
   return ['circle', 'triangle-up', 'diamond', 'square', 'diamond-tall'][index % SHAPE_SEQUENCE.length]
 }
 
+/** UI 形状值 → Plotly symbol（UI 值直接透传时 Plotly 会回退 circle）。 */
+export function plotlySymbol(shape: string): string {
+  const i = (SHAPE_SEQUENCE as readonly string[]).indexOf(shape)
+  return i >= 0 ? plotlyShape(i) : shape
+}
+
 /** 确定性伪随机（jitter 用，按索引稳定）。 */
 export function stableRandom(seed: number): number {
   let t = (seed + 0x6d2b79f5) >>> 0

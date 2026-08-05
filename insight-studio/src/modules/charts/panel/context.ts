@@ -16,8 +16,6 @@ export interface ChartDraftContext {
   saveAttempted: Ref<boolean>
   /** 最近构建的系列名（STYLE 逐系列取色）。 */
   seriesNames: ComputedRef<string[]>
-  /** 默认标题（视图名；Title 刷新恢复用）。 */
-  defaultTitle: ComputedRef<string>
   /** 标脏 + 触发防抖预览。 */
   touch: () => void
   /** 草稿是否已修改（dirty dot / Save 亮起）。 */

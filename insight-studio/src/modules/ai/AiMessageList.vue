@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IIcon } from '../../ui'
 import PlanChecklist from './PlanChecklist.vue'
 import TraceCard from './TraceCard.vue'
 import ArtifactCard from './ArtifactCard.vue'
 import ReasoningCard from './ReasoningCard.vue'
+import AskCard from './AskCard.vue'
 import type { TraceItem, UiMessage } from './aiStore'
 
 /** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
@@ -11,7 +13,11 @@ const props = defineProps<{
   messages: UiMessage[]
 }>()
 
-const emit = defineEmits<{ (e: 'confirm', item: TraceItem): void; (e: 'retry'): void }>()
+const emit = defineEmits<{
+  (e: 'confirm', item: TraceItem): void
+  (e: 'reject', item: TraceItem): void
+  (e: 'retry'): void
+}>()
 
 function fmtTime(at: number): string {
   try {
@@ -23,6 +29,16 @@ function fmtTime(at: number): string {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** 去除 emoji/装饰符号（保留 → × 及 ⚠ ✓ ✗ 等有语义符号），渲染层兜底。 */
+function stripEmoji(s: string): string {
+  return s
+    .replace(
+      /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{269F}\u{26A2}-\u{26FF}\u{2700}-\u{2712}\u{2714}-\u{2716}\u{2718}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,
+      '',
+    )
+    .replace(/[ \t]{2,}/g, ' ')
 }
 
 /** 轻量 markdown → html（先做 HTML 转义，再按模式替换）。 */
@@ -37,9 +53,9 @@ function renderMd(src: string): string {
       .replace(/`([^`]+)`/g, '<code>$1</code>')
 
   while (i < lines.length) {
-    const line = lines[i]
-    // 代码块
-    if (line.trimStart().startsWith('```')) {
+    const raw = lines[i]
+    // 代码块（内容原样保留，不去 emoji）
+    if (raw.trimStart().startsWith('```')) {
       const buf: string[] = []
       i += 1
       while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
@@ -50,6 +66,7 @@ function renderMd(src: string): string {
       out.push(`<pre class="md-pre">${buf.join('\n')}</pre>`)
       continue
     }
+    const line = stripEmoji(raw)
     // 表格
     if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
       const header = line.split('|').slice(1, -1).map((c) => c.trim())
@@ -100,14 +117,25 @@ function htmlOf(id: string): string {
 <template>
   <div class="msgs" data-testid="ai-messages">
     <div v-for="m in messages" :key="m.id" class="msg" :class="`msg--${m.role}`">
-      <div v-if="m.role === 'user'" class="msg__user">
+      <div v-if="m.role === 'system'" class="msg__sys" data-testid="ai-ctx-summary" :title="m.content">
+        <IIcon name="history" :size="11" />
+        上下文已压缩 · 早前对话已折叠为摘要
+      </div>
+      <div v-else-if="m.role === 'user'" class="msg__user">
         <div class="msg__user-text">{{ m.content }}</div>
         <div v-if="m.at" class="msg__time">{{ fmtTime(m.at) }}</div>
       </div>
       <template v-else>
         <ReasoningCard v-if="m.reasoning" :reasoning="m.reasoning" :streaming="m.streaming" />
         <PlanChecklist v-if="m.planSteps?.length" :steps="m.planSteps" :done="m.planDone ?? []" :streaming="m.streaming" />
-        <TraceCard v-if="m.trace.length" :items="m.trace" :streaming="m.streaming" @confirm="emit('confirm', $event)" />
+        <TraceCard
+          v-if="m.trace.length"
+          :items="m.trace"
+          :streaming="m.streaming"
+          @confirm="emit('confirm', $event)"
+          @reject="emit('reject', $event)"
+        />
+        <AskCard v-for="t in m.trace.filter((x) => x.ask)" :key="`ask-${t.id}`" :item="t" />
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="m.content" class="msg__ai md" v-html="htmlOf(m.id)" />
         <div v-if="m.streaming && !m.content && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
@@ -128,6 +156,21 @@ function htmlOf(id: string): string {
 .msg--user {
   display: flex;
   justify-content: flex-end;
+}
+.msg--system {
+  display: flex;
+  justify-content: center;
+}
+.msg__sys {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px dashed var(--is-border-strong);
+  border-radius: var(--is-radius-full);
+  color: var(--is-text-tertiary);
+  font-size: 11px;
+  cursor: default;
 }
 .msg__user {
   max-width: 92%;

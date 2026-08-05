@@ -20,7 +20,7 @@ export interface AiConfig {
   model: string
   /** 备选模型列表（前端输入条可切换）。 */
   models: string[]
-  /** agent-loop 最大工具调用轮数（1–20）。 */
+  /** agent-loop 最大工具调用轮数（1–100）。 */
   maxIterations: number
   /** 删除类操作是否需要用户确认。 */
   confirmDestructive: boolean
@@ -31,7 +31,7 @@ const DEFAULT_CONFIG: AiConfig = {
   apiKey: '',
   model: 'gpt-4o-mini',
   models: [],
-  maxIterations: 8,
+  maxIterations: 100,
   confirmDestructive: true,
 }
 
@@ -138,7 +138,7 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
         : cur.models,
       maxIterations:
         typeof body.maxIterations === 'number' && Number.isFinite(body.maxIterations)
-          ? Math.min(20, Math.max(1, Math.round(body.maxIterations)))
+          ? Math.min(100, Math.max(1, Math.round(body.maxIterations)))
           : cur.maxIterations,
       confirmDestructive: typeof body.confirmDestructive === 'boolean' ? body.confirmDestructive : cur.confirmDestructive,
     }

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { AnalysisTable, ChartPosition, ViewNode } from '../../shared/types'
+import type { AnalysisTable, ChartPosition, StepNode, ViewNode } from '../../shared/types'
 import { runPipeline, PipelineError, isIdentityOrSortOnly, type ViewResult } from '../../shared/pipeline'
 import { findTable, findView, findViewParent, findViewPath } from '../../shared/tree'
+import { IMPLEMENTED_STEP_TYPES, runStep } from '../steps/exec'
+import { stepNodeId } from '../flowchart/graph'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IIcon, IModal, IPopover, ISplitPane, ITextField, toast } from '../../ui'
 import DataGrid from './DataGrid.vue'
@@ -13,12 +15,14 @@ import { downloadCsv, toCsv } from './csv'
 import { resolveTableCollapsedOnEnter } from './tableSourceVisibility'
 
 const ChartView = defineAsyncComponent(() => import('../charts/ChartView.vue'))
+const StepConfigPanel = defineAsyncComponent(() => import('../steps/panel/StepConfigPanel.vue'))
 
 /**
  * 表+图一体化布局壳：
  * - 当前选中表/视图 → DataGrid
  * - 图表视图时按 chart.position（top/bottom/left/right）用 ISplitPane 排布图表区
  * - div[data-mount="chart-panel"] 为图表切片挂载点；上下文经 TABLE_CHART_CONTEXT provide
+ * - 派生表（step 产出）在标题栏提供「配置产出步骤」入口，复用流程图步骤配置面板
  */
 const store = useAnalysisStore()
 const { current, selected } = storeToRefs(store)
@@ -183,6 +187,85 @@ function exportCsv() {
   toast.success('已导出 CSV')
 }
 
+/* 派生表：产出步骤配置入口（复用流程图 StepConfigPanel 的草稿语义） */
+const derivedStep = computed<StepNode | undefined>(() => {
+  const a = current.value
+  const sid = table.value?.stepId
+  if (!a || !sid) return undefined
+  return a.steps.find((s) => s.id === sid)
+})
+
+const editingStep = ref<string | null>(null)
+const editingSnapshot = ref<{ name: string; config: string; inputs: string } | null>(null)
+const editingStepData = computed<StepNode | undefined>(() => current.value?.steps.find((s) => s.id === editingStep.value))
+
+function openStepEditor() {
+  const s = derivedStep.value
+  if (!s) return
+  editingStep.value = s.id
+  editingSnapshot.value = {
+    name: s.name,
+    config: JSON.stringify(s.config),
+    inputs: JSON.stringify(s.inputs),
+  }
+}
+
+/** 关闭配置面板；cancel=true 时恢复打开前的快照（面板内编辑为草稿，不落盘）。 */
+function closeStepEditor(cancel: boolean) {
+  if (editingStep.value && cancel && editingSnapshot.value && current.value) {
+    const s = current.value.steps.find((x) => x.id === editingStep.value)
+    if (s) {
+      s.name = editingSnapshot.value.name
+      s.config = JSON.parse(editingSnapshot.value.config)
+      s.inputs = JSON.parse(editingSnapshot.value.inputs)
+    }
+  }
+  editingStep.value = null
+  editingSnapshot.value = null
+}
+
+function onStepSaved(name: string) {
+  const step = editingStepData.value
+  if (!step || !current.value) return
+  store.mutate(() => {
+    step.name = name
+    // 源步骤（upload-csv 等无执行逻辑）：重命名同步到输出表
+    if (!IMPLEMENTED_STEP_TYPES.has(step.type)) {
+      const outTable = step.output.tables[0] ? current.value!.tables.find((t) => t.id === step.output.tables[0]) : undefined
+      if (outTable) outTable.name = name
+    }
+  })
+  if (IMPLEMENTED_STEP_TYPES.has(step.type)) {
+    runStep(current.value, step)
+    store.mutate(() => {})
+  }
+  editingStep.value = null
+  editingSnapshot.value = null
+}
+
+function onStepDeleted() {
+  const step = editingStepData.value
+  if (!step || !current.value) return
+  const dependents = current.value.steps.filter((s) => s.inputs.some((i) => i.from.nodeId === step.id))
+  if (dependents.length) {
+    toast.error(`无法删除：以下步骤依赖它 — ${dependents.map((d) => d.name).join('、')}。请先删除下游步骤。`)
+    return
+  }
+  const removedTableId = selected.value?.tableId
+  store.mutate((a) => {
+    a.steps = a.steps.filter((s) => s.id !== step.id)
+    a.tables = a.tables.filter((t) => t.stepId !== step.id)
+    delete a.flowchartLayout[stepNodeId(step.id)]
+  })
+  editingStep.value = null
+  editingSnapshot.value = null
+  if (selected.value?.tableId === removedTableId) {
+    const first = current.value?.tables[0]
+    store.select(first ? { kind: 'table', tableId: first.id } : null)
+  }
+  toast.success(`已删除步骤「${step.name}」`)
+}
+
 /* 全局撤销/重做快捷键（网格内已有兜底，这里覆盖工作区其余区域） */
 function onGlobalKeydown(e: KeyboardEvent) {
   const mod = e.ctrlKey || e.metaKey
@@ -226,8 +309,18 @@ provide(
 <template>
   <div ref="rootEl" class="tcw">
     <!-- 标题栏 -->
-    <header v-if="view" class="tcw__head">
-      <span class="tcw__head-title is-ellipsis">{{ view.name }}</span>
+    <header v-if="view || derivedStep" class="tcw__head">
+      <span class="tcw__head-title is-ellipsis">{{ view ? view.name : table?.name }}</span>
+      <IButton
+        v-if="derivedStep"
+        variant="ghost"
+        size="sm"
+        icon="sliders"
+        title="配置产出步骤"
+        @click="openStepEditor"
+      >
+        配置产出步骤
+      </IButton>
       <IButton
         v-if="hasChart"
         variant="ghost"
@@ -262,7 +355,7 @@ provide(
           </div>
         </template>
       </IPopover>
-      <IPopover :open="menuOpen" placement="bottom-end" :arrow="false" @update:open="menuOpen = $event">
+      <IPopover v-if="view" :open="menuOpen" placement="bottom-end" :arrow="false" @update:open="menuOpen = $event">
         <template #anchor>
           <IButton variant="ghost" icon="more" size="sm" aria-label="视图菜单" @click="menuOpen = !menuOpen" />
         </template>
@@ -337,6 +430,15 @@ provide(
       <IButton variant="primary" :disabled="!renameName.trim()" @click="submitRename">保存</IButton>
     </template>
   </IModal>
+
+  <!-- 产出步骤配置（派生表） -->
+  <StepConfigPanel
+    v-if="editingStepData"
+    :step="editingStepData"
+    @close="closeStepEditor(true)"
+    @save="onStepSaved"
+    @delete="onStepDeleted"
+  />
 </template>
 
 <style scoped>

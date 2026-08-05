@@ -70,10 +70,11 @@ function rebuild() {
   rowCount.value = result.rows.length
 }
 
+// current 在原位 mutate 时引用不变，须以 revision（每次 mutate 自增）作为重建触发器
 watch(
-  () => [props.tableId, props.viewId, current.value] as const,
+  () => [props.tableId, props.viewId, current.value?.revision] as const,
   () => rebuild(),
-  { immediate: true, deep: false },
+  { immediate: true },
 )
 </script>
 

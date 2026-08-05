@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { IIcon, toast } from '../../ui'
 import { useAiStore, type TraceItem } from './aiStore'
@@ -13,14 +13,53 @@ const { drawerOpen, settingsOpen, conversations, currentId, messages, running, s
 const historyOpen = ref(false)
 const historyLoading = ref(false)
 const deletingId = ref<string | null>(null)
+const bodyEl = ref<HTMLElement | null>(null)
+/** 用户未主动上滚时，新内容自动跟随到底部 */
+const stickToBottom = ref(true)
 
 onMounted(() => {
   void ai.init()
 })
 
+function scrollBottom() {
+  const el = bodyEl.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+function onBodyScroll() {
+  const el = bodyEl.value
+  if (!el) return
+  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+}
+
 watch(drawerOpen, (open) => {
-  if (!open) historyOpen.value = false
+  if (!open) {
+    historyOpen.value = false
+    return
+  }
+  stickToBottom.value = true
+  void nextTick(scrollBottom)
 })
+
+watch(historyOpen, (open) => {
+  if (!open) {
+    stickToBottom.value = true
+    void nextTick(scrollBottom)
+  }
+})
+
+watch(currentId, () => {
+  stickToBottom.value = true
+  void nextTick(scrollBottom)
+})
+
+watch(
+  messages,
+  () => {
+    if (stickToBottom.value) scrollBottom()
+  },
+  { deep: true, flush: 'post' },
+)
 
 async function openHistory() {
   historyOpen.value = true
@@ -63,7 +102,11 @@ async function onRemoveConversation(id: string) {
 }
 
 async function onConfirm(item: TraceItem): Promise<void> {
-  await ai.confirmAndResume(item.id, item.name, item.summary.replace(/^NEEDS_CONFIRMATION:\s*/, ''))
+  await ai.decideTrace(item.id, 'confirm')
+}
+
+async function onReject(item: TraceItem): Promise<void> {
+  await ai.decideTrace(item.id, 'reject')
 }
 
 function formatUpdatedAt(iso: string): string {
@@ -176,7 +219,7 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
         </div>
 
         <template v-else>
-          <div class="ai-drawer__body">
+          <div ref="bodyEl" class="ai-drawer__body" @scroll.passive="onBodyScroll">
             <div v-if="switching" class="ai-drawer__loading" role="status">加载会话…</div>
             <template v-else>
               <div v-if="!messages.length" class="ai-drawer__empty">
@@ -184,7 +227,7 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
                 <p>我是平台内置的分析助手，可以帮你建表、加工数据、配图表、做看板。</p>
                 <p class="ai-drawer__hint">试试：「把当前表画成散点图并加线性拟合」</p>
               </div>
-              <AiMessageList v-else :messages="messages" @confirm="onConfirm" @retry="ai.retry()" />
+              <AiMessageList v-else :messages="messages" @confirm="onConfirm" @reject="onReject" @retry="ai.retry()" />
             </template>
             <div v-if="running" class="ai-drawer__running">正在生成…</div>
           </div>

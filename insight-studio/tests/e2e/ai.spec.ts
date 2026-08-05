@@ -107,12 +107,33 @@ function mockSseDelete(messages: Msg[]): string {
   }
 }
 
+/** ask_user 选择流编排：list_tables → ask_user（等待作答）→ 收到回答后收尾。 */
+function mockSseAsk(messages: Msg[]): string {
+  const round = messages.filter((m) => m.role === 'tool').length + 1
+  switch (round) {
+    case 1:
+      return sseOf({ toolCalls: [toolCall('list_tables', {})] })
+    case 2:
+      return sseOf({
+        toolCalls: [
+          toolCall('ask_user', {
+            question: '散点图按哪个字段着色分组？',
+            options: ['按 species 分组', '按 batch 分组', '不分组'],
+            allowOther: true,
+          }),
+        ],
+      })
+    default:
+      return sseOf({ content: '收到，按你的选择继续配置图表。' })
+  }
+}
+
 /** 注册 config/chat 拦截（chat 走给定编排）。 */
 async function mockAi(page: import('@playwright/test').Page, script: (messages: Msg[]) => string): Promise<void> {
   await page.route('**/api/ai/config', (route) => {
     if (route.request().method() !== 'GET') return route.continue()
     return route.fulfill({
-      json: { baseUrl: 'https://mock.local/v1', apiKeyMasked: 'm****y', configured: true, model: 'mock-qwen', models: ['mock-qwen-pro'], maxIterations: 8, confirmDestructive: true },
+      json: { baseUrl: 'https://mock.local/v1', apiKeyMasked: 'm****y', configured: true, model: 'mock-qwen', models: ['mock-qwen-pro'], maxIterations: 100, confirmDestructive: true },
     })
   })
   await page.route('**/api/ai/chat', async (route) => {
@@ -187,11 +208,43 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 待确认块折叠状态也外露，表未被删
     const confirmBtn = page.getByTestId('ai-trace-confirm')
     await expect(confirmBtn).toBeVisible()
-    await expect(page.locator('.trace__pending')).toContainText('等待确认：删除表「Iris measurements」')
+    await expect(page.locator('.trace__pending')).toContainText('需要你的批准')
+    await expect(page.locator('.trace__pending')).toContainText('删除表「Iris measurements」')
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
 
     // 确认执行 → 表真实删除
     await confirmBtn.click()
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toHaveCount(0)
+  })
+
+  test('ask_user 选择卡：选项单选 → 提交后续轮；输入区显示上下文量与压缩入口', async ({ page }) => {
+    await mockAi(page, mockSseAsk)
+
+    await createDemoAndEnter(page)
+    await page.getByTestId('ai-entry').click()
+
+    // 输入区：上下文指示器 + 压缩按钮（历史不足 2 轮时禁用）
+    const ctx = page.getByTestId('ai-ctx')
+    await expect(ctx).toBeVisible()
+    await expect(ctx).toContainText('/128k')
+    await expect(page.getByTestId('ai-compress')).toBeDisabled()
+
+    await page.getByTestId('ai-input').fill('帮我给当前表配一个散点图')
+    await page.getByTestId('ai-send').click()
+
+    // 提问卡：问题 + 选项单选 + 其他回答 + 取消/提交（未选时提交禁用）
+    const ask = page.getByTestId('ai-ask')
+    await expect(ask).toBeVisible()
+    await expect(ask).toContainText('需要你的回答')
+    await expect(ask).toContainText('散点图按哪个字段着色分组？')
+    await expect(ask.locator('.ask__opt')).toHaveCount(3)
+    await expect(page.getByTestId('ai-ask-submit')).toBeDisabled()
+
+    // 单选后提交 → 已答态 + 循环续轮收尾
+    await ask.locator('.ask__opt', { hasText: '按 species 分组' }).click()
+    await page.getByTestId('ai-ask-submit').click()
+    await expect(ask).toContainText('已提交回答')
+    await expect(ask).toContainText('按 species 分组')
+    await expect(page.getByTestId('ai-messages')).toContainText('收到，按你的选择继续配置图表')
   })
 })

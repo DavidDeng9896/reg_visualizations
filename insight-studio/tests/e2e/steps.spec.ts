@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createView, dragConnect, dragConnectToBlank, expectCanvasInk, flowNodeIdByName, importCsv, openFlowchart, panCanvas, pickOption, tableNode } from './helpers'
+import { createView, dragConnect, dragConnectToBlank, ensureWorkspace, expectCanvasInk, flowNodeIdByName, importCsv, openFlowchart, panCanvas, pickOption, tableNode } from './helpers'
 
 /** 流程图步骤化主流程：CSV 导入 / Combine 对话框均生成 StepNode，刷新后持久保留。 */
 test.describe('步骤化主流程', () => {
@@ -164,7 +164,7 @@ test.describe('步骤化主流程', () => {
     // 编辑源表 left：把 id=2 改为 0，使其不再满足 id ≥ 2
     // 需求2：流程图模式下点树只定位节点、不退出流程图；编辑表格需显式切回工作区
     await tableNode(page, 'left').click()
-    await openFlowchart(page)
+    await ensureWorkspace(page)
     await expect(page.getByTestId('grid-stats')).toBeVisible()
     // 编辑会话：进入后改单元格，确认修改才传播下游
     await page.getByTestId('enter-edit-btn').click()

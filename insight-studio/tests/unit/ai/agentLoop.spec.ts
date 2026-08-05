@@ -129,6 +129,51 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(failed && failed.type === 'tool_result' ? failed.summary : '').toContain('boom')
     expect(evts.some((e) => e.type === 'done')).toBe(true)
   })
+
+  it('ask_user：发出 ask 事件并暂停，作答作为 tool 结果回灌模型', async () => {
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      return n === 0
+        ? sseOf({ toolCalls: [call('ask_user', { question: '按哪个字段分组？', options: ['species', 'batch'], allowOther: true })] })
+        : sseOf({ content: '收到，继续。' })
+    }
+    const exec: ToolExecutor = async () => ({ ok: true, summary: 'x' })
+    const evts = events()
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 4,
+      askUser: async (req) => {
+        expect(req.question).toBe('按哪个字段分组？')
+        expect(req.options).toEqual(['species', 'batch'])
+        expect(req.allowOther).toBe(true)
+        return 'species'
+      },
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(evts.some((e) => e.type === 'ask')).toBe(true)
+    expect(messages.find((m) => m.role === 'tool')?.content).toBe('用户的回答：species')
+    expect(evts.some((e) => e.type === 'done' && e.content === '收到，继续。')).toBe(true)
+  })
+
+  it('ask_user 无作答通道 → 兜底跳过不中断', async () => {
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      return n === 0 ? sseOf({ toolCalls: [call('ask_user', { question: '继续吗？' })] }) : sseOf({ content: '好' })
+    }
+    const exec: ToolExecutor = async () => ({ ok: true, summary: 'x' })
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 4,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    expect(messages.find((m) => m.role === 'tool')?.content).toContain('未能作答')
+  })
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */

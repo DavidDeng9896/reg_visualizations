@@ -70,7 +70,7 @@ function syncCollapseFlag(): void {
   const w = wrap.value?.clientWidth ?? el.value?.clientWidth ?? 0
   const items = extractLegendItems(props.option?.data)
   const wantsLegend = props.option?.layout?.showlegend !== false && items.length > 0
-  legendCollapsed.value = Boolean(wantsLegend && shouldCollapseLegend(w))
+  legendCollapsed.value = Boolean(wantsLegend && shouldCollapseLegend(w, items.length))
   legendItems.value = items.map((it) => ({ ...it }))
   legendPos.value = legendPosFromLayout(props.option?.layout as Record<string, unknown> | undefined)
   if (!legendCollapsed.value) legendOpen.value = false

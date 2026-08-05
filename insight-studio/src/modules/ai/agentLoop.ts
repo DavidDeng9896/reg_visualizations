@@ -17,12 +17,21 @@ export interface ToolExecResult {
 
 export type ToolExecutor = (call: ToolCall, args: Record<string, unknown>) => Promise<ToolExecResult>
 
+/** ask_user 提问请求（交互卡片渲染 + 等待作答）。 */
+export interface AskRequest {
+  id: string
+  question: string
+  options: string[]
+  allowOther: boolean
+}
+
 export type AgentEvent =
   | { type: 'token'; text: string }
   | { type: 'reasoning'; text: string }
   | { type: 'round'; n: number }
   | { type: 'tool_call'; call: ToolCall }
   | { type: 'tool_result'; id: string; name: string; ok: boolean; summary: string; artifact?: import('./types').Artifact; needsConfirmation?: boolean }
+  | { type: 'ask'; id: string; question: string; options: string[]; allowOther: boolean }
   | { type: 'plan'; steps: string[] }
   | { type: 'step_done'; index: number }
   | { type: 'done'; content: string }
@@ -53,6 +62,8 @@ export interface RunAgentOptions {
   model?: string
   signal?: AbortSignal
   onEvent: (e: AgentEvent) => void
+  /** ask_user 作答通道：挂起直到用户作答/取消/中止；缺省时直接兜底跳过。 */
+  askUser?: (req: AskRequest, signal?: AbortSignal) => Promise<string>
   /** 可注入用于测试；默认走后端代理。 */
   postChatFn?: (payload: ChatPayload, signal?: AbortSignal) => Promise<Response>
 }
@@ -109,6 +120,21 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
         onEvent({ type: 'step_done', index })
         onEvent({ type: 'tool_result', id: call.id, name, ok: true, summary: `步骤 ${index + 1} 完成` })
         messages.push({ role: 'tool', tool_call_id: call.id, name, content: 'ok' })
+        continue
+      }
+      // 协议级工具：向用户提问（暂停循环等待作答，回答回灌模型）
+      if (name === 'ask_user') {
+        const question = String(args.question ?? '').trim()
+        const options = Array.isArray(args.options) ? args.options.map((o) => String(o)).filter(Boolean).slice(0, 4) : []
+        const allowOther = args.allowOther !== false
+        onEvent({ type: 'ask', id: call.id, question, options, allowOther })
+        const answer = opts.askUser
+          ? await opts.askUser({ id: call.id, question, options, allowOther }, signal)
+          : '（前端未接入提问交互，用户未能作答）'
+        throwIfAborted()
+        const summary = `用户的回答：${answer}`
+        onEvent({ type: 'tool_result', id: call.id, name, ok: true, summary })
+        messages.push({ role: 'tool', tool_call_id: call.id, name, content: summary })
         continue
       }
 

@@ -12,7 +12,7 @@ const apiKey = ref('')
 const keyMasked = ref('')
 const model = ref('')
 const modelsText = ref('')
-const maxIterations = ref(8)
+const maxIterations = ref(100)
 const confirmDestructive = ref(true)
 const saving = ref(false)
 
@@ -47,7 +47,7 @@ async function save(): Promise<void> {
         .split(/[,，]/)
         .map((m) => m.trim())
         .filter(Boolean),
-      maxIterations: Number(maxIterations.value) || 8,
+      maxIterations: Number(maxIterations.value) || 100,
       confirmDestructive: !!confirmDestructive.value,
     }
     // 仅在用户输入了新 Key 时才提交；缺省 / 空串均不带该字段（后端保留原值）
@@ -86,7 +86,7 @@ async function save(): Promise<void> {
       </label>
       <div class="cfg__row">
         <span class="cfg__label">最大工具调用轮数（{{ maxIterations }}）</span>
-        <ISlider v-model="maxIterations" :min="1" :max="20" :step="1" aria-label="最大轮数" />
+        <ISlider v-model="maxIterations" :min="1" :max="100" :step="1" aria-label="最大轮数" />
       </div>
       <div class="cfg__row cfg__row--switch">
         <span class="cfg__label">删除类操作需要用户确认</span>

@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { ROW_ID_FIELD } from '../../shared/types'
 import type { WidgetResolveOk } from './widgetData'
+
+/** structure 列渲染化合物结构图（RDKit wasm 按需加载）。 */
+const StructureCellView = defineAsyncComponent(() => import('../table/structure/StructureCell.vue'))
 
 const props = defineProps<{
   source: WidgetResolveOk
@@ -24,7 +27,12 @@ const truncated = computed(() => props.source.result.totalRows > rows.value.leng
         <tbody>
           <tr v-for="(row, i) in rows" :key="String(row[ROW_ID_FIELD] ?? i)">
             <td v-for="c in columns" :key="c.field">
-              {{ row[c.field] == null ? '' : String(row[c.field]) }}
+              <StructureCellView
+                v-if="c.dataType === 'structure'"
+                :value="row[c.field] == null ? null : String(row[c.field])"
+                compact
+              />
+              <template v-else>{{ row[c.field] == null ? '' : String(row[c.field]) }}</template>
             </td>
           </tr>
         </tbody>

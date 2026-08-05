@@ -40,12 +40,6 @@ const title = computed(() => {
   return props.widget.type === 'chart' ? '图表' : '表格'
 })
 
-const sourceLabel = computed(() => {
-  if (isLink.value) return props.widget.url ? '外部链接' : ''
-  if (!resolved.value?.ok) return ''
-  return `来自 Insight · ${resolved.value.analysis.name}`
-})
-
 async function load() {
   if (isLink.value || !inView.value || !props.widget.ref) return
   const token = ++gen
@@ -121,10 +115,7 @@ function openSource() {
 <template>
   <article ref="rootEl" class="dwc">
     <header class="dwc__head">
-      <div class="dwc__titles">
-        <h3 class="dwc__title is-ellipsis" :title="title">{{ title }}</h3>
-        <p v-if="sourceLabel" class="dwc__src is-ellipsis">{{ sourceLabel }}</p>
-      </div>
+      <h3 class="dwc__title is-ellipsis" :title="title">{{ title }}</h3>
       <div class="dwc__actions">
         <IButton
           variant="ghost"
@@ -162,7 +153,7 @@ function openSource() {
 }
 .dwc__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px 6px;
@@ -171,18 +162,11 @@ function openSource() {
   position: relative;
   z-index: 4;
 }
-.dwc__titles {
-  min-width: 0;
-}
 .dwc__title {
   margin: 0;
+  min-width: 0;
   font-size: var(--is-text-sm, 13px);
   font-weight: 600;
-}
-.dwc__src {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--is-text-tertiary);
 }
 .dwc__actions {
   display: flex;

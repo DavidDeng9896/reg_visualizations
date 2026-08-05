@@ -407,6 +407,7 @@ function buildFl112(): Analysis {
  * - bar：100% 堆叠 + 数据标签
  * - scatter：Linear 拟合 + 拟合注释（方程/R²）+ 95% 置信带 + Y=50 参考线（残差图/AUC 在底栏 Tab 看）
  * - box：小提琴图形态
+ * - table：structure 列化合物结构图（看板表格组件渲染）
  */
 function buildShowcase(): Analysis {
   const rand = rng(7001)
@@ -459,9 +460,37 @@ function buildShowcase(): Analysis {
     }
   }
 
+  // T4：化合物库（structure 列；看板表格组件渲染为化合物结构图）
+  const t4Cols: ColumnMeta[] = [
+    { field: 'compound_id', title: 'compound_id', dataType: 'string' },
+    { field: 'smiles', title: 'smiles', dataType: 'structure' },
+    { field: 'stage', title: 'stage', dataType: 'string' },
+    { field: 'mw_da', title: 'mw_da', dataType: 'number' },
+  ]
+  const t4Seed: Array<[string, string, string, number]> = [
+    ['CPD-001', 'CC(=O)Oc1ccccc1C(=O)O', '开发中', 180.2],
+    ['CPD-002', 'Cn1cnc2c1c(=O)n(C)c(=O)n2C', '评估中', 194.2],
+    ['CPD-003', 'CC(C)Cc1ccc(cc1)C(C)C(=O)O', 'CRO测试', 206.3],
+    ['CPD-004', 'CC(=O)Nc1ccc(O)cc1', '开发中', 151.2],
+    ['CPD-005', 'CN(C)CCOC(c1ccccc1)c2ccccc2', '评估中', 255.4],
+    ['CPD-006', 'CC(C)NCC(O)COc1cccc2ccccc12', 'CRO测试', 259.3],
+    ['CPD-007', 'OC(=O)Cc1ccccc1Nc1c(Cl)cccc1Cl', '开发中', 296.1],
+    ['CPD-008', 'COc1ccc2cc(C(C)C(=O)O)ccc2c1', '评估中', 230.3],
+    ['CPD-009', 'CCN(CC)C(=O)Cc1c(C)cccc1C', 'CRO测试', 234.3],
+    ['CPD-010', 'CC(C(=O)O)c1cccc(c1)C(=O)c2ccccc2', '开发中', 254.3],
+  ]
+  const t4Rows: Row[] = t4Seed.map(([compound_id, smiles, stage, mw_da]) => ({
+    [ROW_ID_FIELD]: uuid(),
+    compound_id,
+    smiles,
+    stage,
+    mw_da,
+  }))
+
   const up1 = uploadStep('demo-s-feat-up1', 'Step × Reagent yields', 'demo-t-feat-t1')
   const up2 = uploadStep('demo-s-feat-up2', 'Concentration-response', 'demo-t-feat-t2')
   const up3 = uploadStep('demo-s-feat-up3', 'Signal by group', 'demo-t-feat-t3')
+  const up4 = uploadStep('demo-s-feat-up4', 'Compound library', 'demo-t-feat-t4')
 
   const tables = [
     mkTable('demo-t-feat-t1', 'Step × Reagent yields', t1Cols, t1Rows, [
@@ -492,6 +521,7 @@ function buildShowcase(): Analysis {
     mkTable('demo-t-feat-t3', 'Signal by group', t3Cols, t3Rows, [
       makeView('box', '小提琴图', { y: { field: 'signal' }, x: { field: 'group' } }, { box: { mode: 'violin', showPoints: 'all' } }, 'demo-v-feat-box'),
     ], up3.id),
+    mkTable('demo-t-feat-t4', 'Compound library', t4Cols, t4Rows, [], up4.id),
   ]
 
   const now = nowIso()
@@ -505,7 +535,7 @@ function buildShowcase(): Analysis {
     revision: 0,
     tables,
     flowchartLayout: {},
-    steps: [up1, up2, up3],
+    steps: [up1, up2, up3, up4],
     files: [],
   })
 }

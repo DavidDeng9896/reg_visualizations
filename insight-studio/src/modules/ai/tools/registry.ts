@@ -1,6 +1,6 @@
 /**
  * Agent 工具注册表：OpenAI function calling 的 tools 定义（JSON Schema）。
- * 实现见 impl.ts；协议级工具 submit_plan / mark_step_done 在 agentLoop 内置处理。
+ * 实现见 impl.ts；协议级工具 submit_plan / mark_step_done / ask_user 在 agentLoop 内置处理。
  */
 
 type JsonSchema = Record<string, unknown>
@@ -24,6 +24,19 @@ export const TOOL_DEFS: ToolDef[] = [
     name: 'mark_step_done',
     description: '每完成计划中的一个步骤后调用，用于更新进展。',
     parameters: { type: 'object', properties: { index: { type: 'number', description: '完成的步骤序号（从 0 开始）' } }, required: ['index'] },
+  },
+  {
+    name: 'ask_user',
+    description: '需要用户拍板时调用：以卡片形式向用户提问并暂停等待作答（方案选择、关键参数缺失、口径确认）。用户的回答会作为工具结果返回。',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: str('向用户提出的问题（一句话说清要决策什么）'),
+        options: strArr('可选答案（2-4 个，用户单选）；为空时退化为纯提问'),
+        allowOther: { type: 'boolean', description: '是否允许用户输入自定义回答（默认 true）' },
+      },
+      required: ['question'],
+    },
   },
   {
     name: 'list_analyses',

@@ -3,6 +3,13 @@ import { createDemoAnalysis } from '../../src/shared/seed'
 
 /* ------------------------------- 通用动作 ------------------------------- */
 
+/** 确保处于工作区模式（无 query 进入默认 flowchart；flowchart 下树点击不切工作区）。 */
+export async function ensureWorkspace(page: Page): Promise<void> {
+  const btn = page.getByRole('button', { name: 'Flowchart' })
+  await expect(btn).toBeVisible()
+  if ((await btn.getAttribute('aria-pressed')) === 'true') await btn.click()
+}
+
 /** 写入 Iris Demo 并进入工作区（侧栏三张表就绪）。不依赖首页空态「一键 Demo」。 */
 export async function createDemoAndEnter(page: Page): Promise<void> {
   const demo = createDemoAnalysis()
@@ -10,6 +17,7 @@ export async function createDemoAndEnter(page: Page): Promise<void> {
   expect(res.ok()).toBeTruthy()
   await page.goto(`/analysis/${demo.id}`)
   await expect(page.getByTestId('sidebar-table').first()).toBeVisible()
+  await ensureWorkspace(page)
 }
 
 /** 打开流程图（已在 flowchart 时不重复点击，避免切回工作区）。 */
@@ -27,6 +35,7 @@ export function tableNode(page: Page, name: string): Locator {
 }
 
 export async function selectTable(page: Page, name: string): Promise<void> {
+  await ensureWorkspace(page)
   await tableNode(page, name).click()
   await expect(page.getByTestId('grid-stats')).toBeVisible()
 }
@@ -58,8 +67,8 @@ export async function mapField(page: Page, slotLabel: string, fieldLabel: string
 
 /** 断言 Plotly 图表已渲染出可见 trace。 */
 export async function expectCanvasInk(page: Page, _minInk = 40, timeout = 10_000): Promise<void> {
-  const plot = page.getByTestId('chart-canvas')
-  await expect(plot).toHaveClass(/js-plotly-plot/, { timeout })
+  // chart-canvas 是 ChartPanel 外层容器；Plotly 实例（js-plotly-plot）挂在内层 .chart-panel 上
+  const plot = page.getByTestId('chart-canvas').locator('.js-plotly-plot')
   await expect(plot).toBeVisible({ timeout })
   await expect(plot.locator('.plotly .trace').first()).toBeVisible({ timeout })
 }

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
 
-/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认操作始终外露。 */
+/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认操作以审批卡形式始终外露。 */
 const props = defineProps<{
   items: TraceItem[]
   streaming?: boolean
@@ -14,7 +14,7 @@ const doneCount = computed(() => props.items.filter((t) => !t.running).length)
 const pending = computed(() => {
   const seen = new Set<string>()
   return props.items.filter((t) => {
-    if (!t.needsConfirmation || t.confirmed) return false
+    if (!t.needsConfirmation || t.confirmed || t.rejected) return false
     // 模型偶尔重复发起同一删除，去重避免确认按钮堆叠
     if (seen.has(t.summary)) return false
     seen.add(t.summary)
@@ -35,6 +35,13 @@ function briefArgs(t: TraceItem): string {
   const s = JSON.stringify(t.args)
   return s.length > 90 ? `${s.slice(0, 90)}…` : s
 }
+
+/** 审批卡展示的具体操作描述（去协议前缀与续轮提示后缀）。 */
+function pendingAction(t: TraceItem): string {
+  return (t.summary || '')
+    .replace(/^NEEDS_CONFIRMATION:\s*/, '')
+    .split('。不要重试')[0]
+}
 </script>
 
 <template>
@@ -45,32 +52,50 @@ function briefArgs(t: TraceItem): string {
       <IIcon v-if="streaming" name="spinner" :size="12" class="trace__spin" />
     </button>
     <div v-if="expanded" class="trace__list">
-      <div v-for="t in items" :key="t.id" class="trace__item" :class="{ 'trace__item--fail': t.ok === false && !t.needsConfirmation }">
+      <div
+        v-for="t in items"
+        :key="t.id"
+        class="trace__item"
+        :class="{ 'trace__item--fail': t.ok === false && (!t.needsConfirmation || !!t.rejected) }"
+      >
         <div class="trace__row">
           <span class="trace__status">
             <IIcon v-if="t.running" name="spinner" :size="11" class="trace__spin" />
-            <IIcon v-else-if="t.needsConfirmation && !t.confirmed" name="warning" :size="11" class="trace__warn" />
+            <IIcon v-else-if="t.needsConfirmation && !t.confirmed && !t.rejected" name="warning" :size="11" class="trace__warn" />
             <IIcon v-else-if="t.ok" name="check" :size="11" class="trace__ok" />
             <IIcon v-else name="close" :size="11" class="trace__fail" />
           </span>
           <span class="trace__name">{{ t.name }}</span>
         </div>
         <div v-if="briefArgs(t)" class="trace__args">{{ briefArgs(t) }}</div>
-        <div v-if="t.summary" class="trace__summary">{{ t.summary.replace(/^NEEDS_CONFIRMATION:\s*/, '') }}</div>
+        <div v-if="t.summary" class="trace__summary">{{ t.needsConfirmation ? pendingAction(t) : t.summary }}</div>
       </div>
     </div>
-    <!-- 待确认操作：折叠状态下也始终外露 -->
+    <!-- 待确认操作：折叠状态下也始终外露的审批卡 -->
     <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
-      <IIcon name="warning" :size="12" class="trace__warn" />
-      <span class="trace__pending-text">等待确认：{{ t.summary.replace(/^NEEDS_CONFIRMATION:\s*/, '') }}</span>
-      <button type="button" class="trace__confirm" data-testid="ai-trace-confirm" @click="$emit('confirm', t)">确认执行</button>
+      <div class="trace__pending-head">
+        <IIcon name="approval" :size="13" class="trace__warn" />
+        <span class="trace__pending-title">需要你的批准</span>
+        <code class="trace__pending-tag">{{ t.name }}</code>
+      </div>
+      <div class="trace__pending-body">{{ pendingAction(t) }}</div>
+      <div class="trace__pending-actions">
+        <button type="button" class="trace__reject" @click="$emit('reject', t)">
+          <IIcon name="close" :size="12" />
+          拒绝
+        </button>
+        <button type="button" class="trace__approve" data-testid="ai-trace-confirm" @click="$emit('confirm', t)">
+          <IIcon name="check" :size="12" />
+          批准并执行
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 export default {
-  emits: ['confirm'],
+  emits: ['confirm', 'reject'],
 }
 </script>
 
@@ -162,9 +187,54 @@ export default {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.trace__confirm {
-  margin: 6px 0 0 20px;
-  padding: 3px 12px;
+.trace__pending {
+  margin-top: 8px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius);
+  background: var(--is-surface);
+  box-shadow: var(--is-shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
+  overflow: hidden;
+}
+.trace__pending-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+}
+.trace__pending-title {
+  font-size: var(--is-text-xs);
+  font-weight: 600;
+  color: var(--is-text);
+}
+.trace__pending-tag {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--is-danger) 45%, transparent);
+  border-radius: var(--is-radius-sm);
+  color: var(--is-danger);
+  font-family: var(--is-font-mono);
+  font-size: 10px;
+}
+.trace__pending-body {
+  padding: 7px 10px;
+  background: var(--is-surface-hover);
+  color: var(--is-text-secondary);
+  font-size: var(--is-text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.trace__pending-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.trace__approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
   border: 1px solid var(--is-accent);
   border-radius: var(--is-radius-sm);
   background: var(--is-accent);
@@ -172,27 +242,23 @@ export default {
   font-size: var(--is-text-xs);
   cursor: pointer;
 }
-.trace__confirm:hover {
+.trace__approve:hover {
   background: var(--is-accent-hover);
 }
-.trace__pending {
-  display: flex;
+.trace__reject {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--is-warning-border);
+  gap: 5px;
+  padding: 4px 12px;
+  border: none;
   border-radius: var(--is-radius-sm);
-  background: var(--is-warning-bg, #fdf6e7);
-  font-size: var(--is-text-xs);
-}
-.trace__pending-text {
-  flex: 1;
-  min-width: 0;
+  background: transparent;
   color: var(--is-text-secondary);
+  font-size: var(--is-text-xs);
+  cursor: pointer;
 }
-.trace__pending .trace__confirm {
-  margin: 0;
-  flex-shrink: 0;
+.trace__reject:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-danger);
 }
 </style>

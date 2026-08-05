@@ -25,22 +25,6 @@ function makeNum<T extends number | undefined>(get: () => T, set: (v: number | u
   })
 }
 
-const title = computed({
-  get: () => style.value.title ?? '',
-  set: (v: string) => {
-    if (v.trim()) style.value.title = v
-    else delete style.value.title
-    ctx.touch()
-  },
-})
-const subtitle = computed({
-  get: () => style.value.subtitle ?? '',
-  set: (v: string) => {
-    if (v.trim()) style.value.subtitle = v
-    else delete style.value.subtitle
-    ctx.touch()
-  },
-})
 const width = makeNum(() => style.value.width, (v) => (style.value.width = v))
 const height = makeNum(() => style.value.height, (v) => (style.value.height = v))
 const marginOf = (key: 'top' | 'right' | 'bottom' | 'left') =>
@@ -141,14 +125,6 @@ function removeRefLine(i: number) {
     <!-- General -->
     <section class="sty__sec">
       <h4 class="sty__sec-title">General</h4>
-      <div class="sty__row">
-        <span class="sty__label">Title</span>
-        <ITextField v-model="title" size="sm" clearable :placeholder="ctx.defaultTitle.value" />
-      </div>
-      <div class="sty__row">
-        <span class="sty__label">Subtitle</span>
-        <ITextField v-model="subtitle" size="sm" placeholder="可选" />
-      </div>
       <div class="sty__row">
         <span class="sty__label">Width (px)</span>
         <ITextField v-model="width" size="sm" placeholder="自适应" />

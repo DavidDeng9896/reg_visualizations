@@ -4,6 +4,9 @@ import { enqueueStructureJob } from './queue'
 /** 表格缩略图默认尺寸。 */
 export const STRUCTURE_THUMB_WIDTH = 160
 export const STRUCTURE_THUMB_HEIGHT = 128
+/** 紧凑缩略图尺寸（看板表格组件等高密度容器）。 */
+export const STRUCTURE_THUMB_COMPACT_WIDTH = 96
+export const STRUCTURE_THUMB_COMPACT_HEIGHT = 72
 /** 浮层预览尺寸。 */
 export const STRUCTURE_PREVIEW_WIDTH = 280
 export const STRUCTURE_PREVIEW_HEIGHT = 220

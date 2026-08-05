@@ -3,13 +3,15 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { runPipeline } from '../../shared/pipeline'
 import { findTable, findView } from '../../shared/tree'
+import { analysisRepository } from '../../shared/repository'
 import { buildChartOption } from '../charts/registry'
 import ChartPanel from '../charts/ChartPanel.vue'
 import type { ChartOption } from '../charts/types'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import type { Analysis } from '../../shared/types'
 import type { Artifact } from './types'
 
-/** 产物卡内嵌小图表（view 产物）：按当前分析实时构建。 */
+/** 产物卡内嵌小图表（view 产物）：按产物所属分析构建；非当前分析时从库读取。 */
 const props = defineProps<{
   artifact: Artifact
 }>()
@@ -19,13 +21,21 @@ const { current } = storeToRefs(store)
 
 const option = ref<ChartOption | null>(null)
 const failed = ref(false)
+let gen = 0
 
-function rebuild(): void {
+async function rebuild(): Promise<void> {
+  const token = ++gen
   failed.value = false
   option.value = null
-  const a = current.value
   const art = props.artifact
-  if (!a || art.kind !== 'view' || !art.tableId || !art.viewId) return
+  if (art.kind !== 'view' || !art.analysisId || !art.tableId || !art.viewId) return
+  let a: Analysis | null | undefined = current.value?.id === art.analysisId ? current.value : null
+  if (!a) a = await analysisRepository.get(art.analysisId)
+  if (token !== gen) return
+  if (!a) {
+    failed.value = true
+    return
+  }
   const table = findTable(a, art.tableId)
   const view = table ? findView(table.views, art.viewId) : null
   if (!view?.chart) {
@@ -40,7 +50,11 @@ function rebuild(): void {
   }
 }
 
-watch(() => [props.artifact.tableId, props.artifact.viewId, current.value?.updatedAt] as const, rebuild, { immediate: true })
+watch(
+  () => [props.artifact.analysisId, props.artifact.tableId, props.artifact.viewId, current.value?.updatedAt] as const,
+  () => void rebuild(),
+  { immediate: true },
+)
 
 const chartType = computed(() => props.artifact.viewType ?? 'chart')
 </script>

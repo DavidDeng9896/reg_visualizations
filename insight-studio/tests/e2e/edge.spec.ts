@@ -62,7 +62,8 @@ test.describe('边界：图表数据', () => {
     await pickOption(page.getByRole('combobox', { name: 'Chart type' }), 'Pie chart')
     await mapField(page, 'Categories', 'cat')
     await mapField(page, 'Measure', 'val')
-    await expect(page.locator('.cview__notice--warn', { hasText: '已剔除 1 个负值扇区' })).toBeVisible()
+    await page.getByTestId('chart-warnings').click()
+    await expect(page.locator('.cview__warnitem', { hasText: '已剔除 1 个负值扇区' })).toBeVisible()
     await expectCanvasInk(page)
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
   })
@@ -79,7 +80,8 @@ test.describe('边界：图表数据', () => {
 
     await page.getByRole('tab', { name: 'STYLE' }).click()
     await page.locator('section.axis-sec', { hasText: 'X-Axis' }).getByRole('switch').click()
-    await expect(page.locator('.cview__notice--warn', { hasText: 'Log 轴已回退' })).toBeVisible()
+    await page.getByTestId('chart-warnings').click()
+    await expect(page.locator('.cview__warnitem', { hasText: 'Log 轴已回退' })).toBeVisible()
     // 回退后仍能出图
     await expectCanvasInk(page, 20)
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
@@ -120,7 +122,8 @@ test.describe('边界：图表数据', () => {
     await mapField(page, 'X Axis', 'x')
     await mapField(page, 'Y Axis', 'y')
     await pickOption(page.getByRole('combobox', { name: '回归模型' }), 'Linear')
-    await expect(page.locator('.cview__notice--warn', { hasText: '至少需要 2 个数据点' })).toBeVisible()
+    await page.getByTestId('chart-warnings').click()
+    await expect(page.locator('.cview__warnitem', { hasText: '至少需要 2 个数据点' })).toBeVisible()
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
 
     // 全同 x（无方差）
@@ -130,7 +133,9 @@ test.describe('边界：图表数据', () => {
     await mapField(page, 'X Axis', 'x')
     await mapField(page, 'Y Axis', 'y')
     await pickOption(page.getByRole('combobox', { name: '回归模型' }), 'Linear')
-    await expect(page.locator('.cview__notice--warn', { hasText: 'X 无方差' })).toBeVisible()
+    const chip = page.getByTestId('chart-warnings')
+    if ((await chip.getAttribute('aria-expanded')) !== 'true') await chip.click()
+    await expect(page.locator('.cview__warnitem', { hasText: 'X 无方差' })).toBeVisible()
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
   })
 })
@@ -153,7 +158,9 @@ test.describe('边界：依赖与绑定', () => {
     const iris = tableNode(page, 'Iris measurements')
     await iris.hover()
     await iris.getByLabel('更多操作').click()
-    await page.getByRole('menuitem', { name: '删除' }).click()
+    const deleteItem = page.getByRole('menuitem', { name: '删除' })
+    await expect(deleteItem).toBeVisible()
+    await deleteItem.click()
     await expect(page.locator('.is-toast--error', { hasText: '无法删除' })).toBeVisible()
     // 表仍在
     await expect(tableNode(page, 'Iris measurements')).toBeVisible()
@@ -224,6 +231,6 @@ test.describe('边界：快速连续切换（防抖竞争）', () => {
     // 最终状态：无页面错误、无 error toast、网格或图表正常
     expect(pageErrors).toEqual([])
     await expect(page.locator('.is-toast--error')).toHaveCount(0)
-    await expect(page.getByTestId('grid-stats')).toBeVisible()
+    await expect(page.getByTestId('grid-stats').or(page.getByTestId('chart-canvas'))).toBeVisible()
   })
 })

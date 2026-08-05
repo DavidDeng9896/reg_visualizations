@@ -30,7 +30,7 @@ func defaultAiConfig() aiConfig {
 		APIKey:             "",
 		Model:              "gpt-4o-mini",
 		Models:             []string{},
-		MaxIterations:      8,
+		MaxIterations:      100,
 		ConfirmDestructive: true,
 	}
 }
@@ -63,7 +63,7 @@ func (s *Server) readAiConfig() aiConfig {
 		cfg.Models = []string{}
 	}
 	if cfg.MaxIterations < 1 {
-		cfg.MaxIterations = 8
+		cfg.MaxIterations = 100
 	}
 	return cfg
 }
@@ -137,8 +137,8 @@ func (s *Server) putAiConfig(w http.ResponseWriter, r *http.Request) {
 		if n < 1 {
 			n = 1
 		}
-		if n > 20 {
-			n = 20
+		if n > 100 {
+			n = 100
 		}
 		next.MaxIterations = n
 	}
