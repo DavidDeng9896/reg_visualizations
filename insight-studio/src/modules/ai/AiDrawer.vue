@@ -6,34 +6,152 @@ import { useAiStore, type TraceItem } from './aiStore'
 import AiMessageList from './AiMessageList.vue'
 import AiInputBar from './AiInputBar.vue'
 import AiSettingsModal from './AiSettingsModal.vue'
+import {
+  clampFloating,
+  dockedRect,
+  HEADER_OFFSET,
+  readLayout,
+  shouldDock,
+  writeLayout,
+  type FloatingRect,
+  type PanelMode,
+} from './panelLayout'
 
-/** AI 助手全局抽屉：会话历史面板 + 消息流 + 输入条。 */
+/** AI 助手全局面板：可停靠右侧或拖出悬浮；会话历史 + 消息流 + 输入条。 */
 const ai = useAiStore()
 const { drawerOpen, settingsOpen, conversations, currentId, messages, running, switching } = storeToRefs(ai)
 const historyOpen = ref(false)
 const historyLoading = ref(false)
 const deletingId = ref<string | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
-/** 用户未主动上滚时，新内容自动跟随到底部 */
 const stickToBottom = ref(true)
-/** 内容（含图表预览）晚到增高时，重开抽屉仍能贴底 */
 let bodyRo: ResizeObserver | null = null
+
+const mode = ref<PanelMode>('docked')
+const floating = ref<FloatingRect>(dockedRect({ width: typeof window !== 'undefined' ? window.innerWidth : 1280, height: typeof window !== 'undefined' ? window.innerHeight : 800 }))
+const dragging = ref(false)
+let dragOffsetX = 0
+let dragOffsetY = 0
+
+function persist() {
+  writeLayout({ mode: mode.value, floating: floating.value })
+  ai.setPanelMode(mode.value)
+}
+
+function applyViewportClamp() {
+  const vp = { width: window.innerWidth, height: window.innerHeight }
+  if (mode.value === 'docked') {
+    floating.value = dockedRect(vp, floating.value.w)
+  } else {
+    floating.value = clampFloating(floating.value, vp)
+  }
+}
+
+function onResize() {
+  applyViewportClamp()
+  persist()
+}
+
+function onEsc(e: KeyboardEvent) {
+  if (e.key === 'Escape' && drawerOpen.value && !settingsOpen.value) {
+    drawerOpen.value = false
+  }
+}
 
 onMounted(() => {
   void ai.init()
+  const saved = readLayout()
+  mode.value = saved.mode
+  floating.value = saved.floating
+  applyViewportClamp()
+  ai.setPanelMode(mode.value)
+  window.addEventListener('resize', onResize)
+  window.addEventListener('keydown', onEsc)
 })
 
 onBeforeUnmount(() => {
   bodyRo?.disconnect()
   bodyRo = null
+  window.removeEventListener('resize', onResize)
+  window.removeEventListener('keydown', onEsc)
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragEnd)
 })
+
+const panelStyle = computed(() => {
+  if (mode.value === 'docked') {
+    return {
+      top: `${HEADER_OFFSET}px`,
+      right: '0',
+      left: 'auto',
+      bottom: '0',
+      width: `${floating.value.w}px`,
+      maxHeight: 'none',
+      height: 'auto',
+      borderRadius: '0',
+    } as Record<string, string>
+  }
+  const h = `min(720px, calc(100vh - ${floating.value.y + 8}px))`
+  return {
+    top: `${floating.value.y}px`,
+    left: `${floating.value.x}px`,
+    right: 'auto',
+    bottom: 'auto',
+    width: `${floating.value.w}px`,
+    height: h,
+    maxHeight: h,
+    borderRadius: 'var(--is-radius-md, 10px)',
+  } as Record<string, string>
+})
+
+function onDragStart(e: PointerEvent) {
+  const t = e.target as HTMLElement
+  if (t.closest('button, a, input, textarea, [data-no-drag]')) return
+  dragging.value = true
+  if (mode.value === 'docked') {
+    const vp = { width: window.innerWidth, height: window.innerHeight }
+    floating.value = dockedRect(vp, floating.value.w)
+    mode.value = 'floating'
+    ai.setPanelMode('floating')
+  }
+  dragOffsetX = e.clientX - floating.value.x
+  dragOffsetY = e.clientY - floating.value.y
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', onDragEnd)
+  e.preventDefault()
+}
+
+function onDragMove(e: PointerEvent) {
+  if (!dragging.value) return
+  floating.value = clampFloating(
+    { x: e.clientX - dragOffsetX, y: e.clientY - dragOffsetY, w: floating.value.w },
+    { width: window.innerWidth, height: window.innerHeight },
+  )
+}
+
+function onDragEnd() {
+  if (!dragging.value) return
+  dragging.value = false
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragEnd)
+  const vp = { width: window.innerWidth, height: window.innerHeight }
+  if (shouldDock(floating.value, vp.width)) {
+    mode.value = 'docked'
+    floating.value = dockedRect(vp, floating.value.w)
+    ai.setPanelMode('docked')
+  } else {
+    mode.value = 'floating'
+    floating.value = clampFloating(floating.value, vp)
+    ai.setPanelMode('floating')
+  }
+  persist()
+}
 
 function scrollBottom() {
   const el = bodyEl.value
   if (el) el.scrollTop = el.scrollHeight
 }
 
-/** 双 rAF：等布局/Teleport 与图表预览首帧后再贴底 */
 function scrollBottomSoon() {
   void nextTick(() => {
     scrollBottom()
@@ -162,13 +280,25 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
 <template>
   <Teleport to="body">
     <Transition name="ai-drawer">
-      <aside v-if="drawerOpen" class="ai-drawer" aria-label="AI 助手" data-testid="ai-drawer">
-        <header class="ai-drawer__head">
+      <aside
+        v-if="drawerOpen"
+        class="ai-drawer"
+        :class="{
+          'ai-drawer--docked': mode === 'docked',
+          'ai-drawer--floating': mode === 'floating',
+          'ai-drawer--dragging': dragging,
+        }"
+        :style="panelStyle"
+        aria-label="AI 助手"
+        data-testid="ai-drawer"
+        :data-mode="mode"
+      >
+        <header class="ai-drawer__head ai-drawer__head--drag" @pointerdown="onDragStart">
           <div class="ai-drawer__title">
             <IIcon name="sparkle" :size="16" class="ai-drawer__logo" />
             <span>{{ historyOpen ? '会话历史' : 'AI 助手' }}</span>
           </div>
-          <div class="ai-drawer__actions">
+          <div class="ai-drawer__actions" data-no-drag>
             <button
               v-if="!historyOpen"
               type="button"
@@ -210,7 +340,6 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
           </div>
         </header>
 
-        <!-- 会话历史：画在抽屉内部，避免 Teleport Popover z-index 被抽屉盖住 -->
         <div v-if="historyOpen" class="ai-drawer__history" data-testid="ai-history-panel" role="listbox" aria-label="会话历史列表">
           <div v-if="historyLoading" class="ai-drawer__loading" role="status">加载历史…</div>
           <div v-else-if="historyEmpty" class="ai-drawer__history-empty">
@@ -276,17 +405,26 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
 <style scoped>
 .ai-drawer {
   position: fixed;
-  top: 48px;
-  right: 0;
-  bottom: 0;
-  width: 480px;
   max-width: 92vw;
   display: flex;
   flex-direction: column;
   background: var(--is-bg);
-  border-left: 1px solid var(--is-border);
+  border: 1px solid var(--is-border);
   box-shadow: var(--is-shadow-lg);
   z-index: var(--is-z-modal);
+  overflow: hidden;
+}
+.ai-drawer--docked {
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+}
+.ai-drawer--floating {
+  border-radius: var(--is-radius-md, 10px);
+}
+.ai-drawer--dragging {
+  user-select: none;
+  cursor: grabbing;
 }
 .ai-drawer__head {
   display: flex;
@@ -296,6 +434,12 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
   background: var(--is-surface);
   border-bottom: 1px solid var(--is-border);
   flex-shrink: 0;
+}
+.ai-drawer__head--drag {
+  cursor: grab;
+}
+.ai-drawer--dragging .ai-drawer__head--drag {
+  cursor: grabbing;
 }
 .ai-drawer__title {
   display: flex;

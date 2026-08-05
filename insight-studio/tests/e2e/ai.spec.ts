@@ -159,7 +159,7 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await createDemoAndEnter(page)
 
     // 打开抽屉 → 发指令
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
     await expect(page.getByTestId('ai-drawer')).toBeVisible()
     await page.getByTestId('ai-input').fill('把 Weight-length study 画成散点图并加线性拟合')
     await page.getByTestId('ai-send').click()
@@ -210,7 +210,7 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await createDemoAndEnter(page)
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
 
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
     await page.getByTestId('ai-input').fill('删除 Iris measurements 表')
     await page.getByTestId('ai-send').click()
 
@@ -232,7 +232,7 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await mockAi(page, mockSseAsk)
 
     await createDemoAndEnter(page)
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
 
     // 输入区：上下文指示器 + 压缩按钮（历史不足 2 轮时禁用）
     const ctx = page.getByTestId('ai-ctx')

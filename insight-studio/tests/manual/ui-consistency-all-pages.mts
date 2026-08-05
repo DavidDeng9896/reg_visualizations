@@ -346,7 +346,7 @@ async function main() {
     /* ========== AI ========== */
     await pageCase(page, 'P18-ai-drawer', 'AI 助手抽屉', async () => {
       await closeAllOverlays(page)
-      await page.getByTestId('ai-entry').click()
+      await page.getByTestId('ai-fab').click()
       await page.getByTestId('ai-drawer').waitFor({ state: 'visible' })
       return 'drawer'
     })

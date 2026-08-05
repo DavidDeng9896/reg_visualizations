@@ -149,7 +149,7 @@ async function main() {
     })
 
     await step('06-打开AI抽屉', page, async () => {
-      await page.getByTestId('ai-entry').click()
+      await page.getByTestId('ai-fab').click()
       await waitVisible(page, '[data-testid="ai-drawer"]')
       return 'drawer-open'
     })

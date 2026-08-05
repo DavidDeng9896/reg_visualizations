@@ -6,7 +6,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { createScientistAnalysis } from '../../src/shared/scientistSeed'
 
 async function openAi(page: Page): Promise<void> {
-  await page.getByTestId('ai-entry').click()
+  await page.getByTestId('ai-fab').click()
   await expect(page.getByTestId('ai-drawer')).toBeVisible()
 }
 
