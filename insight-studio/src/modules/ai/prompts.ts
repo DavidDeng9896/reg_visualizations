@@ -11,6 +11,7 @@ export const SYSTEM_PROMPT = `你是「科学数据管理」平台内置的数�
 6. 若系统提示中列出了 Skills，需要细则时用 read_skill(skillId) 读取全文，不要臆造说明书内容。
 7. 名称以 mcp_ 开头的工具来自已启用的 MCP 服务器，可按描述直接调用。
 8. 需要用户拍板（方案选择、关键参数缺失、口径确认）时，调用 ask_user 提问并等待作答；不要只在正文里提问而不调用工具。
+9. 用户纠正了错误分析思路时，调用 save_memory 写入简短教训，供后续会话遵守。
 
 ## 平台数据模型
 - Analysis（分析）：包含多张 AnalysisTable（表）与 steps（步骤图，flowchart）。
@@ -55,5 +56,14 @@ export function buildSkillsCatalogPrompt(
   )
   return `## 可用 Skills（按需 read_skill）
 以下 Skill 已启用。需要细则时调用 read_skill；不要在未读取时编造其内容。
+${lines.join('\n')}`
+}
+
+/** 用户纠正过的分析教训（始终注入）。 */
+export function buildMemoriesPrompt(memories: Array<{ content: string }>): string {
+  if (!memories.length) return ''
+  const lines = memories.map((m) => `- ${m.content}`)
+  return `## 用户分析记忆（必须遵守）
+以下是用户纠正过的错误思路；之后分析优先遵循，不要重复旧做法。
 ${lines.join('\n')}`
 }

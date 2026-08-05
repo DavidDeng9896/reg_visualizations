@@ -131,12 +131,11 @@ func (s *Store) migrate() error {
         user_id TEXT NOT NULL DEFAULT 'david'
       );
       CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations(updated_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations(user_id, updated_at DESC);
     `)
 	if err != nil {
 		return err
 	}
-	// Existing DBs created before user_id: add column (ignore duplicate-column error).
+	// Existing DBs created before user_id: add column first, then index (ignore duplicate-column error).
 	_, _ = s.DB.Exec(`ALTER TABLE ai_conversations ADD COLUMN user_id TEXT NOT NULL DEFAULT 'david'`)
 	_, _ = s.DB.Exec(`UPDATE ai_conversations SET user_id = 'david' WHERE user_id IS NULL OR user_id = ''`)
 	_, _ = s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations(user_id, updated_at DESC)`)

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/memory"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
 )
@@ -16,30 +17,31 @@ type Server struct {
 	Store      *store.Store
 	Mux        *http.ServeMux
 	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
-	DataDir    string // when set, Skills/MCP resolve under users/<id>/
+	DataDir    string // when set, Skills/MCP/memory resolve under users/<id>/
 	SkillsSeed string // official skills seed source
 	Skills     *skills.Store // legacy single-store fallback (tests / DataDir empty)
 	MCP        *mcp.Store
+	Memory     *memory.Store
 	stores     *userStores
 }
 
 func New(s *store.Store) *Server {
-	return NewWithOptions(s, "", "", "", nil, nil)
+	return NewWithOptions(s, "", "", "", nil, nil, nil)
 }
 
 func NewWithConfigPath(s *store.Store, configPath string) *Server {
-	return NewWithOptions(s, configPath, "", "", nil, nil)
+	return NewWithOptions(s, configPath, "", "", nil, nil, nil)
 }
 
-// NewWithUserData wires per-user Skills/MCP under dataDir/users/<userId>/.
+// NewWithUserData wires per-user Skills/MCP/memory under dataDir/users/<userId>/.
 func NewWithUserData(s *store.Store, configPath, dataDir, skillsSeed string) *Server {
-	return NewWithOptions(s, configPath, dataDir, skillsSeed, nil, nil)
+	return NewWithOptions(s, configPath, dataDir, skillsSeed, nil, nil, nil)
 }
 
-func NewWithOptions(s *store.Store, configPath, dataDir, skillsSeed string, sk *skills.Store, mcpStore *mcp.Store) *Server {
+func NewWithOptions(s *store.Store, configPath, dataDir, skillsSeed string, sk *skills.Store, mcpStore *mcp.Store, memStore *memory.Store) *Server {
 	srv := &Server{
 		Store: s, Mux: http.NewServeMux(), ConfigPath: configPath,
-		DataDir: dataDir, SkillsSeed: skillsSeed, Skills: sk, MCP: mcpStore,
+		DataDir: dataDir, SkillsSeed: skillsSeed, Skills: sk, MCP: mcpStore, Memory: memStore,
 		stores: newUserStores(),
 	}
 	srv.routes()
@@ -80,6 +82,10 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("POST /api/ai/mcp/servers/{id}/refresh", s.refreshMcpServer)
 	s.Mux.HandleFunc("GET /api/ai/mcp/tools", s.listMcpTools)
 	s.Mux.HandleFunc("POST /api/ai/mcp/tools/call", s.callMcpTool)
+
+	s.Mux.HandleFunc("GET /api/ai/memories", s.listMemories)
+	s.Mux.HandleFunc("POST /api/ai/memories", s.createMemory)
+	s.Mux.HandleFunc("DELETE /api/ai/memories/{id}", s.deleteMemory)
 
 	s.Mux.HandleFunc("POST /api/python/execute", s.postPythonExecute)
 }

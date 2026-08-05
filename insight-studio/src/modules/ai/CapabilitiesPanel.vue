@@ -3,7 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { IButton, IModal, ITabs, ITextField, IToggle, toast, type TabItem } from '../../ui'
 import {
   aiMcpApi,
+  aiMemoriesApi,
   aiSkillsApi,
+  type AiMemory,
   type McpHeaderKV,
   type McpServerView,
   type SkillDetail,
@@ -11,7 +13,7 @@ import {
 } from './client'
 import { useCurrentUser } from '../shell/currentUser'
 
-/** 侧栏「能力」面板：Skills | MCP 管理（按当前模拟用户隔离）。 */
+/** 侧栏「能力」面板：Skills | MCP | 记忆（按当前模拟用户隔离）。 */
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
@@ -20,6 +22,7 @@ const { currentId: currentUserId } = useCurrentUser()
 const tabs: TabItem[] = [
   { key: 'skills', label: 'Skills' },
   { key: 'mcp', label: 'MCP' },
+  { key: 'memory', label: '记忆' },
 ]
 const tab = ref('skills')
 
@@ -36,6 +39,11 @@ const formUrl = ref('')
 const formHeaders = ref<McpHeaderKV[]>([{ key: '', value: '' }])
 const savingMcp = ref(false)
 const refreshingId = ref<string | null>(null)
+
+const memories = ref<AiMemory[]>([])
+const loadingMemories = ref(false)
+const memoryDraft = ref('')
+const savingMemory = ref(false)
 
 const title = computed(() => '能力')
 
@@ -63,12 +71,25 @@ async function loadMcp(): Promise<void> {
   }
 }
 
+async function loadMemories(): Promise<void> {
+  loadingMemories.value = true
+  try {
+    memories.value = await aiMemoriesApi.list()
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '加载记忆失败')
+    memories.value = []
+  } finally {
+    loadingMemories.value = false
+  }
+}
+
 watch(
   () => props.open,
   (v) => {
     if (!v) return
     void loadSkills()
     void loadMcp()
+    void loadMemories()
     preview.value = null
   },
 )
@@ -78,6 +99,7 @@ watch(currentUserId, () => {
   preview.value = null
   void loadSkills()
   void loadMcp()
+  void loadMemories()
 })
 
 async function toggleSkill(s: SkillInfo, enabled: boolean): Promise<void> {
@@ -200,6 +222,35 @@ async function removeServer(s: McpServerView): Promise<void> {
     toast.error(e instanceof Error ? e.message : '删除失败')
   }
 }
+
+async function addMemory(): Promise<void> {
+  const content = memoryDraft.value.trim()
+  if (!content) {
+    toast.error('请填写记忆内容')
+    return
+  }
+  savingMemory.value = true
+  try {
+    const rec = await aiMemoriesApi.create(content)
+    memories.value = [rec, ...memories.value]
+    memoryDraft.value = ''
+    toast.success('已添加记忆')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '添加失败')
+  } finally {
+    savingMemory.value = false
+  }
+}
+
+async function removeMemory(m: AiMemory): Promise<void> {
+  try {
+    await aiMemoriesApi.remove(m.id)
+    memories.value = memories.value.filter((x) => x.id !== m.id)
+    toast.success('已删除')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '删除失败')
+  }
+}
 </script>
 
 <template>
@@ -258,7 +309,7 @@ async function removeServer(s: McpServerView): Promise<void> {
         </div>
       </div>
 
-      <div v-else class="cap__pane">
+      <div v-else-if="tab === 'mcp'" class="cap__pane">
         <div class="cap__form">
           <label class="cap__field">
             <span>名称</span>
@@ -310,6 +361,39 @@ async function removeServer(s: McpServerView): Promise<void> {
               label="启用"
               @update:model-value="toggleServer(s, $event)"
             />
+          </li>
+        </ul>
+      </div>
+
+      <div v-else class="cap__pane" data-testid="ai-memories">
+        <p class="cap__hint">记录纠正过的分析思路；下次对话会自动注入，避免重复旧做法。</p>
+        <div class="cap__form">
+          <label class="cap__field">
+            <span>新记忆</span>
+            <ITextField v-model="memoryDraft" placeholder="例如：类别对比先聚合再柱状图，勿直接散点" />
+          </label>
+          <IButton
+            variant="primary"
+            size="sm"
+            :loading="savingMemory"
+            data-testid="ai-memory-add"
+            @click="addMemory"
+          >
+            添加
+          </IButton>
+        </div>
+        <p v-if="loadingMemories" class="cap__empty">加载中…</p>
+        <p v-else-if="!memories.length" class="cap__empty">暂无记忆。也可在对话中让 AI 调用 save_memory。</p>
+        <ul v-else class="cap__list">
+          <li v-for="m in memories" :key="m.id" class="cap__item">
+            <div class="cap__item-main">
+              <p class="cap__desc">{{ m.content }}</p>
+              <div class="cap__actions">
+                <button type="button" class="cap__link cap__link--danger" @click="removeMemory(m)">
+                  删除
+                </button>
+              </div>
+            </div>
           </li>
         </ul>
       </div>

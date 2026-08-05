@@ -6,22 +6,25 @@ import (
 	"sync"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/memory"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userid"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userscope"
 )
 
-// userStores caches per-user Skills/MCP stores keyed by user id.
+// userStores caches per-user Skills/MCP/memory stores keyed by user id.
 type userStores struct {
-	mu     sync.Mutex
-	skills map[string]*skills.Store
-	mcp    map[string]*mcp.Store
+	mu      sync.Mutex
+	skills  map[string]*skills.Store
+	mcp     map[string]*mcp.Store
+	memory  map[string]*memory.Store
 }
 
 func newUserStores() *userStores {
 	return &userStores{
 		skills: map[string]*skills.Store{},
 		mcp:    map[string]*mcp.Store{},
+		memory: map[string]*memory.Store{},
 	}
 }
 
@@ -61,6 +64,24 @@ func (s *Server) mcpFor(r *http.Request) (*mcp.Store, error) {
 		return nil, err
 	}
 	s.stores.mcp[uid] = st
+	return st, nil
+}
+
+func (s *Server) memoryFor(r *http.Request) (*memory.Store, error) {
+	if s.DataDir == "" {
+		return s.Memory, nil
+	}
+	uid := userid.FromRequest(r)
+	s.stores.mu.Lock()
+	defer s.stores.mu.Unlock()
+	if st, ok := s.stores.memory[uid]; ok {
+		return st, nil
+	}
+	st, err := memory.NewStore(userscope.UserRoot(s.DataDir, uid))
+	if err != nil {
+		return nil, err
+	}
+	s.stores.memory[uid] = st
 	return st, nil
 }
 

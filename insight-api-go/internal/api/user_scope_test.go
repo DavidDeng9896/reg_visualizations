@@ -163,3 +163,70 @@ func TestMcpIsolatedByUser(t *testing.T) {
 		t.Fatal("dengxiaowei should see 0 mcp")
 	}
 }
+
+func TestMemoriesIsolatedByUser(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
+	h := srv.Handler()
+
+	create := func(user, content string) string {
+		body := `{"content":` + mustJSON(content) + `}`
+		req := httptest.NewRequest(http.MethodPost, "/api/ai/memories", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(userid.HeaderName, user)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("create %s: %d %s", user, rr.Code, rr.Body.String())
+		}
+		var rec map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &rec)
+		return rec["id"].(string)
+	}
+
+	idDavid := create("david", "david lesson")
+	_ = create("dengxiaowei", "dx lesson")
+
+	list := func(user string) []map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/ai/memories", nil)
+		req.Header.Set(userid.HeaderName, user)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != 200 {
+			t.Fatalf("list %s: %d", user, rr.Code)
+		}
+		var out []map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &out)
+		return out
+	}
+
+	davidList := list("david")
+	dxList := list("dengxiaowei")
+	if len(davidList) != 1 || davidList[0]["content"] != "david lesson" {
+		t.Fatalf("david list=%v", davidList)
+	}
+	if len(dxList) != 1 || dxList[0]["content"] != "dx lesson" {
+		t.Fatalf("dx list=%v", dxList)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/ai/memories/"+idDavid, nil)
+	req.Header.Set(userid.HeaderName, "dengxiaowei")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("cross-user delete want 404 got %d", rr.Code)
+	}
+	if len(list("david")) != 1 {
+		t.Fatal("david memory should remain")
+	}
+}
+
+func mustJSON(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}

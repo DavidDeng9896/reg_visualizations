@@ -317,3 +317,18 @@ export const aiMcpApi = {
       body: JSON.stringify(body),
     }, { withUser: true }),
 }
+
+export interface AiMemory {
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export const aiMemoriesApi = {
+  list: () => req<AiMemory[]>('/api/ai/memories', undefined, { withUser: true }),
+  create: (content: string) =>
+    req<AiMemory>('/api/ai/memories', { method: 'POST', body: JSON.stringify({ content }) }, { withUser: true }),
+  remove: (id: string) =>
+    req<void>(`/api/ai/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
+}

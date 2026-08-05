@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { runAgent, MaxIterError, type AgentEvent, type AskRequest, type ToolExecutor } from './agentLoop'
-import { aiConfigApi, aiConvApi, aiMcpApi, aiSkillsApi, type AiPublicConfig, type ConversationMeta } from './client'
+import { aiConfigApi, aiConvApi, aiMcpApi, aiMemoriesApi, aiSkillsApi, type AiPublicConfig, type ConversationMeta } from './client'
 import type { ChatMessage, ChatPayload, ToolCall } from './client'
 import { OPENAI_TOOLS } from './tools/registry'
 import { execTool } from './tools/impl'
 import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
-import { SYSTEM_PROMPT, buildSkillsCatalogPrompt } from './prompts'
+import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import type { Artifact } from './types'
@@ -213,6 +213,14 @@ export const useAiStore = defineStore('ai', {
         if (catalog) chatMessages.splice(1, 0, { role: 'system', content: catalog })
       } catch {
         /* skills 不可用时跳过 */
+      }
+      // 用户分析记忆：始终注入（失败降级）
+      try {
+        const memories = await aiMemoriesApi.list()
+        const memPrompt = buildMemoriesPrompt(memories)
+        if (memPrompt) chatMessages.splice(1, 0, { role: 'system', content: memPrompt })
+      } catch {
+        /* memories 不可用时跳过 */
       }
       const { tools, exec } = await this.buildToolsAndExec()
 

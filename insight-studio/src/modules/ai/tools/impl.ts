@@ -19,7 +19,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore'
 import { useDashboardStore } from '../../../stores/dashboardStore'
 import type { ToolExecResult } from '../agentLoop'
 import type { Artifact } from '../types'
-import { aiSkillsApi } from '../client'
+import { aiSkillsApi, aiMemoriesApi } from '../client'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -490,6 +490,13 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (!id) return fail('缺少 skillId')
     const d = await aiSkillsApi.get(id)
     return ok(`# ${d.name} (${d.id})\n\n${d.body}`)
+  },
+
+  async save_memory(args) {
+    const content = String(args.content ?? '').trim()
+    if (!content) return fail('缺少 content（请写入简短可复用的分析教训）')
+    const rec = await aiMemoriesApi.create(content)
+    return ok(`已保存分析记忆（id: ${rec.id}）：${rec.content}`)
   },
 }
 

@@ -212,6 +212,12 @@ export const TOOL_DEFS: ToolDef[] = [
     description: '读取某个 Skill 的完整 SKILL.md 说明书正文。',
     parameters: { type: 'object', properties: { skillId: str('Skill id（来自 list_skills）') }, required: ['skillId'] },
   },
+  {
+    name: 'save_memory',
+    description:
+      '将用户纠正过的错误分析思路沉淀为记忆，供后续会话遵守。content 应是简短、可复用的教训（勿贴整段对话）。',
+    parameters: { type: 'object', properties: { content: str('教训正文') }, required: ['content'] },
+  },
 ]
 
 /** OpenAI tools 数组（可直接放进 chat payload）。 */
