@@ -13,7 +13,6 @@ import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, ISelect, ITextField, toast } from '../../ui'
 import AddDataMenu from '../workspace/AddDataMenu.vue'
 import { useAddData } from './useAddData'
-import CapabilitiesPanel from '../ai/CapabilitiesPanel.vue'
 
 // 重依赖（xlsx/alasql/CodeMirror/papaparse）不进首屏 entry，按需异步加载
 const SidebarTree = defineAsyncComponent(() => import('../workspace/SidebarTree.vue'))
@@ -36,7 +35,6 @@ const analysisStore = useAnalysisStore()
 const { sortedItems, currentId } = storeToRefs(dashStore)
 const { current: currentAnalysis } = storeToRefs(analysisStore)
 const { open: addDataOpen, closeMenu: closeAddData } = useAddData()
-const capabilitiesOpen = ref(false)
 
 /* ------------------------------- 模式 ------------------------------- */
 type Pane = 'dashboard' | 'analysis-list' | 'analysis-detail'
@@ -409,16 +407,6 @@ function openCombine() {
       >
         <IIcon name="plus" :size="15" />
       </button>
-      <button
-        type="button"
-        class="side__add"
-        aria-label="能力"
-        title="能力（Skills / MCP）"
-        @click="capabilitiesOpen = true"
-      >
-        <IIcon name="sparkle" :size="15" />
-      </button>
-      <CapabilitiesPanel v-model:open="capabilitiesOpen" />
     </div>
 
     <!-- 列表模式：项目/部门筛选 -->

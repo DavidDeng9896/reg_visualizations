@@ -65,6 +65,8 @@ interface AiState {
   abort: AbortController | null
   /** ask_user 待答问题（卡片渲染；作答经模块级 resolver 回灌 agent-loop）。 */
   pendingAsk: { id: string; question: string; options: string[]; allowOther: boolean } | null
+  /** 对话窗模式：停靠 | 悬浮（与 AiDrawer 同步，供 FAB 显隐）。 */
+  panelMode: 'docked' | 'floating'
 }
 
 let uid = 0
@@ -89,6 +91,7 @@ export const useAiStore = defineStore('ai', {
     modelOverride: typeof localStorage !== 'undefined' ? localStorage.getItem(MODEL_KEY) : null,
     abort: null,
     pendingAsk: null,
+    panelMode: 'docked',
   }),
 
   getters: {
@@ -175,6 +178,10 @@ export const useAiStore = defineStore('ai', {
     toggleDrawer() {
       this.drawerOpen = !this.drawerOpen
       if (this.drawerOpen) void this.init()
+    },
+
+    setPanelMode(mode: 'docked' | 'floating') {
+      this.panelMode = mode
     },
 
     /** 发送用户消息并跑 agent-loop。 */

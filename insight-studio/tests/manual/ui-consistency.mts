@@ -144,7 +144,7 @@ async function main() {
     }
 
     // —— AI 抽屉 + 历史 ——
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
     await page.getByTestId('ai-drawer').waitFor({ state: 'visible' })
     await shot(page, '05-ai-drawer')
     await page.getByTestId('ai-history').click()

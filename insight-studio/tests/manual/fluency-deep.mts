@@ -96,7 +96,7 @@ try {
   await step('D05-AI历史选旧会话回看', page, async () => {
     // 确保抽屉可点：先关可能存在的遮罩
     await page.keyboard.press('Escape').catch(() => undefined)
-    await page.getByTestId('ai-entry').click()
+    await page.getByTestId('ai-fab').click()
     await page.getByTestId('ai-drawer').waitFor({ state: 'visible' })
     await page.getByTestId('ai-history').click()
     await page.getByTestId('ai-history-panel').waitFor({ state: 'visible' })
