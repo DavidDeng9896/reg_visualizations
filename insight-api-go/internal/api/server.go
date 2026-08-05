@@ -80,6 +80,8 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("POST /api/ai/mcp/servers/{id}/refresh", s.refreshMcpServer)
 	s.Mux.HandleFunc("GET /api/ai/mcp/tools", s.listMcpTools)
 	s.Mux.HandleFunc("POST /api/ai/mcp/tools/call", s.callMcpTool)
+
+	s.Mux.HandleFunc("POST /api/python/execute", s.postPythonExecute)
 }
 
 func withCORS(next http.Handler) http.Handler {

@@ -26,7 +26,7 @@ import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
 import type { PortType, StepInputRef, StepNode, StepType } from '../../shared/types'
 import { debounce } from '../charts/draft'
-import { runStep, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
+import { runStepAsync, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 
 /**
@@ -491,10 +491,10 @@ function onConnect(conn: Connection): void {
   })
 
   // 在下一个 tick 执行并持久化
-  void nextTick(() => {
+  void nextTick(async () => {
     const step = current.value?.steps.find((s) => s.id === targetNode.stepId)
     if (step && current.value) {
-      runStep(current.value, step)
+      await runStepAsync(current.value, step)
       store.mutate(() => {})
     }
   })
@@ -626,8 +626,9 @@ function onStepSaved(name: string): void {
     }
   })
   if (IMPLEMENTED_STEP_TYPES.has(step.type)) {
-    runStep(current.value, step)
-    store.mutate(() => {})
+    void runStepAsync(current.value, step).then(() => {
+      store.mutate(() => {})
+    })
   }
   editingStep.value = null
   editingIsNew.value = false

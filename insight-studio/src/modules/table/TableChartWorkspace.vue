@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import type { AnalysisTable, ChartPosition, StepNode, ViewNode } from '../../shared/types'
 import { runPipeline, PipelineError, isIdentityOrSortOnly, type ViewResult } from '../../shared/pipeline'
 import { findTable, findView, findViewParent, findViewPath } from '../../shared/tree'
-import { IMPLEMENTED_STEP_TYPES, runStep } from '../steps/exec'
+import { IMPLEMENTED_STEP_TYPES, runStepAsync } from '../steps/exec'
 import { stepNodeId } from '../flowchart/graph'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IIcon, IModal, IPopover, ISplitPane, ITextField, toast } from '../../ui'
@@ -236,8 +236,9 @@ function onStepSaved(name: string) {
     }
   })
   if (IMPLEMENTED_STEP_TYPES.has(step.type)) {
-    runStep(current.value, step)
-    store.mutate(() => {})
+    void runStepAsync(current.value, step).then(() => {
+      store.mutate(() => {})
+    })
   }
   editingStep.value = null
   editingSnapshot.value = null

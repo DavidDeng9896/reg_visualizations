@@ -4,7 +4,7 @@
  * - 默认自动重跑下游，但受防抖与成本预算约束（见 schedulePropagateTableEdit）。
  */
 import type { Analysis, StepNode } from '../../shared/types'
-import { IMPLEMENTED_STEP_TYPES, runStep } from './exec'
+import { IMPLEMENTED_STEP_TYPES, runStep, runStepAsync } from './exec'
 
 /** 合并连续编辑的防抖窗口（ms）。 */
 export const PROPAGATE_DEBOUNCE_MS = 200
@@ -154,7 +154,18 @@ export function schedulePropagateTableEdit(
 /** 重跑单个步骤（仅限已实现执行逻辑的类型），返回是否成功。 */
 export function rerunStep(analysis: Analysis, step: StepNode): boolean {
   if (!IMPLEMENTED_STEP_TYPES.has(step.type)) return false
+  if (step.type === 'custom-code') {
+    void runStepAsync(analysis, step)
+    return true
+  }
   runStep(analysis, step)
+  return step.status !== 'failed'
+}
+
+/** 异步重跑（Custom Code 等）。 */
+export async function rerunStepAsync(analysis: Analysis, step: StepNode): Promise<boolean> {
+  if (!IMPLEMENTED_STEP_TYPES.has(step.type)) return false
+  await runStepAsync(analysis, step)
   return step.status !== 'failed'
 }
 

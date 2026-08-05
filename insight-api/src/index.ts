@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { InsightStore, type AnalysisDoc, type DashboardDoc } from './store.ts'
 import { registerAiRoutes } from './ai.ts'
+import { registerPythonRoutes } from './python.ts'
 
 const store = new InsightStore()
 const app = new Hono()
@@ -17,6 +18,7 @@ app.use(
 )
 
 registerAiRoutes(app, store)
+registerPythonRoutes(app)
 
 app.get('/health', (c) =>
   c.json({

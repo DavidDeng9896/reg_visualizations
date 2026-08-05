@@ -37,6 +37,7 @@ const availableDefs = computed(() => {
 
 const groups = computed(() => {
   const out: { key: string; title: string; defs: StepDef[] }[] = [
+    { key: 'code', title: 'Code', defs: [] },
     { key: 'combine', title: 'Combine tables', defs: [] },
     { key: 'transform', title: 'Transform', defs: [] },
     { key: 'statistics', title: 'Statistics', defs: [] },
