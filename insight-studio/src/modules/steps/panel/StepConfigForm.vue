@@ -8,6 +8,8 @@ import { getStepDef } from '../registry'
 import { resolveStepInputs } from '../exec'
 import { uuid } from '../../../shared/id'
 import { operatorArity, operatorsFor, parseConditionValue } from '../../table/filterForm'
+import PythonEditor, { type PythonCompletionSource } from './PythonEditor.vue'
+import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../customCodeTemplate'
 
 const props = defineProps<{ step: StepNode }>()
 const emit = defineEmits<{ (e: 'change'): void }>()
@@ -120,6 +122,62 @@ const computedCfg = computed<{ name: string; expression: string }>(() => {
   ensureConfig({ name: '', expression: '' })
   return props.step.config as { name: string; expression: string }
 })
+
+/* ------------------------------ custom-code ------------------------------ */
+
+const pyEditorRef = ref<InstanceType<typeof PythonEditor> | null>(null)
+
+const customCodeCfg = computed(() => {
+  ensureConfig({ code: CUSTOM_CODE_DEFAULT_TEMPLATE })
+  const cfg = props.step.config as { code?: string }
+  if (!cfg.code) cfg.code = CUSTOM_CODE_DEFAULT_TEMPLATE
+  return cfg as { code: string }
+})
+
+const customCodeInputs = computed(() => {
+  if (!current.value || props.step.type !== 'custom-code') return [] as AnalysisTable[]
+  const inputs = resolveStepInputs(current.value, props.step)
+  const raw = inputs['Input datasets']
+  if (Array.isArray(raw)) return raw
+  return raw ? [raw as AnalysisTable] : []
+})
+
+const pyCompletion = computed<PythonCompletionSource>(() => {
+  const columnsByInput: Record<number, string[]> = {}
+  const inputNames: string[] = []
+  customCodeInputs.value.forEach((t, i) => {
+    inputNames.push(t.name)
+    columnsByInput[i] = t.columns.map((c) => c.field)
+  })
+  return { columnsByInput, inputNames }
+})
+
+const fieldInsertOptions = computed<SelectOption[]>(() => {
+  const opts: SelectOption[] = []
+  customCodeInputs.value.forEach((t, i) => {
+    for (const c of t.columns) {
+      opts.push({
+        value: `inputs[${i}].data["${c.field}"]`,
+        label: `${t.name} · ${c.title}`,
+        icon: c.dataType === 'number' ? ('type-number' as const) : ('type-text' as const),
+      })
+    }
+  })
+  return opts
+})
+
+function insertFieldSnippet(v: string | number | null) {
+  if (v == null || v === '') return
+  pyEditorRef.value?.insertAtCursor(String(v))
+  emit('change')
+}
+
+const customCodeErrorLine = computed(() => {
+  const n = props.step.config.__errorLine
+  return typeof n === 'number' ? n : undefined
+})
+const customCodeStdout = computed(() => String(props.step.config.__stdout ?? ''))
+const customCodeStderr = computed(() => String(props.step.config.__stderr ?? ''))
 
 /* ------------------------------ join ------------------------------ */
 
@@ -420,6 +478,40 @@ watch(() => props.step.type, () => {
           if(cond,a,b) round(x,n) abs sqrt log ln min max year month day concat(...).
           Use [column name] for names with spaces.
         </p>
+      </section>
+    </template>
+
+    <!-- Custom code -->
+    <template v-else-if="step.type === 'custom-code'">
+      <section class="scf__section scf__section--code">
+        <h4 class="scf__section-title">Code</h4>
+        <div class="scf__toolbar">
+          <ISelect
+            :model-value="null"
+            size="sm"
+            :options="fieldInsertOptions"
+            placeholder="插入字段…"
+            :disabled="!fieldInsertOptions.length"
+            @update:model-value="insertFieldSnippet($event == null ? null : String($event))"
+          />
+          <span class="scf__hint">契约：custom_code(inputs: list[IOData]) → list[IOData]</span>
+        </div>
+        <div class="scf__py">
+          <PythonEditor
+            ref="pyEditorRef"
+            v-model="customCodeCfg.code"
+            :completion="pyCompletion"
+            @update:model-value="emit('change')"
+          />
+        </div>
+        <p v-if="step.error" class="scf__error">
+          <template v-if="customCodeErrorLine != null">Line {{ customCodeErrorLine }}: </template>{{ step.error }}
+        </p>
+        <details v-if="customCodeStdout || customCodeStderr" class="scf__logs">
+          <summary>Standard output / error</summary>
+          <pre v-if="customCodeStdout" class="scf__pre">{{ customCodeStdout }}</pre>
+          <pre v-if="customCodeStderr" class="scf__pre scf__pre--err">{{ customCodeStderr }}</pre>
+        </details>
       </section>
     </template>
 
@@ -900,5 +992,36 @@ watch(() => props.step.type, () => {
 .scf__toggle-label {
   font-size: var(--is-text-sm);
   color: var(--is-text);
+}
+.scf__section--code .scf__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.scf__py {
+  min-height: 320px;
+  height: 42vh;
+}
+.scf__error {
+  margin-top: 8px;
+  color: var(--is-danger, #b42318);
+  font-size: var(--is-text-xs);
+}
+.scf__logs {
+  margin-top: 8px;
+  font-size: var(--is-text-xs);
+}
+.scf__pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  background: var(--is-surface-muted, #f2f4f7);
+  border-radius: var(--is-radius-sm);
+  overflow: auto;
+  max-height: 160px;
+  white-space: pre-wrap;
+}
+.scf__pre--err {
+  color: var(--is-danger, #b42318);
 }
 </style>

@@ -39,7 +39,23 @@ def _build_inputs(inputs: list[dict]) -> list[IOData]:
         if kind == "dataframe":
             columns = item.get("columns") or []
             rows = item.get("rows") or []
-            df = pd.DataFrame(rows, columns=columns)
+            col_names: list[str] = []
+            for c in columns:
+                if isinstance(c, dict):
+                    col_names.append(str(c.get("field") or c.get("name") or ""))
+                else:
+                    col_names.append(str(c))
+            col_names = [c for c in col_names if c]
+            if rows and isinstance(rows[0], dict):
+                df = pd.DataFrame(rows)
+                if col_names:
+                    # preserve declared order; keep extras
+                    ordered = [c for c in col_names if c in df.columns] + [
+                        c for c in df.columns if c not in col_names
+                    ]
+                    df = df.reindex(columns=ordered)
+            else:
+                df = pd.DataFrame(rows, columns=col_names or None)
             result.append(IOData(name=name, data=df))
         elif kind == "file":
             content_b64 = item.get("contentBase64") or ""
@@ -50,31 +66,19 @@ def _build_inputs(inputs: list[dict]) -> list[IOData]:
     return result
 
 
-def _is_iodata_like(obj: Any) -> bool:
-    if isinstance(obj, IOData):
-        return True
-    if isinstance(obj, tuple) and len(obj) == 2:
-        return True
-    name = getattr(obj, "name", None)
-    data = getattr(obj, "data", None)
-    return name is not None and data is not None
-
-
-def _normalize_iodata(obj: Any) -> IOData:
-    if isinstance(obj, IOData):
-        return obj
-    if isinstance(obj, tuple) and len(obj) == 2:
-        return IOData(name=obj[0], data=obj[1])
-    return IOData(name=obj.name, data=obj.data)
-
-
 def _serialize_output(item: IOData) -> dict:
     name = item.name
     data = item.data
 
     if isinstance(data, pd.DataFrame):
-        columns = list(data.columns.astype(str))
-        rows = data.values.tolist()
+        columns = []
+        for col in data.columns:
+            series = data[col]
+            dtype = "number" if pd.api.types.is_numeric_dtype(series) else "string"
+            if pd.api.types.is_bool_dtype(series):
+                dtype = "boolean"
+            columns.append({"field": str(col), "title": str(col), "dataType": dtype})
+        rows = data.where(pd.notnull(data), None).to_dict(orient="records")
         return {"name": name, "kind": "dataframe", "columns": columns, "rows": rows}
 
     if isinstance(data, io.BytesIO):
@@ -97,6 +101,24 @@ def _serialize_output(item: IOData) -> dict:
     raise ValueError(
         f"Output {name!r} has unsupported data type: {type(data).__name__}"
     )
+
+
+def _is_iodata_like(obj: Any) -> bool:
+    if isinstance(obj, IOData):
+        return True
+    if isinstance(obj, tuple) and len(obj) == 2:
+        return True
+    name = getattr(obj, "name", None)
+    data = getattr(obj, "data", None)
+    return name is not None and data is not None
+
+
+def _normalize_iodata(obj: Any) -> IOData:
+    if isinstance(obj, IOData):
+        return obj
+    if isinstance(obj, tuple) and len(obj) == 2:
+        return IOData(name=obj[0], data=obj[1])
+    return IOData(name=obj.name, data=obj.data)
 
 
 def _extract_user_line(exc: BaseException, user_code: str) -> int | None:
@@ -145,7 +167,11 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
     if go is not None:
         namespace["go"] = go
 
-    use_alarm = hasattr(signal, "SIGALRM") and timeout_sec > 0
+    use_alarm = (
+        hasattr(signal, "SIGALRM")
+        and timeout_sec > 0
+        and __import__("threading").current_thread() is __import__("threading").main_thread()
+    )
     old_handler = None
     if use_alarm:
         old_handler = signal.signal(signal.SIGALRM, _timeout_handler)

@@ -11,7 +11,9 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
-import { runStep } from '../../steps/exec'
+import { runStep, runStepAsync } from '../../steps/exec'
+import { createStepNode } from '../../steps/factory'
+import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
 import { useAnalysisStore } from '../../../stores/analysisStore'
 import { useDashboardStore } from '../../../stores/dashboardStore'
@@ -287,14 +289,60 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已隐藏 ${columns.length} 列（step id: ${step.id}，产出表 id: ${table.id}，剩 ${table.columns.length} 列）`, artifactOf('table', table.name, { tableId: table.id, stepId: step.id }))
   },
 
-  run_step(args) {
+  async add_custom_code_step(args) {
+    const t = requireTable(String(args.tableId ?? ''))
+    const code = typeof args.code === 'string' && args.code.trim() ? String(args.code) : CUSTOM_CODE_DEFAULT_TEMPLATE
+    const name = typeof args.name === 'string' && args.name.trim() ? String(args.name).trim() : 'Custom code'
+    let stepId = ''
+    store().mutate((a) => {
+      const up = producingStep(a, t.id)
+      const step = createStepNode('custom-code', name)
+      step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
+      step.config.code = code
+      a.steps.push(step)
+      stepId = step.id
+    })
+    const a = requireAnalysis()
+    const step = a.steps.find((s) => s.id === stepId)
+    if (!step) return fail('创建 Custom Code 步骤失败')
+    const result = await runStepAsync(a, step)
+    store().mutate(() => {})
+    if (result.status !== 'configured') {
+      return fail(result.error ?? 'Custom Code 执行失败')
+    }
+    const outId = step.output.tables[0]
+    const out = outId ? findTable(a, outId) : undefined
+    const resultSummary = out
+      ? `已创建 Custom Code「${step.name}」（step id: ${step.id}，产出表 id: ${out.id}，${out.rows.length} 行）`
+      : `已创建 Custom Code「${step.name}」（step id: ${step.id}）`
+    return ok(resultSummary, out ? artifactOf('table', out.name, { tableId: out.id, stepId: step.id }) : undefined)
+  },
+
+  async update_custom_code_step(args) {
+    const a = requireAnalysis()
+    const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
+    if (!step || step.type !== 'custom-code') return fail('Custom Code 步骤不存在')
+    store().mutate((analysis) => {
+      const target = analysis.steps.find((s) => s.id === step.id)
+      if (!target) return
+      if (typeof args.code === 'string') target.config.code = args.code
+      if (typeof args.name === 'string' && args.name.trim()) target.name = args.name.trim()
+    })
+    const latest = requireAnalysis().steps.find((s) => s.id === step.id)!
+    const result = await runStepAsync(requireAnalysis(), latest)
+    store().mutate(() => {})
+    if (result.status !== 'configured') return fail(result.error ?? '执行失败')
+    return ok(`已更新并执行 Custom Code「${latest.name}」`)
+  },
+
+  async run_step(args) {
     const a = requireAnalysis()
     const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
     if (!step) return fail(`步骤不存在：${String(args.stepId ?? '')}`)
-    store().mutate((analysis) => {
-      const target = analysis.steps.find((s) => s.id === step.id)
-      if (target) runStep(analysis, target)
-    })
+    const target = requireAnalysis().steps.find((s) => s.id === step.id)
+    if (!target) return fail('步骤不存在')
+    await runStepAsync(requireAnalysis(), target)
+    store().mutate(() => {})
     return ok(`步骤「${step.name}」已重新执行`)
   },
 

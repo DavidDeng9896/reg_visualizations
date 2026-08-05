@@ -9,7 +9,13 @@ export interface StepExecCtx {
 export interface StepExecResult {
   status: 'configured' | 'failed'
   error?: string
+  /** Custom Code 等：Python 异常行号。 */
+  errorLine?: number
   outputTables?: AnalysisTable[]
+  outputFiles?: import('../../../shared/types').AnalysisFile[]
+  outputCharts?: import('../../../shared/types').AnalysisChartArtifact[]
+  stdout?: string
+  stderr?: string
 }
 
 export interface StepPreviewResult {

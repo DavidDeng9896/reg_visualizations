@@ -347,6 +347,7 @@ export type StepType =
   | 'dedupe' // 去重（P1/P2）
   | 'sort' // 排序（P1/P2）
   | 'interpolation' // 标准曲线插值（P2）
+  | 'custom-code' // Python Custom Code（托管 Worker）
 
 export type StepStatus = 'pending' | 'configured' | 'running' | 'failed' | 'stale'
 
@@ -361,6 +362,17 @@ export interface StepOutputRefs {
   tables: string[]
   files: string[]
   views: string[]
+  /** Custom Code 等产出的独立 Plotly 图表产物 id。 */
+  charts?: string[]
+}
+
+/** Custom Code / 步骤产出的独立图表（非 bar/line ViewNode.chart）。 */
+export interface AnalysisChartArtifact {
+  id: string
+  name: string
+  stepId: string
+  /** Plotly figure JSON（data/layout）。 */
+  plotlyJson: Record<string, unknown>
 }
 
 export interface StepNode {
@@ -426,9 +438,11 @@ export interface Analysis {
   steps: StepNode[]
   /**
    * 文件源占位（兼容旧模型）。
-   * 产品拍板：不持久化导入原始文件字节；可仅保留显示用元数据。
+   * Custom Code 可将 BytesIO 内容以 data URL 写入 contentRef。
    */
   files: AnalysisFile[]
+  /** Custom Code 等步骤产出的独立 Plotly 图表。 */
+  charts?: AnalysisChartArtifact[]
   /** 旧数据迁移备份，便于回退与调试。 */
   __legacyTables?: AnalysisTable[]
 }

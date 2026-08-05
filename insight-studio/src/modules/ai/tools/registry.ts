@@ -121,6 +121,24 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: { tableId: str('输入表 id'), columns: strArr('要隐藏的列 field') }, required: ['tableId', 'columns'] },
   },
   {
+    name: 'add_custom_code_step',
+    description: '添加 Python Custom Code 步骤（list[IOData] 契约）。tableId 为上游表；可选 code（完整脚本，须含 custom_code）与 name。创建后立即执行。',
+    parameters: {
+      type: 'object',
+      properties: { tableId: str('上游表 id'), code: str('Python 脚本（可选）'), name: str('步骤名（可选）') },
+      required: ['tableId'],
+    },
+  },
+  {
+    name: 'update_custom_code_step',
+    description: '更新 Custom Code 步骤的 code/name 并重新执行。',
+    parameters: {
+      type: 'object',
+      properties: { stepId: str('步骤 id'), code: str('Python 脚本（可选）'), name: str('步骤名（可选）') },
+      required: ['stepId'],
+    },
+  },
+  {
     name: 'run_step',
     description: '重新执行一个步骤（配置变更或源数据更新后）。',
     parameters: { type: 'object', properties: { stepId: str('步骤 id') }, required: ['stepId'] },

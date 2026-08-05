@@ -40,8 +40,8 @@ def test_dataframe_pass_through():
     output = result["outputs"][0]
     assert output["name"] == "renamed_output"
     assert output["kind"] == "dataframe"
-    assert output["columns"] == ["a", "b"]
-    assert output["rows"] == [[1, 2], [3, 4]]
+    assert [c["field"] for c in output["columns"]] == ["a", "b"]
+    assert output["rows"] == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
 
 def test_invalid_return_not_list():
@@ -73,3 +73,25 @@ def test_raises_value_error():
     assert result["ok"] is False
     assert "bad input value" in result["error"]["message"]
     assert result["error"]["type"] == "ValueError"
+
+
+def test_dict_columns_and_rows_frontend_shape():
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "n", "dataType": "number"}],
+            "rows": [{"n": 3}],
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    df = inputs[0].data.copy()
+    df["n2"] = df["n"] * 2
+    return [IOData(name="out", data=df)]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    out = result["outputs"][0]
+    assert [c["field"] for c in out["columns"]] == ["n", "n2"]
+    assert out["rows"] == [{"n": 3, "n2": 6}]

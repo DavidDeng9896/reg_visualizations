@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisTable, StepNode, StepOutputRefs } from '../../../shared/types'
+import type { Analysis, AnalysisTable, StepNode } from '../../../shared/types'
 import { findTable } from '../../../shared/tree'
 import { getStepDef } from '../registry'
 import type { StepExecCtx, StepExecResult, StepPreviewResult } from './types'
@@ -7,6 +7,7 @@ import { execFilter, previewFilter } from './filter'
 import { execHideColumns, previewHideColumns } from './hideColumns'
 import { execJoin, previewJoin } from './join'
 import { execUnion, previewUnion } from './union'
+import { execCustomCode } from './customCode'
 
 export * from './types'
 export { executeFilter, previewFilter } from './filter'
@@ -22,6 +23,7 @@ export const IMPLEMENTED_STEP_TYPES: ReadonlySet<string> = new Set([
   'computed-column',
   'join',
   'union',
+  'custom-code',
 ])
 
 /**
@@ -61,8 +63,11 @@ function findOutputTable(analysis: Analysis, nodeId: string, port: string): Anal
   return findTable(analysis, tableId) ?? null
 }
 
-/** 执行单个步骤，返回结果但不修改 analysis（调用方负责写入）。 */
+/** 执行单个步骤，返回结果但不修改 analysis（调用方负责写入）。同步步骤用。 */
 export function executeStep(analysis: Analysis, step: StepNode): StepExecResult {
+  if (step.type === 'custom-code') {
+    return { status: 'failed', error: 'Custom Code 请使用 runStepAsync' }
+  }
   const inputs = resolveStepInputs(analysis, step)
   const ctx: StepExecCtx = { analysis, step, inputs }
 
@@ -80,6 +85,16 @@ export function executeStep(analysis: Analysis, step: StepNode): StepExecResult 
     default:
       return { status: 'failed', error: `步骤 "${step.type}" 尚未实现执行逻辑` }
   }
+}
+
+/** 异步执行（Custom Code 走 Worker；其它步骤与 executeStep 相同）。 */
+export async function executeStepAsync(analysis: Analysis, step: StepNode): Promise<StepExecResult> {
+  if (step.type === 'custom-code') {
+    const inputs = resolveStepInputs(analysis, step)
+    const ctx: StepExecCtx = { analysis, step, inputs }
+    return execCustomCode(ctx, { analysisFiles: analysis.files })
+  }
+  return executeStep(analysis, step)
 }
 
 /** 预览单个步骤（不修改 analysis）。 */
@@ -133,25 +148,33 @@ export function applyStepResult(
 ): void {
   step.status = result.status
   step.error = result.error
+  if (result.stdout !== undefined) step.config.__stdout = result.stdout
+  if (result.stderr !== undefined) step.config.__stderr = result.stderr
+  if (result.errorLine !== undefined) step.config.__errorLine = result.errorLine
   // 失败时保留旧输出表与 output 引用，用户仍可查看上一次成功结果
   if (result.status === 'failed') return
   const oldTableIds = step.output.tables.slice()
+  const oldFileIds = step.output.files.slice()
+  const oldChartIds = step.output.charts?.slice() ?? []
 
-  if (!result.outputTables || result.outputTables.length === 0) {
-    step.output = { tables: [], files: [], views: [] }
+  const newTables = result.outputTables ?? []
+  const newFiles = result.outputFiles ?? []
+  const newCharts = result.outputCharts ?? []
+
+  if (!newTables.length && !newFiles.length && !newCharts.length) {
+    step.output = { tables: [], files: [], views: [], charts: [] }
     removeTables(analysis, oldTableIds)
+    removeFiles(analysis, oldFileIds)
+    removeCharts(analysis, oldChartIds)
     return
   }
 
-  const newTables = result.outputTables
   const outputTableIds: string[] = []
-
   newTables.forEach((t, i) => {
     const oldId = oldTableIds[i]
     const oldIdx = oldId ? analysis.tables.findIndex((x) => x.id === oldId) : -1
     t.stepId = step.id
     if (oldIdx >= 0) {
-      // 复用旧表 id：视图树、表级过滤随 id 保留
       t.id = oldId
       t.views = analysis.tables[oldIdx].views
       t.filters = analysis.tables[oldIdx].filters
@@ -161,12 +184,40 @@ export function applyStepResult(
     }
     outputTableIds.push(t.id)
   })
-
-  // 清理本次不再产出的旧输出表（含失败但本次有产出之外的情况已由上方处理）
   removeTables(analysis, oldTableIds.slice(newTables.length))
 
-  const output: StepOutputRefs = { tables: outputTableIds, files: [], views: [] }
-  step.output = output
+  if (!analysis.files) analysis.files = []
+  const outputFileIds: string[] = []
+  newFiles.forEach((f, i) => {
+    const oldId = oldFileIds[i]
+    const oldIdx = oldId ? analysis.files.findIndex((x) => x.id === oldId) : -1
+    if (oldIdx >= 0) {
+      f.id = oldId
+      analysis.files[oldIdx] = f
+    } else {
+      analysis.files.push(f)
+    }
+    outputFileIds.push(f.id)
+  })
+  removeFiles(analysis, oldFileIds.slice(newFiles.length))
+
+  if (!analysis.charts) analysis.charts = []
+  const outputChartIds: string[] = []
+  newCharts.forEach((ch, i) => {
+    const oldId = oldChartIds[i]
+    const oldIdx = oldId ? analysis.charts!.findIndex((x) => x.id === oldId) : -1
+    ch.stepId = step.id
+    if (oldIdx >= 0) {
+      ch.id = oldId
+      analysis.charts![oldIdx] = ch
+    } else {
+      analysis.charts!.push(ch)
+    }
+    outputChartIds.push(ch.id)
+  })
+  removeCharts(analysis, oldChartIds.slice(newCharts.length))
+
+  step.output = { tables: outputTableIds, files: outputFileIds, views: [], charts: outputChartIds }
 }
 
 /** 从 analysis 移除指定表（若存在）。 */
@@ -176,9 +227,29 @@ function removeTables(analysis: Analysis, tableIds: string[]): void {
   analysis.tables = analysis.tables.filter((t) => !drop.has(t.id))
 }
 
-/** 一键执行并应用单个步骤结果。 */
+function removeFiles(analysis: Analysis, fileIds: string[]): void {
+  if (!fileIds.length || !analysis.files?.length) return
+  const drop = new Set(fileIds)
+  analysis.files = analysis.files.filter((f) => !drop.has(f.id))
+}
+
+function removeCharts(analysis: Analysis, chartIds: string[]): void {
+  if (!chartIds.length || !analysis.charts?.length) return
+  const drop = new Set(chartIds)
+  analysis.charts = analysis.charts.filter((c) => !drop.has(c.id))
+}
+
+/** 一键执行并应用单个步骤结果（同步步骤）。 */
 export function runStep(analysis: Analysis, step: StepNode): StepExecResult {
   const result = executeStep(analysis, step)
+  applyStepResult(analysis, step, result)
+  return result
+}
+
+/** 一键异步执行（Custom Code 必须用此入口）。 */
+export async function runStepAsync(analysis: Analysis, step: StepNode): Promise<StepExecResult> {
+  step.status = 'running'
+  const result = await executeStepAsync(analysis, step)
   applyStepResult(analysis, step, result)
   return result
 }

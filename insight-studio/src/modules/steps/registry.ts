@@ -16,7 +16,7 @@ export interface StepDef {
   type: StepType
   label: string
   /** 分类，用于 Add step 目录分组。 */
-  category: 'source' | 'combine' | 'transform' | 'statistics' | 'output'
+  category: 'source' | 'combine' | 'transform' | 'statistics' | 'output' | 'code'
   description: string
   /** 输入端口定义。 */
   inputs: StepPort[]
@@ -241,6 +241,28 @@ const STEP_DEFS: StepDef[] = [
       model: 'linear' as 'linear' | 'quadratic' | '4pl',
     },
   },
+
+  /* ---------- code ---------- */
+  {
+    type: 'custom-code',
+    label: 'Custom code',
+    category: 'code',
+    description: 'Run Python (pandas / rdkit / sklearn / plotly) with list[IOData] in and out.',
+    inputs: [
+      { name: 'Input datasets', type: 'table', multiple: true, optional: true },
+      { name: 'Input files', type: 'file', multiple: true, optional: true },
+    ],
+    outputs: [
+      { name: 'Output charts', type: 'chart', multiple: true },
+      { name: 'Output datasets', type: 'table', multiple: true },
+      { name: 'Output files', type: 'file', multiple: true },
+      { name: 'Standard error', type: 'file', multiple: true },
+      { name: 'Standard output', type: 'file', multiple: true },
+    ],
+    defaultConfig: {
+      code: '', // filled from CUSTOM_CODE_DEFAULT_TEMPLATE in factory when empty
+    },
+  },
 ]
 
 const STEP_DEF_MAP = new Map<StepType, StepDef>(STEP_DEFS.map((d) => [d.type, d]))
@@ -262,6 +284,7 @@ export function stepDefsByCategory(): Record<StepDef['category'], StepDef[]> {
     transform: [],
     statistics: [],
     output: [],
+    code: [],
   }
   for (const def of STEP_DEFS) {
     groups[def.category].push(def)
