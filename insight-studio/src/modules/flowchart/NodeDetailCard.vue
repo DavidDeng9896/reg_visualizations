@@ -4,13 +4,14 @@ export type DetailLayout = 'right' | 'bottom'
 </script>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { IButton, IIcon } from '../../ui'
+import { IButton, IIcon, toast } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
 import { stepTypeLabel, viewTypeLabel } from './graph'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import { refreshSqlSourceStep } from '../table/refreshSqlSource'
 
 const FlowChartPreview = defineAsyncComponent(() => import('./FlowChartPreview.vue'))
 const PlotlyArtifactPreview = defineAsyncComponent(
@@ -35,6 +36,7 @@ const emit = defineEmits<{
 
 const store = useAnalysisStore()
 const { current } = storeToRefs(store)
+const refreshing = ref(false)
 
 const LAYOUT_OPTIONS: { value: DetailLayout; label: string; icon: IconName }[] = [
   { value: 'right', label: '右侧固定', icon: 'panel-right' },
@@ -106,6 +108,12 @@ const metaRows = computed<MetaRow[]>(() => {
     if (n.rowCount !== undefined) rows.push({ label: '行数', value: String(n.rowCount) })
     if (n.columnCount !== undefined) rows.push({ label: '列数', value: String(n.columnCount) })
     if (stepCharts.value.length) rows.push({ label: '图表', value: String(stepCharts.value.length) })
+    if (sqlStepMeta.value?.lastSyncedAt) {
+      rows.push({ label: '上次同步', value: formatSyncedAt(sqlStepMeta.value.lastSyncedAt) })
+    }
+    if (sqlStepMeta.value?.connectionName) {
+      rows.push({ label: '连接', value: sqlStepMeta.value.connectionName })
+    }
     if (n.error) rows.push({ label: '错误', value: n.error })
     return rows
   }
@@ -114,6 +122,61 @@ const metaRows = computed<MetaRow[]>(() => {
     { label: '子视图', value: String(n.childCount ?? 0) },
   ]
 })
+
+const isQuerySql = computed(() => props.node.kind === 'step' && props.node.stepType === 'query-sql')
+
+const sqlStepMeta = computed(() => {
+  if (!isQuerySql.value || !current.value || !props.node.stepId) return null
+  const step = current.value.steps.find((s) => s.id === props.node.stepId)
+  if (!step) return null
+  return {
+    lastSyncedAt: typeof step.config.lastSyncedAt === 'string' ? step.config.lastSyncedAt : '',
+    connectionName: typeof step.config.connectionName === 'string' ? step.config.connectionName : '',
+    autoRefresh: !!step.config.autoRefresh,
+  }
+})
+
+function formatSyncedAt(iso: string): string {
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return iso
+  try {
+    return new Date(t).toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
+async function onRefreshSql(): Promise<void> {
+  if (!props.node.stepId || refreshing.value) return
+  refreshing.value = true
+  try {
+    const r = await refreshSqlSourceStep(props.node.stepId)
+    const extra =
+      r.mode === 'reran' ? `，下游已重跑 ${r.ran} 步` : r.mode === 'stale-only' ? '，下游已标 stale（请点 Run stale）' : ''
+    toast.success(`数据源已刷新（${r.rowCount} 行）${extra}`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '刷新失败')
+  } finally {
+    refreshing.value = false
+  }
+}
+
+function toggleAutoRefresh(): void {
+  if (!props.node.stepId) return
+  let next = false
+  store.mutate((a) => {
+    const s = a.steps.find((x) => x.id === props.node.stepId)
+    if (!s || s.type !== 'query-sql') return
+    next = !s.config.autoRefresh
+    s.config.autoRefresh = next
+  })
+  toast.success(next ? '已开启自动刷新（打开分析时约每 2 分钟）' : '已关闭自动刷新')
+}
 
 function refIcon(n: FlowNodeData): IconName {
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
@@ -220,6 +283,24 @@ function onDelete() {
 
     <footer class="flow-detail__foot">
       <template v-if="node.kind === 'step'">
+        <IButton
+          v-if="isQuerySql"
+          variant="ghost"
+          icon="refresh"
+          :loading="refreshing"
+          data-testid="sql-source-refresh"
+          @click="onRefreshSql"
+        >
+          刷新数据源
+        </IButton>
+        <IButton
+          v-if="isQuerySql"
+          variant="ghost"
+          data-testid="sql-source-auto"
+          @click="toggleAutoRefresh"
+        >
+          {{ sqlStepMeta?.autoRefresh ? '自动刷新：开' : '自动刷新：关' }}
+        </IButton>
         <IButton variant="ghost" icon="edit" @click="emit('edit')">Edit</IButton>
         <IButton variant="ghost" icon="trash" @click="onDelete">Delete</IButton>
       </template>

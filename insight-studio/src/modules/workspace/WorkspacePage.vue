@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -8,6 +8,24 @@ import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '.
 import WorkspaceMain from './WorkspaceMain.vue'
 import FlowchartChunkLoading from './FlowchartChunkLoading.vue'
 import { useAddData } from '../shell/useAddData'
+import { refreshAutoSqlSources } from '../table/refreshSqlSource'
+
+const AUTO_SQL_REFRESH_MS = 120_000
+let autoSqlTimer: ReturnType<typeof setInterval> | undefined
+
+function stopAutoSqlRefresh() {
+  if (autoSqlTimer !== undefined) {
+    clearInterval(autoSqlTimer)
+    autoSqlTimer = undefined
+  }
+}
+
+function startAutoSqlRefresh() {
+  stopAutoSqlRefresh()
+  autoSqlTimer = setInterval(() => {
+    void refreshAutoSqlSources()
+  }, AUTO_SQL_REFRESH_MS)
+}
 
 const FlowchartMain = defineAsyncComponent({
   loader: () => import('./FlowchartMain.vue'),
@@ -58,6 +76,11 @@ onMounted(async () => {
   }
   // 加载期间用户已手动选择节点时不覆盖其选择
   if (!store.selected) applyEntryMode()
+  startAutoSqlRefresh()
+})
+
+onBeforeUnmount(() => {
+  stopAutoSqlRefresh()
 })
 
 // 路由参数变化（例如列表页跳转）时重新加载

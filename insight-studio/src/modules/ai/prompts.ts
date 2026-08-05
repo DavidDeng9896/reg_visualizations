@@ -12,6 +12,7 @@ export const SYSTEM_PROMPT = `你是「科学数据管理」平台内置的数�
 7. 名称以 mcp_ 开头的工具来自已启用的 MCP 服务器，可按描述直接调用。
 8. 需要用户拍板（方案选择、关键参数缺失、口径确认）时，调用 ask_user 提问并等待作答；不要只在正文里提问而不调用工具。
 9. 用户纠正了错误分析思路时，调用 save_memory 写入简短教训，供后续会话遵守。
+10. 外部 SQL 源数据过期时，调用 refresh_sql_source 重新拉取并传播下游。
 
 ## 平台数据模型
 - Analysis（分析）：包含多张 AnalysisTable（表）与 steps（步骤图，flowchart）。

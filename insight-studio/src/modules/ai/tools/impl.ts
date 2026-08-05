@@ -15,6 +15,7 @@ import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
+import { refreshSqlSourceStep } from '../../table/refreshSqlSource'
 import { useAnalysisStore } from '../../../stores/analysisStore'
 import { useDashboardStore } from '../../../stores/dashboardStore'
 import type { ToolExecResult } from '../agentLoop'
@@ -354,6 +355,32 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       n = rerunStaleSteps(analysis)
     })
     return ok(`已重跑 ${n} 个 stale 步骤`)
+  },
+
+  async refresh_sql_source(args) {
+    const a = requireAnalysis()
+    let stepId = String(args.stepId ?? '').trim()
+    if (!stepId) {
+      const sqlSteps = a.steps.filter((s) => s.type === 'query-sql')
+      if (sqlSteps.length === 0) return fail('当前分析没有 query-sql 数据源步骤')
+      if (sqlSteps.length > 1) {
+        return fail(
+          `存在多个 SQL 源，请指定 stepId：${sqlSteps.map((s) => `${s.name}(${s.id})`).join('、')}`,
+        )
+      }
+      stepId = sqlSteps[0]!.id
+    }
+    const step = a.steps.find((s) => s.id === stepId)
+    if (!step || step.type !== 'query-sql') return fail('stepId 不是 query-sql 步骤')
+    try {
+      const r = await refreshSqlSourceStep(stepId)
+      return ok(
+        `已刷新 SQL 源「${step.name}」（${r.rowCount} 行），下游：${r.mode}${r.ran ? ` / 重跑 ${r.ran}` : ''}`,
+        artifactOf('table', step.name, { tableId: r.tableId, stepId }),
+      )
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e))
+    }
   },
 
   create_view(args) {

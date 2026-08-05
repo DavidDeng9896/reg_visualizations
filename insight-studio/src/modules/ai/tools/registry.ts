@@ -149,6 +149,12 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: {} },
   },
   {
+    name: 'refresh_sql_source',
+    description:
+      '重新查询 query-sql 数据源并替换产出表快照，自动传播下游 stale/重跑。stepId 可省略（仅一个 SQL 源时）。',
+    parameters: { type: 'object', properties: { stepId: str('query-sql 步骤 id（可选）') } },
+  },
+  {
     name: 'create_view',
     description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。',
     parameters: { type: 'object', properties: { tableId: str('表 id'), type: str('视图类型'), name: str('视图名（可选）') }, required: ['tableId', 'type'] },

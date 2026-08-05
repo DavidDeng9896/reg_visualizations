@@ -300,8 +300,13 @@ async function confirm() {
               host: draft.value.host,
               database: draft.value.database,
               connectionName: draft.value.name,
+              connectionId: draft.value.id,
+              lastSyncedAt: new Date().toISOString(),
+              autoRefresh: false,
             }
-          : {}),
+          : {
+              lastSyncedAt: new Date().toISOString(),
+            }),
       },
       sourceLabel: sourceMode.value === 'remote' ? `SQL · ${draft.value.name}` : 'SQL · 本地表',
     })

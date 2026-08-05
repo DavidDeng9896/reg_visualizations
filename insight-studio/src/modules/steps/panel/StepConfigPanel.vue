@@ -3,11 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { StepNode } from '../../../shared/types'
 import { useAnalysisStore } from '../../../stores/analysisStore'
-import { IButton, IIcon, ITextField } from '../../../ui'
+import { IButton, IIcon, ITextField, toast } from '../../../ui'
 import { getStepDef } from '../registry'
 import { previewStep } from '../exec'
 import type { StepPreviewResult } from '../exec'
 import StepConfigForm from './StepConfigForm.vue'
+import { refreshSqlSourceStep } from '../../table/refreshSqlSource'
 
 /**
  * 步骤配置面板（草稿语义）：
@@ -79,6 +80,33 @@ function save() {
 function cancel() {
   emit('close', true)
 }
+
+const refreshingSql = ref(false)
+const isQuerySql = computed(() => props.step.type === 'query-sql')
+const lastSyncedLabel = computed(() => {
+  const iso = props.step.config.lastSyncedAt
+  if (typeof iso !== 'string' || !iso) return ''
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return iso
+  try {
+    return new Date(t).toLocaleString('zh-CN')
+  } catch {
+    return iso
+  }
+})
+
+async function onRefreshSql(): Promise<void> {
+  if (refreshingSql.value) return
+  refreshingSql.value = true
+  try {
+    const r = await refreshSqlSourceStep(props.step.id)
+    toast.success(`数据源已刷新（${r.rowCount} 行）`)
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '刷新失败')
+  } finally {
+    refreshingSql.value = false
+  }
+}
 </script>
 
 <template>
@@ -100,6 +128,22 @@ function cancel() {
       </header>
 
       <div class="step-panel__body">
+        <section v-if="isQuerySql" class="step-panel__section">
+          <h3 class="step-panel__section-title">SQL 数据源</h3>
+          <p v-if="lastSyncedLabel" class="step-panel__hint">上次同步：{{ lastSyncedLabel }}</p>
+          <IButton
+            size="sm"
+            icon="refresh"
+            :loading="refreshingSql"
+            data-testid="sql-source-refresh-panel"
+            @click="onRefreshSql"
+          >
+            刷新数据源
+          </IButton>
+        </section>
+
+        <div v-if="isQuerySql" class="step-panel__divider" />
+
         <section class="step-panel__section">
           <h3 class="step-panel__section-title">Step details</h3>
           <div class="step-panel__field">
@@ -264,6 +308,11 @@ function cancel() {
   font-size: var(--is-text-xs);
   font-weight: 600;
   color: var(--is-text-secondary);
+}
+.step-panel__hint {
+  margin: 0 0 8px;
+  font-size: var(--is-text-xs);
+  color: var(--is-text-tertiary);
 }
 .step-panel__preview {
   border: 1px solid var(--is-border);
