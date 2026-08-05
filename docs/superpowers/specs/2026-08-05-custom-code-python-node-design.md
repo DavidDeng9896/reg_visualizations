@@ -242,12 +242,15 @@ insight-studio/src/modules/steps/panel/PythonEditor.vue     # 新建
 insight-studio/src/modules/steps/panel/CustomCodeAiAssist.vue # 新建
 insight-studio/src/modules/flowchart/AddStepPanel.vue
 insight-studio/src/modules/ai/tools/registry.ts / impl.ts / prompts.ts
-insight-api-go/.../python_proxy.go（或等价）
-python-worker/                                              # 新建服务 + Dockerfile
-docs/features/steps/custom-code.md                          # 用户向用法
+insight-api-go/internal/httpapi/python_execute.go   # 代理 /api/python/execute
+python-worker/                                      # 新建：app、Dockerfile、requirements
+docs/features/steps/custom-code.md                  # 用户向用法
 docs/superpowers/specs/2026-08-05-custom-code-python-node-design.md
 ```
 
+### 图表产物存储（明确）
+
+在 `Analysis` / 步骤输出中增加 chart 产物引用（例如 `step.output` 扩展或并行 `AnalysisChartArtifact[]`：`{ id, name, stepId, plotlyJson }`），供预览与 Output charts 端口连线；**不**写入 `ViewNode.chart` 的 bar/line 配置。
 ## 11. 参考
 
 - Benchling Help: Automate Data Analysis with Automation Designer（Custom Code 节）
