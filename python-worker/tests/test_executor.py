@@ -95,3 +95,87 @@ def custom_code(inputs):
     out = result["outputs"][0]
     assert [c["field"] for c in out["columns"]] == ["n", "n2"]
     assert out["rows"] == [{"n": 3, "n2": 6}]
+
+
+def test_figure_and_file_outputs():
+    import base64
+
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "x", "dataType": "number"}],
+            "rows": [{"x": 1}, {"x": 2}],
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    df = inputs[0].data
+    fig = go.Figure(data=[go.Bar(x=["a", "b"], y=df["x"].tolist())])
+    buf = BytesIO(b"hello-bytes")
+    return [
+        IOData(name="chart", data=fig),
+        IOData(name="out.bin", data=buf),
+    ]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    kinds = {o["kind"] for o in result["outputs"]}
+    assert kinds == {"figure", "file"}
+    fig = next(o for o in result["outputs"] if o["kind"] == "figure")
+    assert "data" in fig["plotlyJson"]
+    f = next(o for o in result["outputs"] if o["kind"] == "file")
+    assert base64.b64decode(f["contentBase64"]) == b"hello-bytes"
+
+
+def test_file_input_roundtrip():
+    import base64
+
+    payload = base64.b64encode(b"abc123").decode("ascii")
+    inputs = [
+        {
+            "name": "notes.txt",
+            "kind": "file",
+            "filename": "notes.txt",
+            "contentBase64": payload,
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    data = inputs[0].data
+    data.seek(0)
+    raw = data.read()
+    return [IOData(name="echo.txt", data=BytesIO(raw + b"!"))]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    out = result["outputs"][0]
+    assert out["kind"] == "file"
+    assert base64.b64decode(out["contentBase64"]) == b"abc123!"
+
+
+def test_rdkit_optional():
+    pytest.importorskip("rdkit")
+    inputs = [
+        {
+            "name": "mols",
+            "kind": "dataframe",
+            "columns": [{"field": "SMILES", "dataType": "string"}],
+            "rows": [{"SMILES": "CCO"}, {"SMILES": "c1ccccc1"}],
+        }
+    ]
+    code = """
+from rdkit import Chem
+def custom_code(inputs):
+    df = inputs[0].data.copy()
+    df["atoms"] = [
+        Chem.MolFromSmiles(s).GetNumAtoms() if Chem.MolFromSmiles(s) else None
+        for s in df["SMILES"]
+    ]
+    return [IOData(name="counted", data=df)]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    rows = result["outputs"][0]["rows"]
+    assert rows[0]["atoms"] == 3
+    assert rows[1]["atoms"] == 6

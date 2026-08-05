@@ -10,6 +10,7 @@ import { uuid } from '../../../shared/id'
 import { operatorArity, operatorsFor, parseConditionValue } from '../../table/filterForm'
 import PythonEditor, { type PythonCompletionSource } from './PythonEditor.vue'
 import CustomCodeAiAssist from './CustomCodeAiAssist.vue'
+import PlotlyArtifactPreview from './PlotlyArtifactPreview.vue'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../customCodeTemplate'
 
 const props = defineProps<{ step: StepNode }>()
@@ -179,6 +180,22 @@ const customCodeErrorLine = computed(() => {
 })
 const customCodeStdout = computed(() => String(props.step.config.__stdout ?? ''))
 const customCodeStderr = computed(() => String(props.step.config.__stderr ?? ''))
+
+const customCodeCharts = computed(() => {
+  if (!current.value || props.step.type !== 'custom-code') return []
+  const ids = props.step.output.charts ?? []
+  if (!ids.length || !current.value.charts?.length) return []
+  const byId = new Map(current.value.charts.map((c) => [c.id, c]))
+  return ids.map((id) => byId.get(id)).filter((c): c is NonNullable<typeof c> => !!c)
+})
+
+const customCodeFiles = computed(() => {
+  if (!current.value || props.step.type !== 'custom-code') return []
+  const ids = props.step.output.files ?? []
+  if (!ids.length || !current.value.files?.length) return []
+  const byId = new Map(current.value.files.map((f) => [f.id, f]))
+  return ids.map((id) => byId.get(id)).filter((f): f is NonNullable<typeof f> => !!f)
+})
 
 const customCodeInputsSummary = computed(() => {
   if (!customCodeInputs.value.length) return '（暂无已连接的 Input dataset）'
@@ -532,6 +549,24 @@ watch(() => props.step.type, () => {
           <pre v-if="customCodeStdout" class="scf__pre">{{ customCodeStdout }}</pre>
           <pre v-if="customCodeStderr" class="scf__pre scf__pre--err">{{ customCodeStderr }}</pre>
         </details>
+        <div v-if="customCodeCharts.length" class="scf__artifacts" data-testid="custom-code-charts">
+          <h4 class="scf__section-title">Output charts</h4>
+          <PlotlyArtifactPreview
+            v-for="ch in customCodeCharts"
+            :key="ch.id"
+            :name="ch.name"
+            :plotly-json="ch.plotlyJson"
+          />
+        </div>
+        <div v-if="customCodeFiles.length" class="scf__artifacts scf__artifacts--files" data-testid="custom-code-files">
+          <h4 class="scf__section-title">Output files</h4>
+          <ul class="scf__file-list">
+            <li v-for="f in customCodeFiles" :key="f.id" class="scf__file-item">
+              <span class="is-ellipsis" :title="f.name">{{ f.name }}</span>
+              <span class="scf__file-size">{{ Math.max(1, Math.round(f.sizeBytes / 1024)) }} KB</span>
+            </li>
+          </ul>
+        </div>
       </section>
     </template>
 
@@ -1043,5 +1078,33 @@ watch(() => props.step.type, () => {
 }
 .scf__pre--err {
   color: var(--is-danger, #b42318);
+}
+.scf__artifacts {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.scf__file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.scf__file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: var(--is-text-xs);
+  background: var(--is-surface-muted, #f2f4f7);
+  border-radius: var(--is-radius-sm);
+}
+.scf__file-size {
+  color: var(--is-text-tertiary);
+  flex-shrink: 0;
 }
 </style>

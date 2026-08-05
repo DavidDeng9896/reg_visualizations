@@ -5,12 +5,17 @@ export type DetailLayout = 'right' | 'bottom'
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
+import { storeToRefs } from 'pinia'
 import { IButton, IIcon } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
 import { stepTypeLabel, viewTypeLabel } from './graph'
+import { useAnalysisStore } from '../../stores/analysisStore'
 
 const FlowChartPreview = defineAsyncComponent(() => import('./FlowChartPreview.vue'))
+const PlotlyArtifactPreview = defineAsyncComponent(
+  () => import('../steps/panel/PlotlyArtifactPreview.vue'),
+)
 
 const props = defineProps<{
   node: FlowNodeData
@@ -28,6 +33,9 @@ const emit = defineEmits<{
   (e: 'update:layout', layout: DetailLayout): void
 }>()
 
+const store = useAnalysisStore()
+const { current } = storeToRefs(store)
+
 const LAYOUT_OPTIONS: { value: DetailLayout; label: string; icon: IconName }[] = [
   { value: 'right', label: '右侧固定', icon: 'panel-right' },
   { value: 'bottom', label: '下侧固定', icon: 'panel-bottom' },
@@ -36,6 +44,17 @@ const LAYOUT_OPTIONS: { value: DetailLayout; label: string; icon: IconName }[] =
 const isChartNode = computed(
   () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
 )
+
+const stepCharts = computed(() => {
+  if (props.node.kind !== 'step' || props.node.stepType !== 'custom-code' || !current.value) return []
+  const step = current.value.steps.find((s) => s.id === props.node.stepId)
+  const ids = step?.output.charts ?? []
+  if (!ids.length || !current.value.charts?.length) return []
+  const byId = new Map(current.value.charts.map((c) => [c.id, c]))
+  return ids.map((id) => byId.get(id)).filter((c): c is NonNullable<typeof c> => !!c)
+})
+
+const showWidePreview = computed(() => isChartNode.value || stepCharts.value.length > 0)
 
 const kindTitle = computed(() => {
   const n = props.node
@@ -65,6 +84,8 @@ const nodeIcon = computed<IconName>(() => {
       return 'type-number'
     case 'interpolation':
       return 'line'
+    case 'custom-code':
+      return 'database'
     default:
       return 'database'
   }
@@ -84,6 +105,7 @@ const metaRows = computed<MetaRow[]>(() => {
     ]
     if (n.rowCount !== undefined) rows.push({ label: '行数', value: String(n.rowCount) })
     if (n.columnCount !== undefined) rows.push({ label: '列数', value: String(n.columnCount) })
+    if (stepCharts.value.length) rows.push({ label: '图表', value: String(stepCharts.value.length) })
     if (n.error) rows.push({ label: '错误', value: n.error })
     return rows
   }
@@ -108,7 +130,7 @@ function onDelete() {
 <template>
   <aside
     class="flow-detail flow-detail--docked"
-    :class="{ 'flow-detail--chart': isChartNode }"
+    :class="{ 'flow-detail--chart': showWidePreview }"
     role="complementary"
     :aria-label="isChartNode ? '图表预览' : '节点详情'"
   >
@@ -146,7 +168,17 @@ function onDelete() {
         <FlowChartPreview :table-id="node.tableId ?? ''" :view-id="node.viewId" @open="emit('open')" />
       </section>
 
-      <dl class="flow-detail__meta" :class="{ 'flow-detail__meta--compact': isChartNode }">
+      <section v-else-if="stepCharts.length" class="flow-detail__preview" data-testid="step-chart-artifacts">
+        <h4 class="flow-detail__section-title">Output charts</h4>
+        <PlotlyArtifactPreview
+          v-for="ch in stepCharts"
+          :key="ch.id"
+          :name="ch.name"
+          :plotly-json="ch.plotlyJson"
+        />
+      </section>
+
+      <dl class="flow-detail__meta" :class="{ 'flow-detail__meta--compact': showWidePreview }">
         <template v-for="row in metaRows" :key="row.label">
           <dt>{{ row.label }}</dt>
           <dd class="is-ellipsis" :title="row.value">{{ row.value }}</dd>

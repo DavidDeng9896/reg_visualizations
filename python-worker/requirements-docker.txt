@@ -1,0 +1,2 @@
+# Extra packages for Docker images (not required for minimal local pytest).
+rdkit==2024.9.6

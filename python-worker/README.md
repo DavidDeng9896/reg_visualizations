@@ -23,6 +23,8 @@ Default port: **8091**.
 ```bash
 pip install -r requirements.txt
 pip install pytest httpx
+# Optional (for rdkit examples):
+# pip install -r requirements-docker.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8091
 pytest tests/ -v
 ```
@@ -30,11 +32,18 @@ pytest tests/ -v
 ## Docker
 
 ```bash
-docker build -t python-worker .
-docker run -p 8091:8091 python-worker
+cd python-worker
+docker compose up --build
+# → http://127.0.0.1:8091/health
 ```
 
-`rdkit` is not in `requirements.txt` (local tests skip it). Install via conda or a platform wheel in Docker when needed.
+Image installs `requirements.txt` + `requirements-docker.txt` (includes **rdkit**).
+
+Point API proxies at the worker:
+
+```bash
+export PYTHON_WORKER_URL=http://127.0.0.1:8091
+```
 
 ## Security (v1)
 

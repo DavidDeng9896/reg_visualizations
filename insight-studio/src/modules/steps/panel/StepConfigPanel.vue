@@ -43,6 +43,11 @@ const dirty = computed(() => {
 let previewTimer: ReturnType<typeof setTimeout> | null = null
 function schedulePreview() {
   if (!current.value) return
+  if (props.step.type === 'custom-code') {
+    preview.value = null
+    previewLoading.value = false
+    return
+  }
   if (previewTimer) clearTimeout(previewTimer)
   previewLoading.value = true
   previewTimer = setTimeout(() => {
@@ -111,7 +116,7 @@ function cancel() {
 
         <div class="step-panel__divider" />
 
-        <section class="step-panel__section">
+        <section v-if="step.type !== 'custom-code'" class="step-panel__section">
           <div class="step-panel__preview">
             <div class="step-panel__preview-head">
               <span class="step-panel__preview-title">Preview</span>
@@ -140,6 +145,11 @@ function cancel() {
             </div>
             <div v-else class="step-panel__preview-empty">无预览数据</div>
           </div>
+        </section>
+        <section v-else class="step-panel__section">
+          <p class="step-panel__preview-empty">
+            Custom Code 在 Save 后由 Python Worker 执行；输出表 / 图 / 文件与日志见上方编辑区。
+          </p>
         </section>
       </div>
 

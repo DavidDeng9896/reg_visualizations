@@ -14,6 +14,8 @@ import { uuid } from '../../../shared/id'
 import { nowIso } from '../../../shared/datetime'
 import { ensureRowIds, sealRows } from '../../../shared/factories'
 import { ROW_ID_FIELD } from '../../../shared/types'
+import { findTable } from '../../../shared/tree'
+import { getStepDef } from '../registry'
 import type { StepExecCtx, StepExecResult } from './types'
 
 export interface PythonExecuteResponse {
@@ -88,8 +90,8 @@ function fileToPayload(f: AnalysisFile): Record<string, unknown> | null {
   let contentBase64 = ''
   if (ref.startsWith('data:') && ref.includes(',')) {
     contentBase64 = ref.slice(ref.indexOf(',') + 1)
-  } else if (/^[A-Za-z0-9+/=]+$/.test(ref) && ref.length > 16) {
-    contentBase64 = ref
+  } else if (/^[A-Za-z0-9+/=\s]+$/.test(ref) && ref.replace(/\s/g, '').length > 16) {
+    contentBase64 = ref.replace(/\s/g, '')
   } else {
     return null
   }
@@ -99,6 +101,91 @@ function fileToPayload(f: AnalysisFile): Record<string, unknown> | null {
     filename: f.name,
     contentBase64,
   }
+}
+
+/** 解析上游步骤某 table 端口上的全部输出表（一端口多表）。 */
+export function findOutputTables(
+  analysis: Analysis,
+  nodeId: string,
+  port: string,
+): AnalysisTable[] {
+  const step = analysis.steps.find((s) => s.id === nodeId)
+  if (!step) return []
+  const def = getStepDef(step.type)
+  const portDef = def.outputs.find((o) => o.name === port)
+  if (!portDef || portDef.type !== 'table') return []
+  return (step.output.tables ?? [])
+    .map((id) => findTable(analysis, id))
+    .filter((t): t is AnalysisTable => !!t)
+}
+
+/** 解析上游步骤 Output files 端口上的文件（跳过 stdout/stderr 伪端口）。 */
+export function findOutputFiles(
+  analysis: Analysis,
+  nodeId: string,
+  port: string,
+  files: AnalysisFile[] = analysis.files ?? [],
+): AnalysisFile[] {
+  if (port === 'Standard error' || port === 'Standard output') return []
+  const step = analysis.steps.find((s) => s.id === nodeId)
+  if (!step) return []
+  const def = getStepDef(step.type)
+  const portDef = def.outputs.find((o) => o.name === port)
+  if (!portDef || portDef.type !== 'file') return []
+  return (step.output.files ?? [])
+    .map((id) => files.find((f) => f.id === id))
+    .filter((f): f is AnalysisFile => !!f)
+}
+
+/**
+ * 按 step.inputs 连线顺序展开 Input datasets / Input files → Worker 入参。
+ * 同一条边若源端口为 multiple，则展开该端口全部产物。
+ */
+export function buildCustomCodeInputPayloads(
+  analysis: Analysis,
+  step: { inputs: { port: string; from: { nodeId: string; port: string } }[] },
+  files: AnalysisFile[] = analysis.files ?? [],
+): { payloads: Record<string, unknown>[]; error?: string } {
+  const payloads: Record<string, unknown>[] = []
+  const missing: string[] = []
+
+  for (const ref of step.inputs) {
+    if (ref.port === 'Input datasets') {
+      const tables = findOutputTables(analysis, ref.from.nodeId, ref.from.port)
+      if (!tables.length) {
+        missing.push(`无法解析上游表（${ref.from.nodeId} / ${ref.from.port}）`)
+        continue
+      }
+      for (const t of tables) payloads.push(tableToPayload(t))
+    } else if (ref.port === 'Input files') {
+      const outs = findOutputFiles(analysis, ref.from.nodeId, ref.from.port, files)
+      if (!outs.length) {
+        missing.push(`无法解析上游文件（${ref.from.nodeId} / ${ref.from.port}）`)
+        continue
+      }
+      for (const f of outs) {
+        const p = fileToPayload(f)
+        if (!p) {
+          missing.push(`文件「${f.name}」缺少可序列化内容（contentRef）`)
+          continue
+        }
+        payloads.push(p)
+      }
+    }
+  }
+
+  if (!payloads.length) {
+    return {
+      payloads: [],
+      error:
+        missing[0] ||
+        'Custom Code 需要至少一个 Input dataset 或带内容的 Input file',
+    }
+  }
+  if (missing.length) {
+    return { payloads: [], error: missing.join('；') }
+  }
+  return { payloads }
 }
 
 export async function callPythonExecute(
@@ -123,28 +210,12 @@ export async function execCustomCode(
     return { status: 'failed', error: '请先编写 custom_code 函数', errorLine: undefined }
   }
 
-  const datasets = (ctx.inputs['Input datasets'] ?? []) as AnalysisTable[]
-  const list = Array.isArray(datasets) ? datasets : datasets ? [datasets as AnalysisTable] : []
-
-  const inputs: Record<string, unknown>[] = list.map(tableToPayload)
-
-  // 文件：按连线顺序从 analysis.files 取（Input files 端口目前 resolve 仅表；用 step.inputs 补）
-  const fileRefs = ctx.step.inputs.filter((i) => i.port === 'Input files')
   const files = opts?.analysisFiles ?? ctx.analysis.files ?? []
-  for (const ref of fileRefs) {
-    const fromStep = ctx.analysis.steps.find((s) => s.id === ref.from.nodeId)
-    const fileIds = fromStep?.output.files ?? []
-    for (const fid of fileIds) {
-      const f = files.find((x) => x.id === fid)
-      if (!f) continue
-      const p = fileToPayload(f)
-      if (p) inputs.push(p)
-    }
+  const built = buildCustomCodeInputPayloads(ctx.analysis, ctx.step, files)
+  if (built.error || !built.payloads.length) {
+    return { status: 'failed', error: built.error || 'Custom Code 需要至少一个 Input dataset 或带内容的 Input file' }
   }
-
-  if (!inputs.length) {
-    return { status: 'failed', error: 'Custom Code 需要至少一个 Input dataset 或带内容的 Input file' }
-  }
+  const inputs = built.payloads
 
   let resp: PythonExecuteResponse
   try {
