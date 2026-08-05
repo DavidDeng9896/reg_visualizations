@@ -194,6 +194,19 @@ func (s *Store) SetEnabled(id string, enabled bool) error {
 	return s.saveState(st)
 }
 
+// UpdateBody writes SKILL.md for a user skill. Official skills → ErrForbidden.
+func (s *Store) UpdateBody(id, body string) error {
+	dir, source, err := s.resolveDir(id)
+	if err != nil {
+		return err
+	}
+	if source == "official" {
+		return ErrForbidden
+	}
+	path := filepath.Join(dir, "SKILL.md")
+	return os.WriteFile(path, []byte(body), 0o644)
+}
+
 func (s *Store) Delete(id string) error {
 	dir, source, err := s.resolveDir(id)
 	if err != nil {

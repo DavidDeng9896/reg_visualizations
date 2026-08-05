@@ -61,6 +61,17 @@ func TestImportListGetEnableDelete(t *testing.T) {
 		t.Fatal("expected disabled")
 	}
 
+	if err := st.UpdateBody("my-skill", "# Updated\nbody"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = st.Get("my-skill")
+	if !bytes.Contains([]byte(d.Body), []byte("Updated")) {
+		t.Fatalf("body not updated: %q", d.Body)
+	}
+	if err := st.UpdateBody("chart-best-practices", "nope"); err != skills.ErrForbidden {
+		t.Fatalf("official update: %v", err)
+	}
+
 	if err := st.Delete("chart-best-practices"); err != skills.ErrForbidden {
 		t.Fatalf("delete official: %v", err)
 	}

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, type Directive } from 'vue'
-import type { ViewNode, ViewType } from '../../shared/types'
+import type { ViewNode } from '../../shared/types'
 import { IIcon, IPopover } from '../../ui'
-import type { IconName } from '../../ui'
+import { VIEW_ICON } from '../../shared/viewIcons'
 
 /** 局部 v-focus 指令：挂载即聚焦并全选。 */
 const vFocus: Directive = {
@@ -35,17 +35,6 @@ const emit = defineEmits<{
   (e: 'new-view', tableId: string, parentViewId: string): void
   (e: 'show-in-flowchart', tableId: string, viewId: string): void
 }>()
-
-const VIEW_ICON: Record<ViewType, IconName> = {
-  table: 'table',
-  bar: 'bar',
-  line: 'line',
-  scatter: 'scatter',
-  box: 'box',
-  pie: 'pie',
-  heatmap: 'heatmap',
-  bignumber: 'bignumber',
-}
 
 const isExpanded = computed(() => props.expanded.has(props.node.id))
 const isSelected = computed(() => props.selectedViewId === props.node.id)
