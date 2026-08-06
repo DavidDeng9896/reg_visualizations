@@ -32,6 +32,26 @@ PORT=8787 INSIGHT_DB_PATH=./data/insight.sqlite go run ./cmd/server
 cd insight-studio && yarn dev
 ```
 
+### Custom Code 需要 Python Worker（:8091）
+
+流程图 Custom Code 步骤会经本服务代理到 `PYTHON_WORKER_URL`（默认 `http://127.0.0.1:8091`）。  
+**必须另开终端启动 worker**，否则会出现 `python worker unreachable` / Windows `connectex`：
+
+```bat
+REM Windows
+cd python-worker
+start.cmd
+```
+
+```bash
+# macOS / Linux
+cd python-worker && ./start.sh
+# 或
+cd python-worker && npm run install-deps && npm start
+```
+
+健康检查：`http://127.0.0.1:8091/health` → `{"ok":true}`
+
 PostgreSQL（生产 schema）：
 
 ```bash

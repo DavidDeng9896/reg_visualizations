@@ -33,17 +33,37 @@ pandas, numpy, scipy, scikit-learn, rdkit, plotly, openpyxl, pydantic
 
 模板常量 `CUSTOM_CODE_RDKIT_EXAMPLE`（`customCodeTemplate.ts`）演示：读 SMILES 列 → `atom_count` 表 + Plotly 柱状图。需 Worker 已安装 rdkit。
 
-## 本地联调
+## 本地联调（三进程）
+
+Custom Code 依赖 **Python Worker :8091**。只起 Go API（:8787）+ Vite（:7100）不够；未起 worker 时会出现：
+
+`python worker unreachable ... dial tcp 127.0.0.1:8091: connectex: ... refused`
+
+### Windows
+
+```bat
+cd python-worker
+start.cmd
+```
+
+### macOS / Linux
 
 ```bash
-# Worker
-cd python-worker && pip install -r requirements.txt && uvicorn app.main:app --port 8091
-# 或 Docker（含 rdkit）
-cd python-worker && docker compose up --build
-
-# API（Node 或 Go 均可代理 /api/python/execute）
-cd insight-api && npm run dev   # :8787，PYTHON_WORKER_URL 默认同上
-
-# 前端
-cd insight-studio && npm run dev
+cd python-worker && ./start.sh
+# 或
+cd python-worker && npm run install-deps && npm start
 ```
+
+### 其余服务
+
+```bash
+# Go API（默认后端）
+cd insight-api-go && go run ./cmd/server   # :8787
+
+# 前端（Vite 把 /api 代理到 :8787）
+cd insight-studio && npm run dev          # :7100
+```
+
+健康检查：打开 `http://127.0.0.1:8091/health` 应返回 `{"ok":true}`。
+
+可选：`docker compose up --build`（`python-worker/`，含 rdkit）。

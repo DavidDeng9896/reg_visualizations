@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -86,7 +87,10 @@ func TestPostPythonExecuteWorkerUnreachable(t *testing.T) {
 		t.Fatalf("error=%v", resp["error"])
 	}
 	msg, _ := errObj["message"].(string)
-	if msg == "" || len(msg) < len("python worker unreachable: ") {
+	if !strings.Contains(msg, "python worker unreachable:") {
 		t.Fatalf("message=%q", msg)
+	}
+	if !strings.Contains(msg, "Start worker:") {
+		t.Fatalf("expected start hint in message=%q", msg)
 	}
 }
