@@ -121,6 +121,17 @@ export const useAiStore = defineStore('ai', {
     canContinueTask(): boolean {
       return !this.running && !!this.resumableAssistant
     },
+    /**
+     * 对话输入条权限模式：
+     * - ask = 请求权限（写入/删除均需确认）
+     * - allow = 全部允许（无需确认）
+     * 历史混合配置（仅删需确认）归入 ask。
+     */
+    permissionMode: (s): 'ask' | 'allow' => {
+      const write = s.config?.confirmWrite ?? false
+      const destructive = s.config?.confirmDestructive ?? true
+      return !write && !destructive ? 'allow' : 'ask'
+    },
   },
 
   actions: {
@@ -129,6 +140,22 @@ export const useAiStore = defineStore('ai', {
       if (typeof localStorage !== 'undefined') {
         if (m) localStorage.setItem(MODEL_KEY, m)
         else localStorage.removeItem(MODEL_KEY)
+      }
+    },
+
+    /** 在对话框内切换权限模式并持久化到 AI 配置。 */
+    async setPermissionMode(mode: 'ask' | 'allow'): Promise<void> {
+      const confirmWrite = mode === 'ask'
+      const confirmDestructive = mode === 'ask'
+      try {
+        await aiConfigApi.put({ confirmWrite, confirmDestructive })
+        if (this.config) {
+          this.config = { ...this.config, confirmWrite, confirmDestructive }
+        } else {
+          await this.init()
+        }
+      } catch (e) {
+        throw e instanceof Error ? e : new Error(String(e))
       }
     },
 
