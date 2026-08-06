@@ -179,3 +179,44 @@ def custom_code(inputs):
     rows = result["outputs"][0]["rows"]
     assert rows[0]["atoms"] == 3
     assert rows[1]["atoms"] == 6
+
+
+def test_accepts_dict_output():
+    """AI / 用户常 return [{'name': ..., 'data': df}]，应与 IOData 等价。"""
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "a", "dataType": "number"}],
+            "rows": [{"a": 1}],
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    df = inputs[0].data
+    return [{"name": "标准化清洗数据", "data": df}]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True, result.get("error")
+    assert result["outputs"][0]["name"] == "标准化清洗数据"
+    assert result["outputs"][0]["kind"] == "dataframe"
+    assert result["outputs"][0]["rows"] == [{"a": 1}]
+
+
+def test_rejects_plain_dataframe_in_list():
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "a", "dataType": "number"}],
+            "rows": [{"a": 1}],
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    return [inputs[0].data]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is False
+    assert "IOData" in result["error"]["message"]
+

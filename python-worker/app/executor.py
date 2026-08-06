@@ -108,6 +108,8 @@ def _is_iodata_like(obj: Any) -> bool:
         return True
     if isinstance(obj, tuple) and len(obj) == 2:
         return True
+    if isinstance(obj, dict):
+        return "name" in obj and "data" in obj
     name = getattr(obj, "name", None)
     data = getattr(obj, "data", None)
     return name is not None and data is not None
@@ -118,6 +120,8 @@ def _normalize_iodata(obj: Any) -> IOData:
         return obj
     if isinstance(obj, tuple) and len(obj) == 2:
         return IOData(name=obj[0], data=obj[1])
+    if isinstance(obj, dict):
+        return IOData(name=obj["name"], data=obj["data"])
     return IOData(name=obj.name, data=obj.data)
 
 
@@ -233,7 +237,9 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
             for item in outputs:
                 if not _is_iodata_like(item):
                     return _error_result(
-                        "Each output must be an IOData object with name and data",
+                        "Each output must be IOData(name=..., data=...) "
+                        "(or a dict/tuple with name+data). "
+                        f"Got {type(item).__name__}: {item!r}"[:240],
                         stdout=stdout_buffer.getvalue(),
                         stderr=stderr_buffer.getvalue(),
                     )
