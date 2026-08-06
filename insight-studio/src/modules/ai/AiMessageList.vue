@@ -197,6 +197,9 @@ function htmlOf(id: string): string {
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="m.content" class="msg__ai md" v-html="htmlOf(m.id)" />
         <div v-if="m.streaming && !m.content && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
+        <div v-if="m.incomplete && !m.streaming" class="msg__incomplete" data-testid="ai-incomplete">
+          任务未完成：计划中仍有未执行步骤，可点击下方「继续任务」从检查点续跑。
+        </div>
         <ArtifactCard v-for="a in m.artifacts" :key="`${a.kind}-${a.name}`" :artifact="a" />
         <div v-if="m.error" class="msg__error">{{ m.error }}<button type="button" class="msg__retry" data-testid="ai-retry" @click="emit('retry')">重试</button></div>
       </template>
@@ -258,6 +261,15 @@ function htmlOf(id: string): string {
   color: var(--is-text-tertiary);
   font-size: var(--is-text-xs);
   padding: 4px 2px;
+}
+.msg__incomplete {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--is-radius-sm);
+  background: var(--is-warning-soft, color-mix(in srgb, var(--is-warning, #b45309) 12%, transparent));
+  color: var(--is-warning, #b45309);
+  font-size: var(--is-text-xs);
+  line-height: 1.5;
 }
 .msg__error {
   margin-top: 6px;

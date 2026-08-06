@@ -214,6 +214,133 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     })
     expect(messages.find((m) => m.role === 'tool')?.content).toContain('未能作答')
   })
+  it('计划门禁：未 mark_step_done 完就收尾 → 注入催促并续跑', async () => {
+    let nudges = 0
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      const hasNudge = p.messages.some(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('计划未完成'),
+      )
+      if (hasNudge) nudges += 1
+      if (n === 0) return sseOf({ toolCalls: [call('submit_plan', { steps: ['A', 'B'] })] })
+      if (nudges === 0) return sseOf({ content: '先到这里吧' }) // 假结束
+      if (nudges === 1) return sseOf({ toolCalls: [call('mark_step_done', { index: 0 })] })
+      if (nudges === 2) {
+        // 仍未完成 B；再假结束一次会被第二次 nudge
+        return sseOf({ content: '又想结束' })
+      }
+      // 第二次 nudge 后完成剩余
+      const doneTools = p.messages.filter((m) => m.role === 'tool' && m.name === 'mark_step_done').length
+      if (doneTools < 2) return sseOf({ toolCalls: [call('mark_step_done', { index: 1 })] })
+      return sseOf({ content: '全部完成' })
+    }
+    const exec: ToolExecutor = async () => ({ ok: true, summary: 'x' })
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: '任务' }],
+      tools: [],
+      exec,
+      maxIterations: 20,
+      maxPlanNudges: 3,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(nudges).toBeGreaterThanOrEqual(1)
+    expect(evts.filter((e) => e.type === 'step_done').length).toBe(2)
+    expect(evts.some((e) => e.type === 'done' && e.content === '全部完成')).toBe(true)
+    expect(evts.some((e) => e.type === 'incomplete')).toBe(false)
+  })
+
+  it('计划门禁催促耗尽 → incomplete 事件', async () => {
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) return sseOf({ toolCalls: [call('submit_plan', { steps: ['只做一步'] })] })
+      return sseOf({ content: '提前收工' })
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 10,
+      maxPlanNudges: 2,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(evts.some((e) => e.type === 'incomplete')).toBe(true)
+    expect(evts.some((e) => e.type === 'done')).toBe(true)
+  })
+
+  it('超长 tool 结果回灌会被裁剪', async () => {
+    const long = '字'.repeat(5000)
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      return n === 0 ? sseOf({ toolCalls: [call('list_tables', {})] }) : sseOf({ content: 'ok' })
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: long }),
+      maxIterations: 4,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    const tool = messages.find((m) => m.role === 'tool')
+    expect(tool?.content?.length ?? 0).toBeLessThan(long.length)
+    expect(tool?.content).toContain('省略')
+  })
+
+  it('delegate_skill_worker：嵌套短 loop 摘要回灌', async () => {
+    let depth = 0
+    const post = async (p: ChatPayload) => {
+      const isWorker = p.messages.some(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('Skill 工人'),
+      )
+      if (isWorker) {
+        depth += 1
+        const tools = p.messages.filter((m) => m.role === 'tool')
+        if (!tools.length) {
+          return sseOf({ toolCalls: [call('read_skill', { skillId: 's1' }, 'w_read')] })
+        }
+        return sseOf({ content: '要点：先过滤再出图' })
+      }
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) {
+        return sseOf({
+          toolCalls: [call('delegate_skill_worker', { goal: '读 skill 提炼要点' }, 'd1')],
+        })
+      }
+      return sseOf({ content: '主循环完成' })
+    }
+    const exec: ToolExecutor = async (c) => {
+      if (c.function.name === 'read_skill') return { ok: true, summary: 'skill body…' }
+      return { ok: true, summary: 'x' }
+    }
+    const evts = events()
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'read_skill',
+            description: 'read',
+            parameters: { type: 'object', properties: { skillId: { type: 'string' } } },
+          },
+        },
+      ],
+      exec,
+      maxIterations: 8,
+      planGate: false,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(depth).toBeGreaterThan(0)
+    const workerResult = messages.find((m) => m.role === 'tool' && m.name === 'delegate_skill_worker')
+    expect(workerResult?.content).toContain('Skill 工人')
+    expect(workerResult?.content).toContain('要点')
+    expect(evts.some((e) => e.type === 'done' && e.content === '主循环完成')).toBe(true)
+  })
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */

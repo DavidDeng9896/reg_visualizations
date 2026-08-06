@@ -8,6 +8,7 @@ import { buildAnalysisContext, buildMentionContext, type MentionTarget } from '.
 import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
+import { continueTaskSystemMessage, planIncomplete } from './taskState'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 
@@ -46,6 +47,8 @@ export interface UiMessage {
   streaming?: boolean
   error?: string
   maxIter?: boolean
+  /** 计划门禁耗尽或超轮时仍有未完成步骤。 */
+  incomplete?: boolean
   /** 本轮 runAgent 追加的模型可见消息尾（assistant/tool 交替），确认/拒绝后重入循环续轮用。 */
   rawTail?: ChatMessage[]
 }
@@ -76,6 +79,9 @@ let pendingAskResolve: ((answer: string) => void) | null = null
 /** 危险操作确认挂起：与 ask_user 同构，保持 agent-loop 存活直到用户决定。 */
 let pendingConfirmResolve: ((resultText: string) => void) | null = null
 let pendingConfirmId: string | null = null
+/** 同会话连续自动续跑次数（用户新发送时清零）。 */
+let autoContinueCount = 0
+const MAX_AUTO_CONTINUE = 2
 const MODEL_KEY = 'insight.ai.model'
 
 export const useAiStore = defineStore('ai', {
@@ -103,6 +109,18 @@ export const useAiStore = defineStore('ai', {
     /** 模型可见上下文估算 token（系统提示词 + 摘要/历史）。 */
     contextTokens: (s) =>
       estimateTokens(SYSTEM_PROMPT) + estimateChatTokens(s.messages.map((m) => ({ role: m.role, content: m.content }))),
+    /** 最近一条带未完成计划的助手消息（供「继续任务」）。 */
+    resumableAssistant: (s): UiMessage | null => {
+      for (let i = s.messages.length - 1; i >= 0; i -= 1) {
+        const m = s.messages[i]
+        if (m.role !== 'assistant' || !m.planSteps?.length) continue
+        if (m.incomplete || planIncomplete(m.planSteps, m.planDone)) return m
+      }
+      return null
+    },
+    canContinueTask(): boolean {
+      return !this.running && !!this.resumableAssistant
+    },
   },
 
   actions: {
@@ -197,6 +215,7 @@ export const useAiStore = defineStore('ai', {
     async send(text: string, mentions: MentionTarget[] = []): Promise<void> {
       const input = text.trim()
       if (!input || this.running) return
+      autoContinueCount = 0
       await this.ensureConversation()
       // 上下文超过阈值（上限 80%）先自动压缩：最近 2 个用户轮保留，更早历史折叠为摘要
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
@@ -245,6 +264,7 @@ export const useAiStore = defineStore('ai', {
       }
 
       const baseLen = chatMessages.length
+      let aborted = false
       try {
         const finalMessages = await runAgent({
           messages: chatMessages,
@@ -263,6 +283,7 @@ export const useAiStore = defineStore('ai', {
           assistant.maxIter = true
           assistant.error = err.message
         } else if (err instanceof DOMException && err.name === 'AbortError') {
+          aborted = true
           assistant.error = '已中止'
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
@@ -273,6 +294,110 @@ export const useAiStore = defineStore('ai', {
         this.abort = null
         await this.persist()
       }
+      if (!aborted) await this.maybeAutoContinue(assistant)
+    },
+
+    /**
+     * 从检查点续跑未完成计划：不新增用户气泡，注入 system 催促后开新一轮 assistant。
+     */
+    async continueTask(opts?: { auto?: boolean }): Promise<void> {
+      if (this.running) return
+      const prev = this.resumableAssistant as UiMessage | null
+      if (!prev?.planSteps?.length) return
+      if (!opts?.auto) autoContinueCount = 0
+      await this.ensureConversation()
+      if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
+
+      this.messages.push({
+        id: nextId(),
+        role: 'assistant',
+        content: '',
+        trace: [],
+        artifacts: [],
+        streaming: true,
+        at: Date.now(),
+        planSteps: [...prev.planSteps],
+        planDone: [...(prev.planDone ?? [])],
+      })
+      const assistant = this.messages[this.messages.length - 1] as UiMessage
+
+      this.running = true
+      this.abort = new AbortController()
+
+      const analysis = useAnalysisStore().current
+      const chatMessages: ChatMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildAnalysisContext(analysis) },
+        ...this.messages
+          .filter((m) => m.id !== assistant.id)
+          .map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+        { role: 'system', content: continueTaskSystemMessage(prev.planSteps, prev.planDone) },
+      ]
+
+      try {
+        const skills = await aiSkillsApi.list()
+        const catalog = buildSkillsCatalogPrompt(
+          skills.filter((s) => s.enabled).map((s) => ({ id: s.id, name: s.name, description: s.description })),
+        )
+        if (catalog) chatMessages.splice(1, 0, { role: 'system', content: catalog })
+      } catch {
+        /* skip */
+      }
+      try {
+        const memories = await aiMemoriesApi.list()
+        const memPrompt = buildMemoriesPrompt(memories)
+        if (memPrompt) chatMessages.splice(1, 0, { role: 'system', content: memPrompt })
+      } catch {
+        /* skip */
+      }
+
+      const { tools, exec } = await this.buildToolsAndExec()
+      const pushArtifact = (a?: Artifact) => {
+        if (a && !assistant.artifacts.some((x) => x.name === a.name && x.kind === a.kind)) assistant.artifacts.push(a)
+      }
+      const baseLen = chatMessages.length
+      let aborted = false
+      try {
+        const finalMessages = await runAgent({
+          messages: chatMessages,
+          tools,
+          exec,
+          maxIterations: this.config?.maxIterations ?? 100,
+          model: this.modelOverride ?? undefined,
+          signal: this.abort.signal,
+          askUser: this.makeAskUser(this.abort.signal),
+          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          initialPlan: { steps: prev.planSteps, done: prev.planDone ?? [] },
+          onEvent: makeOnEvent(assistant, pushArtifact),
+        })
+        assistant.rawTail = finalMessages.slice(baseLen)
+        if (!assistant.incomplete) prev.incomplete = false
+      } catch (err) {
+        if (err instanceof MaxIterError) {
+          assistant.maxIter = true
+          assistant.error = err.message
+        } else if (err instanceof DOMException && err.name === 'AbortError') {
+          aborted = true
+          assistant.error = '已中止'
+        } else {
+          assistant.error = err instanceof Error ? err.message : String(err)
+        }
+      } finally {
+        assistant.streaming = false
+        this.running = false
+        this.abort = null
+        await this.persist()
+      }
+      if (!aborted) await this.maybeAutoContinue(assistant)
+    },
+
+    /** 本轮结束后若仍 incomplete，自动续跑（同会话连续 ≤ MAX_AUTO_CONTINUE）。 */
+    async maybeAutoContinue(assistant: UiMessage): Promise<void> {
+      if (!assistant.incomplete && !planIncomplete(assistant.planSteps, assistant.planDone)) return
+      if (autoContinueCount >= MAX_AUTO_CONTINUE) return
+      if (this.running) return
+      autoContinueCount += 1
+      await this.continueTask({ auto: true })
     },
 
     /** 构建工具集与执行器（内置 + MCP）。 */
@@ -298,7 +423,7 @@ export const useAiStore = defineStore('ai', {
               arguments: args,
             })
             const text = JSON.stringify(res.result ?? res)
-            return { ok: true, summary: text.length > 1200 ? `${text.slice(0, 1200)}…` : text }
+            return { ok: true, summary: text }
           } catch (e) {
             return { ok: false, summary: e instanceof Error ? e.message : String(e) }
           }
@@ -575,8 +700,14 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
     } else if (e.type === 'plan') {
       assistant.planSteps = e.steps
       assistant.planDone = []
+      assistant.incomplete = false
     } else if (e.type === 'step_done') {
       if (assistant.planDone && !assistant.planDone.includes(e.index)) assistant.planDone.push(e.index)
+      if (assistant.planSteps && !planIncomplete(assistant.planSteps, assistant.planDone)) {
+        assistant.incomplete = false
+      }
+    } else if (e.type === 'incomplete') {
+      assistant.incomplete = true
     } else if (e.type === 'done') {
       assistant.content = e.content || assistant.content
     }
