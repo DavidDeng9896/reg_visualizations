@@ -56,6 +56,7 @@ const loadingMcp = ref(false)
 const formName = ref('')
 const formUrl = ref('')
 const formHeaders = ref<McpHeaderKV[]>([{ key: '', value: '' }])
+const editingMcpId = ref<string | null>(null)
 const savingMcp = ref(false)
 const refreshingId = ref<string | null>(null)
 
@@ -65,6 +66,21 @@ const memoryDraft = ref('')
 const savingMemory = ref(false)
 
 const title = computed(() => '能力')
+const mcpSubmitLabel = computed(() => (editingMcpId.value ? '保存修改' : '添加连接'))
+
+function resetMcpForm(): void {
+  editingMcpId.value = null
+  formName.value = ''
+  formUrl.value = ''
+  formHeaders.value = [{ key: '', value: '' }]
+}
+
+function startEditServer(s: McpServerView): void {
+  editingMcpId.value = s.id
+  formName.value = s.name
+  formUrl.value = s.url
+  formHeaders.value = [{ key: '', value: '' }]
+}
 
 async function loadSkills(): Promise<void> {
   loadingSkills.value = true
@@ -207,14 +223,19 @@ async function addServer(): Promise<void> {
   const headers = formHeaders.value.filter((h) => h.key.trim())
   savingMcp.value = true
   try {
-    await aiMcpApi.create({ name, url, headers })
-    formName.value = ''
-    formUrl.value = ''
-    formHeaders.value = [{ key: '', value: '' }]
-    toast.success('已添加 MCP')
+    if (editingMcpId.value) {
+      const patch: { name: string; url: string; headers?: McpHeaderKV[] } = { name, url }
+      if (headers.length) patch.headers = headers
+      await aiMcpApi.patch(editingMcpId.value, patch)
+      toast.success('已更新 MCP')
+    } else {
+      await aiMcpApi.create({ name, url, headers })
+      toast.success('已添加 MCP')
+    }
+    resetMcpForm()
     await loadMcp()
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '添加失败')
+    toast.error(e instanceof Error ? e.message : '保存失败')
   } finally {
     savingMcp.value = false
   }
@@ -365,7 +386,10 @@ async function removeMemory(m: AiMemory): Promise<void> {
             </div>
             <button type="button" class="cap__link" @click="addHeaderRow">+ 添加 Header</button>
           </div>
-          <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">添加连接</IButton>
+          <div class="cap__form-actions">
+            <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">{{ mcpSubmitLabel }}</IButton>
+            <button v-if="editingMcpId" type="button" class="cap__link" @click="resetMcpForm">取消编辑</button>
+          </div>
         </div>
         <p v-if="loadingMcp" class="cap__empty">加载中…</p>
         <p v-else-if="!servers.length" class="cap__empty">暂无 MCP 连接。</p>
@@ -379,6 +403,7 @@ async function removeMemory(m: AiMemory): Promise<void> {
               <p class="cap__desc cap__desc--mono">{{ s.url }}</p>
               <p v-if="s.lastError" class="cap__err">{{ s.lastError }}</p>
               <div class="cap__actions">
+                <button type="button" class="cap__link" @click="startEditServer(s)">编辑</button>
                 <button
                   type="button"
                   class="cap__link"
@@ -507,7 +532,10 @@ async function removeMemory(m: AiMemory): Promise<void> {
             </div>
             <button type="button" class="cap__link" @click="addHeaderRow">+ 添加 Header</button>
           </div>
-          <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">添加连接</IButton>
+          <div class="cap__form-actions">
+            <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">{{ mcpSubmitLabel }}</IButton>
+            <button v-if="editingMcpId" type="button" class="cap__link" @click="resetMcpForm">取消编辑</button>
+          </div>
         </div>
         <p v-if="loadingMcp" class="cap__empty">加载中…</p>
         <p v-else-if="!servers.length" class="cap__empty">暂无 MCP 连接。</p>
@@ -521,6 +549,7 @@ async function removeMemory(m: AiMemory): Promise<void> {
               <p class="cap__desc cap__desc--mono">{{ s.url }}</p>
               <p v-if="s.lastError" class="cap__err">{{ s.lastError }}</p>
               <div class="cap__actions">
+                <button type="button" class="cap__link" @click="startEditServer(s)">编辑</button>
                 <button
                   type="button"
                   class="cap__link"
@@ -695,6 +724,11 @@ async function removeMemory(m: AiMemory): Promise<void> {
   gap: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--is-border);
+}
+.cap__form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .cap__field {
   display: flex;

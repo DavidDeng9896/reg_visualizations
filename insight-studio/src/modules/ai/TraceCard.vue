@@ -3,12 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
 
-/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认操作以审批卡形式始终外露。 */
-const props = defineProps<{
-  items: TraceItem[]
-  streaming?: boolean
-}>()
-
+/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认可外露或由上层悬浮区接管。 */
+const props = withDefaults(
+  defineProps<{
+    items: TraceItem[]
+    streaming?: boolean
+    /** 为 true 时不在卡片内渲染审批区（由抽屉底部悬浮区展示）。 */
+    hidePending?: boolean
+  }>(),
+  { hidePending: false },
+)
 const expanded = ref(false)
 const doneCount = computed(() => props.items.filter((t) => !t.running).length)
 const pending = computed(() => {
@@ -71,25 +75,27 @@ function pendingAction(t: TraceItem): string {
         <div v-if="t.summary" class="trace__summary">{{ t.needsConfirmation ? pendingAction(t) : t.summary }}</div>
       </div>
     </div>
-    <!-- 待确认操作：折叠状态下也始终外露的审批卡 -->
-    <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
-      <div class="trace__pending-head">
-        <IIcon name="approval" :size="13" class="trace__warn" />
-        <span class="trace__pending-title">需要你的批准</span>
-        <code class="trace__pending-tag">{{ t.name }}</code>
+    <!-- 待确认操作：折叠状态下也始终外露的审批卡（可被 hidePending 关掉） -->
+    <template v-if="!hidePending">
+      <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
+        <div class="trace__pending-head">
+          <IIcon name="approval" :size="13" class="trace__warn" />
+          <span class="trace__pending-title">需要你的批准</span>
+          <code class="trace__pending-tag">{{ t.name }}</code>
+        </div>
+        <div class="trace__pending-body">{{ pendingAction(t) }}</div>
+        <div class="trace__pending-actions">
+          <button type="button" class="trace__reject" @click="$emit('reject', t)">
+            <IIcon name="close" :size="12" />
+            拒绝
+          </button>
+          <button type="button" class="trace__approve" data-testid="ai-trace-confirm" @click="$emit('confirm', t)">
+            <IIcon name="check" :size="12" />
+            批准并执行
+          </button>
+        </div>
       </div>
-      <div class="trace__pending-body">{{ pendingAction(t) }}</div>
-      <div class="trace__pending-actions">
-        <button type="button" class="trace__reject" @click="$emit('reject', t)">
-          <IIcon name="close" :size="12" />
-          拒绝
-        </button>
-        <button type="button" class="trace__approve" data-testid="ai-trace-confirm" @click="$emit('confirm', t)">
-          <IIcon name="check" :size="12" />
-          批准并执行
-        </button>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 

@@ -6,7 +6,7 @@ import { execTool } from '../../../src/modules/ai/tools/impl'
 import { findTable, findView } from '../../../src/shared/tree'
 
 /** AI 工具实现：在真实 analysisStore 上执行（Dexie 由 fake-indexeddb 环境提供）。 */
-const ctx = { confirmDestructive: true }
+const ctx = { confirmDestructive: true, confirmWrite: false }
 
 async function seedStore() {
   const store = useAnalysisStore()

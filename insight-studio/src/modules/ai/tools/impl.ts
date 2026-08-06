@@ -24,7 +24,29 @@ import { aiSkillsApi, aiMemoriesApi } from '../client'
 
 export interface ToolCtx {
   confirmDestructive: boolean
+  confirmWrite: boolean
 }
+
+/** 写入类工具（非删除）：开启 confirmWrite 时需用户批准。 */
+const WRITE_TOOLS = new Set([
+  'create_analysis',
+  'import_csv_text',
+  'add_filter_step',
+  'add_computed_column_step',
+  'add_join_step',
+  'add_union_step',
+  'add_hide_columns_step',
+  'add_custom_code_step',
+  'update_custom_code_step',
+  'run_step',
+  'rerun_stale_steps',
+  'refresh_sql_source',
+  'create_view',
+  'set_chart_config',
+  'create_dashboard',
+  'add_dashboard_widget',
+  'save_memory',
+])
 
 function ok(summary: string, artifact?: Artifact): ToolExecResult {
   return { ok: true, summary, artifact }
@@ -120,6 +142,54 @@ function appendStep(opts: {
 function artifactOf(kind: Artifact['kind'], name: string, extra: Partial<Artifact> = {}): Artifact {
   const a = store().current
   return { kind, name, analysisId: a?.id, ...extra }
+}
+
+/** 把副本上的 Custom Code 执行产物合并进真实 analysis（保留 step id）。 */
+function applyDraftStepResult(
+  live: Analysis,
+  liveStep: StepNode,
+  draft: Analysis,
+  draftStep: StepNode,
+): void {
+  const prevTableIds = new Set(liveStep.output.tables ?? [])
+  const prevFileIds = new Set(liveStep.output.files ?? [])
+  const prevChartIds = new Set(liveStep.output.charts ?? [])
+
+  liveStep.status = draftStep.status
+  liveStep.error = draftStep.error
+  for (const k of Object.keys(draftStep.config)) {
+    liveStep.config[k] = draftStep.config[k]
+  }
+  liveStep.output = {
+    tables: [...(draftStep.output.tables ?? [])],
+    files: [...(draftStep.output.files ?? [])],
+    views: [...(draftStep.output.views ?? [])],
+    charts: [...(draftStep.output.charts ?? [])],
+  }
+
+  live.tables = live.tables.filter((t) => !prevTableIds.has(t.id))
+  if (live.files?.length) live.files = live.files.filter((f) => !prevFileIds.has(f.id))
+  if (live.charts?.length) live.charts = live.charts.filter((c) => !prevChartIds.has(c.id))
+
+  for (const tid of draftStep.output.tables ?? []) {
+    const tbl = draft.tables.find((x) => x.id === tid)
+    if (!tbl) continue
+    tbl.stepId = liveStep.id
+    live.tables.push(tbl)
+  }
+  if (!live.files) live.files = []
+  for (const fid of draftStep.output.files ?? []) {
+    const f = draft.files?.find((x) => x.id === fid)
+    if (!f) continue
+    live.files.push(f)
+  }
+  if (!live.charts) live.charts = []
+  for (const cid of draftStep.output.charts ?? []) {
+    const c = draft.charts?.find((x) => x.id === cid)
+    if (!c) continue
+    c.stepId = liveStep.id
+    live.charts.push(c)
+  }
 }
 
 function toConditions(args: Record<string, unknown>): Filter[] {
@@ -294,28 +364,37 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const t = requireTable(String(args.tableId ?? ''))
     const code = typeof args.code === 'string' && args.code.trim() ? String(args.code) : CUSTOM_CODE_DEFAULT_TEMPLATE
     const name = typeof args.name === 'string' && args.name.trim() ? String(args.name).trim() : 'Custom code'
-    let stepId = ''
-    store().mutate((a) => {
-      const up = producingStep(a, t.id)
-      const step = createStepNode('custom-code', name)
-      step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
-      step.config.code = code
-      a.steps.push(step)
-      stepId = step.id
-    })
-    const a = requireAnalysis()
-    const step = a.steps.find((s) => s.id === stepId)
-    if (!step) return fail('创建 Custom Code 步骤失败')
-    const result = await runStepAsync(a, step)
-    store().mutate(() => {})
+
+    // 在分析副本上自测；成功后再写入画布，避免失败节点残留
+    const live = requireAnalysis()
+    const draft = structuredClone(live) as Analysis
+    const up = producingStep(draft, t.id)
+    const step = createStepNode('custom-code', name)
+    step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
+    step.config.code = code
+    draft.steps.push(step)
+    const result = await runStepAsync(draft, step)
     if (result.status !== 'configured') {
-      return fail(result.error ?? 'Custom Code 执行失败')
+      return fail(result.error ?? 'Custom Code 自测失败，未写入画布')
     }
-    const outId = step.output.tables[0]
-    const out = outId ? findTable(a, outId) : undefined
+
+    let outTableId = ''
+    store().mutate((a) => {
+      const realUp = producingStep(a, t.id)
+      const real = createStepNode('custom-code', name)
+      real.id = step.id
+      real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: 'Output dataset' } }]
+      real.config.code = code
+      a.steps.push(real)
+      // 复用自测产物（表/文件/图）
+      applyDraftStepResult(a, real, draft, step)
+      outTableId = real.output.tables[0] ?? ''
+    })
+
+    const out = outTableId ? findTable(requireAnalysis(), outTableId) : undefined
     const resultSummary = out
-      ? `已创建 Custom Code「${step.name}」（step id: ${step.id}，产出表 id: ${out.id}，${out.rows.length} 行）`
-      : `已创建 Custom Code「${step.name}」（step id: ${step.id}）`
+      ? `已创建 Custom Code「${name}」（step id: ${step.id}，产出表 id: ${out.id}，${out.rows.length} 行）`
+      : `已创建 Custom Code「${name}」（step id: ${step.id}）`
     return ok(resultSummary, out ? artifactOf('table', out.name, { tableId: out.id, stepId: step.id }) : undefined)
   },
 
@@ -323,17 +402,29 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const a = requireAnalysis()
     const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
     if (!step || step.type !== 'custom-code') return fail('Custom Code 步骤不存在')
+    const prevCode = String(step.config.code ?? '')
+    const prevName = step.name
+    const nextCode = typeof args.code === 'string' ? args.code : prevCode
+    const nextName = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : prevName
+
+    const draft = structuredClone(a) as Analysis
+    const draftStep = draft.steps.find((s) => s.id === step.id)
+    if (!draftStep) return fail('Custom Code 步骤不存在')
+    draftStep.config.code = nextCode
+    draftStep.name = nextName
+    const result = await runStepAsync(draft, draftStep)
+    if (result.status !== 'configured') {
+      return fail(result.error ?? '执行失败，画布未改动')
+    }
+
     store().mutate((analysis) => {
       const target = analysis.steps.find((s) => s.id === step.id)
       if (!target) return
-      if (typeof args.code === 'string') target.config.code = args.code
-      if (typeof args.name === 'string' && args.name.trim()) target.name = args.name.trim()
+      target.config.code = nextCode
+      target.name = nextName
+      applyDraftStepResult(analysis, target, draft, draftStep)
     })
-    const latest = requireAnalysis().steps.find((s) => s.id === step.id)!
-    const result = await runStepAsync(requireAnalysis(), latest)
-    store().mutate(() => {})
-    if (result.status !== 'configured') return fail(result.error ?? '执行失败')
-    return ok(`已更新并执行 Custom Code「${latest.name}」`)
+    return ok(`已更新并执行 Custom Code「${nextName}」`)
   },
 
   async run_step(args) {
@@ -532,6 +623,9 @@ export async function execTool(name: string, args: Record<string, unknown>, ctx:
   const fn = impl[name]
   if (!fn) return fail(`未知工具：${name}`)
   try {
+    if (ctx.confirmWrite && WRITE_TOOLS.has(name) && args.__confirmed !== true) {
+      return needConfirm(`执行写入操作「${name}」`)
+    }
     return await fn(args, ctx)
   } catch (e) {
     return fail(e instanceof Error ? e.message : String(e))

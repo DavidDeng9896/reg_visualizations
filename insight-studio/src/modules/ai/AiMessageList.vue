@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { IIcon } from '../../ui'
 import PlanChecklist from './PlanChecklist.vue'
 import TraceCard from './TraceCard.vue'
 import ArtifactCard from './ArtifactCard.vue'
 import ReasoningCard from './ReasoningCard.vue'
 import AskCard from './AskCard.vue'
-import type { TraceItem, UiMessage } from './aiStore'
+import { useAiStore, type TraceItem, type UiMessage } from './aiStore'
 
 /** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
 const props = defineProps<{
@@ -19,6 +20,13 @@ const emit = defineEmits<{
   (e: 'retry'): void
 }>()
 
+const ai = useAiStore()
+const { pendingAsk } = storeToRefs(ai)
+
+function askSettled(t: TraceItem): boolean {
+  // 待答的 ask 提到输入框上方悬浮区，会话流里只保留已答态
+  return pendingAsk.value?.id !== t.id
+}
 function fmtTime(at: number): string {
   try {
     return new Date(at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -41,9 +49,46 @@ function stripEmoji(s: string): string {
     .replace(/[ \t]{2,}/g, ' ')
 }
 
+/** 长文按句号断段，避免一整坨挤在一起。 */
+function breakLongParagraphs(src: string): string {
+  return src
+    .split(/\n{2,}/)
+    .map((block) => {
+      const trimmed = block.trim()
+      if (!trimmed) return ''
+      if (/^```/m.test(trimmed) || /^\s*[-*] /m.test(trimmed) || /^\s*#{1,4}\s/m.test(trimmed) || /^\s*\|/m.test(trimmed)) {
+        return block
+      }
+      if (trimmed.includes('\n') && trimmed.length < 420) return block
+      const parts = trimmed
+        .replace(/([。！？；])(?!\n)/g, '$1\n')
+        .replace(/([.!?])\s+(?=[A-Z\u4e00-\u9fff])/g, '$1\n')
+        .split('\n')
+        .map((p) => p.trim())
+        .filter(Boolean)
+      if (parts.length <= 1) return block
+      const out: string[] = []
+      let cur = ''
+      for (const p of parts) {
+        if (!cur) cur = p
+        else if (cur.length < 56) {
+          const needSpace = /[a-zA-Z0-9]$/.test(cur) && /^[A-Za-z]/.test(p)
+          cur = `${cur}${needSpace ? ' ' : ''}${p}`
+        } else {
+          out.push(cur)
+          cur = p
+        }
+      }
+      if (cur) out.push(cur)
+      return out.join('\n\n')
+    })
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 /** 轻量 markdown → html（先做 HTML 转义，再按模式替换）。 */
 function renderMd(src: string): string {
-  const lines = escapeHtml(src).split('\n')
+  const lines = escapeHtml(breakLongParagraphs(src)).split('\n')
   const out: string[] = []
   let i = 0
   let listOpen = false
@@ -67,6 +112,14 @@ function renderMd(src: string): string {
       continue
     }
     const line = stripEmoji(raw)
+    if (!line.trim()) {
+      if (listOpen) {
+        out.push('</ul>')
+        listOpen = false
+      }
+      i += 1
+      continue
+    }
     // 表格
     if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
       const header = line.split('|').slice(1, -1).map((c) => c.trim())
@@ -99,7 +152,7 @@ function renderMd(src: string): string {
     }
     if (/^\s*#{1,4}\s+/.test(line)) {
       out.push(`<div class="md-h">${inline(line.replace(/^\s*#{1,4}\s+/, ''))}</div>`)
-    } else if (line.trim()) {
+    } else {
       out.push(`<p class="md-p">${inline(line)}</p>`)
     }
     i += 1
@@ -132,10 +185,15 @@ function htmlOf(id: string): string {
           v-if="m.trace.length"
           :items="m.trace"
           :streaming="m.streaming"
+          hide-pending
           @confirm="emit('confirm', $event)"
           @reject="emit('reject', $event)"
         />
-        <AskCard v-for="t in m.trace.filter((x) => x.ask)" :key="`ask-${t.id}`" :item="t" />
+        <AskCard
+          v-for="t in m.trace.filter((x) => x.ask && askSettled(x))"
+          :key="`ask-${t.id}`"
+          :item="t"
+        />
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="m.content" class="msg__ai md" v-html="htmlOf(m.id)" />
         <div v-if="m.streaming && !m.content && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
@@ -224,7 +282,11 @@ function htmlOf(id: string): string {
 }
 
 .md :deep(.md-p) {
-  margin: 3px 0;
+  margin: 0 0 10px;
+  line-height: 1.65;
+}
+.md :deep(.md-p:last-child) {
+  margin-bottom: 0;
 }
 .md :deep(.md-h) {
   font-weight: 600;
