@@ -65,8 +65,9 @@ watch(
   color: var(--is-text-tertiary);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 220px;
-  overflow-y: auto;
+  /* 随会话区整体滚动，避免思考块自带滚动条 */
+  max-height: none;
+  overflow: visible;
 }
 @keyframes reason-spin {
   to {

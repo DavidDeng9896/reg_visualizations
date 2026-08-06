@@ -123,6 +123,15 @@ export const useAiStore = defineStore('ai', {
       await this.refreshConversations()
     },
 
+    /** 打开抽屉时尽量复用已加载配置，避免重复请求拖慢二次打开。 */
+    async warmInit() {
+      if (this.config) {
+        void this.refreshConversations()
+        return
+      }
+      await this.init()
+    },
+
     async refreshConversations() {
       try {
         this.conversations = await aiConvApi.list()
@@ -177,7 +186,7 @@ export const useAiStore = defineStore('ai', {
 
     toggleDrawer() {
       this.drawerOpen = !this.drawerOpen
-      if (this.drawerOpen) void this.init()
+      if (this.drawerOpen) void this.warmInit()
     },
 
     setPanelMode(mode: 'docked' | 'floating') {
@@ -278,6 +287,7 @@ export const useAiStore = defineStore('ai', {
       const tools = [...OPENAI_TOOLS, ...mcpBundle.tools]
 
       const confirmDestructive = this.config?.confirmDestructive ?? true
+      const confirmWrite = this.config?.confirmWrite ?? false
       const exec: ToolExecutor = async (call: ToolCall, args: Record<string, unknown>) => {
         const mcpRef = mcpBundle.resolve(call.function.name)
         if (mcpRef) {
@@ -293,7 +303,7 @@ export const useAiStore = defineStore('ai', {
             return { ok: false, summary: e instanceof Error ? e.message : String(e) }
           }
         }
-        return execTool(call.function.name, args, { confirmDestructive })
+        return execTool(call.function.name, args, { confirmDestructive, confirmWrite })
       }
       return { tools, exec }
     },
@@ -316,7 +326,7 @@ export const useAiStore = defineStore('ai', {
       if (decision === 'confirm') {
         item.confirmed = true
         item.running = true
-        const res = await execTool(item.name, { ...(item.args ?? {}), __confirmed: true }, { confirmDestructive: false })
+        const res = await execTool(item.name, { ...(item.args ?? {}), __confirmed: true }, { confirmDestructive: false, confirmWrite: false })
         item.running = false
         item.ok = res.ok
         item.summary = res.summary

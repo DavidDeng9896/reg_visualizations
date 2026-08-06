@@ -23,6 +23,7 @@ type aiConfig struct {
 	Models             []string `json:"models"`
 	MaxIterations      int      `json:"maxIterations"`
 	ConfirmDestructive bool     `json:"confirmDestructive"`
+	ConfirmWrite       bool     `json:"confirmWrite"`
 }
 
 func defaultAiConfig() aiConfig {
@@ -33,6 +34,7 @@ func defaultAiConfig() aiConfig {
 		Models:             []string{},
 		MaxIterations:      100,
 		ConfirmDestructive: true,
+		ConfirmWrite:       false,
 	}
 }
 
@@ -91,6 +93,7 @@ func (s *Server) getAiConfig(w http.ResponseWriter, _ *http.Request) {
 		"models":             cfg.Models,
 		"maxIterations":      cfg.MaxIterations,
 		"confirmDestructive": cfg.ConfirmDestructive,
+		"confirmWrite":       cfg.ConfirmWrite,
 	})
 }
 
@@ -145,6 +148,9 @@ func (s *Server) putAiConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if b, ok := body["confirmDestructive"].(bool); ok {
 		next.ConfirmDestructive = b
+	}
+	if b, ok := body["confirmWrite"].(bool); ok {
+		next.ConfirmWrite = b
 	}
 
 	if err := s.writeAiConfig(next); err != nil {

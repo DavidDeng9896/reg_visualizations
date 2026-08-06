@@ -156,12 +156,23 @@ export interface AiPublicConfig {
   models: string[]
   maxIterations: number
   confirmDestructive: boolean
+  /** 写入类工具（建表/改图/加步骤等）是否需用户确认。 */
+  confirmWrite: boolean
 }
 
 export const aiConfigApi = {
   get: () => req<AiPublicConfig>('/api/ai/config'),
-  put: (patch: Partial<{ baseUrl: string; apiKey: string; model: string; models: string[]; maxIterations: number; confirmDestructive: boolean }>) =>
-    req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
+  put: (
+    patch: Partial<{
+      baseUrl: string
+      apiKey: string
+      model: string
+      models: string[]
+      maxIterations: number
+      confirmDestructive: boolean
+      confirmWrite: boolean
+    }>,
+  ) => req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
 }
 
 /** 发送一轮对话（SSE）。缺配置时后端返回 409 → 抛错。 */

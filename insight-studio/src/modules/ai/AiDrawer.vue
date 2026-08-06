@@ -6,6 +6,7 @@ import { useAiStore, type TraceItem } from './aiStore'
 import AiMessageList from './AiMessageList.vue'
 import AiInputBar from './AiInputBar.vue'
 import AiSettingsModal from './AiSettingsModal.vue'
+import PendingActionsBar from './PendingActionsBar.vue'
 import {
   clampFloating,
   dockedRect,
@@ -279,20 +280,20 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
 
 <template>
   <Teleport to="body">
-    <Transition name="ai-drawer">
-      <aside
-        v-if="drawerOpen"
-        class="ai-drawer"
-        :class="{
-          'ai-drawer--docked': mode === 'docked',
-          'ai-drawer--floating': mode === 'floating',
-          'ai-drawer--dragging': dragging,
-        }"
-        :style="panelStyle"
-        aria-label="AI 助手"
-        data-testid="ai-drawer"
-        :data-mode="mode"
-      >
+    <aside
+      v-show="drawerOpen"
+      class="ai-drawer"
+      :class="{
+        'ai-drawer--docked': mode === 'docked',
+        'ai-drawer--floating': mode === 'floating',
+        'ai-drawer--dragging': dragging,
+        'ai-drawer--open': drawerOpen,
+      }"
+      :style="panelStyle"
+      aria-label="AI 助手"
+      data-testid="ai-drawer"
+      :data-mode="mode"
+    >
         <header class="ai-drawer__head ai-drawer__head--drag" @pointerdown="onDragStart">
           <div class="ai-drawer__title">
             <IIcon name="sparkle" :size="16" class="ai-drawer__logo" />
@@ -393,12 +394,12 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
             <div v-if="running" class="ai-drawer__running">正在生成…</div>
           </div>
 
+          <PendingActionsBar @confirm="onConfirm" @reject="onReject" />
           <AiInputBar />
         </template>
 
         <AiSettingsModal :open="settingsOpen" @update:open="settingsOpen = $event" @saved="ai.init()" />
       </aside>
-    </Transition>
   </Teleport>
 </template>
 
@@ -413,6 +414,18 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
   box-shadow: var(--is-shadow-lg);
   z-index: var(--is-z-modal);
   overflow: hidden;
+  /* 保持挂载，用可见性切换，避免二次打开重建整棵消息树 */
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    opacity 120ms var(--is-ease, ease),
+    transform 120ms var(--is-ease, ease);
+}
+.ai-drawer--open {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
 }
 .ai-drawer--docked {
   border-right: none;
@@ -610,17 +623,5 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
 }
 .ai-drawer__spin {
   animation: ai-spin 0.7s linear infinite;
-}
-
-.ai-drawer-enter-active,
-.ai-drawer-leave-active {
-  transition:
-    transform var(--is-dur) var(--is-ease),
-    opacity var(--is-dur) var(--is-ease);
-}
-.ai-drawer-enter-from,
-.ai-drawer-leave-to {
-  transform: translateX(40px);
-  opacity: 0;
 }
 </style>

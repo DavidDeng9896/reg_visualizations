@@ -53,6 +53,7 @@ func TestAiConfigGetPut(t *testing.T) {
 		"models":             []string{"demo-model", "other"},
 		"maxIterations":      12,
 		"confirmDestructive": false,
+		"confirmWrite":       true,
 	}
 	raw, _ := json.Marshal(body)
 	rr = httptest.NewRecorder()
