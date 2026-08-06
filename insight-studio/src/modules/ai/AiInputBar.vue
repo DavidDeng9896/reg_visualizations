@@ -180,6 +180,11 @@ async function submit(): Promise<void> {
   await ai.send(input, ms)
 }
 
+async function onContinue(): Promise<void> {
+  if (running.value || !ai.canContinueTask) return
+  await ai.continueTask()
+}
+
 watch(text, () => void nextTick(autosize))
 watch(
   () => ai.drawerOpen,
@@ -191,6 +196,12 @@ watch(
 
 <template>
   <div class="bar" data-testid="ai-inputbar">
+    <div v-if="ai.canContinueTask" class="bar__continue" data-testid="ai-continue-wrap">
+      <button type="button" class="bar__continue-btn" data-testid="ai-continue" @click="onContinue">
+        继续任务
+      </button>
+      <span class="bar__continue-hint">计划尚未全部完成，可从检查点续跑</span>
+    </div>
     <!-- 抽屉是 --is-z-modal(1300)，菜单要提到 --is-z-dropdown(1350) 否则被抽屉盖住点不中 -->
     <IPopover :open="menuMode !== null" placement="top-start" :arrow="false" z-index="var(--is-z-dropdown)" @update:open="menuMode = $event ? menuMode : null">
       <template #anchor>
@@ -314,6 +325,30 @@ watch(
   border-top: 1px solid var(--is-border);
   padding: 10px 12px 12px;
   background: var(--is-bg);
+}
+.bar__continue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.bar__continue-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--is-accent);
+  border-radius: var(--is-radius-sm);
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
+  font-size: var(--is-text-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bar__continue-btn:hover {
+  background: var(--is-accent);
+  color: var(--is-surface);
+}
+.bar__continue-hint {
+  font-size: 11px;
+  color: var(--is-text-tertiary);
 }
 /* IPopover 根节点默认 inline-block（按钮锚点用），输入条场景要撑满整行 */
 .bar :deep(.is-popover),

@@ -1,8 +1,10 @@
 /**
- * Agent-loop（ReAct）：多轮 模型→工具→观察 循环，支持流式、中止、超轮。
+ * Agent-loop（ReAct）：多轮 模型→工具→观察 循环，支持流式、中止、超轮、计划门禁。
  * 纯逻辑可测：postChat 注入。
  */
 import { postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
+import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
+import { isDelegateWorker, runDelegateWorker } from './tools/workers'
 
 /** 工具执行结果。 */
 export interface ToolExecResult {
@@ -34,6 +36,7 @@ export type AgentEvent =
   | { type: 'ask'; id: string; question: string; options: string[]; allowOther: boolean }
   | { type: 'plan'; steps: string[] }
   | { type: 'step_done'; index: number }
+  | { type: 'incomplete'; reason: string; pendingSteps: Array<{ index: number; text: string }> }
   | { type: 'done'; content: string }
   | { type: 'error'; message: string }
 
@@ -53,6 +56,8 @@ function safeParseArgs(raw: string): Record<string, unknown> {
   }
 }
 
+const DEFAULT_MAX_PLAN_NUDGES = 3
+
 export interface RunAgentOptions {
   messages: ChatMessage[]
   tools: ChatPayload['tools']
@@ -71,6 +76,15 @@ export interface RunAgentOptions {
   waitConfirm?: (req: { id: string; name: string; summary: string }, signal?: AbortSignal) => Promise<string>
   /** 可注入用于测试；默认走后端代理。 */
   postChatFn?: (payload: ChatPayload, signal?: AbortSignal) => Promise<Response>
+  /**
+   * 计划门禁：无 tool_calls 但计划未完成时注入催促并续跑。
+   * Worker 子 loop 应关闭。默认 true。
+   */
+  planGate?: boolean
+  /** 续跑时恢复已有计划状态。 */
+  initialPlan?: { steps: string[]; done: number[] }
+  /** 计划催促最大次数；默认 3。 */
+  maxPlanNudges?: number
 }
 
 /**
@@ -81,9 +95,39 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const { exec, maxIterations, signal, onEvent } = opts
   const post = opts.postChatFn ?? postChat
   const messages = [...opts.messages]
+  const planGate = opts.planGate !== false
+  const maxNudges = opts.maxPlanNudges ?? DEFAULT_MAX_PLAN_NUDGES
+
+  let planSteps: string[] = opts.initialPlan?.steps ? [...opts.initialPlan.steps] : []
+  let planDone: number[] = opts.initialPlan?.done ? [...opts.initialPlan.done] : []
+  let planNudges = 0
 
   const throwIfAborted = () => {
     if (signal?.aborted) throw new DOMException('已中止', 'AbortError')
+  }
+
+  const emitIncompleteIfNeeded = () => {
+    if (!planGate || !planIncomplete(planSteps, planDone)) return false
+    onEvent({
+      type: 'incomplete',
+      reason: 'plan_incomplete',
+      pendingSteps: pendingPlanSteps(planSteps, planDone),
+    })
+    return true
+  }
+
+  const pushToolContent = (call: ToolCall, name: string, content: string, extra?: Partial<ToolExecResult>) => {
+    const clipped = clipToolResult(content)
+    onEvent({
+      type: 'tool_result',
+      id: call.id,
+      name,
+      ok: extra?.ok !== false,
+      summary: clipped,
+      artifact: extra?.artifact,
+      needsConfirmation: extra?.needsConfirmation,
+    })
+    messages.push({ role: 'tool', tool_call_id: call.id, name, content: clipped })
   }
 
   for (let round = 1; round <= maxIterations; round += 1) {
@@ -102,6 +146,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     const calls = assistant.tool_calls ?? []
     if (!calls.length) {
+      // P0 计划门禁：假结束 → 催促续跑
+      if (planGate && planIncomplete(planSteps, planDone) && planNudges < maxNudges) {
+        planNudges += 1
+        messages.push({ role: 'system', content: planNudgeMessage(planSteps, planDone) })
+        continue
+      }
+      emitIncompleteIfNeeded()
       onEvent({ type: 'done', content: assistant.content ?? '' })
       return messages
     }
@@ -115,16 +166,17 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
         const steps = Array.isArray(args.steps) ? args.steps.map((s) => String(s)) : []
+        planSteps = steps
+        planDone = []
         onEvent({ type: 'plan', steps })
-        onEvent({ type: 'tool_result', id: call.id, name, ok: true, summary: `已提交计划（${steps.length} 步）` })
-        messages.push({ role: 'tool', tool_call_id: call.id, name, content: 'ok' })
+        pushToolContent(call, name, `ok：已提交计划（${steps.length} 步）`)
         continue
       }
       if (name === 'mark_step_done') {
         const index = Number(args.index ?? 0)
+        if (Number.isFinite(index) && index >= 0 && !planDone.includes(index)) planDone.push(index)
         onEvent({ type: 'step_done', index })
-        onEvent({ type: 'tool_result', id: call.id, name, ok: true, summary: `步骤 ${index + 1} 完成` })
-        messages.push({ role: 'tool', tool_call_id: call.id, name, content: 'ok' })
+        pushToolContent(call, name, `ok：步骤 ${index + 1} 完成`)
         continue
       }
       // 协议级工具：向用户提问（暂停循环等待作答，回答回灌模型）
@@ -137,9 +189,33 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           ? await opts.askUser({ id: call.id, question, options, allowOther }, signal)
           : '（前端未接入提问交互，用户未能作答）'
         throwIfAborted()
-        const summary = `用户的回答：${answer}`
-        onEvent({ type: 'tool_result', id: call.id, name, ok: true, summary })
-        messages.push({ role: 'tool', tool_call_id: call.id, name, content: summary })
+        pushToolContent(call, name, `用户的回答：${answer}`)
+        continue
+      }
+
+      // P1：派发 Worker（嵌套短 loop）
+      if (isDelegateWorker(name)) {
+        const goal = String(args.goal ?? '').trim()
+        let result: ToolExecResult
+        try {
+          result = await runDelegateWorker({
+            workerName: name,
+            goal,
+            parentTools: opts.tools,
+            parent: {
+              exec,
+              model: opts.model,
+              signal,
+              askUser: opts.askUser,
+              waitConfirm: opts.waitConfirm,
+              postChatFn: opts.postChatFn,
+            },
+          })
+        } catch (e) {
+          if (e instanceof DOMException && e.name === 'AbortError') throw e
+          result = { ok: false, summary: `工人执行失败：${e instanceof Error ? e.message : String(e)}` }
+        }
+        pushToolContent(call, name, result.summary, result)
         continue
       }
 
@@ -166,39 +242,25 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           : '用户未确认该危险操作（前端未接入确认通道）。不要重试；请改用其他方案。'
         throwIfAborted()
         const ok = !resolved.includes('拒绝') && !resolved.includes('未确认')
-        onEvent({
-          type: 'tool_result',
-          id: call.id,
-          name,
-          ok,
-          summary: resolved,
-          needsConfirmation: false,
-        })
-        messages.push({ role: 'tool', tool_call_id: call.id, name, content: resolved })
+        pushToolContent(call, name, resolved, { ok, needsConfirmation: false })
         continue
       }
 
-      onEvent({
-        type: 'tool_result',
-        id: call.id,
-        name,
-        ok: result.ok,
-        summary: result.summary,
-        artifact: result.artifact,
-        needsConfirmation: result.needsConfirmation,
-      })
-      messages.push({ role: 'tool', tool_call_id: call.id, name, content: result.summary })
+      pushToolContent(call, name, result.summary, result)
     }
   }
 
   // 超轮兜底：不带工具再请一轮，让模型基于已有结果直接收尾（避免硬报错）
   throwIfAborted()
   onEvent({ type: 'round', n: maxIterations + 1 })
+  const wrapUpHint = planGate && planIncomplete(planSteps, planDone)
+    ? '已达到最大工具调用轮数，且计划仍有未完成步骤。请不要再调用任何工具，用中文说明已完成与未完成项，并提示用户可点「继续任务」。'
+    : '已达到最大工具调用轮数。请不要再调用任何工具，直接根据以上工具执行结果，用中文给出简洁的完成总结。'
   const wrapUp = await post(
     {
       messages: [
         ...messages,
-        { role: 'system', content: '已达到最大工具调用轮数。请不要再调用任何工具，直接根据以上工具执行结果，用中文给出简洁的完成总结。' },
+        { role: 'system', content: wrapUpHint },
       ],
       ...(opts.model ? { model: opts.model } : {}),
     },
@@ -212,6 +274,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const { reasoning: _r2, ...finalMsg } = finalStream
   messages.push(finalMsg)
   if (finalMsg.content) {
+    emitIncompleteIfNeeded()
     onEvent({ type: 'done', content: finalMsg.content })
     return messages
   }
