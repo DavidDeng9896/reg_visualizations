@@ -20,6 +20,17 @@ func pythonWorkerURL() string {
 	return defaultPythonWorkerURL
 }
 
+func pythonWorkerUnreachableMessage(err error) string {
+	base := pythonWorkerURL()
+	detail := ""
+	if err != nil {
+		detail = err.Error()
+	}
+	return "python worker unreachable: " + detail +
+		". Start worker: cd python-worker && python -m uvicorn app.main:app --host 127.0.0.1 --port 8091" +
+		" (or start.cmd on Windows). Expected " + base + "/execute; set PYTHON_WORKER_URL if different."
+}
+
 func pythonExecuteTimeoutSec(body []byte) int {
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -58,7 +69,7 @@ func (s *Server) postPythonExecute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"ok": false,
 			"error": map[string]any{
-				"message": "python worker unreachable: " + err.Error(),
+				"message": pythonWorkerUnreachableMessage(err),
 			},
 		})
 		return
@@ -71,7 +82,7 @@ func (s *Server) postPythonExecute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"ok": false,
 			"error": map[string]any{
-				"message": "python worker unreachable: " + err.Error(),
+				"message": pythonWorkerUnreachableMessage(err),
 			},
 		})
 		return
@@ -83,7 +94,7 @@ func (s *Server) postPythonExecute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"ok": false,
 			"error": map[string]any{
-				"message": "python worker unreachable: " + err.Error(),
+				"message": pythonWorkerUnreachableMessage(err),
 			},
 		})
 		return

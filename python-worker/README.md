@@ -18,15 +18,37 @@ def custom_code(inputs: list[IOData]) -> list[IOData]:
 
 Default port: **8091**.
 
-## Local dev
+## Quick start
+
+**Windows（推荐）：** 双击或在终端运行：
+
+```bat
+cd python-worker
+start.cmd
+```
+
+**macOS / Linux：**
 
 ```bash
-pip install -r requirements.txt
-pip install pytest httpx
-# Optional (for rdkit examples):
-# pip install -r requirements-docker.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8091
-pytest tests/ -v
+cd python-worker
+chmod +x start.sh
+./start.sh
+```
+
+**npm（跨平台）：**
+
+```bash
+cd python-worker
+npm run install-deps
+npm start
+```
+
+然后确认：`http://127.0.0.1:8091/health` → `{"ok":true}`。
+
+Go / Node API 默认把 `/api/python/execute` 代理到该地址；可用环境变量覆盖：
+
+```bash
+set PYTHON_WORKER_URL=http://127.0.0.1:8091
 ```
 
 ## Docker
@@ -34,15 +56,16 @@ pytest tests/ -v
 ```bash
 cd python-worker
 docker compose up --build
-# → http://127.0.0.1:8091/health
 ```
 
 Image installs `requirements.txt` + `requirements-docker.txt` (includes **rdkit**).
 
-Point API proxies at the worker:
+## Tests
 
 ```bash
-export PYTHON_WORKER_URL=http://127.0.0.1:8091
+pip install -r requirements.txt
+pip install pytest httpx
+pytest tests/ -v
 ```
 
 ## Security (v1)

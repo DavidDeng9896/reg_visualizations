@@ -38,7 +38,19 @@ export function registerPythonRoutes(app: Hono): void {
       return c.body(text, res.status as 200)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      return c.json({ ok: false, error: { message: `python worker unreachable: ${msg}` } }, 502)
+      const base = workerBase()
+      return c.json(
+        {
+          ok: false,
+          error: {
+            message:
+              `python worker unreachable: ${msg}. ` +
+              `Start worker: cd python-worker && python -m uvicorn app.main:app --host 127.0.0.1 --port 8091 ` +
+              `(or start.cmd on Windows). Expected ${base}/execute; set PYTHON_WORKER_URL if different.`,
+          },
+        },
+        502,
+      )
     } finally {
       clearTimeout(timer)
     }
