@@ -74,7 +74,8 @@ my-skill/
 ```
 
 - 导入支持 **zip**（一期 UI 以 zip 为主；目录导入可作为后续增强）
-- zip 根目录（或唯一顶层文件夹内）须同时存在 `skill.json` 与 `SKILL.md`
+- zip 根目录（或唯一顶层文件夹内）须同时存在 `skill.json` 与 `SKILL.md`（文件名大小写不敏感，落盘规范化）
+- 亦支持直接导入单个 `.md`：用 frontmatter（`id`/`name`/`description`/`version`/`tags`）或文件名 slug 生成 `skill.json`
 - 官方示例包随 Go 服务内置目录分发（如 `chart-best-practices`）
 
 `skill.json` 字段：
