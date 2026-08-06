@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
@@ -90,3 +91,86 @@ func TestRejectPathTraversal(t *testing.T) {
 		t.Fatal("expected invalid package")
 	}
 }
+
+func TestImportZipCaseInsensitiveNames(t *testing.T) {
+	root := t.TempDir()
+	st, err := skills.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zipBytes, err := skills.ZipBytes(map[string]string{
+		"pkg/Skill.json": `{"id":"case-skill","version":"1.0.0","description":"d"}`,
+		"pkg/skill.md":   "# Case Skill\nBody",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := st.ImportZip(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if info.ID != "case-skill" || info.Name != "case-skill" {
+		t.Fatalf("info=%+v", info)
+	}
+	d, err := st.Get("case-skill")
+	if err != nil || !bytes.Contains([]byte(d.Body), []byte("Body")) {
+		t.Fatalf("get=%v err=%v", d, err)
+	}
+}
+
+func TestImportZipMissingSkillMDMessage(t *testing.T) {
+	root := t.TempDir()
+	st, err := skills.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zipBytes, err := skills.ZipBytes(map[string]string{
+		"only/skill.json": `{"id":"x","name":"X","version":"1","description":"d"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = st.ImportZip(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err == nil || !strings.Contains(err.Error(), "missing SKILL.md") {
+		t.Fatalf("want missing SKILL.md got %v", err)
+	}
+}
+
+func TestImportMarkdownWithFrontmatter(t *testing.T) {
+	root := t.TempDir()
+	st, err := skills.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md := "---\nid: fm-skill\nname: Frontmatter Skill\ndescription: demo\ntags: a, b\n---\n# Hello\nWorld\n"
+	info, err := st.ImportMarkdown("ignored.md", []byte(md))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.ID != "fm-skill" || info.Name != "Frontmatter Skill" || len(info.Tags) != 2 {
+		t.Fatalf("info=%+v", info)
+	}
+	d, err := st.Get("fm-skill")
+	if err != nil || !strings.Contains(d.Body, "# Hello") || strings.Contains(d.Body, "---") {
+		t.Fatalf("body=%q err=%v", d.Body, err)
+	}
+}
+
+func TestImportMarkdownFromFilename(t *testing.T) {
+	root := t.TempDir()
+	st, err := skills.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := st.ImportMarkdown("My Cool Skill.md", []byte("# Title From Heading\nDo things.\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.ID != "my-cool-skill" {
+		t.Fatalf("id=%q", info.ID)
+	}
+	if info.Name != "Title From Heading" {
+		t.Fatalf("name=%q", info.Name)
+	}
+}
+

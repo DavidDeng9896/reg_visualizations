@@ -28,7 +28,7 @@
 
 | 决策点 | 结论 |
 | --- | --- |
-| Skill 形态 | 可插拔能力包；一期仅 `skill.json` + `SKILL.md` |
+| Skill 形态 | 可插拔能力包；一期 `skill.json` + `SKILL.md`；亦支持单文件 `.md` 导入（自动生成 meta） |
 | Skill 来源 | 官方包可开关 + 本地目录/zip 导入 |
 | MCP 与 Skill | **并列**：分开管理，AI 两边都能用 |
 | MCP 传输（一期） | 仅 **SSE/HTTP** 远程 |
@@ -74,7 +74,8 @@ my-skill/
 ```
 
 - 导入支持 **zip**（一期 UI 以 zip 为主；目录导入可作为后续增强）
-- zip 根目录（或唯一顶层文件夹内）须同时存在 `skill.json` 与 `SKILL.md`
+- zip 根目录（或唯一顶层文件夹内）须同时存在 `skill.json` 与 `SKILL.md`（文件名大小写不敏感，落盘规范化）
+- 亦支持直接导入单个 `.md`：用 frontmatter（`id`/`name`/`description`/`version`/`tags`）或文件名 slug 生成 `skill.json`
 - 官方示例包随 Go 服务内置目录分发（如 `chart-best-practices`）
 
 `skill.json` 字段：
@@ -165,8 +166,8 @@ MCP 客户端实现遵循 MCP 远程传输约定（SSE/HTTP）；具体 SDK 选�
 ### 6.2 Skills Tab
 
 - 列表：名称、版本、来源、描述摘要、启用开关
-- 操作：导入 zip、删除用户包、预览 `SKILL.md`
-- 导入走 `POST /api/ai/skills/import`
+- 操作：导入 zip / `.md`、删除用户包、预览 `SKILL.md`
+- 导入走 `POST /api/ai/skills/import`（按扩展名分流）
 
 ### 6.3 MCP Tab
 

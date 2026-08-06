@@ -250,9 +250,8 @@ export const aiSkillsApi = {
     if (!res.ok) {
       let msg = text
       try {
-        msg = (JSON.parse(text) as { error?: string; message?: string }).message
-          ?? (JSON.parse(text) as { error?: string }).error
-          ?? text
+        const j = JSON.parse(text) as { error?: string; message?: string }
+        msg = j.message || j.error || text
       } catch {
         /* ignore */
       }
@@ -260,6 +259,8 @@ export const aiSkillsApi = {
     }
     return JSON.parse(text) as SkillInfo
   },
+  /** 导入 .zip 或 .md（与 importZip 同一端点）。 */
+  importFile: async (file: File): Promise<SkillInfo> => aiSkillsApi.importZip(file),
 }
 
 export interface McpHeaderKV {

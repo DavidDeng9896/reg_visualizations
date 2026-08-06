@@ -178,7 +178,7 @@ async function onZipPicked(ev: Event): Promise<void> {
   if (!file) return
   importing.value = true
   try {
-    const info = await aiSkillsApi.importZip(file)
+    const info = await aiSkillsApi.importFile(file)
     toast.success(`已导入 ${info.name}`)
     await loadSkills()
   } catch (e) {
@@ -298,18 +298,18 @@ async function removeMemory(m: AiMemory): Promise<void> {
 
       <div v-if="tab === 'skills'" class="cap__pane">
         <div class="cap__toolbar">
-          <IButton size="sm" :loading="importing" @click="pickZip">导入 zip</IButton>
+          <IButton size="sm" :loading="importing" @click="pickZip">导入</IButton>
           <input
             ref="fileInput"
             type="file"
-            accept=".zip,application/zip"
+            accept=".zip,.md,.markdown,application/zip,text/markdown"
             class="cap__file"
             @change="onZipPicked"
           />
-          <span class="cap__hint">仅 skill.json + SKILL.md</span>
+          <span class="cap__hint">支持 .zip（skill.json + SKILL.md）或单个 .md</span>
         </div>
         <p v-if="loadingSkills" class="cap__empty">加载中…</p>
-        <p v-else-if="!skills.length" class="cap__empty">暂无 Skill。可导入 zip 或等待官方示例 seed。</p>
+        <p v-else-if="!skills.length" class="cap__empty">暂无 Skill。可导入 .zip / .md，或等待官方示例 seed。</p>
         <ul v-else class="cap__list">
           <li v-for="s in skills" :key="s.id" class="cap__item">
             <div class="cap__item-main">
@@ -440,18 +440,18 @@ async function removeMemory(m: AiMemory): Promise<void> {
 
       <div v-if="tab === 'skills'" class="cap__pane">
         <div class="cap__toolbar">
-          <IButton size="sm" :loading="importing" @click="pickZip">导入 zip</IButton>
+          <IButton size="sm" :loading="importing" @click="pickZip">导入</IButton>
           <input
             ref="fileInput"
             type="file"
-            accept=".zip,application/zip"
+            accept=".zip,.md,.markdown,application/zip,text/markdown"
             class="cap__file"
             @change="onZipPicked"
           />
-          <span class="cap__hint">仅 skill.json + SKILL.md</span>
+          <span class="cap__hint">支持 .zip（skill.json + SKILL.md）或单个 .md</span>
         </div>
         <p v-if="loadingSkills" class="cap__empty">加载中…</p>
-        <p v-else-if="!skills.length" class="cap__empty">暂无 Skill。可导入 zip 或等待官方示例 seed。</p>
+        <p v-else-if="!skills.length" class="cap__empty">暂无 Skill。可导入 .zip / .md，或等待官方示例 seed。</p>
         <ul v-else class="cap__list">
           <li v-for="s in skills" :key="s.id" class="cap__item">
             <div class="cap__item-main">
