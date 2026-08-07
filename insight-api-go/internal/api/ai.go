@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userid"
 	"github.com/google/uuid"
@@ -186,6 +188,61 @@ func asFiniteInt(v any) (int, bool) {
 	}
 }
 
+// decodeUpstreamErrorBody 解压/解析上游错误体，避免 gzip 二进制被当字符串回传。
+func decodeUpstreamErrorBody(raw []byte) string {
+	if len(raw) == 0 {
+		return "上游模型返回错误（无详情）"
+	}
+	data := raw
+	// 缺 Content-Encoding 时仍可能是 gzip（魔数 1f 8b）
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		if zr, err := gzip.NewReader(bytes.NewReader(data)); err == nil {
+			out, err := io.ReadAll(io.LimitReader(zr, 8<<10))
+			_ = zr.Close()
+			if err == nil && len(out) > 0 {
+				data = out
+			}
+		}
+	}
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    any    `json:"code"`
+		} `json:"error"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(data, &envelope) == nil {
+		if msg := strings.TrimSpace(envelope.Error.Message); msg != "" {
+			return clipErrMsg(msg)
+		}
+		if msg := strings.TrimSpace(envelope.Message); msg != "" {
+			return clipErrMsg(msg)
+		}
+	}
+	s := strings.ToValidUTF8(string(data), "")
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' || unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, s)
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "上游模型返回错误（无法解析响应正文）"
+	}
+	return clipErrMsg(s)
+}
+
+func clipErrMsg(s string) string {
+	const max = 400
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "…"
+}
+
 func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 	cfg := s.readAiConfig()
 	if cfg.APIKey == "" {
@@ -225,6 +282,8 @@ func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	// SSE 代理禁用压缩，避免错误体/流被 gzip 后前端显示乱码
+	req.Header.Set("Accept-Encoding", "identity")
 
 	client := &http.Client{Timeout: 0}
 	resp, err := client.Do(req)
@@ -234,11 +293,11 @@ func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		text, _ := io.ReadAll(io.LimitReader(resp.Body, 2000))
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<10))
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"error":   "upstream_error",
 			"status":  resp.StatusCode,
-			"message": string(text),
+			"message": decodeUpstreamErrorBody(raw),
 		})
 		return
 	}

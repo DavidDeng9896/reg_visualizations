@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { runAgent, MaxIterError, type AgentEvent, type AskRequest, type ToolExecutor } from './agentLoop'
+import { runAgent, MaxIterError, AgentRunError, type AgentEvent, type AskRequest, type ToolExecutor } from './agentLoop'
 import {
   aiConfigApi,
   aiConvApi,
@@ -7,6 +7,7 @@ import {
   aiMcpApi,
   aiMemoriesApi,
   aiSkillsApi,
+  sanitizeModelError,
   type AiFileMeta,
   type AiPublicConfig,
   type ContentPart,
@@ -140,12 +141,14 @@ export const useAiStore = defineStore('ai', {
     /** 模型可见上下文估算 token（系统提示词 + 摘要/历史）。 */
     contextTokens: (s) =>
       estimateTokens(SYSTEM_PROMPT) + estimateChatTokens(s.messages.map((m) => ({ role: m.role, content: m.content }))),
-    /** 最近一条仍可续跑的助手消息（已关闭的检查点忽略）。 */
+    /** 最近一条仍可续跑的助手消息（已关闭的检查点忽略）。含计划未完成，或模型错误且有进度。 */
     resumableAssistant: (s): UiMessage | null => {
       for (let i = s.messages.length - 1; i >= 0; i -= 1) {
         const m = s.messages[i]
-        if (m.role !== 'assistant' || !m.planSteps?.length || m.planDismissed) continue
-        if (m.incomplete || planIncomplete(m.planSteps, m.planDone)) return m
+        if (m.role !== 'assistant' || m.planDismissed) continue
+        if (m.planSteps?.length && (m.incomplete || planIncomplete(m.planSteps, m.planDone))) return m
+        // 模型错误中断：有工具轨迹或 rawTail 时允许从断点续跑
+        if (m.error && (m.rawTail?.length || m.trace.length || m.planSteps?.length)) return m
       }
       return null
     },
@@ -407,12 +410,18 @@ export const useAiStore = defineStore('ai', {
         if (err instanceof MaxIterError) {
           assistant.maxIter = true
           assistant.error = err.message
+          markErrorResumable(assistant)
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
           applyUserAbortToMessages(this.messages)
+        } else if (err instanceof AgentRunError) {
+          assistant.error = sanitizeModelError(err.message)
+          assistant.rawTail = err.partialMessages.slice(baseLen)
+          markErrorResumable(assistant)
         } else {
-          assistant.error = err instanceof Error ? err.message : String(err)
+          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
+          markErrorResumable(assistant)
         }
       } finally {
         assistant.streaming = false
@@ -423,22 +432,29 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      if (!aborted) await this.maybeAutoContinue(assistant)
+      // 模型错误不自动续跑，交给用户点「继续任务」
+      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
     },
 
     /**
-     * 从检查点续跑未完成计划：不新增用户气泡；带上 rawTail 工具历史，避免重做已完成步骤。
+     * 从检查点续跑：计划未完成，或模型错误中断（有 rawTail/trace）。
+     * 不新增用户气泡；带上 rawTail 工具历史，避免重做已完成步骤。
      */
     async continueTask(opts?: { auto?: boolean }): Promise<void> {
       if (this.running) return
       const prev = this.resumableAssistant as UiMessage | null
-      if (!prev?.planSteps?.length || prev.planDismissed) return
+      if (!prev || prev.planDismissed) return
       if (!opts?.auto) autoContinueCount = 0
       clearTransientProgress(this.messages)
       await this.ensureConversation()
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
       const doneSnapshot = [...(prev.planDone ?? [])]
+      const planSteps = prev.planSteps?.length ? [...prev.planSteps] : undefined
+      // 清除旧错误态，准备新一轮续跑
+      prev.error = undefined
+      prev.incomplete = planSteps ? planIncomplete(planSteps, doneSnapshot) : true
+
       this.messages.push({
         id: nextId(),
         role: 'assistant',
@@ -447,14 +463,17 @@ export const useAiStore = defineStore('ai', {
         artifacts: [],
         streaming: true,
         at: Date.now(),
-        planSteps: [...prev.planSteps],
-        planDone: [...doneSnapshot],
+        ...(planSteps ? { planSteps, planDone: [...doneSnapshot] } : {}),
       })
       const assistant = this.messages[this.messages.length - 1] as UiMessage
 
       this.running = true
       this.abort = new AbortController()
       const ac = this.abort
+
+      const resumeHint = planSteps?.length
+        ? continueTaskSystemMessage(planSteps, doneSnapshot)
+        : '【续跑检查点】上次因模型/网络错误中断。请从断点继续，复用已有工具结果，禁止重复已完成操作；直接 tool_calls，全部完成后简短总结。'
 
       // 系统提示 + 检查点之前历史 + 上一轮工具轨迹 + 续跑指令
       const chatMessages: ChatMessage[] = [
@@ -464,7 +483,7 @@ export const useAiStore = defineStore('ai', {
           : prev.content
             ? [{ role: 'assistant' as const, content: prev.content }]
             : []),
-        { role: 'system', content: continueTaskSystemMessage(prev.planSteps, doneSnapshot) },
+        { role: 'system', content: resumeHint },
       ]
 
       try {
@@ -500,25 +519,41 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
-          initialPlan: { steps: prev.planSteps, done: doneSnapshot },
+          ...(planSteps ? { initialPlan: { steps: planSteps, done: doneSnapshot } } : {}),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
         // 把进度合并回检查点，避免旧消息仍显示「可继续」导致死循环
-        syncPlanCheckpoint(prev, assistant)
+        if (planSteps) syncPlanCheckpoint(prev, assistant)
+        else {
+          prev.incomplete = false
+          prev.error = undefined
+          assistant.incomplete = false
+        }
       } catch (err) {
         if (err instanceof MaxIterError) {
           assistant.maxIter = true
           assistant.error = err.message
+          markErrorResumable(assistant)
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
           applyUserAbortToMessages(this.messages)
+        } else if (err instanceof AgentRunError) {
+          assistant.error = sanitizeModelError(err.message)
+          assistant.rawTail = err.partialMessages.slice(baseLen)
+          markErrorResumable(assistant)
         } else {
-          assistant.error = err instanceof Error ? err.message : String(err)
+          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
+          markErrorResumable(assistant)
         }
         // 用户中止后不再同步 incomplete，避免「继续任务」回弹
-        if (!aborted) syncPlanCheckpoint(prev, assistant)
+        if (!aborted && planSteps) syncPlanCheckpoint(prev, assistant)
+        if (!aborted) {
+          // 检查点也标记可续跑，输入条能找到 resumableAssistant
+          markErrorResumable(prev)
+          if (assistant.rawTail?.length) prev.rawTail = [...(prev.rawTail ?? []), ...assistant.rawTail]
+        }
       } finally {
         assistant.streaming = false
         if (this.abort === ac) {
@@ -527,7 +562,7 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      if (!aborted) await this.maybeAutoContinue(assistant)
+      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
     },
 
     /** 用户关闭「继续任务」卡片，不再自动/手动提示续跑。 */
@@ -539,8 +574,9 @@ export const useAiStore = defineStore('ai', {
       void this.persist()
     },
 
-    /** 本轮结束后若仍 incomplete，自动续跑（同会话连续 ≤ MAX_AUTO_CONTINUE）。 */
+    /** 本轮结束后若仍 incomplete，自动续跑（同会话连续 ≤ MAX_AUTO_CONTINUE）。模型错误不自动续。 */
     async maybeAutoContinue(assistant: UiMessage): Promise<void> {
+      if (assistant.error) return
       if (assistant.planDismissed) return
       if (!assistant.incomplete && !planIncomplete(assistant.planSteps, assistant.planDone)) return
       if (autoContinueCount >= MAX_AUTO_CONTINUE) return
@@ -665,11 +701,17 @@ export const useAiStore = defineStore('ai', {
         if (err instanceof MaxIterError) {
           assistant.maxIter = true
           assistant.error = err.message
+          markErrorResumable(assistant)
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           assistant.error = '已中止'
           applyUserAbortToMessages(this.messages)
+        } else if (err instanceof AgentRunError) {
+          assistant.error = sanitizeModelError(err.message)
+          assistant.rawTail = err.partialMessages.slice(baseLen)
+          markErrorResumable(assistant)
         } else {
-          assistant.error = err instanceof Error ? err.message : String(err)
+          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
+          markErrorResumable(assistant)
         }
       } finally {
         assistant.streaming = false
@@ -933,6 +975,12 @@ function syncPlanCheckpoint(prev: UiMessage, assistant: UiMessage): void {
     prev.incomplete = false
     assistant.incomplete = false
   }
+}
+
+/** 模型/超轮错误后标记可续跑（用户点「继续任务」，不自动续）。 */
+function markErrorResumable(msg: UiMessage): void {
+  msg.planDismissed = false
+  msg.incomplete = true
 }
 
 /** 交互结果以普通对话文本落盘（非特殊卡片）；写入 notes，避免被 round 清空。 */

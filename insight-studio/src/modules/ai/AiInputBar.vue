@@ -395,7 +395,11 @@ watch(
       <button type="button" class="bar__continue-btn" data-testid="ai-continue" @click="onContinue">
         继续任务
       </button>
-      <span class="bar__continue-hint">计划尚未全部完成，可从检查点续跑</span>
+      <span class="bar__continue-hint">{{
+        ai.resumableAssistant?.error
+          ? '因模型错误已暂停，可从检查点续跑'
+          : '计划尚未全部完成，可从检查点续跑'
+      }}</span>
       <button
         type="button"
         class="bar__continue-dismiss"
