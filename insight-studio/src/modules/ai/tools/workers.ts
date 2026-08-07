@@ -2,6 +2,7 @@
  * Subagent Workers：受限工具集 + 独立短 loop，摘要回灌主 Planner。
  */
 import type { ChatMessage, ChatPayload } from '../client'
+import { contentText } from '../client'
 import type { RunAgentOptions, ToolExecResult } from '../agentLoop'
 import { clipToolResult } from '../taskState'
 import { OPENAI_TOOLS } from './registry'
@@ -115,11 +116,12 @@ function workerSystemPrompt(role: string, goal: string): string {
 function summarizeWorkerMessages(messages: ChatMessage[], goal: string): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i]
-    if (m.role === 'assistant' && (m.content ?? '').trim()) {
-      return clipToolResult(m.content!.trim())
+    const text = contentText(m.content).trim()
+    if (m.role === 'assistant' && text) {
+      return clipToolResult(text)
     }
   }
-  const tools = messages.filter((m) => m.role === 'tool').map((m) => String(m.content ?? ''))
+  const tools = messages.filter((m) => m.role === 'tool').map((m) => contentText(m.content))
   if (tools.length) {
     return clipToolResult(`工人已执行 ${tools.length} 个工具。目标：${goal}\n末次观察：${tools[tools.length - 1]}`)
   }

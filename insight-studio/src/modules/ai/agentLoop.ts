@@ -2,7 +2,7 @@
  * Agent-loop（ReAct）：多轮 模型→工具→观察 循环，支持流式、中止、超轮、计划门禁。
  * 纯逻辑可测：postChat 注入。
  */
-import { postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
+import { contentText, postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker } from './tools/workers'
@@ -151,7 +151,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     const calls = assistant.tool_calls ?? []
     if (!calls.length) {
-      const text = (assistant.content ?? '').trim()
+      const text = contentText(assistant.content).trim()
       // 空转复读：与上一轮高度相似且无工具 → 计 stall
       if (text && lastStallText && isNearDuplicate(text, lastStallText)) {
         stallRounds += 1
@@ -193,14 +193,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       }
 
       emitIncompleteIfNeeded()
-      onEvent({ type: 'done', content: scrubVisibleContent(assistant.content ?? '') })
+      onEvent({ type: 'done', content: scrubVisibleContent(contentText(assistant.content)) })
       return messages
     }
 
     // 有工具：本轮过程独白不进上下文（防下一轮继续复读）
     stallRounds = 0
     lastStallText = ''
-    if ((assistant.content ?? '').trim()) {
+    if (contentText(assistant.content).trim()) {
       messages[messages.length - 1] = { ...assistant, content: '' }
     }
 
@@ -335,7 +335,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   messages.push(finalMsg)
   if (finalMsg.content) {
     emitIncompleteIfNeeded()
-    onEvent({ type: 'done', content: scrubVisibleContent(finalMsg.content) })
+    onEvent({ type: 'done', content: scrubVisibleContent(contentText(finalMsg.content)) })
     return messages
   }
   throw new MaxIterError(maxIterations)

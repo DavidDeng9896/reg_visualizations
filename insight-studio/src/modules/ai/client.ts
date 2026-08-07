@@ -25,6 +25,16 @@ export interface ChatMessage {
   name?: string
 }
 
+/** 从消息 content 取出纯文本（多模态时拼接 text parts）。 */
+export function contentText(content: string | ContentPart[] | null | undefined): string {
+  if (content == null) return ''
+  if (typeof content === 'string') return content
+  return content
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n')
+}
+
 export interface ChatPayload {
   messages: ChatMessage[]
   tools?: unknown[]

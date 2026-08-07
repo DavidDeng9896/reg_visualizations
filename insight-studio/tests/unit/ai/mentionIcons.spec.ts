@@ -24,16 +24,16 @@ describe('mentionIcon', () => {
           rows: [],
           filters: [],
           views: [
-            { id: 'v1', name: '柱状', type: 'bar', children: [], chart: null },
+            { id: 'v1', name: '柱状', type: 'bar', children: [], chart: undefined },
             {
               id: 'v2',
               name: '嵌套折线',
               type: 'line',
               children: [],
-              chart: null,
+              chart: undefined,
             },
           ],
-        },
+        } as Analysis['tables'][number],
       ],
     })
     expect(mentionIcon({ kind: 'analysis' }, a)).toBe('database')

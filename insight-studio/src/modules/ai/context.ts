@@ -1,6 +1,7 @@
 /** 当前分析上下文构建：表结构/样例行/步骤图摘要 + @引用块。 */
 import type { Analysis, AnalysisTable } from '../../shared/types'
 import { CONTEXT_HEADER } from './prompts'
+import type { AttachmentKind } from './attachments'
 
 function tableBrief(t: AnalysisTable, withSample = true): string {
   const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
@@ -29,8 +30,6 @@ export function buildAnalysisContext(analysis: Analysis | null): string {
     ...analysis.tables.slice(0, 6).map((t) => tableBrief(t)),
   ].join('\n')
 }
-
-import type { AttachmentKind } from './attachments'
 
 /** @ 引用的上下文块类型。 */
 export type MentionTarget =
