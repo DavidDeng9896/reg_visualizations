@@ -4,6 +4,7 @@
  */
 import { postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
+import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker } from './tools/workers'
 
 /** 工具执行结果。 */
@@ -101,6 +102,10 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   let planSteps: string[] = opts.initialPlan?.steps ? [...opts.initialPlan.steps] : []
   let planDone: number[] = opts.initialPlan?.done ? [...opts.initialPlan.done] : []
   let planNudges = 0
+  /** 连续「无工具 / 空转复读」轮数；用于打断死循环独白。 */
+  let stallRounds = 0
+  let lastStallText = ''
+  const MAX_STALL_ROUNDS = 3
 
   const throwIfAborted = () => {
     if (signal?.aborted) throw new DOMException('已中止', 'AbortError')
@@ -146,15 +151,57 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     const calls = assistant.tool_calls ?? []
     if (!calls.length) {
-      // P0 计划门禁：假结束 → 催促续跑
-      if (planGate && planIncomplete(planSteps, planDone) && planNudges < maxNudges) {
+      const text = (assistant.content ?? '').trim()
+      // 空转复读：与上一轮高度相似且无工具 → 计 stall
+      if (text && lastStallText && isNearDuplicate(text, lastStallText)) {
+        stallRounds += 1
+      } else if (text) {
+        stallRounds = planIncomplete(planSteps, planDone) ? stallRounds + 1 : 0
+        lastStallText = text
+      }
+
+      // P0 计划门禁：假结束 → 催促续跑（并压缩独白，避免上下文越读越复读）
+      if (planGate && planIncomplete(planSteps, planDone) && planNudges < maxNudges && stallRounds < MAX_STALL_ROUNDS) {
         planNudges += 1
-        messages.push({ role: 'system', content: planNudgeMessage(planSteps, planDone) })
+        const last = messages[messages.length - 1]
+        if (last?.role === 'assistant') {
+          messages[messages.length - 1] = {
+            ...last,
+            content: '（计划未完成，请立即调用工具继续，禁止复述「让我/好的/开始执行」）',
+          }
+        }
+        messages.push({
+          role: 'system',
+          content:
+            planNudgeMessage(planSteps, planDone) +
+            '\n【禁止独白】不要输出过程说明；本轮必须直接 tool_calls，不要再说「让我确认/开始创建」。',
+        })
         continue
       }
+
+      // 连续空转：强制收束，避免刷屏
+      if (stallRounds >= MAX_STALL_ROUNDS && planGate && planIncomplete(planSteps, planDone)) {
+        const scrubbed = scrubVisibleContent(text)
+        emitIncompleteIfNeeded()
+        onEvent({
+          type: 'done',
+          content: scrubbed
+            ? `${scrubbed}\n\n（执行陷入重复说明，已暂停。可点击「继续任务」。）`
+            : '执行陷入重复说明，已暂停。请点击「继续任务」或改述需求。',
+        })
+        return messages
+      }
+
       emitIncompleteIfNeeded()
-      onEvent({ type: 'done', content: assistant.content ?? '' })
+      onEvent({ type: 'done', content: scrubVisibleContent(assistant.content ?? '') })
       return messages
+    }
+
+    // 有工具：本轮过程独白不进上下文（防下一轮继续复读）
+    stallRounds = 0
+    lastStallText = ''
+    if ((assistant.content ?? '').trim()) {
+      messages[messages.length - 1] = { ...assistant, content: '' }
     }
 
     for (const call of calls) {
@@ -275,7 +322,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   messages.push(finalMsg)
   if (finalMsg.content) {
     emitIncompleteIfNeeded()
-    onEvent({ type: 'done', content: finalMsg.content })
+    onEvent({ type: 'done', content: scrubVisibleContent(finalMsg.content) })
     return messages
   }
   throw new MaxIterError(maxIterations)

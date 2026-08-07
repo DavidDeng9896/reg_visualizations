@@ -341,6 +341,51 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(workerResult?.content).toContain('要点')
     expect(evts.some((e) => e.type === 'done' && e.content === '主循环完成')).toBe(true)
   })
+  it('工具轮：过程独白不写入回灌上下文', async () => {
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) {
+        return sseOf({
+          content: '好，让我先确认表结构再创建视图。'.repeat(5),
+          toolCalls: [call('list_tables', {})],
+        })
+      }
+      return sseOf({ content: '完成' })
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'ok' }),
+      maxIterations: 4,
+      planGate: false,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    const withTools = messages.find((m) => m.role === 'assistant' && (m.tool_calls?.length ?? 0) > 0)
+    expect(withTools?.content ?? '').toBe('')
+  })
+
+  it('连续复读无工具 → 强制收束并 incomplete', async () => {
+    const line = '好，让我直接调用 get_table_schema 确认表结构，然后创建视图。'
+    const post = async (p: ChatPayload) => {
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) return sseOf({ toolCalls: [call('submit_plan', { steps: ['建图'] })] })
+      return sseOf({ content: line })
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: '出图' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 20,
+      maxPlanNudges: 5,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(evts.some((e) => e.type === 'incomplete')).toBe(true)
+    const done = evts.find((e) => e.type === 'done')
+    expect(done && done.type === 'done' ? done.content : '').toMatch(/暂停|省略|继续任务|重复/)
+  })
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */
