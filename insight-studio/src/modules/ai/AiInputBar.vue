@@ -23,7 +23,8 @@ import {
 /**
  * AI 输入条：圆角盒子 + 自动增高输入区 + 精简工具行
  *（+ 菜单 · 权限图标 · 模型 · 上下文/压缩 · 发送）。
- * 附件入口在 + 菜单与拖放；「完成后生成报告」在 + 选项，勾选后以 chip 显示。
+ * + 菜单：一级入口；引用上下文 / 快捷指令在二级侧栏展开。
+ * 「完成后生成报告」在 + 选项，勾选后以 chip 显示。
  */
 const ai = useAiStore()
 const { running, config, sessionFiles } = storeToRefs(ai)
@@ -42,6 +43,17 @@ type MenuMode = 'plus' | 'mention' | 'slash' | 'models' | 'permissions' | null
 const menuMode = ref<MenuMode>(null)
 const mentionFilter = ref('')
 const slashFilter = ref('')
+/** + 菜单二级侧栏：引用上下文 / 快捷指令 */
+type PlusPanel = 'mention' | 'slash' | null
+const plusPanel = ref<PlusPanel>(null)
+
+watch(menuMode, (m) => {
+  if (m !== 'plus') plusPanel.value = null
+})
+
+function openPlusPanel(panel: Exclude<PlusPanel, null>): void {
+  plusPanel.value = plusPanel.value === panel ? null : panel
+}
 
 const PERMISSION_OPTIONS = [
   {
@@ -564,36 +576,95 @@ watch(
       </template>
 
       <template #default>
-        <!-- +：附件 / 引用 / 指令 / 选项 -->
-        <div v-if="menuMode === 'plus'" class="bar__menu" role="menu">
-          <div class="bar__menu-title">附件</div>
-          <button type="button" class="bar__menu-item" role="menuitem" data-testid="ai-upload-menu" @click="openFilePicker">
-            <IIcon name="paperclip" :size="12" class="bar__menu-icon" />上传附件
-          </button>
-          <div class="bar__menu-title">引用上下文</div>
-          <button v-if="!mentionables.length" type="button" class="bar__menu-item" disabled>无可引用项</button>
-          <button v-for="it in mentionables" :key="it.key" type="button" class="bar__menu-item" role="menuitem" @click="pickMentionFromMenu(it)">
-            <IIcon :name="it.icon" :size="12" class="bar__menu-icon" />{{ it.label }}
-          </button>
-          <div class="bar__menu-title">快捷指令</div>
-          <button v-for="c in SLASH_COMMANDS" :key="c.key" type="button" class="bar__menu-item" role="menuitem" @click="applySlash(c)">
-            <span class="bar__menu-slash">/</span>{{ c.key }}
-          </button>
-          <div class="bar__menu-title">选项</div>
-          <button
-            type="button"
-            class="bar__menu-item"
-            role="menuitemcheckbox"
-            :aria-checked="ai.wantReport"
-            data-testid="ai-want-report"
-            title="分析任务完成后自动创建/更新科研风格报告节点"
-            @click="toggleWantReport"
+        <!-- +：一级入口 + 二级侧栏（引用 / 快捷指令） -->
+        <div v-if="menuMode === 'plus'" class="bar__flyout" role="menu" data-testid="ai-plus-menu">
+          <div class="bar__menu bar__menu--primary">
+            <button type="button" class="bar__menu-item" role="menuitem" data-testid="ai-upload-menu" @click="openFilePicker">
+              <IIcon name="paperclip" :size="12" class="bar__menu-icon" />上传附件
+            </button>
+            <button
+              type="button"
+              class="bar__menu-item"
+              :class="{ 'bar__menu-item--on': plusPanel === 'mention' }"
+              role="menuitem"
+              aria-haspopup="true"
+              :aria-expanded="plusPanel === 'mention'"
+              data-testid="ai-plus-mention"
+              @click="openPlusPanel('mention')"
+            >
+              <span class="bar__menu-at">@</span>
+              <span class="bar__menu-label">引用上下文</span>
+              <IIcon name="chevron-right" :size="12" class="bar__menu-chev" />
+            </button>
+            <button
+              type="button"
+              class="bar__menu-item"
+              :class="{ 'bar__menu-item--on': plusPanel === 'slash' }"
+              role="menuitem"
+              aria-haspopup="true"
+              :aria-expanded="plusPanel === 'slash'"
+              data-testid="ai-plus-slash"
+              @click="openPlusPanel('slash')"
+            >
+              <span class="bar__menu-slash">/</span>
+              <span class="bar__menu-label">快捷指令</span>
+              <IIcon name="chevron-right" :size="12" class="bar__menu-chev" />
+            </button>
+            <div class="bar__menu-sep" />
+            <button
+              type="button"
+              class="bar__menu-item"
+              role="menuitemcheckbox"
+              :aria-checked="ai.wantReport"
+              data-testid="ai-want-report"
+              title="分析任务完成后自动创建/更新科研风格报告节点"
+              @click="toggleWantReport"
+            >
+              <IIcon v-if="ai.wantReport" name="check" :size="12" class="bar__menu-check" />
+              <span v-else class="bar__menu-check-space" />
+              <IIcon name="file-text" :size="12" class="bar__menu-icon" />
+              完成后生成报告
+            </button>
+          </div>
+          <div
+            v-if="plusPanel === 'mention'"
+            class="bar__menu bar__menu--side"
+            role="menu"
+            data-testid="ai-plus-mention-panel"
+            aria-label="引用上下文"
           >
-            <IIcon v-if="ai.wantReport" name="check" :size="12" class="bar__menu-check" />
-            <span v-else class="bar__menu-check-space" />
-            <IIcon name="file-text" :size="12" class="bar__menu-icon" />
-            完成后生成报告
-          </button>
+            <div class="bar__menu-title">引用上下文</div>
+            <button v-if="!mentionables.length" type="button" class="bar__menu-item" disabled>无可引用项</button>
+            <button
+              v-for="it in mentionables"
+              :key="it.key"
+              type="button"
+              class="bar__menu-item"
+              role="menuitem"
+              @click="pickMentionFromMenu(it)"
+            >
+              <IIcon :name="it.icon" :size="12" class="bar__menu-icon" />{{ it.label }}
+            </button>
+          </div>
+          <div
+            v-else-if="plusPanel === 'slash'"
+            class="bar__menu bar__menu--side"
+            role="menu"
+            data-testid="ai-plus-slash-panel"
+            aria-label="快捷指令"
+          >
+            <div class="bar__menu-title">快捷指令</div>
+            <button
+              v-for="c in SLASH_COMMANDS"
+              :key="c.key"
+              type="button"
+              class="bar__menu-item"
+              role="menuitem"
+              @click="applySlash(c)"
+            >
+              <span class="bar__menu-slash">/</span>{{ c.key }}
+            </button>
+          </div>
         </div>
         <!-- 内联 @：过滤后的引用 -->
         <div v-else-if="menuMode === 'mention'" class="bar__menu" role="menu">
@@ -994,13 +1065,34 @@ watch(
 }
 
 /* 弹出菜单 */
+.bar__flyout {
+  display: flex;
+  align-items: stretch;
+  max-height: 280px;
+}
 .bar__menu {
   display: flex;
   flex-direction: column;
   padding: 4px;
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
+  min-width: 200px;
+}
+.bar__menu--primary {
+  min-width: 188px;
+  flex-shrink: 0;
+}
+.bar__menu--side {
   min-width: 220px;
+  max-width: 280px;
+  border-left: 1px solid var(--is-border);
+  background: var(--is-surface, #fff);
+}
+.bar__menu-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--is-border);
+  flex-shrink: 0;
 }
 .bar__menu-title {
   padding: 6px 10px 4px;
@@ -1021,12 +1113,27 @@ watch(
   text-align: left;
   color: var(--is-text);
   cursor: pointer;
+  width: 100%;
 }
 .bar__menu-item:hover:not(:disabled) {
   background: var(--is-surface-hover);
 }
+.bar__menu-item--on {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
 .bar__menu-item:disabled {
   color: var(--is-text-tertiary);
+}
+.bar__menu-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.bar__menu-chev {
+  margin-left: auto;
+  color: var(--is-text-tertiary);
+  flex-shrink: 0;
 }
 .bar__menu-icon {
   color: var(--is-text-tertiary);
@@ -1035,6 +1142,18 @@ watch(
 .bar__menu-slash {
   color: var(--is-accent);
   font-weight: 600;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.bar__menu-at {
+  color: var(--is-accent);
+  font-weight: 600;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
 }
 .bar__menu-check {
   color: var(--is-accent);
