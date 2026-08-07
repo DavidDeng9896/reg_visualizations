@@ -101,6 +101,8 @@ interface AiState {
   panelMode: 'docked' | 'floating'
   /** 当前用户最近上传的附件列表（@ 引用用）。 */
   sessionFiles: AiFileMeta[]
+  /** 输入条勾选：本轮任务完成后生成分析报告节点。 */
+  wantReport: boolean
 }
 
 let uid = 0
@@ -130,6 +132,7 @@ export const useAiStore = defineStore('ai', {
     pendingAsk: null,
     panelMode: 'docked',
     sessionFiles: [],
+    wantReport: false,
   }),
 
   getters: {
@@ -336,6 +339,14 @@ export const useAiStore = defineStore('ai', {
       ]
       const mentionCtx = buildMentionContext(analysis, mentions)
       if (mentionCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: mentionCtx })
+
+      if (this.wantReport) {
+        chatMessages.splice(chatMessages.length - 1, 0, {
+          role: 'system',
+          content:
+            '【用户已勾选「完成后生成报告」】在分析相关步骤落地后，必须调用 create_report_step（或更新已有报告）生成科研风格 HTML 分析报告节点；报告须含摘要、关键图表引用（tableId/viewId）、结论。不要只在正文里贴长文代替报告节点。',
+        })
+      }
 
       try {
         const attachCtx = await buildAttachmentContext(atts)

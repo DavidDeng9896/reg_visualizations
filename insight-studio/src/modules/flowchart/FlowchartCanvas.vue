@@ -26,6 +26,7 @@ import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
 import type { PortType, StepInputRef, StepNode, StepType } from '../../shared/types'
 import { debounce } from '../charts/draft'
+import { createStepNode } from '../steps/factory'
 import { runStepAsync, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 
@@ -567,6 +568,20 @@ function onStepSelected(type: StepType): void {
   })
 }
 
+/** 添加独立报告节点（无需连线）。 */
+function addReportNode(): void {
+  if (!current.value) return
+  const step = createStepNode('report', '分析报告')
+  store.mutate((a) => {
+    a.steps.push(step)
+  })
+  const newNodeId = stepNodeId(step.id)
+  void nextTick(() => {
+    openStepEditor(step.id, true)
+    setActive(newNodeId)
+  })
+}
+
 /* --------------------------------- 步骤编辑面板 -------------------------------- */
 
 const editingStep = ref<string | null>(null)
@@ -790,6 +805,17 @@ function minimapNodeColor(node: { data?: unknown }): string {
             @click="arrangeAll()"
           >
             <IIcon name="arrange" :size="14" />
+          </button>
+        </ITooltip>
+        <ITooltip content="添加分析报告">
+          <button
+            type="button"
+            class="flow-controls__btn"
+            aria-label="添加分析报告"
+            :disabled="!current"
+            @click="addReportNode()"
+          >
+            <IIcon name="file-text" :size="14" />
           </button>
         </ITooltip>
         <ITooltip v-if="hasStale" content="重新运行所有待更新步骤">

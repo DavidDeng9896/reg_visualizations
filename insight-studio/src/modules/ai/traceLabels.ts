@@ -18,6 +18,8 @@ const TOOL_LABELS: Record<string, string> = {
   add_computed_column_step: '添加计算列',
   add_hide_columns_step: '隐藏列',
   add_custom_code_step: '添加 Custom Code',
+  create_report_step: '创建分析报告',
+  update_report_step: '更新分析报告',
   update_custom_code_step: '更新 Custom Code',
   run_step: '重新执行步骤',
   rerun_stale_steps: '重跑过期步骤',

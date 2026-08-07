@@ -24,6 +24,7 @@ export const SYSTEM_PROMPT = `你是「科学数据管理」平台内置的数�
 - 步骤：upload（导入源）、filter、join、union、computed-column、hide-columns、custom-code（Python，list[IOData]）；下游步骤从上游表产出新表，形成数据流图。
 - 视图：挂在表上，type 为 table/bar/line/scatter/box/pie/heatmap/bignumber，chart 视图含 configure（映射+回归）与 style（样式）。
 - Custom Code：入口 def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]；data 为 DataFrame/BytesIO/go.Figure；白名单 pandas/numpy/scipy/sklearn/rdkit/plotly/openpyxl/pydantic。可用 add_custom_code_step / update_custom_code_step。复杂清洗（正则、分组）优先 Custom Code。
+- **分析报告**：flowchart 上的独立 \`report\` 节点（无需连线），科研主题 HTML；用 create_report_step / update_report_step。用户勾选「完成后生成报告」或口头要求时，在分析落地后创建/更新报告节点。报告 JSON：title、subtitle、sections[]（heading/paragraph/bullets/chart/table/divider）、conclusion。
 - Dashboard（看板）：多个表/图表组件组成的网格布局。
 
 ## 回复风格（必须遵守）

@@ -358,6 +358,7 @@ export type StepType =
   | 'sort' // 排序（P1/P2）
   | 'interpolation' // 标准曲线插值（P2）
   | 'custom-code' // Python Custom Code（托管 Worker）
+  | 'report' // 分析报告（独立节点，不连线，HTML 总结）
 
 export type StepStatus = 'pending' | 'configured' | 'running' | 'failed' | 'stale'
 
@@ -395,6 +396,37 @@ export interface StepNode {
   status: StepStatus
   error?: string
   output: StepOutputRefs
+}
+
+/* ---------------------------------- 分析报告 ---------------------------------- */
+
+/** 报告章节：结构化存储，由科研主题模板渲染为 HTML。 */
+export type ReportSectionKind = 'heading' | 'paragraph' | 'bullets' | 'chart' | 'table' | 'divider'
+
+export interface ReportSection {
+  id: string
+  kind: ReportSectionKind
+  /** heading / 段落标题 */
+  title?: string
+  /** paragraph 正文（Markdown 轻量纯文本） */
+  body?: string
+  /** bullets 列表项 */
+  items?: string[]
+  /** chart / table 引用 */
+  tableId?: string
+  viewId?: string
+  caption?: string
+}
+
+/** 分析报告文档（存于 report 步骤 config.report）。 */
+export interface AnalysisReport {
+  title: string
+  subtitle?: string
+  generatedAt: string
+  /** 目前仅 research；预留扩展 */
+  theme: 'research'
+  sections: ReportSection[]
+  conclusion?: string
 }
 
 /** 文件实体（P1 启用；P0 先占位以保持模型稳定）。 */

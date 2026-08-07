@@ -8,6 +8,7 @@ import { execHideColumns, previewHideColumns } from './hideColumns'
 import { execJoin, previewJoin } from './join'
 import { execUnion, previewUnion } from './union'
 import { execCustomCode } from './customCode'
+import { execReport } from './report'
 
 export * from './types'
 export { executeFilter, previewFilter } from './filter'
@@ -24,6 +25,7 @@ export const IMPLEMENTED_STEP_TYPES: ReadonlySet<string> = new Set([
   'join',
   'union',
   'custom-code',
+  'report',
 ])
 
 /**
@@ -82,6 +84,8 @@ export function executeStep(analysis: Analysis, step: StepNode): StepExecResult 
       return execJoin(ctx)
     case 'union':
       return execUnion(ctx)
+    case 'report':
+      return execReport(ctx)
     default:
       return { status: 'failed', error: `步骤 "${step.type}" 尚未实现执行逻辑` }
   }

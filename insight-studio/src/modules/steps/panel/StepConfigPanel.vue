@@ -44,7 +44,7 @@ const dirty = computed(() => {
 let previewTimer: ReturnType<typeof setTimeout> | null = null
 function schedulePreview() {
   if (!current.value) return
-  if (props.step.type === 'custom-code') {
+  if (props.step.type === 'custom-code' || props.step.type === 'report') {
     preview.value = null
     previewLoading.value = false
     return
@@ -161,7 +161,7 @@ async function onRefreshSql(): Promise<void> {
 
         <div class="step-panel__divider" />
 
-        <section v-if="step.type !== 'custom-code'" class="step-panel__section">
+        <section v-if="step.type !== 'custom-code' && step.type !== 'report'" class="step-panel__section">
           <div class="step-panel__preview">
             <div class="step-panel__preview-head">
               <span class="step-panel__preview-title">Preview</span>
@@ -193,7 +193,12 @@ async function onRefreshSql(): Promise<void> {
         </section>
         <section v-else class="step-panel__section">
           <p class="step-panel__preview-empty">
-            Custom Code 在 Save 后由 Python Worker 执行；输出表 / 图 / 文件与日志见上方编辑区。
+            <template v-if="step.type === 'report'">
+              报告为独立节点，无需连线；内容与科研主题预览见上方，可用「导出 PDF」打印。
+            </template>
+            <template v-else>
+              Custom Code 在 Save 后由 Python Worker 执行；输出表 / 图 / 文件与日志见上方编辑区。
+            </template>
           </p>
         </section>
       </div>

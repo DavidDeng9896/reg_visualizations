@@ -1,6 +1,6 @@
 /** AI 助手共享类型：产物引用。 */
 
-export type ArtifactKind = 'analysis' | 'table' | 'view' | 'dashboard' | 'step'
+export type ArtifactKind = 'analysis' | 'table' | 'view' | 'dashboard' | 'step' | 'report'
 
 export interface Artifact {
   kind: ArtifactKind

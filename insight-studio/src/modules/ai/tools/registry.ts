@@ -134,6 +134,37 @@ export const TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'create_report_step',
+    description:
+      '在当前分析流程图中创建独立「分析报告」节点（无需连线）。可选传入完整 report JSON（title/sections/conclusion）；缺省为科研主题空壳，用户可在节点内 AI 辅助填写。',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: str('节点名称（可选，默认「分析报告」）'),
+        report: {
+          type: 'object',
+          description: 'AnalysisReport：title, subtitle?, sections[], conclusion?, theme:"research"',
+        },
+      },
+    },
+  },
+  {
+    name: 'update_report_step',
+    description: '更新已有报告节点的内容（report JSON）或名称。',
+    parameters: {
+      type: 'object',
+      properties: {
+        stepId: str('报告步骤 id'),
+        name: str('新名称（可选）'),
+        report: {
+          type: 'object',
+          description: '完整 AnalysisReport JSON',
+        },
+      },
+      required: ['stepId'],
+    },
+  },
+  {
     name: 'update_custom_code_step',
     description: '更新 Custom Code 步骤的 code/name 并重新执行。',
     parameters: {
