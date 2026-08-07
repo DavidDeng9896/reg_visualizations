@@ -2,7 +2,15 @@
  * Agent-loop（ReAct）：多轮 模型→工具→观察 循环，支持流式、中止、超轮、计划门禁。
  * 纯逻辑可测：postChat 注入。
  */
-import { contentText, postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
+import {
+  contentText,
+  postChat,
+  readSseStream,
+  sanitizeChatMessages,
+  type ChatMessage,
+  type ChatPayload,
+  type ToolCall,
+} from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
@@ -162,7 +170,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     let streamed: Awaited<ReturnType<typeof readSseStream>>
     try {
-      const res = await post({ messages, tools: opts.tools, ...(opts.model ? { model: opts.model } : {}) }, signal)
+      const res = await post(
+        {
+          messages: sanitizeChatMessages(messages),
+          tools: opts.tools,
+          ...(opts.model ? { model: opts.model } : {}),
+        },
+        signal,
+      )
       streamed = await readSseStream(
         res,
         (text) => onEvent({ type: 'token', text }),
@@ -247,10 +262,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     }
 
     // 有工具：本轮过程独白不进上下文（防下一轮继续复读）
+    // content 必须用 null（不能 ""），否则部分上游报 Invalid request body
     stallRounds = 0
     lastStallText = ''
     if (contentText(assistant.content).trim()) {
-      messages[messages.length - 1] = { ...assistant, content: '' }
+      messages[messages.length - 1] = { ...assistant, content: null }
     }
 
     for (const call of calls) {
@@ -369,10 +385,10 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   try {
     const wrapUp = await post(
       {
-        messages: [
+        messages: sanitizeChatMessages([
           ...messages,
           { role: 'system', content: wrapUpHint },
-        ],
+        ]),
         ...(opts.model ? { model: opts.model } : {}),
       },
       signal,
