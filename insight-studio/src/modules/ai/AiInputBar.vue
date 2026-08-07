@@ -6,6 +6,9 @@ import { useAnalysisStore } from '../../stores/analysisStore'
 import { useAiStore } from './aiStore'
 import { CONTEXT_TOKEN_LIMIT, formatTokens } from './tokens'
 import type { MentionTarget } from './context'
+import { mentionIcon, mentionName, VIEW_ICON } from './mentionIcons'
+import type { IconName } from '../../ui'
+import type { ViewNode } from '../../shared/types'
 
 /**
  * AI 输入条（对齐参考交互）：统一圆角盒子 + 自动增高输入区 +
@@ -56,15 +59,31 @@ const SLASH_COMMANDS = [
 
 /* ------------------------------- 引用（@） ------------------------------- */
 
+function appendViewMentions(
+  views: ViewNode[],
+  tableId: string,
+  items: { key: string; label: string; icon: IconName; target: MentionTarget }[],
+): void {
+  for (const v of views) {
+    items.push({
+      key: `v-${v.id}`,
+      label: `视图：${v.name}`,
+      icon: VIEW_ICON[v.type],
+      target: { kind: 'view', tableId, viewId: v.id },
+    })
+    appendViewMentions(v.children, tableId, items)
+  }
+}
+
 const mentionables = computed(() => {
   const a = current.value
   if (!a) return []
-  const items: { key: string; label: string; target: MentionTarget }[] = [{ key: 'analysis', label: `分析：${a.name}`, target: { kind: 'analysis' } }]
+  const items: { key: string; label: string; icon: IconName; target: MentionTarget }[] = [
+    { key: 'analysis', label: `分析：${a.name}`, icon: 'database', target: { kind: 'analysis' } },
+  ]
   for (const t of a.tables) {
-    items.push({ key: `t-${t.id}`, label: `表：${t.name}`, target: { kind: 'table', tableId: t.id } })
-    for (const v of t.views) {
-      items.push({ key: `v-${v.id}`, label: `视图：${v.name}`, target: { kind: 'view', tableId: t.id, viewId: v.id } })
-    }
+    items.push({ key: `t-${t.id}`, label: `表：${t.name}`, icon: 'table', target: { kind: 'table', tableId: t.id } })
+    appendViewMentions(t.views, t.id, items)
   }
   return items
 })
@@ -93,6 +112,10 @@ function mentionLabel(m: MentionTarget): string {
   if (m.kind === 'table') return a?.tables.find((t) => t.id === m.tableId)?.name ?? '表'
   const t = a?.tables.find((x) => x.id === m.tableId)
   return t?.views.find((v) => v.id === m.viewId)?.name ?? '视图'
+}
+
+function iconForMention(m: MentionTarget): IconName {
+  return mentionIcon(m, current.value)
 }
 
 /** 从 + 菜单选引用：不加文本，直接成 chip。 */
@@ -252,7 +275,7 @@ watch(
         <div class="bar__box" :class="{ 'bar__box--menu': menuMode !== null }">
           <div v-if="mentions.length" class="bar__mentions">
             <span v-for="(m, i) in mentions" :key="i" class="bar__chip">
-              <IIcon name="table" :size="11" />
+              <IIcon :name="iconForMention(m)" :size="11" />
               {{ mentionLabel(m) }}
               <button type="button" aria-label="移除引用" @click="removeMention(i)">×</button>
             </span>
@@ -340,7 +363,7 @@ watch(
           <div class="bar__menu-title">引用上下文</div>
           <button v-if="!mentionables.length" type="button" class="bar__menu-item" disabled>无可引用项（先打开一个分析）</button>
           <button v-for="it in mentionables" :key="it.key" type="button" class="bar__menu-item" role="menuitem" @click="pickMentionFromMenu(it)">
-            <IIcon name="table" :size="12" class="bar__menu-icon" />{{ it.label }}
+            <IIcon :name="it.icon" :size="12" class="bar__menu-icon" />{{ it.label }}
           </button>
           <div class="bar__menu-title">快捷指令</div>
           <button v-for="c in SLASH_COMMANDS" :key="c.key" type="button" class="bar__menu-item" role="menuitem" @click="applySlash(c)">
@@ -351,7 +374,7 @@ watch(
         <div v-else-if="menuMode === 'mention'" class="bar__menu" role="menu">
           <button v-if="!filteredMentionables.length" type="button" class="bar__menu-item" disabled>无匹配项</button>
           <button v-for="it in filteredMentionables" :key="it.key" type="button" class="bar__menu-item" role="menuitem" @click="pickMentionInline(it)">
-            <IIcon name="table" :size="12" class="bar__menu-icon" />{{ it.label }}
+            <IIcon :name="it.icon" :size="12" class="bar__menu-icon" />{{ it.label }}
           </button>
         </div>
         <!-- 内联 /：过滤后的指令 -->
