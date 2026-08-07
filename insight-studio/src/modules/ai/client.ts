@@ -61,9 +61,9 @@ interface SseChunk {
 /* ------------------------------- SSE 解析 ------------------------------- */
 
 /**
- * 合并 SSE 中的 tool function.name。
- * OpenAI 多为增量片段；部分上游（如豆包）每帧重发完整 name——盲 += 会变成
- * `add_custom_code_stepadd_custom_code_step` 导致「未知工具」。
+ * 合并 SSE 中的 tool function.name / arguments。
+ * OpenAI 多为增量片段；部分上游（如豆包）每帧重发完整值——盲 += 会翻倍：
+ * name → 未知工具；arguments → JSON 损坏（如 submit_plan 变成 0 步）。
  */
 export function mergeStreamedToolName(existing: string, incoming: string): string {
   if (!incoming) return existing
@@ -74,35 +74,92 @@ export function mergeStreamedToolName(existing: string, incoming: string): strin
   return existing + incoming
 }
 
+/** 与 name 相同策略；若已有合法 JSON 且 incoming 也是完整 JSON，保留已有。 */
+export function mergeStreamedToolArguments(existing: string, incoming: string): string {
+  if (!incoming) return existing
+  if (!existing) return incoming
+  if (incoming === existing) return existing
+  if (incoming.startsWith(existing)) return incoming
+  if (existing.startsWith(incoming)) return existing
+  const existingOk = looksLikeJsonObject(existing)
+  const incomingOk = looksLikeJsonObject(incoming)
+  if (existingOk && incomingOk) return existing
+  if (!existingOk && incomingOk) return incoming
+  return existing + incoming
+}
+
+function looksLikeJsonObject(s: string): boolean {
+  const t = s.trim()
+  if (!t.startsWith('{') && !t.startsWith('[')) return false
+  try {
+    JSON.parse(t)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
- * 发往上游前规范化 messages，避免豆包等返回 Invalid request body：
- * - 带 tool_calls 的 assistant：空 content 必须为 null（不能是 ""）
- * - 去掉无内容且无 tool_calls 的空消息
+ * 纯文本 content 数组 → 单字符串（豆包 Seed 等拒收纯 text 的 content array）。
+ */
+export function flattenTextContent(
+  content: string | ContentPart[] | null | undefined,
+): string | ContentPart[] | null | undefined {
+  if (!Array.isArray(content)) return content
+  if (!content.length) return ''
+  const allText = content.every((p) => p.type === 'text')
+  if (!allText) return content
+  return content
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n')
+}
+
+/**
+ * 发往上游前规范化 messages，避免豆包 Invalid request body：
+ * - 带 tool_calls 的 assistant：省略空 content（勿发 null，火山会 MissingParameter）
+ * - 纯 text 的 content 数组压成 string
+ * - tool 消息 content 必须为非空字符串
+ * - 去掉无内容且无 tool_calls 的空消息；剔除 reasoning 等非标字段
  */
 export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
   const out: ChatMessage[] = []
   for (const m of messages) {
-    const next: ChatMessage = { ...m }
-    if (next.tool_calls?.length) {
-      next.tool_calls = next.tool_calls.map((c) => ({
-        ...c,
-        type: 'function' as const,
-        function: {
-          name: c.function.name,
-          arguments: c.function.arguments ?? '',
-        },
-      }))
+    const raw = m as ChatMessage & { reasoning?: unknown }
+    const next: ChatMessage = {
+      role: raw.role,
+      ...(raw.tool_call_id ? { tool_call_id: raw.tool_call_id } : {}),
+      ...(raw.name ? { name: raw.name } : {}),
     }
-    if (next.role === 'assistant' && next.tool_calls?.length) {
-      if (contentText(next.content).trim() === '') {
-        next.content = null
-      }
-    } else if (next.role !== 'tool') {
+    if (raw.tool_calls?.length) {
+      next.tool_calls = raw.tool_calls
+        .filter((c) => c?.function?.name)
+        .map((c) => ({
+          id: c.id || `call_${c.function.name}`,
+          type: 'function' as const,
+          function: {
+            name: c.function.name,
+            arguments: c.function.arguments?.trim() ? c.function.arguments : '{}',
+          },
+        }))
+      if (!next.tool_calls.length) delete next.tool_calls
+    }
+
+    const flat = flattenTextContent(raw.content)
+    if (next.role === 'tool') {
+      const t = contentText(flat).trim()
+      next.content = t || '(空)'
+    } else if (next.role === 'assistant' && next.tool_calls?.length) {
+      const t = contentText(flat).trim()
+      // 火山/豆包：有 tool_calls 时不要发 content:null；有正文则保留，否则省略字段
+      if (t) next.content = typeof flat === 'string' ? flat : t
+    } else {
       const empty =
-        next.content == null ||
-        (typeof next.content === 'string' && next.content.trim() === '') ||
-        (Array.isArray(next.content) && next.content.length === 0)
+        flat == null ||
+        (typeof flat === 'string' && flat.trim() === '') ||
+        (Array.isArray(flat) && flat.length === 0)
       if (empty && !next.tool_calls?.length) continue
+      if (flat != null) next.content = flat
     }
     out.push(next)
   }
@@ -149,7 +206,12 @@ export async function readSseStream(
         if (part.function?.name) {
           cur.function.name = mergeStreamedToolName(cur.function.name, part.function.name)
         }
-        if (part.function?.arguments) cur.function.arguments += part.function.arguments
+        if (part.function?.arguments) {
+          cur.function.arguments = mergeStreamedToolArguments(
+            cur.function.arguments,
+            part.function.arguments,
+          )
+        }
         calls.set(idx, cur)
       }
     }

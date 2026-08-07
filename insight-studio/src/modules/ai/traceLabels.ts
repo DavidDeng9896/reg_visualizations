@@ -29,6 +29,7 @@ const TOOL_LABELS: Record<string, string> = {
   delete_table: '删除表',
   delete_view: '删除视图',
   delete_step: '删除步骤',
+  clear_analysis: '清空分析',
   list_skills: '列出 Skills',
   read_skill: '读取 Skill',
   save_memory: '保存分析记忆',

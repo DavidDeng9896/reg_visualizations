@@ -593,6 +593,25 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已删除步骤「${step.name}」`)
   },
 
+  clear_analysis(args, ctx) {
+    const target = requireAnalysis()
+    if (args.analysisId && String(args.analysisId) !== target.id) {
+      return fail('只能清空当前已打开的分析（请先打开目标分析）')
+    }
+    const tableN = target.tables.length
+    const stepN = target.steps.length
+    if (!tableN && !stepN) return ok('当前分析已无表与步骤，无需清空')
+    if (ctx.confirmDestructive && args.__confirmed !== true) {
+      return needConfirm(`清空分析「${target.name}」的全部内容（${tableN} 张表、${stepN} 个步骤）`)
+    }
+    store().mutate((analysis) => {
+      analysis.tables = []
+      analysis.steps = []
+      analysis.flowchartLayout = {}
+    })
+    return ok(`已清空分析「${target.name}」（删除 ${tableN} 张表、${stepN} 个步骤）`)
+  },
+
   async list_skills() {
     const list = await aiSkillsApi.list()
     if (!list.length) return ok('暂无已安装 Skill')

@@ -243,6 +243,129 @@ func clipErrMsg(s string) string {
 	return string(runes[:max]) + "…"
 }
 
+// sanitizeUpstreamMessages 规范化发往上游的 messages，降低豆包 Invalid request body：
+// - assistant+tool_calls：去掉空/null content（字段省略，勿发 null）
+// - 纯 text 的 content 数组压成 string
+// - tool content 保证为非空字符串；剔除 reasoning 等杂字段
+func sanitizeUpstreamMessages(msgs []any) []any {
+	out := make([]any, 0, len(msgs))
+	for _, raw := range msgs {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		next := map[string]any{}
+		role, _ := m["role"].(string)
+		if role == "" {
+			continue
+		}
+		next["role"] = role
+		if id, ok := m["tool_call_id"].(string); ok && id != "" {
+			next["tool_call_id"] = id
+		}
+		if name, ok := m["name"].(string); ok && name != "" {
+			next["name"] = name
+		}
+		if tcs, ok := m["tool_calls"].([]any); ok && len(tcs) > 0 {
+			cleaned := make([]any, 0, len(tcs))
+			for _, tc := range tcs {
+				tcm, ok := tc.(map[string]any)
+				if !ok {
+					continue
+				}
+				fn, _ := tcm["function"].(map[string]any)
+				if fn == nil {
+					continue
+				}
+				fname, _ := fn["name"].(string)
+				if fname == "" {
+					continue
+				}
+				args, _ := fn["arguments"].(string)
+				if strings.TrimSpace(args) == "" {
+					args = "{}"
+				}
+				id, _ := tcm["id"].(string)
+				if id == "" {
+					id = "call_" + fname
+				}
+				cleaned = append(cleaned, map[string]any{
+					"id":   id,
+					"type": "function",
+					"function": map[string]any{
+						"name":      fname,
+						"arguments": args,
+					},
+				})
+			}
+			if len(cleaned) > 0 {
+				next["tool_calls"] = cleaned
+			}
+		}
+		contentStr, contentRaw, flatOK := normalizeMessageContent(m["content"])
+		_, hasTools := next["tool_calls"]
+		if role == "tool" {
+			if contentStr == "" {
+				contentStr = "(空)"
+			}
+			next["content"] = contentStr
+		} else if role == "assistant" && hasTools {
+			if contentStr != "" {
+				next["content"] = contentStr
+			} else if !flatOK && contentRaw != nil {
+				next["content"] = contentRaw
+			}
+			// 空 content：省略字段（勿写 null）
+		} else {
+			if contentStr == "" && flatOK && !hasTools {
+				continue
+			}
+			if contentStr != "" && flatOK {
+				next["content"] = contentStr
+			} else if contentRaw != nil {
+				next["content"] = contentRaw
+			} else if !hasTools {
+				continue
+			}
+		}
+		out = append(out, next)
+	}
+	return out
+}
+
+// normalizeMessageContent：string 或纯 text 数组 → 字符串；多模态数组返回 raw 且 flatOK=false。
+func normalizeMessageContent(v any) (flat string, raw any, flatOK bool) {
+	if v == nil {
+		return "", nil, true
+	}
+	if s, ok := v.(string); ok {
+		return s, s, true
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return "", v, false
+	}
+	if len(arr) == 0 {
+		return "", nil, true
+	}
+	var b strings.Builder
+	for i, p := range arr {
+		pm, ok := p.(map[string]any)
+		if !ok {
+			return "", arr, false
+		}
+		if t, _ := pm["type"].(string); t != "text" {
+			return "", arr, false
+		}
+		text, _ := pm["text"].(string)
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(text)
+	}
+	return b.String(), arr, true
+}
+
 func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 	cfg := s.readAiConfig()
 	if cfg.APIKey == "" {
@@ -264,7 +387,7 @@ func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	_ = msgs
+	payload["messages"] = sanitizeUpstreamMessages(msgs)
 	if _, has := payload["model"]; !has || payload["model"] == nil || payload["model"] == "" {
 		payload["model"] = cfg.Model
 	}

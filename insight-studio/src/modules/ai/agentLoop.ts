@@ -262,11 +262,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     }
 
     // 有工具：本轮过程独白不进上下文（防下一轮继续复读）
-    // content 必须用 null（不能 ""），否则部分上游报 Invalid request body
+    // 空 content 省略字段（勿用 null：豆包会 Invalid request body / MissingParameter）
     stallRounds = 0
     lastStallText = ''
     if (contentText(assistant.content).trim()) {
-      messages[messages.length - 1] = { ...assistant, content: null }
+      const scrubbed: ChatMessage = { ...assistant }
+      delete scrubbed.content
+      messages[messages.length - 1] = scrubbed
     }
 
     for (const call of calls) {
@@ -277,7 +279,16 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
-        const steps = Array.isArray(args.steps) ? args.steps.map((s) => String(s)) : []
+        const steps = Array.isArray(args.steps) ? args.steps.map((s) => String(s).trim()).filter(Boolean) : []
+        if (!steps.length) {
+          pushToolContent(
+            call,
+            name,
+            'error：计划 steps 为空或无法解析。请重新 submit_plan，提交 3-6 条具体步骤（字符串数组）。',
+            { ok: false },
+          )
+          continue
+        }
         const sameAsCurrent =
           planSteps.length > 0 &&
           planSteps.length === steps.length &&

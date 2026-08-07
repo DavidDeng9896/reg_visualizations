@@ -208,6 +208,17 @@ export const TOOL_DEFS: ToolDef[] = [
     parameters: { type: 'object', properties: { stepId: str('步骤 id') }, required: ['stepId'] },
   },
   {
+    name: 'clear_analysis',
+    description:
+      '【危险】清空当前分析的全部表与步骤（保留分析本身）。用户要求「全部删掉/清空分析」时优先用此工具，勿逐张 delete_table。',
+    parameters: {
+      type: 'object',
+      properties: {
+        analysisId: str('分析 id；缺省为当前打开的分析'),
+      },
+    },
+  },
+  {
     name: 'list_skills',
     description: '列出已安装的 AI Skills（id、名称、描述、是否启用）。需要细节时再 read_skill。',
     parameters: { type: 'object', properties: {} },

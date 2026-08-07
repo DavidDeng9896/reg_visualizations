@@ -106,6 +106,17 @@ describe('AI 工具实现（execTool）', () => {
     expect(analysis.tables.find((t) => t.id === iris.id)).toBeUndefined()
   })
 
+  it('clear_analysis：一次确认清空全部表与步骤', async () => {
+    const { analysis } = await seedStore()
+    expect(analysis.tables.length).toBeGreaterThan(0)
+    const need = await execTool('clear_analysis', {}, ctx)
+    expect(need.needsConfirmation).toBe(true)
+    const done = await execTool('clear_analysis', { __confirmed: true }, ctx)
+    expect(done.ok).toBe(true)
+    expect(analysis.tables).toHaveLength(0)
+    expect(analysis.steps).toHaveLength(0)
+  })
+
   it('未知工具与缺表错误', async () => {
     await seedStore()
     expect((await execTool('nope_tool', {}, ctx)).ok).toBe(false)

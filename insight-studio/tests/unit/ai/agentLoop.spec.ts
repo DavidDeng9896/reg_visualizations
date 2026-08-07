@@ -362,10 +362,10 @@ describe('agentLoop（ReAct 多轮循环）', () => {
       postChatFn: post,
     })
     const withTools = messages.find((m) => m.role === 'assistant' && (m.tool_calls?.length ?? 0) > 0)
-    expect(withTools?.content).toBeNull()
+    expect(withTools?.content).toBeUndefined()
   })
 
-  it('下一轮请求中 tool_calls assistant 的 content 为 null（非空串）', async () => {
+  it('下一轮请求中 tool_calls assistant 省略空 content（勿发 null）', async () => {
     const seen: ChatPayload[] = []
     const post = async (p: ChatPayload) => {
       seen.push(p)
@@ -389,7 +389,31 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     })
     expect(seen.length).toBeGreaterThanOrEqual(2)
     const asst = seen[1].messages.find((m) => m.role === 'assistant' && (m.tool_calls?.length ?? 0) > 0)
-    expect(asst?.content).toBeNull()
+    expect(asst).toBeTruthy()
+    expect(asst!).not.toHaveProperty('content')
+  })
+
+  it('submit_plan 空 steps 拒绝并提示重提', async () => {
+    let n = 0
+    const post = async () => {
+      n += 1
+      if (n === 1) return sseOf({ toolCalls: [call('submit_plan', { steps: [] })] })
+      if (n === 2) return sseOf({ toolCalls: [call('submit_plan', { steps: ['A', 'B'] })] })
+      if (n === 3) return sseOf({ toolCalls: [call('mark_step_done', { index: 0 })] })
+      if (n === 4) return sseOf({ toolCalls: [call('mark_step_done', { index: 1 })] })
+      return sseOf({ content: '完成' })
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: '任务' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 10,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    const planResults = messages.filter((m) => m.role === 'tool' && m.name === 'submit_plan')
+    expect(planResults[0]?.content).toContain('steps 为空')
+    expect(planResults.some((m) => String(m.content).includes('已提交计划（2 步）'))).toBe(true)
   })
 
   it('连续复读无工具 → 强制收束并 incomplete', async () => {
@@ -505,7 +529,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */
-import { readSseStream, sanitizeChatMessages, mergeStreamedToolName } from '../../../src/modules/ai/client'
+import { readSseStream, sanitizeChatMessages, mergeStreamedToolName, mergeStreamedToolArguments } from '../../../src/modules/ai/client'
 
 describe('readSseStream（OpenAI SSE 聚合）', () => {
   it('分片 tool_calls 聚合：id/name/arguments 拼接', async () => {
@@ -549,10 +573,31 @@ describe('readSseStream（OpenAI SSE 聚合）', () => {
     expect(msg.tool_calls![0].function.name).toBe('add_custom_code_step')
     expect(msg.tool_calls![0].function.arguments).toBe('{"a":1}')
   })
+
+  it('每帧重发完整 arguments 时不翻倍损坏 JSON', async () => {
+    const args = '{"steps":["列出表","清空"]}'
+    const chunks = [
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'submit_plan', arguments: args } }],
+            },
+          },
+        ],
+      },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { name: 'submit_plan', arguments: args } }] } }] },
+    ]
+    const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n'
+    const res = new Response(new ReadableStream({ start: (c) => { c.enqueue(new TextEncoder().encode(body)); c.close() } }))
+    const msg = await readSseStream(res)
+    expect(msg.tool_calls![0].function.arguments).toBe(args)
+    expect(JSON.parse(msg.tool_calls![0].function.arguments).steps).toEqual(['列出表', '清空'])
+  })
 })
 
 describe('sanitizeChatMessages / mergeStreamedToolName', () => {
-  it('assistant+tool_calls 的空 content 规范为 null', () => {
+  it('assistant+tool_calls 的空 content 省略字段（勿发 null）', () => {
     const out = sanitizeChatMessages([
       { role: 'user', content: 'hi' },
       {
@@ -565,8 +610,11 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
       { role: 'system', content: '' },
     ])
     expect(out).toHaveLength(3)
-    expect(out[1].content).toBeNull()
+    expect(out[1]).not.toHaveProperty('content')
+    expect(out[1].content).toBeUndefined()
     expect(out[1].tool_calls?.[0].function.name).toBe('list_tables')
+    // JSON 序列化不应出现 "content":null
+    expect(JSON.stringify(out[1])).not.toContain('"content"')
   })
 
   it('mergeStreamedToolName：重发/前缀/增量', () => {
@@ -575,5 +623,11 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(mergeStreamedToolName('list_', 'list_tables')).toBe('list_tables')
     expect(mergeStreamedToolName('list_tables', 'list_')).toBe('list_tables')
     expect(mergeStreamedToolName('list_', 'tables')).toBe('list_tables')
+  })
+
+  it('mergeStreamedToolArguments：完整 JSON 重发不翻倍', () => {
+    const a = '{"steps":["a"]}'
+    expect(mergeStreamedToolArguments(a, a)).toBe(a)
+    expect(mergeStreamedToolArguments('{"steps":', '["a"]}')).toBe('{"steps":["a"]}')
   })
 })
