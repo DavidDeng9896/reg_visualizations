@@ -72,6 +72,8 @@ import {
   UserRound,
   SquareChartGantt,
   ArrowUp,
+  ShieldCheck,
+  CircleAlert,
 } from 'lucide-vue-next'
 
 export type IconName =
@@ -144,6 +146,8 @@ export type IconName =
   | 'grid'
   | 'sparkle'
   | 'history'
+  | 'shield-check'
+  | 'circle-alert'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -215,4 +219,6 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   grid: SquareChartGantt,
   sparkle: Sparkles,
   history: History,
+  'shield-check': ShieldCheck,
+  'circle-alert': CircleAlert,
 }

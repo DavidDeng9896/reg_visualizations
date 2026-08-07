@@ -82,12 +82,22 @@ export function isDelegateWorker(name: string): boolean {
   return Object.prototype.hasOwnProperty.call(WORKER_SPECS, name)
 }
 
-function filterToolsForWorker(
-  all: ChatPayload['tools'],
-  spec: WorkerSpec,
-): NonNullable<ChatPayload['tools']> {
+type OpenAiTool = {
+  type: 'function'
+  function: { name: string; description?: string; parameters?: unknown }
+}
+
+function asOpenAiTools(all: ChatPayload['tools']): OpenAiTool[] {
+  return (all ?? []).filter((t): t is OpenAiTool => {
+    if (!t || typeof t !== 'object') return false
+    const fn = (t as { function?: { name?: unknown } }).function
+    return typeof fn?.name === 'string'
+  })
+}
+
+function filterToolsForWorker(all: ChatPayload['tools'], spec: WorkerSpec): OpenAiTool[] {
   const allow = new Set(spec.allowBuiltin)
-  return (all ?? []).filter((t) => {
+  return asOpenAiTools(all).filter((t) => {
     const n = t.function.name
     if (allow.has(n)) return true
     if (spec.allowMcp && n.startsWith('mcp_')) return true
@@ -144,7 +154,7 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
   const have = new Set(tools.map((t) => t.function.name))
   for (const t of OPENAI_TOOLS) {
     if (spec.allowBuiltin.includes(t.function.name) && !have.has(t.function.name)) {
-      tools.push(t)
+      tools.push(t as OpenAiTool)
       have.add(t.function.name)
     }
   }

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { IButton, IModal, ISlider, ITabs, ITextField, IToggle, toast, type TabItem } from '../../ui'
+import { IButton, IModal, ISlider, ITabs, ITextField, toast, type TabItem } from '../../ui'
 import { aiConfigApi } from './client'
 import CapabilitiesPanel from './CapabilitiesPanel.vue'
 
-/** AI 设置：模型 | Skills | MCP | 记忆。含写入/删除确认权限。 */
+/** AI 设置：模型 | Skills | MCP | 记忆。操作权限在对话输入条切换。 */
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'saved'): void }>()
 
@@ -22,8 +22,6 @@ const keyMasked = ref('')
 const model = ref('')
 const modelsText = ref('')
 const maxIterations = ref(100)
-const confirmDestructive = ref(true)
-const confirmWrite = ref(false)
 const saving = ref(false)
 
 async function loadConfig(): Promise<void> {
@@ -34,8 +32,6 @@ async function loadConfig(): Promise<void> {
     model.value = cfg.model
     modelsText.value = (cfg.models ?? []).join(', ')
     maxIterations.value = cfg.maxIterations
-    confirmDestructive.value = cfg.confirmDestructive
-    confirmWrite.value = cfg.confirmWrite ?? false
   } catch {
     /* 后端不可达时保持默认 */
   }
@@ -63,8 +59,6 @@ async function save(): Promise<void> {
       model: string
       models: string[]
       maxIterations: number
-      confirmDestructive: boolean
-      confirmWrite: boolean
       apiKey?: string
     } = {
       baseUrl: baseUrl.value.trim(),
@@ -74,8 +68,6 @@ async function save(): Promise<void> {
         .map((m) => m.trim())
         .filter(Boolean),
       maxIterations: Number(maxIterations.value) || 100,
-      confirmDestructive: !!confirmDestructive.value,
-      confirmWrite: !!confirmWrite.value,
     }
     const key = typeof apiKey.value === 'string' ? apiKey.value.trim() : ''
     if (key) patch.apiKey = key
@@ -117,19 +109,7 @@ async function save(): Promise<void> {
           <span class="cfg__label">最大工具调用轮数（{{ maxIterations }}）</span>
           <ISlider v-model="maxIterations" :min="1" :max="100" :step="1" aria-label="最大轮数" />
         </div>
-
-        <div class="cfg__section">
-          <h4 class="cfg__section-title">权限与确认</h4>
-          <p class="cfg__hint">类似 Coding Agent：可读操作自动执行；写入 / 删除可要求你点批准。</p>
-          <div class="cfg__row cfg__row--switch">
-            <span class="cfg__label">写入类操作需要确认（建步骤、改图表、导入等）</span>
-            <IToggle v-model="confirmWrite" aria-label="写入需确认" />
-          </div>
-          <div class="cfg__row cfg__row--switch">
-            <span class="cfg__label">删除类操作需要确认</span>
-            <IToggle v-model="confirmDestructive" aria-label="删除需确认" />
-          </div>
-        </div>
+        <p class="cfg__hint">操作权限（请求权限 / 全部允许）请在对话输入条左侧切换。</p>
       </div>
 
       <CapabilitiesPanel
@@ -157,18 +137,6 @@ async function save(): Promise<void> {
   flex-direction: column;
   gap: 14px;
 }
-.cfg__section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
-  border-top: 1px solid var(--is-border);
-}
-.cfg__section-title {
-  margin: 0;
-  font-size: var(--is-text-sm);
-  font-weight: 600;
-}
 .cfg__hint {
   margin: 0;
   font-size: var(--is-text-xs);
@@ -179,12 +147,6 @@ async function save(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-.cfg__row--switch {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 .cfg__label {
   font-size: var(--is-text-xs);

@@ -21,10 +21,31 @@ const text = ref('')
 const mentions = ref<MentionTarget[]>([])
 const inputEl = ref<HTMLTextAreaElement>()
 
-type MenuMode = 'plus' | 'mention' | 'slash' | 'models' | null
+type MenuMode = 'plus' | 'mention' | 'slash' | 'models' | 'permissions' | null
 const menuMode = ref<MenuMode>(null)
 const mentionFilter = ref('')
 const slashFilter = ref('')
+
+const PERMISSION_OPTIONS = [
+  {
+    mode: 'ask' as const,
+    label: '请求权限',
+    desc: '操作前先请求授权',
+    icon: 'shield-check' as const,
+  },
+  {
+    mode: 'allow' as const,
+    label: '全部允许',
+    desc: '无需授权直接执行',
+    icon: 'circle-alert' as const,
+  },
+]
+
+const canSend = computed(() => text.value.trim().length > 0 && !running.value)
+
+const permissionOption = computed(
+  () => PERMISSION_OPTIONS.find((o) => o.mode === ai.permissionMode) ?? PERMISSION_OPTIONS[0],
+)
 
 const SLASH_COMMANDS = [
   { key: '分析此表', text: '分析当前表的数据分布并给出洞察' },
@@ -32,8 +53,6 @@ const SLASH_COMMANDS = [
   { key: '出柱状图', text: '为当前表创建一个柱状图视图并配置好映射' },
   { key: '生成看板', text: '基于当前分析创建看板并加入关键图表' },
 ]
-
-const canSend = computed(() => text.value.trim().length > 0 && !running.value)
 
 /* ------------------------------- 引用（@） ------------------------------- */
 
@@ -110,6 +129,17 @@ const modelOptions = computed(() => {
 
 function pickModel(m: string): void {
   ai.setModel(m === config.value?.model ? null : m)
+}
+
+async function pickPermission(mode: 'ask' | 'allow'): Promise<void> {
+  menuMode.value = null
+  if (mode === ai.permissionMode) return
+  try {
+    await ai.setPermissionMode(mode)
+    toast.success(mode === 'ask' ? '已切换为：请求权限' : '已切换为：全部允许')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '权限切换失败')
+  }
 }
 
 /** 手动压缩上下文（保留最近 2 个用户轮，更早历史折叠为摘要）。 */
@@ -237,6 +267,20 @@ watch(
             </button>
             <button
               type="button"
+              class="bar__perm"
+              :class="{ 'bar__perm--on': menuMode === 'permissions' }"
+              title="操作权限"
+              aria-label="操作权限"
+              data-testid="ai-permission"
+              @click="menuMode = menuMode === 'permissions' ? null : 'permissions'"
+            >
+              <IIcon :name="permissionOption.icon" :size="13" class="bar__perm-icon" />
+              <span class="bar__perm-name is-ellipsis">{{ permissionOption.label }}</span>
+              <IIcon name="chevron-down" :size="12" />
+            </button>
+            <span class="bar__spacer" />
+            <button
+              type="button"
               class="bar__model"
               :class="{ 'bar__model--on': menuMode === 'models' }"
               title="切换模型"
@@ -248,7 +292,6 @@ watch(
               <span class="bar__model-name is-ellipsis">{{ ai.effectiveModel || '未配置' }}</span>
               <IIcon name="chevron-down" :size="12" />
             </button>
-            <span class="bar__spacer" />
             <span
               class="bar__ctx"
               data-testid="ai-ctx"
@@ -304,8 +347,27 @@ watch(
             <span class="bar__menu-slash">/</span>{{ c.key }}
           </button>
         </div>
+        <!-- 操作权限 -->
+        <div v-else-if="menuMode === 'permissions'" class="bar__menu bar__menu--perm" role="menu" data-testid="ai-permission-menu">
+          <button
+            v-for="opt in PERMISSION_OPTIONS"
+            :key="opt.mode"
+            type="button"
+            class="bar__menu-item bar__menu-item--perm"
+            role="menuitem"
+            :data-testid="`ai-permission-${opt.mode}`"
+            @click="pickPermission(opt.mode)"
+          >
+            <IIcon :name="opt.icon" :size="16" class="bar__menu-perm-icon" />
+            <span class="bar__menu-perm-text">
+              <span class="bar__menu-perm-title">{{ opt.label }}</span>
+              <span class="bar__menu-perm-desc">{{ opt.desc }}</span>
+            </span>
+            <IIcon v-if="opt.mode === ai.permissionMode" name="check" :size="14" class="bar__menu-check" />
+          </button>
+        </div>
         <!-- 模型列表 -->
-        <div v-else class="bar__menu" role="menu">
+        <div v-else-if="menuMode === 'models'" class="bar__menu" role="menu">
           <div class="bar__menu-title">选择模型</div>
           <button v-if="!modelOptions.length" type="button" class="bar__menu-item" disabled>未配置模型（去设置）</button>
           <button v-for="m in modelOptions" :key="m" type="button" class="bar__menu-item" role="menuitem" @click="pickModel(m); menuMode = null">
@@ -442,6 +504,32 @@ watch(
 .bar__tbtn--on {
   background: var(--is-surface-hover);
   color: var(--is-text);
+}
+.bar__perm {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 140px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: var(--is-radius-full);
+  background: transparent;
+  color: var(--is-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bar__perm:hover,
+.bar__perm--on {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
+.bar__perm-icon {
+  color: var(--is-warning, #b45309);
+  flex-shrink: 0;
+}
+.bar__perm-name {
+  min-width: 0;
 }
 .bar__model {
   display: inline-flex;
@@ -589,5 +677,37 @@ watch(
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius-full);
   padding: 0 6px;
+}
+.bar__menu--perm {
+  min-width: 240px;
+  padding: 6px;
+}
+.bar__menu-item--perm {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.bar__menu-perm-icon {
+  margin-top: 1px;
+  color: var(--is-text-secondary);
+  flex-shrink: 0;
+}
+.bar__menu-perm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+.bar__menu-perm-title {
+  font-size: var(--is-text-sm);
+  font-weight: 600;
+  color: var(--is-text);
+}
+.bar__menu-perm-desc {
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+  line-height: 1.4;
 }
 </style>

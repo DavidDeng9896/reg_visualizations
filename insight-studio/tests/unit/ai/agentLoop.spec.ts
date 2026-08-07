@@ -193,8 +193,8 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(posts).toBe(2)
     const confirms = evts.filter((e) => e.type === 'tool_result' && e.id === 'call_del')
     expect(confirms.length).toBe(2)
-    expect(confirms[0].needsConfirmation).toBe(true)
-    expect(confirms[1].needsConfirmation).toBe(false)
+    expect(confirms[0].type === 'tool_result' && confirms[0].needsConfirmation).toBe(true)
+    expect(confirms[1].type === 'tool_result' && confirms[1].needsConfirmation).toBe(false)
     expect(evts.some((e) => e.type === 'done' && e.content.includes('完成'))).toBe(true)
   })
 

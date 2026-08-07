@@ -82,47 +82,56 @@ function startEditServer(s: McpServerView): void {
   formHeaders.value = [{ key: '', value: '' }]
 }
 
-async function loadSkills(): Promise<void> {
+async function loadSkills(): Promise<string | null> {
   loadingSkills.value = true
   try {
     skills.value = await aiSkillsApi.list()
+    return null
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '加载 Skills 失败')
     skills.value = []
+    return e instanceof Error ? e.message : '加载 Skills 失败'
   } finally {
     loadingSkills.value = false
   }
 }
 
-async function loadMcp(): Promise<void> {
+async function loadMcp(): Promise<string | null> {
   loadingMcp.value = true
   try {
     servers.value = await aiMcpApi.listServers()
+    return null
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '加载 MCP 失败')
     servers.value = []
+    return e instanceof Error ? e.message : '加载 MCP 失败'
   } finally {
     loadingMcp.value = false
   }
 }
 
-async function loadMemories(): Promise<void> {
+async function loadMemories(): Promise<string | null> {
   loadingMemories.value = true
   try {
     memories.value = await aiMemoriesApi.list()
+    return null
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '加载记忆失败')
     memories.value = []
+    return e instanceof Error ? e.message : '加载记忆失败'
   } finally {
     loadingMemories.value = false
   }
 }
 
-function reloadAll(): void {
-  void loadSkills()
-  void loadMcp()
-  void loadMemories()
+async function reloadAll(): Promise<void> {
   preview.value = null
+  const errs = (await Promise.all([loadSkills(), loadMcp(), loadMemories()])).filter(Boolean) as string[]
+  if (!errs.length) return
+  // 三个接口同时 404（常见于误启 Node legacy API）时只弹一条，避免刷屏
+  const uniq = [...new Set(errs)]
+  if (uniq.length === 1 && errs.length > 1) {
+    toast.error(`${uniq[0]}（Skills/MCP/记忆均失败；请确认已启动 insight-api-go :8787）`)
+  } else {
+    for (const msg of uniq) toast.error(msg)
+  }
 }
 
 watch(
