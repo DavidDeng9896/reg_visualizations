@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { briefOpLabel, fullArgs, fullSummary } from '../../../src/modules/ai/traceLabels'
+import { briefOpLabel, fullArgs, fullOpLabel, fullSummary } from '../../../src/modules/ai/traceLabels'
 import type { TraceItem } from '../../../src/modules/ai/aiStore'
 
 function item(partial: Partial<TraceItem> & Pick<TraceItem, 'id' | 'name'>): TraceItem {
@@ -28,14 +28,17 @@ describe('traceLabels', () => {
     )
   })
 
-  it('fullArgs / fullSummary：展开不截断', () => {
+  it('fullOpLabel / fullArgs / fullSummary：展开不截断', () => {
+    const longGoal = '拉取工单详情并汇总评论与状态变更历史'.repeat(3)
     const long = '结果'.repeat(200)
     const t = item({
       id: '5',
-      name: 'list_tables',
-      args: { analysisId: 'a1', extra: { nested: true } },
+      name: 'delegate_mcp_worker',
+      args: { goal: longGoal, analysisId: 'a1', extra: { nested: true } },
       summary: long,
     })
+    expect(fullOpLabel(t)).toContain(longGoal)
+    expect(fullOpLabel(t)).not.toContain('…')
     expect(fullArgs(t)).toContain('"analysisId"')
     expect(fullArgs(t)).toContain('"nested"')
     expect(fullSummary(t)).toBe(long)

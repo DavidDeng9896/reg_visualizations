@@ -48,50 +48,50 @@ function firstStr(args: Record<string, unknown> | undefined, keys: string[]): st
   return ''
 }
 
-function clip(s: string, n = 28): string {
+function clip(s: string, n: number): string {
   const t = s.replace(/\s+/g, ' ').trim()
-  return t.length > n ? `${t.slice(0, n)}…` : t
+  if (n <= 0 || t.length <= n) return t
+  return `${t.slice(0, n)}…`
 }
 
 /** MCP 常见操作 → 精简业务语义（如「拉取工单详情」）。 */
-function mcpBriefLabel(name: string, args: Record<string, unknown> | undefined): string {
+function mcpBriefLabel(name: string, args: Record<string, unknown> | undefined, maxHint: number): string {
   const bare = name.replace(/^mcp_/, '').toLowerCase()
   const issue = firstStr(args, ['issueKey', 'issue_key', 'key', 'id'])
   if (/get[_-]?issue|fetch[_-]?issue|issue[_-]?detail|get[_-]?ticket/.test(bare)) {
-    return issue ? `拉取工单详情 ${clip(issue, 14)}` : '拉取工单详情'
+    return issue ? `拉取工单详情 ${clip(issue, maxHint)}` : '拉取工单详情'
   }
   if (/search[_-]?issue|list[_-]?issue|find[_-]?issue|jql/.test(bare)) {
     const q = firstStr(args, ['jql', 'query', 'q'])
-    return q ? `搜索工单：${clip(q, 18)}` : '搜索工单'
+    return q ? `搜索工单：${clip(q, maxHint)}` : '搜索工单'
   }
   if (/create[_-]?issue/.test(bare)) {
     const title = firstStr(args, ['title', 'summary'])
-    return title ? `创建工单「${clip(title, 14)}」` : '创建工单'
+    return title ? `创建工单「${clip(title, maxHint)}」` : '创建工单'
   }
   if (/get[_-]?comment|list[_-]?comment/.test(bare)) {
-    return issue ? `拉取工单评论 ${clip(issue, 14)}` : '拉取工单评论'
+    return issue ? `拉取工单评论 ${clip(issue, maxHint)}` : '拉取工单评论'
   }
   return ''
 }
 
-/** 折叠行：精简操作内容（优先业务语义，而非裸工具名）。 */
-export function briefOpLabel(t: TraceItem): string {
+function buildOpLabel(t: TraceItem, maxHint: number): string {
   const name = t.name
   const args = t.args
   const base = TOOL_LABELS[name] ?? (name.startsWith('mcp_') ? name.replace(/^mcp_/, '').replace(/_/g, ' ') : name)
 
   if (name === 'ask_user') {
     const q = firstStr(args, ['question'])
-    return q ? `提问：${clip(q, 24)}` : base
+    return q ? `提问：${clip(q, maxHint)}` : base
   }
   if (name === 'get_table_schema') {
     const id = firstStr(args, ['tableId', 'tableName'])
-    return id ? `查看表结构 ${clip(id, 16)}` : base
+    return id ? `查看表结构 ${clip(id, maxHint)}` : base
   }
   if (name === 'create_view') {
     const typ = firstStr(args, ['type', 'chartType'])
     const nm = firstStr(args, ['name'])
-    if (typ && nm) return `创建${typ}视图「${clip(nm, 12)}」`
+    if (typ && nm) return `创建${typ}视图「${clip(nm, maxHint)}」`
     if (typ) return `创建${typ}视图`
     return base
   }
@@ -101,19 +101,23 @@ export function briefOpLabel(t: TraceItem): string {
   }
   if (name === 'create_analysis' || name === 'create_dashboard') {
     const nm = firstStr(args, ['name'])
-    return nm ? `${base}「${clip(nm, 14)}」` : base
+    return nm ? `${base}「${clip(nm, maxHint)}」` : base
   }
   if (name === 'import_csv_text') {
     const nm = firstStr(args, ['tableName'])
-    return nm ? `导入 CSV「${clip(nm, 14)}」` : base
+    return nm ? `导入 CSV「${clip(nm, maxHint)}」` : base
   }
   if (name === 'read_skill') {
     const id = firstStr(args, ['skillId'])
-    return id ? `读取 Skill ${clip(id, 16)}` : base
+    return id ? `读取 Skill ${clip(id, maxHint)}` : base
+  }
+  if (name === 'add_filter_step' || name === 'add_join_step' || name === 'add_union_step' || name === 'add_computed_column_step' || name === 'add_hide_columns_step' || name === 'add_custom_code_step' || name === 'update_custom_code_step' || name === 'run_step' || name === 'delete_step') {
+    const step = firstStr(args, ['stepId', 'name', 'expression', 'code'])
+    return step ? `${base}：${clip(step, maxHint)}` : base
   }
   if (name === 'delegate_skill_worker' || name === 'delegate_mcp_worker' || name === 'delegate_analysis_worker' || name === 'delegate_code_worker') {
     const goal = firstStr(args, ['goal'])
-    return goal ? `${base}：${clip(goal, 22)}` : base
+    return goal ? `${base}：${clip(goal, maxHint)}` : base
   }
   if (name === 'mark_step_done') {
     const idx = args?.index
@@ -124,18 +128,30 @@ export function briefOpLabel(t: TraceItem): string {
     return steps ? `提交计划（${steps} 步）` : base
   }
   if (name.startsWith('mcp_')) {
-    const mcpBrief = mcpBriefLabel(name, args)
+    const mcpBrief = mcpBriefLabel(name, args, maxHint)
     if (mcpBrief) return mcpBrief
-    const hint = firstStr(args, ['goal', 'query', 'title', 'name', 'issueKey', 'issue_key', 'id'])
-    const short = clip(base.replace(/\s+/g, ' '), 18) || 'MCP 调用'
-    return hint ? `${short}：${clip(hint, 18)}` : short
+    const hint = firstStr(args, ['goal', 'query', 'title', 'name', 'issueKey', 'issue_key', 'id', 'path'])
+    const short = clip(base.replace(/\s+/g, ' '), Math.min(18, maxHint || 18)) || 'MCP 调用'
+    return hint ? `${short}：${clip(hint, maxHint)}` : short
   }
-  // 通用：若 summary 已有短句且非协议噪声，优先用
+  // 通用：优先短 summary；否则补一个关键参数
   const sum = (t.summary || '').trim()
   if (sum && !sum.startsWith('NEEDS_CONFIRMATION') && !sum.startsWith('ok：') && sum.length <= 36) {
-    return sum
+    return maxHint > 0 ? clip(sum, maxHint) : sum
   }
+  const hint = firstStr(args, ['goal', 'query', 'title', 'name', 'tableId', 'tableName', 'path', 'id'])
+  if (hint) return `${base}：${clip(hint, maxHint)}`
   return base
+}
+
+/** 折叠行：精简操作内容（优先业务语义，而非裸工具名）。 */
+export function briefOpLabel(t: TraceItem): string {
+  return buildOpLabel(t, 24)
+}
+
+/** 展开态：完整操作描述（不截断）。 */
+export function fullOpLabel(t: TraceItem): string {
+  return buildOpLabel(t, 0)
 }
 
 /** 展开态：完整参数（不截断）。 */

@@ -9,6 +9,7 @@ import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
+import { applyUserAbortToMessages } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 
@@ -318,6 +319,7 @@ export const useAiStore = defineStore('ai', {
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
@@ -415,10 +417,12 @@ export const useAiStore = defineStore('ai', {
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
-        syncPlanCheckpoint(prev, assistant)
+        // 用户中止后不再同步 incomplete，避免「继续任务」回弹
+        if (!aborted) syncPlanCheckpoint(prev, assistant)
       } finally {
         assistant.streaming = false
         this.running = false
@@ -564,6 +568,7 @@ export const useAiStore = defineStore('ai', {
           assistant.error = err.message
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
@@ -673,10 +678,15 @@ export const useAiStore = defineStore('ai', {
       return true
     },
 
+    /** 用户主动结束：中止 loop/工人，关闭所有「继续任务」提示，结算挂起交互。 */
     stop() {
       this.abort?.abort()
       this.settleAsk('（用户中止了本次生成）')
       this.settleConfirm('用户中止了本次生成，危险操作未执行。')
+      this.pendingAsk = null
+      autoContinueCount = 0
+      applyUserAbortToMessages(this.messages)
+      void this.persist()
     },
 
     async retry(): Promise<void> {

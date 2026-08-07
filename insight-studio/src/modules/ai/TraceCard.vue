@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
-import { briefOpLabel, fullArgs, fullSummary } from './traceLabels'
+import { briefOpLabel, fullArgs, fullOpLabel, fullSummary } from './traceLabels'
 
 /**
  * 工具调用轨迹卡：
@@ -59,7 +59,7 @@ function isDetailOpen(id: string): boolean {
 }
 
 function hasDetail(t: TraceItem): boolean {
-  return !!(fullArgs(t) || fullSummary(t))
+  return !!(fullArgs(t) || fullSummary(t) || fullOpLabel(t))
 }
 
 function pendingAction(t: TraceItem): string {
@@ -121,6 +121,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
           />
         </button>
         <div v-if="isDetailOpen(t.id)" class="trace__detail">
+          <div class="trace__op">{{ fullOpLabel(t) }}</div>
           <div class="trace__tool">工具：{{ t.name }}</div>
           <pre v-if="fullArgs(t)" class="trace__args">{{ fullArgs(t) }}</pre>
           <div v-if="fullSummary(t)" class="trace__summary">{{ fullSummary(t) }}</div>
@@ -183,48 +184,61 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
 }
 
 /*
- * 光影掠过：窄而亮的高光带 + linear 匀速；
- * 背景拉大、行程拉长，避免两端停顿感，对比更明显。
+ * 光影掠过：用 transform 扫过高光层（GPU），避免 background-position 循环顿挫；
+ * 基底文字保持可读，高光带更亮更宽。
  */
 .trace__shimmer {
+  position: relative;
   display: inline-block;
-  color: transparent;
-  background-image: linear-gradient(
-    105deg,
-    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 0%,
-    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 38%,
-    color-mix(in srgb, var(--is-text) 55%, #fff) 46%,
+  overflow: hidden;
+  color: color-mix(in srgb, var(--is-text-tertiary) 55%, var(--is-text));
+  isolation: isolate;
+}
+.trace__shimmer::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 85%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 22%,
+    color-mix(in srgb, #fff 55%, transparent) 40%,
     #fff 50%,
-    color-mix(in srgb, var(--is-text) 55%, #fff) 54%,
-    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 62%,
-    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 100%
+    color-mix(in srgb, #fff 55%, transparent) 60%,
+    transparent 78%,
+    transparent 100%
   );
-  background-size: 320% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: tr-shimmer 1.55s linear infinite;
-  will-change: background-position;
+  transform: translateX(-130%);
+  animation: tr-sheen 1.4s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  will-change: transform;
 }
 .trace__label.trace__shimmer {
-  background-image: linear-gradient(
-    105deg,
-    var(--is-text) 0%,
-    var(--is-text) 36%,
-    color-mix(in srgb, var(--is-accent) 45%, #fff) 45%,
-    #fff 50%,
-    color-mix(in srgb, var(--is-accent) 45%, #fff) 55%,
-    var(--is-text) 64%,
-    var(--is-text) 100%
-  );
-  background-size: 320% 100%;
+  color: var(--is-text);
 }
-@keyframes tr-shimmer {
+.trace__label.trace__shimmer::after {
+  mix-blend-mode: overlay;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 24%,
+    color-mix(in srgb, var(--is-accent) 55%, #fff) 42%,
+    #fff 50%,
+    color-mix(in srgb, var(--is-accent) 55%, #fff) 58%,
+    transparent 76%,
+    transparent 100%
+  );
+}
+@keyframes tr-sheen {
   0% {
-    background-position: 140% 50%;
+    transform: translateX(-130%);
   }
   100% {
-    background-position: -140% 50%;
+    transform: translateX(220%);
   }
 }
 
@@ -308,6 +322,14 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.trace__op {
+  color: var(--is-text);
+  font-size: var(--is-text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .trace__tool {
   font-size: 10px;
