@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/aifiles"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/memory"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
@@ -17,11 +18,12 @@ type Server struct {
 	Store      *store.Store
 	Mux        *http.ServeMux
 	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
-	DataDir    string // when set, Skills/MCP/memory resolve under users/<id>/
+	DataDir    string // when set, Skills/MCP/memory/files resolve under users/<id>/
 	SkillsSeed string // official skills seed source
 	Skills     *skills.Store // legacy single-store fallback (tests / DataDir empty)
 	MCP        *mcp.Store
 	Memory     *memory.Store
+	Files      *aifiles.Store // legacy single-store fallback (tests / DataDir empty)
 	stores     *userStores
 }
 
@@ -74,6 +76,12 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("POST /api/ai/skills/import", s.importSkill)
 	s.Mux.HandleFunc("PATCH /api/ai/skills/{id}", s.patchSkill)
 	s.Mux.HandleFunc("DELETE /api/ai/skills/{id}", s.deleteSkill)
+
+	s.Mux.HandleFunc("GET /api/ai/files", s.listAiFiles)
+	s.Mux.HandleFunc("POST /api/ai/files", s.uploadAiFile)
+	s.Mux.HandleFunc("GET /api/ai/files/{id}/meta", s.getAiFileMeta)
+	s.Mux.HandleFunc("GET /api/ai/files/{id}", s.downloadAiFile)
+	s.Mux.HandleFunc("DELETE /api/ai/files/{id}", s.deleteAiFile)
 
 	s.Mux.HandleFunc("GET /api/ai/mcp/servers", s.listMcpServers)
 	s.Mux.HandleFunc("POST /api/ai/mcp/servers", s.createMcpServer)
