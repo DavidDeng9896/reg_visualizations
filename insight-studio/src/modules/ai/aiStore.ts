@@ -9,7 +9,7 @@ import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
-import { applyUserAbortToMessages } from './userAbort'
+import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 
@@ -216,13 +216,12 @@ export const useAiStore = defineStore('ai', {
         const doc = await aiConvApi.get(id)
         this.currentId = doc.id
         this.messages = Array.isArray(doc.messages) ? (doc.messages as UiMessage[]) : []
-        // 回看时清理瞬态
+        // 回看时清理瞬态：历史回答绝不能带着 streaming/running 转圈
         for (const m of this.messages) {
-          m.streaming = false
           if (!Array.isArray(m.trace)) m.trace = []
           if (!Array.isArray(m.artifacts)) m.artifacts = []
-          for (const t of m.trace) t.running = false
         }
+        clearTransientProgress(this.messages)
       } catch (e) {
         console.error('[aiStore.selectConversation]', e)
         throw e
@@ -250,6 +249,8 @@ export const useAiStore = defineStore('ai', {
       const input = text.trim()
       if (!input || this.running) return
       autoContinueCount = 0
+      // 新一轮前先清掉历史消息上残留的 streaming/running，避免旧进展继续转圈
+      clearTransientProgress(this.messages)
       await this.ensureConversation()
       // 上下文超过阈值（上限 80%）先自动压缩：最近 2 个用户轮保留，更早历史折叠为摘要
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
@@ -344,6 +345,7 @@ export const useAiStore = defineStore('ai', {
       const prev = this.resumableAssistant as UiMessage | null
       if (!prev?.planSteps?.length || prev.planDismissed) return
       if (!opts?.auto) autoContinueCount = 0
+      clearTransientProgress(this.messages)
       await this.ensureConversation()
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
@@ -716,8 +718,14 @@ export const useAiStore = defineStore('ai', {
       if (!this.currentId) return
       const firstUser = this.messages.find((m) => m.role === 'user')
       const title = firstUser ? firstUser.content.slice(0, 24) : '新会话'
+      // 落盘时去掉 streaming/running，避免历史回看仍转圈
+      const messages = this.messages.map((m) => ({
+        ...m,
+        streaming: false,
+        trace: (m.trace ?? []).map((t) => ({ ...t, running: false })),
+      }))
       try {
-        await aiConvApi.update(this.currentId, { title, messages: this.messages as unknown[] })
+        await aiConvApi.update(this.currentId, { title, messages: messages as unknown[] })
         await this.refreshConversations()
       } catch {
         /* 持久化失败不打断 */

@@ -1,5 +1,5 @@
 /**
- * 用户主动中止生成时，清理会话内「可续跑 / 进行中」状态，
+ * 用户主动中止 / 历史回看时，清理会话内「可续跑 / 进行中」状态，
  * 避免再弹出「继续任务」卡片，并立刻停掉光影/转圈等进行中 UI。
  */
 export interface AbortableTrace {
@@ -15,12 +15,24 @@ export interface AbortableTrace {
 
 export interface AbortableMessage {
   role: string
-  /** 流式/生成中标记：中止后必须立刻清掉，否则进展转圈与思考卡会挂住。 */
+  /** 流式/生成中标记：中止或回看后必须清掉，否则进展转圈会挂住。 */
   streaming?: boolean
   planSteps?: string[]
   incomplete?: boolean
   planDismissed?: boolean
   trace: AbortableTrace[]
+}
+
+/** 清掉瞬态进行中 UI（streaming / running），供回看、落盘快照共用（不改计划状态）。 */
+export function clearTransientProgress(messages: AbortableMessage[]): void {
+  for (const m of messages) {
+    if (m.role !== 'assistant') continue
+    m.streaming = false
+    if (!Array.isArray(m.trace)) continue
+    for (const t of m.trace) {
+      if (t.running) t.running = false
+    }
+  }
 }
 
 /** 关闭所有检查点续跑提示，并结算进行中的工具/确认/提问。 */
