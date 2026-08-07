@@ -416,6 +416,86 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(planResults.some((m) => String(m.content).includes('已提交计划（2 步）'))).toBe(true)
   })
 
+  it('submit_plan 兼容裸数组 / plan 字段 / 损坏 JSON 后仍可续跑', async () => {
+    const seen: ChatPayload[] = []
+    let n = 0
+    const post = async (p: ChatPayload) => {
+      seen.push(p)
+      n += 1
+      if (n === 1) {
+        // 裸数组 arguments（非 {steps:...}）
+        return sseOf({
+          toolCalls: [
+            {
+              id: 'p0',
+              type: 'function',
+              function: { name: 'submit_plan', arguments: '["查看表","出图","总结"]' },
+            },
+          ],
+        })
+      }
+      if (n === 2) return sseOf({ toolCalls: [call('mark_step_done', { index: 0 })] })
+      if (n === 3) return sseOf({ toolCalls: [call('mark_step_done', { index: 1 })] })
+      if (n === 4) return sseOf({ toolCalls: [call('mark_step_done', { index: 2 })] })
+      return sseOf({ content: '完成' })
+    }
+    const evts: AgentEvent[] = []
+    await runAgent({
+      messages: [{ role: 'user', content: '任务' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 10,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(evts.some((e) => e.type === 'plan' && e.steps.length === 3)).toBe(true)
+    // 后续请求里 assistant.tool_calls.arguments 必须是可 JSON.parse 的对象字符串
+    for (const p of seen.slice(1)) {
+      for (const m of p.messages) {
+        for (const c of m.tool_calls ?? []) {
+          const parsed = JSON.parse(c.function.arguments)
+          expect(parsed).toBeTypeOf('object')
+        }
+      }
+    }
+  })
+
+  it('submit_plan 接受 plan 别名与换行字符串', async () => {
+    let n = 0
+    const post = async () => {
+      n += 1
+      if (n === 1) {
+        return sseOf({
+          toolCalls: [
+            {
+              id: 'p1',
+              type: 'function',
+              function: {
+                name: 'submit_plan',
+                arguments: JSON.stringify({ plan: '1. 看表\n2. 建视图\n3. 配图' }),
+              },
+            },
+          ],
+        })
+      }
+      if (n === 2) return sseOf({ toolCalls: [call('mark_step_done', { index: 0 })] })
+      if (n === 3) return sseOf({ toolCalls: [call('mark_step_done', { index: 1 })] })
+      if (n === 4) return sseOf({ toolCalls: [call('mark_step_done', { index: 2 })] })
+      return sseOf({ content: 'ok' })
+    }
+    const evts: AgentEvent[] = []
+    await runAgent({
+      messages: [{ role: 'user', content: 'x' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 10,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    const plan = evts.find((e) => e.type === 'plan')
+    expect(plan && plan.type === 'plan' ? plan.steps : []).toEqual(['看表', '建视图', '配图'])
+  })
+
   it('连续复读无工具 → 强制收束并 incomplete', async () => {
     const line = '好，让我直接调用 get_table_schema 确认表结构，然后创建视图。'
     const post = async (p: ChatPayload) => {
@@ -529,7 +609,8 @@ describe('agentLoop（ReAct 多轮循环）', () => {
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */
-import { readSseStream, sanitizeChatMessages, mergeStreamedToolName, mergeStreamedToolArguments } from '../../../src/modules/ai/client'
+import { readSseStream, sanitizeChatMessages, mergeStreamedToolName, mergeStreamedToolArguments, normalizeToolArguments } from '../../../src/modules/ai/client'
+import { extractPlanSteps } from '../../../src/modules/ai/agentLoop'
 
 describe('readSseStream（OpenAI SSE 聚合）', () => {
   it('分片 tool_calls 聚合：id/name/arguments 拼接', async () => {
@@ -629,5 +710,31 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     const a = '{"steps":["a"]}'
     expect(mergeStreamedToolArguments(a, a)).toBe(a)
     expect(mergeStreamedToolArguments('{"steps":', '["a"]}')).toBe('{"steps":["a"]}')
+  })
+
+  it('normalizeToolArguments：损坏/fence/对象 → 合法 JSON 字符串', () => {
+    expect(normalizeToolArguments('')).toBe('{}')
+    expect(normalizeToolArguments('not-json')).toBe('{}')
+    expect(normalizeToolArguments('{"a":1}')).toBe('{"a":1}')
+    expect(normalizeToolArguments('```json\n{"a":1}\n```')).toBe('{"a":1}')
+    expect(normalizeToolArguments({ steps: ['x'] })).toBe(JSON.stringify({ steps: ['x'] }))
+    expect(normalizeToolArguments('prefix {"steps":["a"]} trailing')).toBe('{"steps":["a"]}')
+    // sanitize 后发给上游的 arguments 必须可 parse
+    const out = sanitizeChatMessages([
+      {
+        role: 'assistant',
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'submit_plan', arguments: 'broken{{' } },
+        ],
+      },
+    ])
+    expect(() => JSON.parse(out[0].tool_calls![0].function.arguments)).not.toThrow()
+  })
+
+  it('extractPlanSteps：steps/plan/裸数组/换行', () => {
+    expect(extractPlanSteps({ steps: ['A', 'B'] })).toEqual(['A', 'B'])
+    expect(extractPlanSteps({ plan: ['A', ' B '] })).toEqual(['A', 'B'])
+    expect(extractPlanSteps({ steps: '1. 看表\n2. 出图' })).toEqual(['看表', '出图'])
+    expect(extractPlanSteps({ steps: ['A', { text: 'B' }, { title: 'C' }] })).toEqual(['A', 'B', 'C'])
   })
 })

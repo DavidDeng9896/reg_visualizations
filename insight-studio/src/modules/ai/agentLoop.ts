@@ -4,6 +4,7 @@
  */
 import {
   contentText,
+  normalizeToolArguments,
   postChat,
   readSseStream,
   sanitizeChatMessages,
@@ -70,12 +71,52 @@ export class AgentRunError extends Error {
 }
 
 function safeParseArgs(raw: string): Record<string, unknown> {
+  const normalized = normalizeToolArguments(raw)
   try {
-    const v = JSON.parse(raw || '{}') as unknown
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+    const v = JSON.parse(normalized) as unknown
+    // 模型偶发直接传步骤数组：["a","b"] → 视为 { steps: [...] }，便于 submit_plan
+    if (Array.isArray(v)) return { steps: v }
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
   } catch {
     return {}
   }
+}
+
+/** 从 submit_plan 参数中尽量抽出步骤列表（兼容 steps/plan/tasks、字符串、裸数组）。 */
+export function extractPlanSteps(args: Record<string, unknown>): string[] {
+  const asList = (v: unknown): string[] => {
+    if (Array.isArray(v)) {
+      return v
+        .map((s) => {
+          if (typeof s === 'string') return s.trim()
+          if (s && typeof s === 'object' && 'text' in (s as object)) return String((s as { text: unknown }).text).trim()
+          if (s && typeof s === 'object' && 'title' in (s as object)) return String((s as { title: unknown }).title).trim()
+          return String(s ?? '').trim()
+        })
+        .filter(Boolean)
+    }
+    if (typeof v === 'string') {
+      const t = v.trim()
+      if (!t) return []
+      try {
+        const parsed = JSON.parse(t) as unknown
+        if (Array.isArray(parsed)) return asList(parsed)
+      } catch {
+        /* 按行拆分：1. xxx / - xxx */
+      }
+      return t
+        .split(/\n+/)
+        .map((line) => line.replace(/^\s*(?:\d+[\.\)、]|[-*•])\s*/, '').trim())
+        .filter(Boolean)
+    }
+    return []
+  }
+
+  for (const key of ['steps', 'plan', 'tasks', 'items']) {
+    const got = asList(args[key])
+    if (got.length) return got
+  }
+  return []
 }
 
 const DEFAULT_MAX_PLAN_NUDGES = 3
@@ -273,13 +314,15 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     for (const call of calls) {
       throwIfAborted()
+      // 先规范化 arguments（合法 JSON 字符串），再解析；避免坏片段留在上下文触发上游 502
+      call.function.arguments = normalizeToolArguments(call.function.arguments)
       onEvent({ type: 'tool_call', call })
       const args = safeParseArgs(call.function.arguments)
       const name = call.function.name
 
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
-        const steps = Array.isArray(args.steps) ? args.steps.map((s) => String(s).trim()).filter(Boolean) : []
+        const steps = extractPlanSteps(args).slice(0, 8)
         if (!steps.length) {
           pushToolContent(
             call,
@@ -289,6 +332,8 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           )
           continue
         }
+        // 回写规范化后的 arguments，保证后续 sanitize 一定是合法 JSON
+        call.function.arguments = JSON.stringify({ steps })
         const sameAsCurrent =
           planSteps.length > 0 &&
           planSteps.length === steps.length &&

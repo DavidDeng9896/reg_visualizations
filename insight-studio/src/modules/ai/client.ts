@@ -100,6 +100,51 @@ function looksLikeJsonObject(s: string): boolean {
 }
 
 /**
+ * 保证 tool function.arguments 为合法 JSON 字符串（豆包要求）。
+ * 无法修复时回退 "{}"，避免续跑 502 invalid_parameter_error。
+ */
+export function normalizeToolArguments(raw: unknown): string {
+  if (raw == null) return '{}'
+  if (typeof raw === 'object') {
+    try {
+      return JSON.stringify(raw)
+    } catch {
+      return '{}'
+    }
+  }
+  let s = String(raw).trim()
+  if (!s) return '{}'
+  // 去掉偶发的 markdown fence
+  const fence = s.match(/^```(?:json)?\s*([\s\S]*?)```$/i)
+  if (fence) s = fence[1].trim()
+  try {
+    JSON.parse(s)
+    return s
+  } catch {
+    /* continue */
+  }
+  const obj = s.match(/\{[\s\S]*\}/)
+  if (obj) {
+    try {
+      JSON.parse(obj[0])
+      return obj[0]
+    } catch {
+      /* continue */
+    }
+  }
+  const arr = s.match(/\[[\s\S]*\]/)
+  if (arr) {
+    try {
+      JSON.parse(arr[0])
+      return arr[0]
+    } catch {
+      /* continue */
+    }
+  }
+  return '{}'
+}
+
+/**
  * 纯文本 content 数组 → 单字符串（豆包 Seed 等拒收纯 text 的 content array）。
  */
 export function flattenTextContent(
@@ -139,7 +184,7 @@ export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
           type: 'function' as const,
           function: {
             name: c.function.name,
-            arguments: c.function.arguments?.trim() ? c.function.arguments : '{}',
+            arguments: normalizeToolArguments(c.function.arguments),
           },
         }))
       if (!next.tool_calls.length) delete next.tool_calls
@@ -236,7 +281,15 @@ export async function readSseStream(
     }
   }
 
-  const toolCalls = [...calls.values()].filter((c) => c.function.name)
+  const toolCalls = [...calls.values()]
+    .filter((c) => c.function.name)
+    .map((c) => ({
+      ...c,
+      function: {
+        name: c.function.name,
+        arguments: normalizeToolArguments(c.function.arguments),
+      },
+    }))
   return {
     role: 'assistant',
     content: content || null,
