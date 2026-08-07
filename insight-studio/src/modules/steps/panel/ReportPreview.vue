@@ -54,12 +54,14 @@ function printPdf() {
   gap: 8px;
   min-height: 360px;
   flex: 1;
+  height: 100%;
 }
 .rpv__bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-shrink: 0;
 }
 .rpv__hint {
   font-size: 12px;
@@ -68,7 +70,7 @@ function printPdf() {
 .rpv__frame {
   width: 100%;
   flex: 1;
-  min-height: 420px;
+  min-height: 280px;
   border: 1px solid var(--is-border, #d0d5dd);
   border-radius: 4px;
   background: #fbfbf9;

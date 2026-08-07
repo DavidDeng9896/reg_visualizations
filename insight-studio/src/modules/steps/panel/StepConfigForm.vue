@@ -549,7 +549,7 @@ watch(() => props.step.type, () => {
 
     <!-- Report -->
     <template v-else-if="step.type === 'report'">
-      <section class="scf__section">
+      <section class="scf__section scf__section--report">
         <ReportAiAssist
           :step="step"
           :analysis="current"
@@ -805,11 +805,18 @@ watch(() => props.step.type, () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 .scf__section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.scf__section--report,
+.scf__section--code {
+  flex: 1;
+  min-height: 0;
 }
 .scf__section-title {
   font-size: 11px;
