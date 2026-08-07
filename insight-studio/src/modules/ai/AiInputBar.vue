@@ -6,23 +6,38 @@ import { useAnalysisStore } from '../../stores/analysisStore'
 import { useAiStore } from './aiStore'
 import { CONTEXT_TOKEN_LIMIT, formatTokens } from './tokens'
 import type { MentionTarget } from './context'
-import { mentionIcon, mentionName, VIEW_ICON } from './mentionIcons'
+import { attachmentKindIcon, mentionIcon, VIEW_ICON } from './mentionIcons'
 import type { IconName } from '../../ui'
 import type { ViewNode } from '../../shared/types'
+import { aiFilesApi } from './client'
+import {
+  ATTACHMENT_ACCEPT,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_TURN,
+  attachmentFromMeta,
+  excelSelectionValid,
+  probeExcelSheets,
+  type ChatAttachment,
+} from './attachments'
 
 /**
  * AI 输入条（对齐参考交互）：统一圆角盒子 + 自动增高输入区 +
  * 工具行（+ 上下文/指令菜单 · 模型选择器 · 发送/中止方块按钮）。
- * 支持输入时内联触发 @（引用表/视图）与 /（快捷指令），Enter 选中首项。
+ * 支持输入时内联触发 @（引用表/视图/附件）与 /（快捷指令），Enter 选中首项。
+ * 支持上传附件（拖放 / 纸夹 / + 菜单）、「给 AI 读」「导入为分析表」。
  */
 const ai = useAiStore()
-const { running, config } = storeToRefs(ai)
+const { running, config, sessionFiles } = storeToRefs(ai)
 const analysisStore = useAnalysisStore()
 const { current } = storeToRefs(analysisStore)
 
 const text = ref('')
 const mentions = ref<MentionTarget[]>([])
+const pending = ref<ChatAttachment[]>([])
+const uploading = ref(false)
+const dragging = ref(false)
 const inputEl = ref<HTMLTextAreaElement>()
+const fileInputEl = ref<HTMLInputElement>()
 
 type MenuMode = 'plus' | 'mention' | 'slash' | 'models' | 'permissions' | null
 const menuMode = ref<MenuMode>(null)
@@ -44,7 +59,9 @@ const PERMISSION_OPTIONS = [
   },
 ]
 
-const canSend = computed(() => text.value.trim().length > 0 && !running.value)
+const canSend = computed(
+  () => (text.value.trim().length > 0 || pending.value.length > 0) && !running.value && !uploading.value,
+)
 
 const permissionOption = computed(
   () => PERMISSION_OPTIONS.find((o) => o.mode === ai.permissionMode) ?? PERMISSION_OPTIONS[0],
@@ -76,15 +93,29 @@ function appendViewMentions(
 }
 
 const mentionables = computed(() => {
+  const items: { key: string; label: string; icon: IconName; target: MentionTarget }[] = []
   const a = current.value
-  if (!a) return []
-  const items: { key: string; label: string; icon: IconName; target: MentionTarget }[] = [
-    { key: 'analysis', label: `分析：${a.name}`, icon: 'database', target: { kind: 'analysis' } },
-  ]
-  for (const t of a.tables) {
-    items.push({ key: `t-${t.id}`, label: `表：${t.name}`, icon: 'table', target: { kind: 'table', tableId: t.id } })
-    appendViewMentions(t.views, t.id, items)
+  if (a) {
+    items.push({ key: 'analysis', label: `分析：${a.name}`, icon: 'database', target: { kind: 'analysis' } })
+    for (const t of a.tables) {
+      items.push({ key: `t-${t.id}`, label: `表：${t.name}`, icon: 'table', target: { kind: 'table', tableId: t.id } })
+      appendViewMentions(t.views, t.id, items)
+    }
   }
+  // 本轮待发 + 服务端近期附件
+  const seen = new Set<string>()
+  const addFile = (id: string, name: string, kind: string) => {
+    if (seen.has(id)) return
+    seen.add(id)
+    items.push({
+      key: `f-${id}`,
+      label: `附件：${name}`,
+      icon: attachmentKindIcon(kind),
+      target: { kind: 'attachment', fileId: id, name, fileKind: kind as ChatAttachment['kind'] },
+    })
+  }
+  for (const p of pending.value) addFile(p.id, p.name, p.kind)
+  for (const f of sessionFiles.value) addFile(f.id, f.name, f.kind)
   return items
 })
 
@@ -110,6 +141,7 @@ function mentionLabel(m: MentionTarget): string {
   const a = current.value
   if (m.kind === 'analysis') return a?.name ?? '分析'
   if (m.kind === 'table') return a?.tables.find((t) => t.id === m.tableId)?.name ?? '表'
+  if (m.kind === 'attachment') return m.name?.trim() || '附件'
   const t = a?.tables.find((x) => x.id === m.tableId)
   return t?.views.find((v) => v.id === m.viewId)?.name ?? '视图'
 }
@@ -140,6 +172,92 @@ function applySlash(cmd: { key: string; text: string }): void {
   text.value = cmd.text
   menuMode.value = null
   void nextTick(() => inputEl.value?.focus())
+}
+
+/* ------------------------------- 附件 ------------------------------- */
+
+function openFilePicker(): void {
+  menuMode.value = null
+  fileInputEl.value?.click()
+}
+
+async function addFiles(fileList: FileList | File[] | null | undefined): Promise<void> {
+  if (!fileList?.length) return
+  const files = [...fileList]
+  uploading.value = true
+  try {
+    for (const file of files) {
+      if (pending.value.length >= MAX_ATTACHMENTS_PER_TURN) {
+        toast.error(`每轮最多 ${MAX_ATTACHMENTS_PER_TURN} 个附件`)
+        break
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        toast.error(`「${file.name}」超过 10MB 限制`)
+        continue
+      }
+      try {
+        const meta = await aiFilesApi.upload(file)
+        const att = attachmentFromMeta(meta)
+        if (meta.kind === 'excel') {
+          try {
+            att.availableSheets = await probeExcelSheets(meta.id)
+            att.selectedSheets = [...(att.availableSheets ?? [])]
+          } catch (e) {
+            toast.error(`Excel 工作表探测失败：${e instanceof Error ? e.message : String(e)}`)
+          }
+        }
+        // 图片不可导入为表
+        if (meta.kind === 'image') att.importAsTable = false
+        pending.value.push(att)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : `上传失败：${file.name}`)
+      }
+    }
+    await ai.refreshSessionFiles()
+  } finally {
+    uploading.value = false
+  }
+}
+
+function onFilePick(e: Event): void {
+  const input = e.target as HTMLInputElement
+  void addFiles(input.files)
+  input.value = ''
+}
+
+function removePending(i: number): void {
+  pending.value.splice(i, 1)
+}
+
+function toggleForAi(att: ChatAttachment): void {
+  att.forAi = !att.forAi
+}
+
+function toggleImport(att: ChatAttachment): void {
+  if (att.kind !== 'csv' && att.kind !== 'excel') return
+  att.importAsTable = !att.importAsTable
+}
+
+function toggleSheet(att: ChatAttachment, sheet: string): void {
+  const cur = new Set(att.selectedSheets ?? [])
+  if (cur.has(sheet)) cur.delete(sheet)
+  else cur.add(sheet)
+  att.selectedSheets = [...cur]
+}
+
+function onDragOver(e: DragEvent): void {
+  e.preventDefault()
+  dragging.value = true
+}
+
+function onDragLeave(): void {
+  dragging.value = false
+}
+
+function onDrop(e: DragEvent): void {
+  e.preventDefault()
+  dragging.value = false
+  void addFiles(e.dataTransfer?.files)
 }
 
 /* ------------------------------- 模型选择 ------------------------------- */
@@ -224,13 +342,21 @@ function onKeydown(e: KeyboardEvent): void {
 
 async function submit(): Promise<void> {
   const input = text.value.trim()
-  if (!input || running.value) return
+  if ((!input && !pending.value.length) || running.value || uploading.value) return
+  for (const att of pending.value) {
+    if (!excelSelectionValid(att)) {
+      toast.error(`Excel「${att.name}」请至少选择一个工作表`)
+      return
+    }
+  }
   const ms = [...mentions.value]
+  const atts = pending.value.map((a) => ({ ...a, selectedSheets: a.selectedSheets ? [...a.selectedSheets] : undefined }))
   text.value = ''
   mentions.value = []
+  pending.value = []
   menuMode.value = null
   void nextTick(autosize)
-  await ai.send(input, ms)
+  await ai.send(input, ms, atts)
 }
 
 async function onContinue(): Promise<void> {
@@ -246,13 +372,25 @@ watch(text, () => void nextTick(autosize))
 watch(
   () => ai.drawerOpen,
   (open) => {
-    if (open) void nextTick(() => inputEl.value?.focus())
+    if (open) {
+      void ai.refreshSessionFiles()
+      void nextTick(() => inputEl.value?.focus())
+    }
   },
 )
 </script>
 
 <template>
   <div class="bar" data-testid="ai-inputbar">
+    <input
+      ref="fileInputEl"
+      type="file"
+      class="bar__file"
+      multiple
+      :accept="ATTACHMENT_ACCEPT"
+      data-testid="ai-file-input"
+      @change="onFilePick"
+    />
     <div v-if="ai.canContinueTask" class="bar__continue" data-testid="ai-continue-wrap">
       <button type="button" class="bar__continue-btn" data-testid="ai-continue" @click="onContinue">
         继续任务
@@ -272,7 +410,14 @@ watch(
     <!-- 抽屉是 --is-z-modal(1300)，菜单要提到 --is-z-dropdown(1350) 否则被抽屉盖住点不中 -->
     <IPopover :open="menuMode !== null" placement="top-start" :arrow="false" z-index="var(--is-z-dropdown)" @update:open="menuMode = $event ? menuMode : null">
       <template #anchor>
-        <div class="bar__box" :class="{ 'bar__box--menu': menuMode !== null }">
+        <div
+          class="bar__box"
+          :class="{ 'bar__box--menu': menuMode !== null, 'bar__box--drag': dragging }"
+          data-testid="ai-dropzone"
+          @dragover="onDragOver"
+          @dragleave="onDragLeave"
+          @drop="onDrop"
+        >
           <div v-if="mentions.length" class="bar__mentions">
             <span v-for="(m, i) in mentions" :key="i" class="bar__chip">
               <IIcon :name="iconForMention(m)" :size="11" />
@@ -280,12 +425,45 @@ watch(
               <button type="button" aria-label="移除引用" @click="removeMention(i)">×</button>
             </span>
           </div>
+          <div v-if="pending.length" class="bar__atts" data-testid="ai-pending-atts">
+            <div v-for="(att, i) in pending" :key="att.id" class="bar__att" data-testid="ai-pending-att">
+              <div class="bar__att-head">
+                <IIcon :name="attachmentKindIcon(att.kind)" :size="12" class="bar__att-icon" />
+                <span class="bar__att-name is-ellipsis" :title="att.name">{{ att.name }}</span>
+                <button type="button" class="bar__att-rm" aria-label="移除附件" @click="removePending(i)">×</button>
+              </div>
+              <div class="bar__att-opts">
+                <label class="bar__att-opt">
+                  <input type="checkbox" :checked="att.forAi" @change="toggleForAi(att)" />
+                  给 AI 读
+                </label>
+                <label v-if="att.kind === 'csv' || att.kind === 'excel'" class="bar__att-opt">
+                  <input type="checkbox" :checked="att.importAsTable" @change="toggleImport(att)" />
+                  导入为分析表
+                </label>
+              </div>
+              <div
+                v-if="att.kind === 'excel' && att.availableSheets?.length"
+                class="bar__att-sheets"
+                data-testid="ai-excel-sheets"
+              >
+                <label v-for="sh in att.availableSheets" :key="sh" class="bar__att-sheet">
+                  <input
+                    type="checkbox"
+                    :checked="att.selectedSheets?.includes(sh)"
+                    @change="toggleSheet(att, sh)"
+                  />
+                  {{ sh }}
+                </label>
+              </div>
+            </div>
+          </div>
           <textarea
             ref="inputEl"
             v-model="text"
             class="bar__input"
             rows="1"
-            :placeholder="running ? '生成中，可继续输入或点击中止…' : config?.configured ? '问 AI 助手，@ 添加上下文，/ 使用命令' : '请先在右上角设置里配置 API Key'"
+            :placeholder="running ? '生成中，可继续输入或点击中止…' : config?.configured ? '问 AI 助手，@ 添加上下文，/ 使用命令，可拖入附件' : '请先在右上角设置里配置 API Key'"
             data-testid="ai-input"
             @input="onInput"
             @keydown="onKeydown"
@@ -301,6 +479,17 @@ watch(
               @click="menuMode = menuMode === 'plus' ? null : 'plus'"
             >
               <IIcon name="plus" :size="15" />
+            </button>
+            <button
+              type="button"
+              class="bar__tbtn"
+              title="上传附件"
+              aria-label="上传附件"
+              data-testid="ai-attach"
+              :disabled="uploading || running"
+              @click="openFilePicker"
+            >
+              <IIcon name="paperclip" :size="15" />
             </button>
             <button
               type="button"
@@ -360,8 +549,12 @@ watch(
       <template #default>
         <!-- +：引用 + 指令两组 -->
         <div v-if="menuMode === 'plus'" class="bar__menu" role="menu">
+          <div class="bar__menu-title">附件</div>
+          <button type="button" class="bar__menu-item" role="menuitem" data-testid="ai-upload-menu" @click="openFilePicker">
+            <IIcon name="paperclip" :size="12" class="bar__menu-icon" />上传附件
+          </button>
           <div class="bar__menu-title">引用上下文</div>
-          <button v-if="!mentionables.length" type="button" class="bar__menu-item" disabled>无可引用项（先打开一个分析）</button>
+          <button v-if="!mentionables.length" type="button" class="bar__menu-item" disabled>无可引用项</button>
           <button v-for="it in mentionables" :key="it.key" type="button" class="bar__menu-item" role="menuitem" @click="pickMentionFromMenu(it)">
             <IIcon :name="it.icon" :size="12" class="bar__menu-icon" />{{ it.label }}
           </button>
@@ -424,6 +617,9 @@ watch(
   border-top: 1px solid var(--is-border);
   padding: 10px 12px 12px;
   background: var(--is-bg);
+}
+.bar__file {
+  display: none;
 }
 .bar__continue {
   display: flex;
@@ -494,6 +690,10 @@ watch(
 .bar__box--menu {
   border-color: var(--is-accent);
 }
+.bar__box--drag {
+  border-color: var(--is-accent);
+  background: var(--is-accent-soft);
+}
 
 .bar__mentions {
   display: flex;
@@ -519,6 +719,77 @@ watch(
   padding: 0;
   font-size: 12px;
   line-height: 1;
+}
+
+.bar__atts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 2px 8px;
+}
+.bar__att {
+  padding: 6px 8px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-sm);
+  background: var(--is-surface-muted, var(--is-bg));
+}
+.bar__att-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bar__att-icon {
+  color: var(--is-text-tertiary);
+  flex-shrink: 0;
+}
+.bar__att-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--is-text);
+}
+.bar__att-rm {
+  border: none;
+  background: transparent;
+  color: var(--is-text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.bar__att-rm:hover {
+  color: var(--is-danger);
+}
+.bar__att-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+.bar__att-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--is-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.bar__att-sheets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--is-border);
+}
+.bar__att-sheet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--is-text-secondary);
+  cursor: pointer;
 }
 
 .bar__input {
@@ -562,6 +833,10 @@ watch(
 .bar__tbtn--on {
   background: var(--is-surface-hover);
   color: var(--is-text);
+}
+.bar__tbtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .bar__perm {
   display: inline-flex;

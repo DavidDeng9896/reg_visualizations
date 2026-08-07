@@ -30,12 +30,14 @@ export function buildAnalysisContext(analysis: Analysis | null): string {
   ].join('\n')
 }
 
+import type { AttachmentKind } from './attachments'
+
 /** @ 引用的上下文块类型。 */
 export type MentionTarget =
   | { kind: 'analysis' }
   | { kind: 'table'; tableId: string }
   | { kind: 'view'; tableId: string; viewId: string }
-  | { kind: 'attachment'; fileId: string; name?: string; fileKind?: import('./attachments').AttachmentKind }
+  | { kind: 'attachment'; fileId: string; name?: string; fileKind?: AttachmentKind }
 
 /** 生成 @ 引用的补充上下文文本。无分析时仍可处理附件引用。 */
 export function buildMentionContext(analysis: Analysis | null, targets: MentionTarget[]): string {

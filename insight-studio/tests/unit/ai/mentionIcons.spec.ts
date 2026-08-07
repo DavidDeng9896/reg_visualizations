@@ -41,4 +41,9 @@ describe('mentionIcon', () => {
     expect(mentionIcon({ kind: 'view', tableId: 't1', viewId: 'v1' }, a)).toBe('bar')
     expect(mentionIcon({ kind: 'view', tableId: 't1', viewId: 'v2' }, a)).toBe('line')
   })
+
+  it('附件按 kind 显示图标', () => {
+    expect(mentionIcon({ kind: 'attachment', fileId: 'f', fileKind: 'image', name: 'a.png' }, null)).toBe('image')
+    expect(mentionIcon({ kind: 'attachment', fileId: 'f', fileKind: 'pdf' }, null)).toBe('file-text')
+  })
 })
