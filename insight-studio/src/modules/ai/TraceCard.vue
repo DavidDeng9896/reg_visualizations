@@ -184,61 +184,47 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
 }
 
 /*
- * 光影掠过：用 transform 扫过高光层（GPU），避免 background-position 循环顿挫；
- * 基底文字保持可读，高光带更亮更宽。
+ * 光影掠过：background-clip:text 按字形蒙版，高光为白色（非子任务蓝色）。
+ * linear 匀速，避免两端顿挫。
  */
 .trace__shimmer {
-  position: relative;
   display: inline-block;
-  overflow: hidden;
-  color: color-mix(in srgb, var(--is-text-tertiary) 55%, var(--is-text));
-  isolation: isolate;
-}
-.trace__shimmer::after {
-  content: '';
-  position: absolute;
-  top: -20%;
-  bottom: -20%;
-  left: 0;
-  width: 85%;
-  background: linear-gradient(
-    100deg,
-    transparent 0%,
-    transparent 22%,
-    color-mix(in srgb, #fff 55%, transparent) 40%,
+  color: transparent;
+  background-image: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--is-text-tertiary) 70%, transparent) 0%,
+    color-mix(in srgb, var(--is-text-tertiary) 70%, transparent) 38%,
+    color-mix(in srgb, #fff 55%, var(--is-text-tertiary)) 46%,
     #fff 50%,
-    color-mix(in srgb, #fff 55%, transparent) 60%,
-    transparent 78%,
-    transparent 100%
+    color-mix(in srgb, #fff 55%, var(--is-text-tertiary)) 54%,
+    color-mix(in srgb, var(--is-text-tertiary) 70%, transparent) 62%,
+    color-mix(in srgb, var(--is-text-tertiary) 70%, transparent) 100%
   );
-  transform: translateX(-130%);
-  animation: tr-sheen 1.4s linear infinite;
-  pointer-events: none;
-  mix-blend-mode: soft-light;
-  will-change: transform;
+  background-size: 280% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tr-shimmer 1.5s linear infinite;
 }
 .trace__label.trace__shimmer {
-  color: var(--is-text);
-}
-.trace__label.trace__shimmer::after {
-  mix-blend-mode: overlay;
-  background: linear-gradient(
-    100deg,
-    transparent 0%,
-    transparent 24%,
-    color-mix(in srgb, var(--is-accent) 55%, #fff) 42%,
+  background-image: linear-gradient(
+    105deg,
+    var(--is-text) 0%,
+    var(--is-text) 38%,
+    color-mix(in srgb, #fff 70%, var(--is-text)) 46%,
     #fff 50%,
-    color-mix(in srgb, var(--is-accent) 55%, #fff) 58%,
-    transparent 76%,
-    transparent 100%
+    color-mix(in srgb, #fff 70%, var(--is-text)) 54%,
+    var(--is-text) 62%,
+    var(--is-text) 100%
   );
+  background-size: 280% 100%;
 }
-@keyframes tr-sheen {
+@keyframes tr-shimmer {
   0% {
-    transform: translateX(-130%);
+    background-position: 120% 50%;
   }
   100% {
-    transform: translateX(220%);
+    background-position: -120% 50%;
   }
 }
 
