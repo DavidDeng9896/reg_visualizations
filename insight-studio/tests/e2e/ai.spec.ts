@@ -234,10 +234,11 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await createDemoAndEnter(page)
     await page.getByTestId('ai-fab').click()
 
-    // 输入区：上下文指示器 + 压缩按钮（历史不足 2 轮时禁用）
+    // 输入区：上下文指示器；点开后显示压缩（历史不足 2 轮时禁用）
     const ctx = page.getByTestId('ai-ctx')
     await expect(ctx).toBeVisible()
     await expect(ctx).toContainText('/128k')
+    await ctx.click()
     await expect(page.getByTestId('ai-compress')).toBeDisabled()
 
     await page.getByTestId('ai-input').fill('帮我给当前表配一个散点图')

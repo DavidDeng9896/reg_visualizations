@@ -21,10 +21,9 @@ import {
 } from './attachments'
 
 /**
- * AI 输入条（对齐参考交互）：统一圆角盒子 + 自动增高输入区 +
- * 工具行（+ 上下文/指令菜单 · 模型选择器 · 发送/中止方块按钮）。
- * 支持输入时内联触发 @（引用表/视图/附件）与 /（快捷指令），Enter 选中首项。
- * 支持上传附件（拖放 / 纸夹 / + 菜单）、「给 AI 读」「导入为分析表」。
+ * AI 输入条：圆角盒子 + 自动增高输入区 + 精简工具行
+ *（+ 菜单 · 权限图标 · 模型 · 上下文/压缩 · 发送）。
+ * 附件入口在 + 菜单与拖放；「完成后生成报告」在 + 选项，勾选后以 chip 显示。
  */
 const ai = useAiStore()
 const { running, config, sessionFiles } = storeToRefs(ai)
@@ -66,6 +65,17 @@ const canSend = computed(
 const permissionOption = computed(
   () => PERMISSION_OPTIONS.find((o) => o.mode === ai.permissionMode) ?? PERMISSION_OPTIONS[0],
 )
+
+/** 点上下文量再展开压缩；用量 ≥50% 时自动露出压缩入口。 */
+const ctxExpanded = ref(false)
+const showCompress = computed(
+  () => ctxExpanded.value || ai.contextTokens >= CONTEXT_TOKEN_LIMIT * 0.5,
+)
+
+function toggleWantReport(): void {
+  ai.wantReport = !ai.wantReport
+  menuMode.value = null
+}
 
 const SLASH_COMMANDS = [
   { key: '分析此表', text: '分析当前表的数据分布并给出洞察' },
@@ -462,6 +472,18 @@ watch(
               </div>
             </div>
           </div>
+          <div v-if="ai.wantReport" class="bar__flags" data-testid="ai-want-report-chip">
+            <button
+              type="button"
+              class="bar__flag"
+              title="点击取消「完成后生成报告」"
+              @click="ai.wantReport = false"
+            >
+              <IIcon name="file-text" :size="11" />
+              <span>生成报告</span>
+              <span class="bar__flag-x" aria-hidden="true">×</span>
+            </button>
+          </div>
           <textarea
             ref="inputEl"
             v-model="text"
@@ -487,31 +509,14 @@ watch(
             <button
               type="button"
               class="bar__tbtn"
-              title="上传附件"
-              aria-label="上传附件"
-              data-testid="ai-attach"
-              :disabled="uploading || running"
-              @click="openFilePicker"
-            >
-              <IIcon name="paperclip" :size="15" />
-            </button>
-            <button
-              type="button"
-              class="bar__perm"
-              :class="{ 'bar__perm--on': menuMode === 'permissions' }"
-              title="操作权限"
-              aria-label="操作权限"
+              :class="{ 'bar__tbtn--on': menuMode === 'permissions' }"
+              :title="`操作权限：${permissionOption.label}`"
+              :aria-label="`操作权限：${permissionOption.label}`"
               data-testid="ai-permission"
               @click="menuMode = menuMode === 'permissions' ? null : 'permissions'"
             >
-              <IIcon :name="permissionOption.icon" :size="13" class="bar__perm-icon" />
-              <span class="bar__perm-name is-ellipsis">{{ permissionOption.label }}</span>
-              <IIcon name="chevron-down" :size="12" />
+              <IIcon :name="permissionOption.icon" :size="14" />
             </button>
-            <label class="bar__report" title="分析任务完成后自动创建/更新科研风格报告节点" data-testid="ai-want-report">
-              <input v-model="ai.wantReport" type="checkbox" />
-              <span>完成后生成报告</span>
-            </label>
             <span class="bar__spacer" />
             <button
               type="button"
@@ -526,14 +531,18 @@ watch(
               <span class="bar__model-name is-ellipsis">{{ ai.effectiveModel || '未配置' }}</span>
               <IIcon name="chevron-down" :size="12" />
             </button>
-            <span
+            <button
+              type="button"
               class="bar__ctx"
               data-testid="ai-ctx"
-              :title="`模型可见上下文约 ${ai.contextTokens} tokens；达到上限 80% 时自动压缩，也可手动压缩`"
+              :aria-expanded="showCompress"
+              :title="`模型可见上下文约 ${ai.contextTokens} tokens；点击展开压缩。达到上限 80% 时自动压缩`"
+              @click="ctxExpanded = !ctxExpanded"
             >
-              上下文 {{ formatTokens(ai.contextTokens) }}/{{ formatTokens(CONTEXT_TOKEN_LIMIT) }}
-            </span>
+              {{ formatTokens(ai.contextTokens) }}/{{ formatTokens(CONTEXT_TOKEN_LIMIT) }}
+            </button>
             <button
+              v-if="showCompress"
               type="button"
               class="bar__compress"
               :disabled="!ai.compressible || running"
@@ -555,7 +564,7 @@ watch(
       </template>
 
       <template #default>
-        <!-- +：引用 + 指令两组 -->
+        <!-- +：附件 / 引用 / 指令 / 选项 -->
         <div v-if="menuMode === 'plus'" class="bar__menu" role="menu">
           <div class="bar__menu-title">附件</div>
           <button type="button" class="bar__menu-item" role="menuitem" data-testid="ai-upload-menu" @click="openFilePicker">
@@ -569,6 +578,21 @@ watch(
           <div class="bar__menu-title">快捷指令</div>
           <button v-for="c in SLASH_COMMANDS" :key="c.key" type="button" class="bar__menu-item" role="menuitem" @click="applySlash(c)">
             <span class="bar__menu-slash">/</span>{{ c.key }}
+          </button>
+          <div class="bar__menu-title">选项</div>
+          <button
+            type="button"
+            class="bar__menu-item"
+            role="menuitemcheckbox"
+            :aria-checked="ai.wantReport"
+            data-testid="ai-want-report"
+            title="分析任务完成后自动创建/更新科研风格报告节点"
+            @click="toggleWantReport"
+          >
+            <IIcon v-if="ai.wantReport" name="check" :size="12" class="bar__menu-check" />
+            <span v-else class="bar__menu-check-space" />
+            <IIcon name="file-text" :size="12" class="bar__menu-icon" />
+            完成后生成报告
           </button>
         </div>
         <!-- 内联 @：过滤后的引用 -->
@@ -846,52 +870,31 @@ watch(
   opacity: 0.45;
   cursor: not-allowed;
 }
-.bar__perm {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 140px;
-  padding: 3px 8px;
-  border: none;
-  border-radius: var(--is-radius-full);
-  background: transparent;
-  color: var(--is-text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  flex-shrink: 0;
+.bar__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 10px 2px;
 }
-.bar__perm:hover,
-.bar__perm--on {
-  background: var(--is-surface-hover);
-  color: var(--is-text);
-}
-.bar__perm-icon {
-  color: var(--is-warning, #b45309);
-  flex-shrink: 0;
-}
-.bar__perm-name {
-  min-width: 0;
-}
-.bar__report {
+.bar__flag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 6px;
-  border-radius: var(--is-radius-full);
-  color: var(--is-text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  flex-shrink: 0;
-  user-select: none;
-  white-space: nowrap;
-}
-.bar__report:hover {
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--is-border);
   background: var(--is-surface-hover);
+  font-size: 11px;
+  color: var(--is-text-secondary);
+  cursor: pointer;
+}
+.bar__flag:hover {
   color: var(--is-text);
 }
-.bar__report input {
-  margin: 0;
-  accent-color: var(--is-accent, #2563eb);
+.bar__flag-x {
+  margin-left: 2px;
+  opacity: 0.55;
 }
 .bar__model {
   display: inline-flex;
@@ -928,11 +931,20 @@ watch(
   flex: 1;
 }
 .bar__ctx {
+  padding: 3px 6px;
+  border: none;
+  border-radius: var(--is-radius-full);
+  background: transparent;
   font-size: 11px;
   color: var(--is-text-tertiary);
   white-space: nowrap;
-  cursor: default;
+  cursor: pointer;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.bar__ctx:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text-secondary);
 }
 .bar__compress {
   padding: 3px 8px;
