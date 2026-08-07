@@ -36,9 +36,22 @@ export function planNudgeMessage(steps: string[], done: number[] | undefined): s
 
 export function continueTaskSystemMessage(steps: string[], done: number[] | undefined): string {
   const pending = pendingPlanSteps(steps, done)
+  const doneList = (done ?? [])
+    .slice()
+    .sort((a, b) => a - b)
+    .map((i) => `${i + 1}. ${steps[i] ?? ''}`)
+    .filter((s) => s.length > 3)
   if (!pending.length) {
-    return '请检查是否还有未完成的用户目标；若已完成请简要确认产物。'
+    return '请检查是否还有未完成的用户目标；若已完成请简要确认产物。禁止重新 submit_plan。'
   }
   const list = pending.map((p) => `${p.index + 1}. ${p.text}`).join('\n')
-  return `【续跑检查点】用户要求继续完成未竟任务。已完成步骤勿重复。剩余：\n${list}\n从下一步继续执行，用 mark_step_done 更新进展，全部完成后再总结。`
+  const doneBlock = doneList.length ? `已完成（勿重复执行）：\n${doneList.join('\n')}\n` : ''
+  return `【续跑检查点】从断点继续，不要重做已完成工作。
+${doneBlock}剩余（仅做这些）：
+${list}
+硬性要求：
+1. 禁止再次调用 submit_plan（计划已存在，重置会丢掉进度）。
+2. 已完成步骤的产物若上下文/工具历史中已有，直接复用。
+3. 从未完成的最小 index 继续；每完成一步 mark_step_done(index)。
+4. 禁止过程独白；直接 tool_calls。全部完成后简短总结。`
 }

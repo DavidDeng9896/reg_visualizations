@@ -215,6 +215,10 @@ async function onContinue(): Promise<void> {
   await ai.continueTask()
 }
 
+function onDismissContinue(): void {
+  ai.dismissContinueTask()
+}
+
 watch(text, () => void nextTick(autosize))
 watch(
   () => ai.drawerOpen,
@@ -231,6 +235,16 @@ watch(
         继续任务
       </button>
       <span class="bar__continue-hint">计划尚未全部完成，可从检查点续跑</span>
+      <button
+        type="button"
+        class="bar__continue-dismiss"
+        title="关闭，不再提示继续"
+        aria-label="关闭继续任务"
+        data-testid="ai-continue-dismiss"
+        @click="onDismissContinue"
+      >
+        ×
+      </button>
     </div>
     <!-- 抽屉是 --is-z-modal(1300)，菜单要提到 --is-z-dropdown(1350) 否则被抽屉盖住点不中 -->
     <IPopover :open="menuMode !== null" placement="top-start" :arrow="false" z-index="var(--is-z-dropdown)" @update:open="menuMode = $event ? menuMode : null">
@@ -411,6 +425,27 @@ watch(
 .bar__continue-hint {
   font-size: 11px;
   color: var(--is-text-tertiary);
+  flex: 1;
+  min-width: 0;
+}
+.bar__continue-dismiss {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--is-radius-sm);
+  background: transparent;
+  color: var(--is-text-tertiary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bar__continue-dismiss:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
 }
 /* IPopover 根节点默认 inline-block（按钮锚点用），输入条场景要撑满整行 */
 .bar :deep(.is-popover),
