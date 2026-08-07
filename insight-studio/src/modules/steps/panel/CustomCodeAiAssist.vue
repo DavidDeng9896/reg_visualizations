@@ -5,7 +5,7 @@
  */
 import { computed, ref } from 'vue'
 import type { StepNode } from '../../../shared/types'
-import { postChat, readSseStream, type ChatMessage } from '../../ai/client'
+import { contentText, postChat, readSseStream, type ChatMessage } from '../../ai/client'
 import { IButton, IIcon, ITextField } from '../../../ui'
 
 const props = defineProps<{
@@ -76,8 +76,8 @@ async function send() {
     const msg = await readSseStream(res, (t) => {
       draft.value += t
     })
-    const finalText = msg.content ?? draft.value
-    draft.value = finalText ?? draft.value
+    const finalText = contentText(msg.content) || draft.value
+    draft.value = finalText || draft.value
     prompt.value = ''
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : String(e)

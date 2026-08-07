@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/aifiles"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/mcp"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/memory"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
@@ -12,12 +13,13 @@ import (
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userscope"
 )
 
-// userStores caches per-user Skills/MCP/memory stores keyed by user id.
+// userStores caches per-user Skills/MCP/memory/files stores keyed by user id.
 type userStores struct {
-	mu      sync.Mutex
-	skills  map[string]*skills.Store
-	mcp     map[string]*mcp.Store
-	memory  map[string]*memory.Store
+	mu     sync.Mutex
+	skills map[string]*skills.Store
+	mcp    map[string]*mcp.Store
+	memory map[string]*memory.Store
+	files  map[string]*aifiles.Store
 }
 
 func newUserStores() *userStores {
@@ -25,6 +27,7 @@ func newUserStores() *userStores {
 		skills: map[string]*skills.Store{},
 		mcp:    map[string]*mcp.Store{},
 		memory: map[string]*memory.Store{},
+		files:  map[string]*aifiles.Store{},
 	}
 }
 
@@ -82,6 +85,24 @@ func (s *Server) memoryFor(r *http.Request) (*memory.Store, error) {
 		return nil, err
 	}
 	s.stores.memory[uid] = st
+	return st, nil
+}
+
+func (s *Server) filesFor(r *http.Request) (*aifiles.Store, error) {
+	if s.DataDir == "" {
+		return s.Files, nil
+	}
+	uid := userid.FromRequest(r)
+	s.stores.mu.Lock()
+	defer s.stores.mu.Unlock()
+	if st, ok := s.stores.files[uid]; ok {
+		return st, nil
+	}
+	st, err := aifiles.NewStore(userscope.UserRoot(s.DataDir, uid))
+	if err != nil {
+		return nil, err
+	}
+	s.stores.files[uid] = st
 	return st, nil
 }
 

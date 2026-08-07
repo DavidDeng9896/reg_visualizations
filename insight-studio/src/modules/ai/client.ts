@@ -12,12 +12,27 @@ export interface ToolCall {
   function: { name: string; arguments: string }
 }
 
+/** 多模态内容块（OpenAI vision：文本 + 图片 data URL）。 */
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content?: string | null
+  content?: string | ContentPart[] | null
   tool_calls?: ToolCall[]
   tool_call_id?: string
   name?: string
+}
+
+/** 从消息 content 取出纯文本（多模态时拼接 text parts）。 */
+export function contentText(content: string | ContentPart[] | null | undefined): string {
+  if (content == null) return ''
+  if (typeof content === 'string') return content
+  return content
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n')
 }
 
 export interface ChatPayload {
@@ -343,4 +358,56 @@ export const aiMemoriesApi = {
     req<AiMemory>('/api/ai/memories', { method: 'POST', body: JSON.stringify({ content }) }, { withUser: true }),
   remove: (id: string) =>
     req<void>(`/api/ai/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
+}
+
+/* ------------------------------- 聊天附件 Files ------------------------------- */
+
+export type AiFileKind = 'csv' | 'text' | 'pdf' | 'excel' | 'image' | 'other'
+
+export interface AiFileMeta {
+  id: string
+  name: string
+  mime: string
+  sizeBytes: number
+  createdAt: string
+  kind: AiFileKind
+}
+
+export const aiFilesApi = {
+  list: () => req<AiFileMeta[]>('/api/ai/files', undefined, { withUser: true }),
+  meta: (id: string) =>
+    req<AiFileMeta>(`/api/ai/files/${encodeURIComponent(id)}/meta`, undefined, { withUser: true }),
+  remove: (id: string) =>
+    req<void>(`/api/ai/files/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
+  upload: async (file: File): Promise<AiFileMeta> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/ai/files', {
+      method: 'POST',
+      body: fd,
+      headers: userHeaders(),
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      let msg = text
+      try {
+        const j = JSON.parse(text) as { error?: string; message?: string }
+        msg = j.message || j.error || text
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`上传失败（${res.status}）：${msg}`)
+    }
+    return JSON.parse(text) as AiFileMeta
+  },
+  downloadBlob: async (id: string): Promise<Blob> => {
+    const res = await fetch(`/api/ai/files/${encodeURIComponent(id)}`, {
+      headers: userHeaders(),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`下载失败（${res.status}）：${text.slice(0, 200)}`)
+    }
+    return res.blob()
+  },
 }

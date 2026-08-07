@@ -74,6 +74,10 @@ import {
   ArrowUp,
   ShieldCheck,
   CircleAlert,
+  Paperclip,
+  File,
+  FileText,
+  Image,
 } from 'lucide-vue-next'
 
 export type IconName =
@@ -148,6 +152,10 @@ export type IconName =
   | 'history'
   | 'shield-check'
   | 'circle-alert'
+  | 'paperclip'
+  | 'file'
+  | 'file-text'
+  | 'image'
 
 export const ICONS: Record<IconName, FunctionalComponent> = {
   'type-text': Type,
@@ -221,4 +229,8 @@ export const ICONS: Record<IconName, FunctionalComponent> = {
   history: History,
   'shield-check': ShieldCheck,
   'circle-alert': CircleAlert,
+  paperclip: Paperclip,
+  file: File,
+  'file-text': FileText,
+  image: Image,
 }

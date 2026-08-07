@@ -1,6 +1,7 @@
 /** 当前分析上下文构建：表结构/样例行/步骤图摘要 + @引用块。 */
 import type { Analysis, AnalysisTable } from '../../shared/types'
 import { CONTEXT_HEADER } from './prompts'
+import type { AttachmentKind } from './attachments'
 
 function tableBrief(t: AnalysisTable, withSample = true): string {
   const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
@@ -35,18 +36,25 @@ export type MentionTarget =
   | { kind: 'analysis' }
   | { kind: 'table'; tableId: string }
   | { kind: 'view'; tableId: string; viewId: string }
+  | { kind: 'attachment'; fileId: string; name?: string; fileKind?: AttachmentKind }
 
-/** 生成 @ 引用的补充上下文文本。 */
+/** 生成 @ 引用的补充上下文文本。无分析时仍可处理附件引用。 */
 export function buildMentionContext(analysis: Analysis | null, targets: MentionTarget[]): string {
-  if (!targets.length || !analysis) return ''
+  if (!targets.length) return ''
   const parts: string[] = []
   for (const target of targets) {
+    if (target.kind === 'attachment') {
+      const label = target.name?.trim() || target.fileId
+      parts.push(`用户特别引用了附件「${label}」(id: ${target.fileId})。`)
+      continue
+    }
+    if (!analysis) continue
     if (target.kind === 'analysis') {
       parts.push(`用户特别引用了整个分析「${analysis.name}」。`)
     } else if (target.kind === 'table') {
       const t = analysis.tables.find((x) => x.id === target.tableId)
       if (t) parts.push(`用户特别引用了表：\n${tableBrief(t)}`)
-    } else {
+    } else if (target.kind === 'view') {
       const t = analysis.tables.find((x) => x.id === target.tableId)
       const v = t?.views.find((x) => x.id === target.viewId)
       if (t && v) {

@@ -8,6 +8,7 @@ import ArtifactCard from './ArtifactCard.vue'
 import ReasoningCard from './ReasoningCard.vue'
 import AskCard from './AskCard.vue'
 import { useAiStore, type TraceItem, type UiMessage } from './aiStore'
+import { attachmentKindIcon } from './mentionIcons'
 
 /** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
 const props = defineProps<{
@@ -185,7 +186,13 @@ function displayContent(m: UiMessage): string {
         上下文已压缩 · 早前对话已折叠为摘要
       </div>
       <div v-else-if="m.role === 'user'" class="msg__user">
-        <div class="msg__user-text">{{ m.content }}</div>
+        <div v-if="m.content" class="msg__user-text">{{ m.content }}</div>
+        <div v-if="m.attachments?.length" class="msg__atts" data-testid="ai-msg-atts">
+          <span v-for="att in m.attachments" :key="att.id" class="msg__att">
+            <IIcon :name="attachmentKindIcon(att.kind)" :size="11" />
+            <span class="msg__att-name">{{ att.name }}</span>
+          </span>
+        </div>
         <div v-if="m.at" class="msg__time">{{ fmtTime(m.at) }}</div>
       </div>
       <template v-else>
@@ -255,6 +262,30 @@ function displayContent(m: UiMessage): string {
   word-break: break-word;
   text-align: left;
   display: inline-block;
+}
+.msg__atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.msg__att {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--is-radius-full);
+  background: var(--is-surface-muted, var(--is-surface-hover));
+  color: var(--is-text-secondary);
+  font-size: 11px;
+  max-width: 100%;
+}
+.msg__att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
 }
 .msg__time {
   margin-top: 3px;

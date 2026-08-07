@@ -39,6 +39,7 @@
     "lucide-vue-next": "^1.0.0",
     "mysql2": "^3.23.1",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^4.10.38",
     "pg": "^8.22.0",
     "pinia": "^3.0.3",
     "plotly.js-dist-min": "^3.7.0",

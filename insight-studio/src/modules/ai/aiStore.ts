@@ -1,10 +1,29 @@
 import { defineStore } from 'pinia'
 import { runAgent, MaxIterError, type AgentEvent, type AskRequest, type ToolExecutor } from './agentLoop'
-import { aiConfigApi, aiConvApi, aiMcpApi, aiMemoriesApi, aiSkillsApi, type AiPublicConfig, type ConversationMeta } from './client'
+import {
+  aiConfigApi,
+  aiConvApi,
+  aiFilesApi,
+  aiMcpApi,
+  aiMemoriesApi,
+  aiSkillsApi,
+  type AiFileMeta,
+  type AiPublicConfig,
+  type ContentPart,
+  type ConversationMeta,
+} from './client'
 import type { ChatMessage, ChatPayload, ToolCall } from './client'
 import { OPENAI_TOOLS } from './tools/registry'
 import { execTool } from './tools/impl'
 import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
+import {
+  blobToDataUrl,
+  buildAttachmentContext,
+  importAttachmentAsTables,
+  serializeAttachment,
+  type ChatAttachment,
+  type ChatAttachmentSnapshot,
+} from './attachments'
 import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
@@ -58,6 +77,8 @@ export interface UiMessage {
   interactionNotes?: string
   /** 本轮 runAgent 追加的模型可见消息尾（assistant/tool 交替），确认/拒绝后重入循环续轮用。 */
   rawTail?: ChatMessage[]
+  /** 用户本轮附件快照（持久化）。 */
+  attachments?: ChatAttachmentSnapshot[]
 }
 
 interface AiState {
@@ -77,6 +98,8 @@ interface AiState {
   pendingAsk: { id: string; question: string; options: string[]; allowOther: boolean } | null
   /** 对话窗模式：停靠 | 悬浮（与 AiDrawer 同步，供 FAB 显隐）。 */
   panelMode: 'docked' | 'floating'
+  /** 当前用户最近上传的附件列表（@ 引用用）。 */
+  sessionFiles: AiFileMeta[]
 }
 
 let uid = 0
@@ -105,6 +128,7 @@ export const useAiStore = defineStore('ai', {
     abort: null,
     pendingAsk: null,
     panelMode: 'docked',
+    sessionFiles: [],
   }),
 
   getters: {
@@ -173,12 +197,14 @@ export const useAiStore = defineStore('ai', {
         this.config = null
       }
       await this.refreshConversations()
+      void this.refreshSessionFiles()
     },
 
     /** 打开抽屉时尽量复用已加载配置，避免重复请求拖慢二次打开。 */
     async warmInit() {
       if (this.config) {
         void this.refreshConversations()
+        void this.refreshSessionFiles()
         return
       }
       await this.init()
@@ -189,6 +215,14 @@ export const useAiStore = defineStore('ai', {
         this.conversations = await aiConvApi.list()
       } catch {
         this.conversations = []
+      }
+    },
+
+    async refreshSessionFiles() {
+      try {
+        this.sessionFiles = await aiFilesApi.list()
+      } catch {
+        this.sessionFiles = []
       }
     },
 
@@ -244,10 +278,11 @@ export const useAiStore = defineStore('ai', {
       this.panelMode = mode
     },
 
-    /** 发送用户消息并跑 agent-loop。 */
-    async send(text: string, mentions: MentionTarget[] = []): Promise<void> {
+    /** 发送用户消息并跑 agent-loop。允许纯附件（无文字）。 */
+    async send(text: string, mentions: MentionTarget[] = [], attachments: ChatAttachment[] = []): Promise<void> {
       const input = text.trim()
-      if (!input || this.running) return
+      const atts = attachments.slice()
+      if ((!input && !atts.length) || this.running) return
       autoContinueCount = 0
       // 新一轮前先清掉历史消息上残留的 streaming/running，避免旧进展继续转圈
       clearTransientProgress(this.messages)
@@ -255,7 +290,17 @@ export const useAiStore = defineStore('ai', {
       // 上下文超过阈值（上限 80%）先自动压缩：最近 2 个用户轮保留，更早历史折叠为摘要
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
-      this.messages.push({ id: nextId(), role: 'user', content: input, trace: [], artifacts: [], at: Date.now() })
+      const userContent =
+        input || (atts.length ? `（附件：${atts.map((a) => a.name).join('、')}）` : '')
+      this.messages.push({
+        id: nextId(),
+        role: 'user',
+        content: userContent,
+        trace: [],
+        artifacts: [],
+        at: Date.now(),
+        ...(atts.length ? { attachments: atts.map(serializeAttachment) } : {}),
+      })
       // 必须经 store 的响应式数组取回 proxy 再改，直接改原始对象不触发视图更新
       this.messages.push({ id: nextId(), role: 'assistant', content: '', trace: [], artifacts: [], streaming: true, at: Date.now() })
       const assistant = this.messages[this.messages.length - 1] as UiMessage
@@ -263,6 +308,20 @@ export const useAiStore = defineStore('ai', {
       this.running = true
       this.abort = new AbortController()
       const ac = this.abort
+
+      // 导入为分析表（失败写入助手错误，仍尽量继续）
+      try {
+        for (const att of atts) {
+          if (att.importAsTable) await importAttachmentAsTables(att)
+        }
+      } catch (e) {
+        assistant.error = e instanceof Error ? e.message : String(e)
+        assistant.streaming = false
+        this.running = false
+        this.abort = null
+        await this.persist()
+        return
+      }
 
       const analysis = useAnalysisStore().current
       const chatMessages: ChatMessage[] = [
@@ -274,6 +333,36 @@ export const useAiStore = defineStore('ai', {
       ]
       const mentionCtx = buildMentionContext(analysis, mentions)
       if (mentionCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: mentionCtx })
+
+      try {
+        const attachCtx = await buildAttachmentContext(atts)
+        if (attachCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: attachCtx })
+      } catch {
+        /* 附件上下文失败时跳过 */
+      }
+
+      // 图片走 vision：替换最后一条 user 消息为 multimodal
+      const imageAtts = atts.filter((a) => a.kind === 'image' && a.forAi)
+      if (imageAtts.length) {
+        const parts: ContentPart[] = [
+          { type: 'text', text: input || '请结合附图进行分析。' },
+        ]
+        for (const img of imageAtts) {
+          try {
+            const blob = await aiFilesApi.downloadBlob(img.id)
+            const url = await blobToDataUrl(blob)
+            parts.push({ type: 'image_url', image_url: { url } })
+          } catch {
+            /* 单张失败跳过 */
+          }
+        }
+        for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
+          if (chatMessages[i].role === 'user') {
+            chatMessages[i] = { role: 'user', content: parts }
+            break
+          }
+        }
+      }
 
       // Skills 目录摘要（失败时降级为空，不影响内置工具）
       try {
@@ -711,7 +800,19 @@ export const useAiStore = defineStore('ai', {
       if (!lastUser || this.running) return
       if (lastAssistant?.role === 'assistant') this.messages.pop()
       this.messages.pop() // 去掉原 user 消息，重发
-      await this.send(lastUser.content)
+      const atts: ChatAttachment[] = (lastUser.attachments ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        mime: a.mime,
+        sizeBytes: a.sizeBytes,
+        kind: a.kind,
+        forAi: a.forAi,
+        importAsTable: a.importAsTable,
+        selectedSheets: a.selectedSheets ? [...a.selectedSheets] : undefined,
+      }))
+      // 重试时避免重复导入表
+      for (const a of atts) a.importAsTable = false
+      await this.send(lastUser.content, [], atts)
     },
 
     async persist(): Promise<void> {
