@@ -685,11 +685,16 @@ export const useAiStore = defineStore('ai', {
 /** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用）。 */
 function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
   return (e) => {
-    if (e.type === 'token') {
+    if (e.type === 'round') {
+      // 每轮重新累计可见正文；工具轮独白会在 tool_call 时清空，避免多轮复读堆进气泡
+      assistant.content = ''
+    } else if (e.type === 'token') {
       assistant.content += e.text
     } else if (e.type === 'reasoning') {
       assistant.reasoning = (assistant.reasoning ?? '') + e.text
     } else if (e.type === 'tool_call') {
+      // 本轮若进入工具调用，过程独白不展示（进展看 TraceCard）
+      assistant.content = ''
       let args: Record<string, unknown> = {}
       try {
         args = JSON.parse(e.call.function.arguments || '{}') as Record<string, unknown>
@@ -703,7 +708,7 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
         running: true,
         summary: '',
       })
-    } else     if (e.type === 'tool_result') {
+    } else if (e.type === 'tool_result') {
       // 同 id 重复（模型偶发复用 call id）时优先匹配仍在 running 的那条；
       // 确认通道会二次发 tool_result（先 needsConfirmation，再最终结果）。
       const item =
