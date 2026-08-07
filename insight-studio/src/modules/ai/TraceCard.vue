@@ -3,7 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
 
-/** 工具调用轨迹卡：「已处理 N 个操作」默认折叠，展开看每步详情；待确认可外露或由上层悬浮区接管。 */
+/**
+ * 工具调用轨迹卡：
+ * - 标题「已处理 N 个操作（完成 M）」；任一子项 running 时标题与子项文字 shimmer
+ * - 进行中保持折叠；待确认审批卡始终外露
+ * - 展开后子项默认一行（名+状态），点开再看参数/结果
+ */
 const props = withDefaults(
   defineProps<{
     items: TraceItem[]
@@ -13,26 +18,49 @@ const props = withDefaults(
   }>(),
   { hidePending: false },
 )
+
+defineEmits<{
+  (e: 'confirm', t: TraceItem): void
+  (e: 'reject', t: TraceItem): void
+}>()
+
 const expanded = ref(false)
+/** 已展开明细的子项 id。 */
+const openDetail = ref<Set<string>>(new Set())
+
 const doneCount = computed(() => props.items.filter((t) => !t.running).length)
+/** 任一子操作仍在执行 → 进行中（与整轮 streaming 解耦）。 */
+const inProgress = computed(() => props.items.some((t) => t.running))
+
 const pending = computed(() => {
   const seen = new Set<string>()
   return props.items.filter((t) => {
     if (!t.needsConfirmation || t.confirmed || t.rejected) return false
-    // 模型偶尔重复发起同一删除，去重避免确认按钮堆叠
     if (seen.has(t.summary)) return false
     seen.add(t.summary)
     return true
   })
 })
-watch(
-  pending,
-  (p) => {
-    // 有待确认操作时自动展开，让上下文可见
-    if (p.length) expanded.value = true
-  },
-  { immediate: true },
-)
+
+watch(inProgress, (busy) => {
+  // 进行中强制折叠；完成后不自动展开，由用户点开
+  if (busy) expanded.value = false
+})
+
+function toggleDetail(id: string): void {
+  const next = new Set(openDetail.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  openDetail.value = next
+}
+
+function isDetailOpen(id: string): boolean {
+  return openDetail.value.has(id)
+}
+
+function hasDetail(t: TraceItem): boolean {
+  return !!(briefArgs(t) || t.summary)
+}
 
 function briefArgs(t: TraceItem): string {
   if (!t.args) return ''
@@ -40,42 +68,76 @@ function briefArgs(t: TraceItem): string {
   return s.length > 90 ? `${s.slice(0, 90)}…` : s
 }
 
-/** 审批卡展示的具体操作描述（去协议前缀与续轮提示后缀）。 */
 function pendingAction(t: TraceItem): string {
   return (t.summary || '')
     .replace(/^NEEDS_CONFIRMATION:\s*/, '')
     .split('。不要重试')[0]
 }
+
+const headLabel = computed(() => `已处理 ${props.items.length} 个操作（完成 ${doneCount.value}）`)
 </script>
 
 <template>
-  <div class="trace" data-testid="ai-trace">
-    <button type="button" class="trace__head" :aria-expanded="expanded" @click="expanded = !expanded">
+  <div class="trace" data-testid="ai-trace" :data-in-progress="inProgress || undefined">
+    <button
+      type="button"
+      class="trace__head"
+      :aria-expanded="expanded"
+      data-testid="ai-trace-head"
+      @click="expanded = !expanded"
+    >
       <IIcon name="chevron-right" :size="12" class="trace__chev" :class="{ 'trace__chev--open': expanded }" />
-      <span>已处理 {{ items.length }} 个操作（完成 {{ doneCount }}）</span>
-      <IIcon v-if="streaming" name="spinner" :size="12" class="trace__spin" />
+      <span class="trace__head-text" :class="{ 'trace__shimmer': inProgress }">{{ headLabel }}</span>
     </button>
-    <div v-if="expanded" class="trace__list">
+
+    <div v-if="expanded" class="trace__list" data-testid="ai-trace-list">
       <div
         v-for="t in items"
         :key="t.id"
         class="trace__item"
-        :class="{ 'trace__item--fail': t.ok === false && (!t.needsConfirmation || !!t.rejected) }"
+        :class="{
+          'trace__item--fail': t.ok === false && (!t.needsConfirmation || !!t.rejected),
+          'trace__item--open': isDetailOpen(t.id),
+        }"
       >
-        <div class="trace__row">
+        <button
+          type="button"
+          class="trace__row"
+          :disabled="!hasDetail(t)"
+          :aria-expanded="isDetailOpen(t.id)"
+          :data-testid="`ai-trace-item-${t.id}`"
+          @click="hasDetail(t) && toggleDetail(t.id)"
+        >
           <span class="trace__status">
             <IIcon v-if="t.running" name="spinner" :size="11" class="trace__spin" />
-            <IIcon v-else-if="t.needsConfirmation && !t.confirmed && !t.rejected" name="warning" :size="11" class="trace__warn" />
+            <IIcon
+              v-else-if="t.needsConfirmation && !t.confirmed && !t.rejected"
+              name="warning"
+              :size="11"
+              class="trace__warn"
+            />
             <IIcon v-else-if="t.ok" name="check" :size="11" class="trace__ok" />
             <IIcon v-else name="close" :size="11" class="trace__fail" />
           </span>
-          <span class="trace__name">{{ t.name }}</span>
+          <span class="trace__name" :class="{ 'trace__shimmer': t.running }">{{ t.name }}</span>
+          <IIcon
+            v-if="hasDetail(t)"
+            name="chevron-right"
+            :size="11"
+            class="trace__item-chev"
+            :class="{ 'trace__item-chev--open': isDetailOpen(t.id) }"
+          />
+        </button>
+        <div v-if="isDetailOpen(t.id)" class="trace__detail">
+          <div v-if="briefArgs(t)" class="trace__args">{{ briefArgs(t) }}</div>
+          <div v-if="t.summary" class="trace__summary">
+            {{ t.needsConfirmation ? pendingAction(t) : t.summary }}
+          </div>
         </div>
-        <div v-if="briefArgs(t)" class="trace__args">{{ briefArgs(t) }}</div>
-        <div v-if="t.summary" class="trace__summary">{{ t.needsConfirmation ? pendingAction(t) : t.summary }}</div>
       </div>
     </div>
-    <!-- 待确认操作：折叠状态下也始终外露的审批卡（可被 hidePending 关掉） -->
+
+    <!-- 待确认：折叠状态下也始终外露（可被 hidePending 关掉） -->
     <template v-if="!hidePending">
       <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
         <div class="trace__pending-head">
@@ -99,12 +161,6 @@ function pendingAction(t: TraceItem): string {
   </div>
 </template>
 
-<script lang="ts">
-export default {
-  emits: ['confirm', 'reject'],
-}
-</script>
-
 <style scoped>
 .trace {
   margin: 4px 0;
@@ -125,14 +181,55 @@ export default {
 .trace__head:hover {
   color: var(--is-text-secondary);
 }
+.trace__head-text {
+  min-width: 0;
+}
 .trace__chev {
   transition: transform var(--is-dur-fast) var(--is-ease);
+  flex-shrink: 0;
 }
 .trace__chev--open {
   transform: rotate(90deg);
 }
+
+/* 光影掠过：进行中标题 / running 子项名 */
+.trace__shimmer {
+  background: linear-gradient(
+    105deg,
+    var(--is-text-tertiary) 0%,
+    var(--is-text-tertiary) 38%,
+    color-mix(in srgb, var(--is-text) 88%, #fff) 50%,
+    var(--is-text-tertiary) 62%,
+    var(--is-text-tertiary) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: tr-shimmer 1.6s ease-in-out infinite;
+}
+.trace__name.trace__shimmer {
+  background-image: linear-gradient(
+    105deg,
+    var(--is-text) 0%,
+    var(--is-text) 38%,
+    color-mix(in srgb, var(--is-accent) 55%, #fff) 50%,
+    var(--is-text) 62%,
+    var(--is-text) 100%
+  );
+  background-size: 220% 100%;
+}
+@keyframes tr-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .trace__spin {
-  margin-left: auto;
   animation: tr-spin 1s linear infinite;
   color: var(--is-accent);
 }
@@ -144,20 +241,34 @@ export default {
 .trace__list {
   border-top: 1px dashed var(--is-border);
   margin-top: 4px;
-  padding: 8px 0 4px 2px;
+  padding: 6px 0 4px 2px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 2px;
   max-height: 260px;
   overflow-y: auto;
 }
 .trace__item {
   font-size: var(--is-text-xs);
+  border-radius: var(--is-radius-sm);
 }
 .trace__row {
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  padding: 4px 4px 4px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--is-radius-sm);
+}
+.trace__row:hover:not(:disabled) {
+  background: var(--is-surface-hover);
+}
+.trace__row:disabled {
+  cursor: default;
 }
 .trace__status {
   display: inline-flex;
@@ -175,20 +286,32 @@ export default {
   color: var(--is-warning-text);
 }
 .trace__name {
+  flex: 1;
+  min-width: 0;
   font-weight: 500;
   color: var(--is-text);
   font-family: var(--is-font-mono);
   font-size: 11px;
 }
+.trace__item-chev {
+  flex-shrink: 0;
+  color: var(--is-text-tertiary);
+  transition: transform var(--is-dur-fast) var(--is-ease);
+}
+.trace__item-chev--open {
+  transform: rotate(90deg);
+}
+.trace__detail {
+  padding: 0 4px 6px 20px;
+}
 .trace__args {
-  margin: 2px 0 0 20px;
   color: var(--is-text-tertiary);
   font-family: var(--is-font-mono);
   font-size: 11px;
   word-break: break-all;
 }
 .trace__summary {
-  margin: 2px 0 0 20px;
+  margin-top: 2px;
   color: var(--is-text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
