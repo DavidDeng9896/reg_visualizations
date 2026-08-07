@@ -478,6 +478,30 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(messages.some((m) => m.role === 'tool' && m.name === 'create_view')).toBe(true)
     expect(messages.some((m) => m.role === 'assistant' && m.content === '已建图')).toBe(true)
   })
+
+  it('workerStrict：已有落地工具后短总结可收工（不因文案短误催促）', async () => {
+    let nudgeCount = 0
+    const post = async (p: ChatPayload) => {
+      if (p.messages.some((m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('工人未完成'))) {
+        nudgeCount += 1
+      }
+      const tools = p.messages.filter((m) => m.role === 'tool').length
+      if (tools === 0) return sseOf({ toolCalls: [call('create_view', { type: 'line' }, 'cv1')] })
+      return sseOf({ content: '完成' }) // 短总结
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: '出图' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'ok' }),
+      maxIterations: 6,
+      planGate: false,
+      workerStrict: true,
+      onEvent: () => {},
+      postChatFn: post,
+    })
+    expect(nudgeCount).toBe(0)
+    expect(messages.some((m) => m.role === 'assistant' && m.content === '完成')).toBe(true)
+  })
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */

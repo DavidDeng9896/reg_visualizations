@@ -224,11 +224,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
         continue
       }
 
-      // Worker：禁止只读 schema / 空回复就收工
+      // Worker：禁止只读探路就收工；已有落地工具时允许短总结结束（勿因文案<24字误催促）
       if (workerStrict && workerNudges < MAX_WORKER_NUDGES) {
         const onlyExplored = workerOnlyExplored(messages)
-        const emptyOrWeak = !text || text.length < 24
-        if (onlyExplored || emptyOrWeak) {
+        const noToolsYet = !messages.some((m) => m.role === 'tool')
+        if (onlyExplored || (noToolsYet && !text)) {
           workerNudges += 1
           const last = messages[messages.length - 1]
           if (last?.role === 'assistant') {
@@ -327,6 +327,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
             workerName: name,
             goal,
             parentTools: opts.tools,
+            parentMessages: messages,
             parent: {
               exec,
               model: opts.model,

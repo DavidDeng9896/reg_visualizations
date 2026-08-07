@@ -5,6 +5,7 @@ import type { ChatMessage, ChatPayload } from '../client'
 import { contentText } from '../client'
 import type { AgentEvent, RunAgentOptions, ToolExecResult } from '../agentLoop'
 import { clipToolResult } from '../taskState'
+import { CONTEXT_HEADER } from '../prompts'
 import { OPENAI_TOOLS } from './registry'
 
 export type WorkerKind = 'skill' | 'mcp' | 'analysis' | 'code'
@@ -28,6 +29,13 @@ export const WORKER_READ_ONLY_TOOLS = new Set([
   'read_skill',
 ])
 
+/** 分析/代码工人速查：补全冷启动缺失的平台知识。 */
+const WORKER_PLATFORM_BRIEF = `## 平台要点（工人速查）
+- 列名用原始 field（可含空格/特殊字符），title 仅展示名。
+- Custom Code 入口：def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]；写完后 run_step。
+- line：x + values[]；scatter：x + values，可用 color；分组用 series/color。
+- set_chart_config 必须给出完整可用映射，勿留空必填槽。`
+
 export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_skill_worker: {
     kind: 'skill',
@@ -41,7 +49,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
     kind: 'mcp',
     toolName: 'delegate_mcp_worker',
     role: 'MCP 工人',
-    maxIterations: 10,
+    maxIterations: 12,
     allowBuiltin: [],
     allowMcp: true,
   },
@@ -49,7 +57,8 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
     kind: 'analysis',
     toolName: 'delegate_analysis_worker',
     role: '分析工人',
-    maxIterations: 20,
+    // 清洗 + 多图配置常需 20+ 轮；过低会未跑完就超轮
+    maxIterations: 36,
     allowBuiltin: [
       'list_analyses',
       'list_tables',
@@ -78,7 +87,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
     kind: 'code',
     toolName: 'delegate_code_worker',
     role: 'Custom Code 工人',
-    maxIterations: 14,
+    maxIterations: 24,
     allowBuiltin: [
       'list_tables',
       'get_table_schema',
@@ -118,14 +127,16 @@ function filterToolsForWorker(all: ChatPayload['tools'], spec: WorkerSpec): Open
   })
 }
 
-function workerSystemPrompt(role: string, goal: string): string {
-  return `你是「${role}」子代理。只完成下列目标，禁止调用与目标无关的工具。
+function workerSystemPrompt(spec: WorkerSpec, goal: string): string {
+  const brief = spec.kind === 'analysis' || spec.kind === 'code' ? `\n${WORKER_PLATFORM_BRIEF}\n` : ''
+  return `你是「${spec.role}」子代理。只完成下列目标，禁止调用与目标无关的工具。
 硬性要求：
 1. 必须持续 tool_calls 直到目标落地（写出步骤/建图/改配置）；禁止只 list_tables / get_table_schema 就结束。
 2. 禁止复述目标长文；不要过程独白，直接调用工具。
 3. 若某工具失败，换参数或换工具继续，不要空回复收工。
-4. 全部做完后用简洁中文给出：结论、关键产物 id/名称、未完成项（如有）。不要宣称用户总任务已全部完成。
-目标：${goal}`
+4. 已有落地工具（加工/代码/建图等）后，可用简短中文收工：结论、关键产物 id/名称、未完成项。不要宣称用户总任务已全部完成。
+5. 优先复用下方「工作区上下文」与主循环工具摘要中的表 id / 字段名，避免重复无意义探路。
+${brief}目标：${goal}`
 }
 
 function toolNamesUsed(messages: ChatMessage[]): string[] {
@@ -139,6 +150,51 @@ export function workerOnlyExplored(messages: ChatMessage[]): boolean {
   const names = toolNamesUsed(messages)
   if (!names.length) return true
   return names.every((n) => WORKER_READ_ONLY_TOOLS.has(n))
+}
+
+/**
+ * 从主循环消息提取工人可用的工作区上下文（分析表结构、@ 引用、记忆）
+ * 以及最近非工人工具观察，避免工人冷启动一无所知。
+ */
+export function extractParentContextForWorker(parentMessages: ChatMessage[] | undefined): string {
+  if (!parentMessages?.length) return ''
+  const parts: string[] = []
+  for (const m of parentMessages) {
+    if (m.role !== 'system') continue
+    const t = contentText(m.content).trim()
+    if (!t) continue
+    if (
+      t.includes(CONTEXT_HEADER) ||
+      t.includes('用户特别引用') ||
+      t.includes('## 用户分析记忆')
+    ) {
+      parts.push(t)
+    }
+  }
+
+  const skip = new Set<string>([
+    'submit_plan',
+    'mark_step_done',
+    'ask_user',
+    ...Object.keys(WORKER_SPECS),
+  ])
+  const observations: string[] = []
+  for (let i = parentMessages.length - 1; i >= 0 && observations.length < 4; i -= 1) {
+    const m = parentMessages[i]
+    if (m.role !== 'tool' || !m.name || skip.has(m.name)) continue
+    const body = contentText(m.content).trim()
+    if (!body) continue
+    observations.push(`- ${m.name}: ${body.slice(0, 800)}`)
+  }
+  if (observations.length) {
+    parts.push(
+      `## 主循环已执行工具摘要（可复用，勿重复无意义探路）\n${observations.reverse().join('\n')}`,
+    )
+  }
+
+  const joined = parts.join('\n\n').trim()
+  if (!joined) return ''
+  return joined.length > 10000 ? `${joined.slice(0, 10000)}\n…` : joined
 }
 
 /** 从工人会话中提炼末条助手文本作为摘要。 */
@@ -162,6 +218,8 @@ export interface RunWorkerOpts {
   goal: string
   parentTools: ChatPayload['tools']
   parent: Pick<RunAgentOptions, 'exec' | 'model' | 'signal' | 'askUser' | 'waitConfirm' | 'postChatFn'>
+  /** 主循环当前 messages，用于注入工作区上下文。 */
+  parentMessages?: ChatMessage[]
   /** 工人内部进展回调（供 Trace 显示「工人进行中：xxx」）。 */
   onProgress?: (summary: string) => void
 }
@@ -192,6 +250,13 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
     }
   }
 
+  const seed: ChatMessage[] = [{ role: 'system', content: workerSystemPrompt(spec, goal) }]
+  const parentCtx = extractParentContextForWorker(opts.parentMessages)
+  if (parentCtx) {
+    seed.push({ role: 'system', content: parentCtx })
+  }
+  seed.push({ role: 'user', content: goal })
+
   try {
     const { runAgent } = await import('../agentLoop')
     const onWorkerEvent = (e: AgentEvent) => {
@@ -201,10 +266,7 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
       else if (e.type === 'round') opts.onProgress(`工人第 ${e.n} 轮…`)
     }
     const messages = await runAgent({
-      messages: [
-        { role: 'system', content: workerSystemPrompt(spec.role, goal) },
-        { role: 'user', content: goal },
-      ],
+      messages: seed,
       tools,
       exec: opts.parent.exec,
       maxIterations: spec.maxIterations,

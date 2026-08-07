@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { workerOnlyExplored, WORKER_SPECS } from '../../../src/modules/ai/tools/workers'
+import {
+  workerOnlyExplored,
+  WORKER_SPECS,
+  extractParentContextForWorker,
+} from '../../../src/modules/ai/tools/workers'
 import type { ChatMessage } from '../../../src/modules/ai/client'
+import { CONTEXT_HEADER } from '../../../src/modules/ai/prompts'
 
 describe('workerOnlyExplored', () => {
   it('无工具视为仅探路', () => {
@@ -25,11 +30,27 @@ describe('workerOnlyExplored', () => {
 })
 
 describe('WORKER_SPECS analysis', () => {
-  it('分析工人白名单含 custom code 与出图', () => {
-    const allow = WORKER_SPECS.delegate_analysis_worker.allowBuiltin
-    expect(allow).toContain('add_custom_code_step')
-    expect(allow).toContain('update_custom_code_step')
-    expect(allow).toContain('create_view')
-    expect(allow).toContain('set_chart_config')
+  it('分析工人白名单含 custom code 与出图，且轮数充足', () => {
+    const spec = WORKER_SPECS.delegate_analysis_worker
+    expect(spec.allowBuiltin).toContain('add_custom_code_step')
+    expect(spec.allowBuiltin).toContain('update_custom_code_step')
+    expect(spec.allowBuiltin).toContain('create_view')
+    expect(spec.allowBuiltin).toContain('set_chart_config')
+    expect(spec.maxIterations).toBeGreaterThanOrEqual(30)
+  })
+})
+
+describe('extractParentContextForWorker', () => {
+  it('提取工作区上下文与主循环工具摘要', () => {
+    const ctx = extractParentContextForWorker([
+      { role: 'system', content: `${CONTEXT_HEADER}\n当前分析：细胞传代` },
+      { role: 'user', content: '做生长曲线' },
+      { role: 'tool', name: 'get_table_schema', content: 'field=天数', tool_call_id: '1' },
+      { role: 'tool', name: 'delegate_analysis_worker', content: '旧工人', tool_call_id: '2' },
+    ])
+    expect(ctx).toContain('当前分析：细胞传代')
+    expect(ctx).toContain('get_table_schema')
+    expect(ctx).toContain('field=天数')
+    expect(ctx).not.toContain('旧工人')
   })
 })

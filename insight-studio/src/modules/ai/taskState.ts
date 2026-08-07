@@ -31,7 +31,7 @@ export function pendingPlanSteps(steps: string[], done: number[] | undefined): A
 export function planNudgeMessage(steps: string[], done: number[] | undefined): string {
   const pending = pendingPlanSteps(steps, done)
   const list = pending.map((p) => `${p.index + 1}. ${p.text}`).join('\n')
-  return `【计划未完成 — 禁止结束】仍有 ${pending.length} 步未 mark_step_done：\n${list}\n请继续调用工具（优先 delegate_*_worker）完成剩余步骤；每完成一步调用 mark_step_done(index)。全部完成后再用中文简短总结。`
+  return `【计划未完成 — 禁止结束】仍有 ${pending.length} 步未 mark_step_done：\n${list}\n请继续调用工具完成剩余步骤（主循环直接做或再派工人均可）；每完成一步调用 mark_step_done(index)。全部完成后再用中文简短总结。`
 }
 
 export function continueTaskSystemMessage(steps: string[], done: number[] | undefined): string {
