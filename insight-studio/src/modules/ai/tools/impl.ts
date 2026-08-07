@@ -22,6 +22,7 @@ import { useDashboardStore } from '../../../stores/dashboardStore'
 import type { ToolExecResult } from '../agentLoop'
 import type { Artifact } from '../types'
 import { aiSkillsApi, aiMemoriesApi } from '../client'
+import { normalizeExpressionColumns } from '../../../shared/pipeline'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -147,11 +148,25 @@ function artifactOf(kind: Artifact['kind'], name: string, extra: Partial<Artifac
 
 /**
  * 深拷贝分析（自测 Custom Code 用）。
- * 不能用 structuredClone：Pinia/Vue 响应式 Proxy 与 markRaw 行数据会抛
- * “Failed to execute 'structuredClone'… could not be cloned”。
+ * 禁止 structuredClone：Pinia/Vue Proxy 与 markRaw 行会抛 DataCloneError。
  */
 export function cloneAnalysisForDraft(a: Analysis): Analysis {
-  return JSON.parse(JSON.stringify(toRaw(a))) as Analysis
+  try {
+    // 逐层 toRaw，避免嵌套仍为 Proxy 时个别环境异常
+    const plain = JSON.parse(JSON.stringify(toRaw(a), (_k, v) => {
+      if (v && typeof v === 'object') {
+        try {
+          return toRaw(v)
+        } catch {
+          return v
+        }
+      }
+      return v
+    })) as Analysis
+    return plain
+  } catch (e) {
+    throw new Error(`无法复制分析用于 Custom Code 自测：${e instanceof Error ? e.message : String(e)}`)
+  }
 }
 
 /** 把副本上的 Custom Code 执行产物合并进真实 analysis（保留 step id）。 */
@@ -347,15 +362,24 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   add_computed_column_step(args) {
     const t = requireTable(String(args.tableId ?? ''))
     const name = String(args.name ?? '').trim()
-    const expression = String(args.expression ?? '').trim()
-    if (!name || !expression) return fail('name 与 expression 不能为空')
+    const rawExpr = String(args.expression ?? '').trim()
+    if (!name || !rawExpr) return fail('name 与 expression 不能为空')
+    // 含括号/空格的列名自动加 []，避免 IC50(nM) 被当成函数
+    const expression = normalizeExpressionColumns(
+      rawExpr,
+      t.columns.map((c) => c.field),
+    )
     const { step, table } = appendStep({
       type: 'computed-column',
       name: `Computed column`,
       fromTableIds: [t.id],
       config: { name, expression },
     })
-    return ok(`已创建派生列「${name}」（step id: ${step.id}，产出表 id: ${table.id}）`, artifactOf('table', table.name, { tableId: table.id, stepId: step.id }))
+    const note = expression !== rawExpr ? `（已规范化列引用：\`${expression}\`）` : ''
+    return ok(
+      `已创建派生列「${name}」${note}（step id: ${step.id}，产出表 id: ${table.id}）`,
+      artifactOf('table', table.name, { tableId: table.id, stepId: step.id }),
+    )
   },
 
   add_hide_columns_step(args) {
@@ -378,7 +402,12 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
     // 在分析副本上自测；成功后再写入画布，避免失败节点残留
     const live = requireAnalysis()
-    const draft = cloneAnalysisForDraft(live)
+    let draft: Analysis
+    try {
+      draft = cloneAnalysisForDraft(live)
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : String(e))
+    }
     const up = producingStep(draft, t.id)
     const step = createStepNode('custom-code', name)
     step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]

@@ -144,8 +144,8 @@ export function applyFilters(rows: Row[], filters: Filter[], columns?: ColumnMet
  *   unary   := '-' unary | primary
  *   primary := number | 'string' | column | func(args) | '(' expr ')'
  * 比较运算结果为 1/0，可直接用于 if(cond,a,b)。
- * 列引用：裸标识符（字母/数字/下划线/非 ASCII）或 [带空格的列名]。
- * 函数见 EXPRESSION_FUNCTIONS（if/round/abs/sqrt/log/ln/min/max/year/month/day/concat）。
+ * 列引用：裸标识符（字母/数字/下划线/非 ASCII）或 [带空格/括号等特殊字符的列名]。
+ * 函数见 EXPRESSION_FUNCTIONS（if/round/abs/…/concat/value/text/replace）。
  */
 
 type ExprNode =
@@ -225,6 +225,53 @@ export const EXPRESSION_FUNCTIONS: Record<string, ExprFunc> = {
     arity: 'variadic',
     eval: (args) => args.map((v) => (v === null || v === undefined ? '' : String(v))).join(''),
   },
+  // 文本 / 数值转换与替换（AI 与业务清洗常用；别名共用实现）
+  text: {
+    arity: 1,
+    eval: ([x]) => (x === null || x === undefined ? '' : String(x)),
+  },
+  value: {
+    arity: 1,
+    eval: ([x]) => num(x ?? null),
+  },
+  replace: {
+    arity: 3,
+    eval: ([s, oldV, newV]) => {
+      if (s === null || s === undefined) return null
+      const src = String(s)
+      const from = oldV === null || oldV === undefined ? '' : String(oldV)
+      const to = newV === null || newV === undefined ? '' : String(newV)
+      if (!from) return src
+      return src.split(from).join(to)
+    },
+  },
+}
+
+// 别名：模型常猜 parseFloat / toNumber / toString 等
+EXPRESSION_FUNCTIONS.tostring = EXPRESSION_FUNCTIONS.text
+EXPRESSION_FUNCTIONS.totext = EXPRESSION_FUNCTIONS.text
+EXPRESSION_FUNCTIONS.number = EXPRESSION_FUNCTIONS.value
+EXPRESSION_FUNCTIONS.tonumber = EXPRESSION_FUNCTIONS.value
+EXPRESSION_FUNCTIONS.parsefloat = EXPRESSION_FUNCTIONS.value
+EXPRESSION_FUNCTIONS.parse_float = EXPRESSION_FUNCTIONS.value
+
+/**
+ * 把含特殊字符的列名自动包成 [field]，避免 `IC50(nM)` 被解析成函数调用。
+ * 已在 [] 内的引用不重复处理。
+ */
+export function normalizeExpressionColumns(expression: string, fields: string[]): string {
+  let out = String(expression ?? '')
+  if (!out || !fields.length) return out
+  const special = fields
+    .filter((f) => f && (/[^A-Za-z0-9_\u0080-\uFFFF]/.test(f) || /^\d/.test(f)))
+    .slice()
+    .sort((a, b) => b.length - a.length)
+  for (const field of special) {
+    const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`(?<!\\[)${escaped}(?!\\])`, 'g')
+    out = out.replace(re, `[${field}]`)
+  }
+  return out
 }
 
 interface Token {
@@ -531,7 +578,9 @@ export function applyTransforms(columns: ColumnMeta[], rows: Row[], transforms: 
         break
       }
       case 'derived': {
-        const ast = parseExpression(t.expression) as ExprNode
+        const fields = cols.map((c) => c.field)
+        const expr = normalizeExpressionColumns(t.expression, fields)
+        const ast = parseExpression(expr) as ExprNode
         const existing = cols.find((c) => c.field === t.name)
         const values = data.map((row) => {
           try {

@@ -7,6 +7,7 @@ import {
   applyTransforms,
   evaluateExpression,
   isIdentityOrSortOnly,
+  normalizeExpressionColumns,
   parseExpression,
   runPipeline,
 } from '../../src/shared/pipeline'
@@ -337,6 +338,23 @@ describe('表达式函数扩展', () => {
     const r: Row = { name: 'a', v: 2 }
     expect(evaluateExpression("concat(name, '-', v)", r)).toBe('a-2')
     expect(evaluateExpression('round(abs(v - 5) / 2, 1)', r)).toBe(1.5)
+  })
+
+  it('text/value/replace 与别名；方括号列名', () => {
+    const r: Row = { 'IC50(nM)': '>12.5', n: 3 }
+    expect(evaluateExpression("value(replace([IC50(nM)], '>', ''))", r)).toBe(12.5)
+    expect(evaluateExpression("number(replace(text([IC50(nM)]), '>', ''))", r)).toBe(12.5)
+    expect(evaluateExpression('toNumber(n)', r)).toBe(3)
+    expect(evaluateExpression('parseFloat(n)', r)).toBe(3)
+    expect(evaluateExpression('[IC50(nM)]', r)).toBe('>12.5')
+  })
+
+  it('normalizeExpressionColumns：自动包裹特殊列名', () => {
+    expect(normalizeExpressionColumns("IC50(nM) * 1", ['IC50(nM)'])).toBe('[IC50(nM)] * 1')
+    expect(normalizeExpressionColumns("value(replace(IC50(nM), '>', ''))", ['IC50(nM)'])).toBe(
+      "value(replace([IC50(nM)], '>', ''))",
+    )
+    expect(normalizeExpressionColumns('[IC50(nM)]', ['IC50(nM)'])).toBe('[IC50(nM)]')
   })
 
   it('未知函数与参数个数错误抛错', () => {

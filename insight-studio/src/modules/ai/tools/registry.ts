@@ -107,10 +107,15 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_computed_column_step',
-    description: '添加派生列步骤（表达式引用列名，如 `yield_pct / 100`、`kon_1e5 * koff_1e4`），产出新表。',
+    description:
+      '添加派生列步骤。表达式语法：算术 + if/round/abs/min/max/concat/value/text/replace；含空格或括号的列名用方括号，如 value([IC50(nM)]) 或 replace([IC50(nM)], \'>\', \'\')。产出新表。',
     parameters: {
       type: 'object',
-      properties: { tableId: str('输入表 id'), name: str('新列名'), expression: str('表达式') },
+      properties: {
+        tableId: str('输入表 id'),
+        name: str('新列名'),
+        expression: str('表达式，特殊列名写 [field]'),
+      },
       required: ['tableId', 'name', 'expression'],
     },
   },

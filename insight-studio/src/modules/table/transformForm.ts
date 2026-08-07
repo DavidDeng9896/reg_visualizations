@@ -2,7 +2,7 @@
  * 转换表单校验纯函数：Submit 前整体校验；派生列表达式实时校验与预览。
  */
 import type { CellValue, ColumnMeta, Row, Transform } from '../../shared/types'
-import { evaluateExpression, parseExpression } from '../../shared/pipeline'
+import { evaluateExpression, normalizeExpressionColumns, parseExpression } from '../../shared/pipeline'
 
 export interface ValidationResult {
   ok: boolean
@@ -20,7 +20,7 @@ export function validateDerived(name: string, expression: string, columns: Colum
   if (!expression.trim()) errors.push('请填写表达式')
   else {
     try {
-      parseExpression(expression)
+      parseExpression(normalizeExpressionColumns(expression, columns.map((c) => c.field)))
     } catch (e) {
       errors.push(e instanceof Error ? e.message : '表达式无法解析')
     }

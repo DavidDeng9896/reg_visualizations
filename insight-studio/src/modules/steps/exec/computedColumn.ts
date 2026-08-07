@@ -1,5 +1,5 @@
 import type { AnalysisTable } from '../../../shared/types'
-import { applyTransforms, parseExpression } from '../../../shared/pipeline'
+import { applyTransforms, normalizeExpressionColumns, parseExpression } from '../../../shared/pipeline'
 import { createTable } from '../../../shared/factories'
 import type { StepExecCtx, StepExecResult, StepPreviewResult } from './types'
 
@@ -20,7 +20,7 @@ export function validateComputedColumn(input: AnalysisTable, config: Record<stri
   if (!name.trim()) return '请输入新列名'
   if (!expression.trim()) return '请输入表达式'
   try {
-    parseExpression(expression)
+    parseExpression(normalizeExpressionColumns(expression, input.columns.map((c) => c.field)))
   } catch (e) {
     return e instanceof Error ? e.message : '表达式解析失败'
   }
