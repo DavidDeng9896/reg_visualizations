@@ -214,11 +214,31 @@ function displayContent(m: UiMessage): string {
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="displayContent(m)" class="msg__ai md" v-html="htmlOf(m.id)" />
         <div v-if="m.streaming && !displayContent(m) && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
-        <div v-if="m.incomplete && !m.streaming && !m.planDismissed" class="msg__incomplete" data-testid="ai-incomplete">
-          任务未完成：可点击下方「继续任务」从检查点续跑，或关闭该提示。
+        <div
+          v-if="(m.incomplete || m.error) && !m.streaming && !m.planDismissed && (m.planSteps?.length || m.rawTail?.length || m.trace.length)"
+          class="msg__incomplete"
+          data-testid="ai-incomplete"
+        >
+          <template v-if="m.error">
+            因模型或网络错误已暂停：可点击下方「继续任务」从检查点续跑，或关闭该提示。
+          </template>
+          <template v-else>
+            任务未完成：可点击下方「继续任务」从检查点续跑，或关闭该提示。
+          </template>
         </div>
         <ArtifactCard v-for="a in m.artifacts" :key="`${a.kind}-${a.name}`" :artifact="a" />
-        <div v-if="m.error" class="msg__error">{{ m.error }}<button type="button" class="msg__retry" data-testid="ai-retry" @click="emit('retry')">重试</button></div>
+        <div v-if="m.error" class="msg__error" data-testid="ai-error">
+          <span class="msg__error-text">{{ m.error }}</span>
+          <button
+            v-if="!m.planSteps?.length && !m.rawTail?.length && !m.trace.length"
+            type="button"
+            class="msg__retry"
+            data-testid="ai-retry"
+            @click="emit('retry')"
+          >
+            重试
+          </button>
+        </div>
       </template>
     </div>
   </div>
@@ -317,8 +337,15 @@ function displayContent(m: UiMessage): string {
   font-size: var(--is-text-xs);
   color: var(--is-danger);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+.msg__error-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
 .msg__retry {
   border: 1px solid var(--is-border);

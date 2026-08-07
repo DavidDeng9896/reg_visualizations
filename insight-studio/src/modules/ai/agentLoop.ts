@@ -48,6 +48,17 @@ export class MaxIterError extends Error {
   }
 }
 
+/** 模型/网络等中途失败：携带已推进的 messages，供 UI 从检查点续跑。 */
+export class AgentRunError extends Error {
+  constructor(
+    message: string,
+    public readonly partialMessages: ChatMessage[],
+  ) {
+    super(message)
+    this.name = 'AgentRunError'
+  }
+}
+
 function safeParseArgs(raw: string): Record<string, unknown> {
   try {
     const v = JSON.parse(raw || '{}') as unknown
@@ -139,12 +150,21 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     throwIfAborted()
     onEvent({ type: 'round', n: round })
 
-    const res = await post({ messages, tools: opts.tools, ...(opts.model ? { model: opts.model } : {}) }, signal)
-    const streamed = await readSseStream(
-      res,
-      (text) => onEvent({ type: 'token', text }),
-      (text) => onEvent({ type: 'reasoning', text }),
-    )
+    let streamed: Awaited<ReturnType<typeof readSseStream>>
+    try {
+      const res = await post({ messages, tools: opts.tools, ...(opts.model ? { model: opts.model } : {}) }, signal)
+      streamed = await readSseStream(
+        res,
+        (text) => onEvent({ type: 'token', text }),
+        (text) => onEvent({ type: 'reasoning', text }),
+      )
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err
+      const msg = err instanceof Error ? err.message : String(err)
+      emitIncompleteIfNeeded()
+      onEvent({ type: 'error', message: msg })
+      throw new AgentRunError(msg, messages)
+    }
     // reasoning 只用于 UI 展示，不回灌上游（兼容模式对未知字段可能 400）
     const { reasoning: _reasoning, ...assistant } = streamed
     messages.push(assistant)
@@ -316,27 +336,35 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const wrapUpHint = planGate && planIncomplete(planSteps, planDone)
     ? '已达到最大工具调用轮数，且计划仍有未完成步骤。请不要再调用任何工具，用中文说明已完成与未完成项，并提示用户可点「继续任务」。'
     : '已达到最大工具调用轮数。请不要再调用任何工具，直接根据以上工具执行结果，用中文给出简洁的完成总结。'
-  const wrapUp = await post(
-    {
-      messages: [
-        ...messages,
-        { role: 'system', content: wrapUpHint },
-      ],
-      ...(opts.model ? { model: opts.model } : {}),
-    },
-    signal,
-  )
-  const finalStream = await readSseStream(
-    wrapUp,
-    (text) => onEvent({ type: 'token', text }),
-    (text) => onEvent({ type: 'reasoning', text }),
-  )
-  const { reasoning: _r2, ...finalMsg } = finalStream
-  messages.push(finalMsg)
-  if (finalMsg.content) {
+  try {
+    const wrapUp = await post(
+      {
+        messages: [
+          ...messages,
+          { role: 'system', content: wrapUpHint },
+        ],
+        ...(opts.model ? { model: opts.model } : {}),
+      },
+      signal,
+    )
+    const finalStream = await readSseStream(
+      wrapUp,
+      (text) => onEvent({ type: 'token', text }),
+      (text) => onEvent({ type: 'reasoning', text }),
+    )
+    const { reasoning: _r2, ...finalMsg } = finalStream
+    messages.push(finalMsg)
+    if (finalMsg.content) {
+      emitIncompleteIfNeeded()
+      onEvent({ type: 'done', content: scrubVisibleContent(contentText(finalMsg.content)) })
+      return messages
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    const msg = err instanceof Error ? err.message : String(err)
     emitIncompleteIfNeeded()
-    onEvent({ type: 'done', content: scrubVisibleContent(contentText(finalMsg.content)) })
-    return messages
+    onEvent({ type: 'error', message: msg })
+    throw new AgentRunError(msg, messages)
   }
   throw new MaxIterError(maxIterations)
 }

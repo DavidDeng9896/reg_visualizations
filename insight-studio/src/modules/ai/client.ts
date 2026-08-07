@@ -208,9 +208,24 @@ export async function postChat(payload: ChatPayload, signal?: AbortSignal): Prom
       /* ignore */
     }
     if (res.status === 409) throw new Error('AI 未配置：请先在设置中填写 API Key')
-    throw new Error(`模型请求失败（${res.status}）：${String(msg).slice(0, 300)}`)
+    throw new Error(`模型请求失败（${res.status}）：${sanitizeModelError(String(msg))}`)
   }
   return res
+}
+
+/** 去掉 gzip/二进制噪声，保留可读错误文案。 */
+export function sanitizeModelError(raw: string): string {
+  const s = String(raw ?? '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .replace(/\uFFFD+/g, '')
+    .trim()
+  if (!s) return '上游模型返回错误（无法解析详情）'
+  // 仍含大量非打印/替换符 → 视为损坏正文
+  const printable = s.replace(/[^\x20-\x7E\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\n\t]/g, '')
+  if (printable.length < Math.min(12, s.length) * 0.4) {
+    return '上游模型返回错误（响应无法解析，请稍后重试）'
+  }
+  return s.length > 400 ? `${s.slice(0, 400)}…` : s
 }
 
 /* ------------------------------- 会话 API ------------------------------- */
