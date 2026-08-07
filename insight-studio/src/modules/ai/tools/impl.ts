@@ -3,6 +3,7 @@
  * 返回 ToolExecResult；危险操作支持「需确认」模式（前端确认后带 __confirmed 重放）。
  */
 import Papa from 'papaparse'
+import { toRaw } from 'vue'
 import type { Analysis, AnalysisTable, ChartConfig, DashboardWidget, Filter, Row, StepNode, StepType } from '../../../shared/types'
 import { createEmptyAnalysis, createTable, createViewNode, defaultViewName, createDashboard, createDashboardWidget, sealRows } from '../../../shared/factories'
 import { uuid } from '../../../shared/id'
@@ -144,6 +145,15 @@ function artifactOf(kind: Artifact['kind'], name: string, extra: Partial<Artifac
   return { kind, name, analysisId: a?.id, ...extra }
 }
 
+/**
+ * 深拷贝分析（自测 Custom Code 用）。
+ * 不能用 structuredClone：Pinia/Vue 响应式 Proxy 与 markRaw 行数据会抛
+ * “Failed to execute 'structuredClone'… could not be cloned”。
+ */
+export function cloneAnalysisForDraft(a: Analysis): Analysis {
+  return JSON.parse(JSON.stringify(toRaw(a))) as Analysis
+}
+
 /** 把副本上的 Custom Code 执行产物合并进真实 analysis（保留 step id）。 */
 function applyDraftStepResult(
   live: Analysis,
@@ -175,6 +185,7 @@ function applyDraftStepResult(
     const tbl = draft.tables.find((x) => x.id === tid)
     if (!tbl) continue
     tbl.stepId = liveStep.id
+    tbl.rows = sealRows(tbl.rows)
     live.tables.push(tbl)
   }
   if (!live.files) live.files = []
@@ -367,7 +378,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
     // 在分析副本上自测；成功后再写入画布，避免失败节点残留
     const live = requireAnalysis()
-    const draft = structuredClone(live) as Analysis
+    const draft = cloneAnalysisForDraft(live)
     const up = producingStep(draft, t.id)
     const step = createStepNode('custom-code', name)
     step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
@@ -407,7 +418,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const nextCode = typeof args.code === 'string' ? args.code : prevCode
     const nextName = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : prevName
 
-    const draft = structuredClone(a) as Analysis
+    const draft = cloneAnalysisForDraft(a)
     const draftStep = draft.steps.find((s) => s.id === step.id)
     if (!draftStep) return fail('Custom Code 步骤不存在')
     draftStep.config.code = nextCode

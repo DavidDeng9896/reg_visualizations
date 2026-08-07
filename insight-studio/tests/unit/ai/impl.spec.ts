@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { createDemoAnalysis } from '../../../src/shared/seed'
+import { sealAnalysisRows } from '../../../src/shared/factories'
 import { useAnalysisStore } from '../../../src/stores/analysisStore'
-import { execTool } from '../../../src/modules/ai/tools/impl'
+import { cloneAnalysisForDraft, execTool } from '../../../src/modules/ai/tools/impl'
 import { findTable, findView } from '../../../src/shared/tree'
 
 /** AI 工具实现：在真实 analysisStore 上执行（Dexie 由 fake-indexeddb 环境提供）。 */
@@ -115,6 +117,61 @@ describe('AI 工具实现（execTool）', () => {
     expect(done.ok).toBe(true)
     expect(analysis.tables).toHaveLength(0)
     expect(analysis.steps).toHaveLength(0)
+  })
+
+  it('cloneAnalysisForDraft：可克隆 Pinia/sealRows 后的分析（structuredClone 会炸）', () => {
+    const sealed = sealAnalysisRows(createDemoAnalysis())
+    const proxied = reactive(sealed)
+    expect(() => structuredClone(proxied)).toThrow(/could not be cloned|DataCloneError|Failed to execute/i)
+    const draft = cloneAnalysisForDraft(proxied as typeof sealed)
+    expect(draft.id).toBe(sealed.id)
+    expect(draft.tables[0].rows.length).toBe(sealed.tables[0].rows.length)
+    expect(draft.tables[0].rows).not.toBe(sealed.tables[0].rows)
+  })
+
+  it('add_custom_code_step：在响应式分析上自测并写入画布', async () => {
+    const { analysis } = await seedStore()
+    // 模拟工作区：封印行 + 经 store 持有（与真实打开分析一致）
+    sealAnalysisRows(analysis)
+    const iris = analysis.tables[0]
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [
+              { field: 'species', dataType: 'string' },
+              { field: 'n', dataType: 'number' },
+            ],
+            rows: [{ species: 'setosa', n: 1 }],
+          },
+        ],
+        stdout: '',
+        stderr: '',
+      }),
+    })) as unknown as typeof fetch
+    const prev = globalThis.fetch
+    globalThis.fetch = fetchImpl
+    try {
+      const res = await execTool(
+        'add_custom_code_step',
+        {
+          tableId: iris.id,
+          name: 'IC50清洗v2',
+          code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n',
+        },
+        ctx,
+      )
+      expect(res.ok).toBe(true)
+      expect(res.summary).toContain('IC50清洗v2')
+      expect(analysis.steps.some((s) => s.type === 'custom-code' && s.name === 'IC50清洗v2')).toBe(true)
+      expect(fetchImpl).toHaveBeenCalled()
+    } finally {
+      globalThis.fetch = prev
+    }
   })
 
   it('未知工具与缺表错误', async () => {
