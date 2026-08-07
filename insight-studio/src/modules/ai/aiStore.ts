@@ -954,6 +954,11 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
       }
     } else if (e.type === 'incomplete') {
       assistant.incomplete = true
+    } else if (e.type === 'worker_progress') {
+      const item =
+        assistant.trace.find((t) => t.id === e.id && t.running) ??
+        assistant.trace.find((t) => t.id === e.id)
+      if (item) item.summary = e.summary
     } else if (e.type === 'done') {
       const body = (e.content || '').trim()
       const notes = (assistant.interactionNotes ?? '').trim()

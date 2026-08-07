@@ -5,7 +5,7 @@
 import { contentText, postChat, readSseStream, type ChatMessage, type ChatPayload, type ToolCall } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
-import { isDelegateWorker, runDelegateWorker } from './tools/workers'
+import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 
 /** 工具执行结果。 */
 export interface ToolExecResult {
@@ -40,6 +40,8 @@ export type AgentEvent =
   | { type: 'incomplete'; reason: string; pendingSteps: Array<{ index: number; text: string }> }
   | { type: 'done'; content: string }
   | { type: 'error'; message: string }
+  /** 工人内部进展（用于 Trace 上显示「工人进行中：xxx」）。 */
+  | { type: 'worker_progress'; id: string; summary: string }
 
 export class MaxIterError extends Error {
   constructor(public readonly iterations: number) {
@@ -97,6 +99,11 @@ export interface RunAgentOptions {
   initialPlan?: { steps: string[]; done: number[] }
   /** 计划催促最大次数；默认 3。 */
   maxPlanNudges?: number
+  /**
+   * Worker 严格模式：无 tool_calls / 仅探路就收工时催促继续。
+   * 与 planGate 独立；工人子 loop 应开启。
+   */
+  workerStrict?: boolean
 }
 
 /**
@@ -108,11 +115,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const post = opts.postChatFn ?? postChat
   const messages = [...opts.messages]
   const planGate = opts.planGate !== false
+  const workerStrict = !!opts.workerStrict
   const maxNudges = opts.maxPlanNudges ?? DEFAULT_MAX_PLAN_NUDGES
 
   let planSteps: string[] = opts.initialPlan?.steps ? [...opts.initialPlan.steps] : []
   let planDone: number[] = opts.initialPlan?.done ? [...opts.initialPlan.done] : []
   let planNudges = 0
+  let workerNudges = 0
+  const MAX_WORKER_NUDGES = 4
   /** 连续「无工具 / 空转复读」轮数；用于打断死循环独白。 */
   let stallRounds = 0
   let lastStallText = ''
@@ -197,6 +207,25 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
             '\n【禁止独白】不要输出过程说明；本轮必须直接 tool_calls，不要再说「让我确认/开始创建」；不要重新 submit_plan。',
         })
         continue
+      }
+
+      // Worker：禁止只读 schema / 空回复就收工
+      if (workerStrict && workerNudges < MAX_WORKER_NUDGES) {
+        const onlyExplored = workerOnlyExplored(messages)
+        const emptyOrWeak = !text || text.length < 24
+        if (onlyExplored || emptyOrWeak) {
+          workerNudges += 1
+          const last = messages[messages.length - 1]
+          if (last?.role === 'assistant') {
+            messages[messages.length - 1] = { ...last, content: '（目标未落地，继续调用工具）' }
+          }
+          messages.push({
+            role: 'system',
+            content:
+              '【工人未完成】目标尚未落地。请立即继续 tool_calls（加工/Custom Code/建图/配置），禁止只 list_tables/get_table_schema 就结束；不要复述目标长文。',
+          })
+          continue
+        }
       }
 
       // 连续空转：强制收束，避免刷屏
@@ -290,6 +319,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
               waitConfirm: opts.waitConfirm,
               postChatFn: opts.postChatFn,
             },
+            onProgress: (summary) => onEvent({ type: 'worker_progress', id: call.id, summary }),
           })
         } catch (e) {
           if (e instanceof DOMException && e.name === 'AbortError') throw e
