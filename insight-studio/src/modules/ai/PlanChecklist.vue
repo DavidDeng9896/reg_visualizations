@@ -15,7 +15,7 @@ function stepState(i: number): 'done' | 'doing' | 'todo' {
   if (props.done.includes(i)) return 'done'
   // 已结束（含历史回看）：剩余步骤不再标为 doing，避免转圈/进行中态
   if (!props.streaming) return 'todo'
-  const next = props.done.length ? Math.max(...props.done) + 1 : 0
+  const next = props.steps.findIndex((_, idx) => !props.done.includes(idx))
   return i === next ? 'doing' : 'todo'
 }
 </script>

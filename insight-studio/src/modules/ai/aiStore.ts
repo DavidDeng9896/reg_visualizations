@@ -958,8 +958,8 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
       assistant.planDone = []
       assistant.incomplete = false
     } else if (e.type === 'step_done') {
-      if (!assistant.planDone) assistant.planDone = []
-      if (!assistant.planDone.includes(e.index)) assistant.planDone.push(e.index)
+      const prev = assistant.planDone ?? []
+      if (!prev.includes(e.index)) assistant.planDone = [...prev, e.index]
       if (assistant.planSteps && !planIncomplete(assistant.planSteps, assistant.planDone)) {
         assistant.incomplete = false
       }

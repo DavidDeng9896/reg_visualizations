@@ -7,7 +7,8 @@ import { briefOpLabel, fullArgs, fullOpLabel, fullSummary } from './traceLabels'
 /**
  * 工具调用轨迹卡：
  * - 标题「已处理 N 个操作（完成 M）」；进行中标题/子项光影掠过
- * - 进行中保持折叠；待确认审批卡始终外露
+ * - 进行中自动展开列表，便于看到实时任务；结束后可手动折叠
+ * - 待确认审批卡始终外露
  * - 子项一行显示精简操作内容；展开后完整参数与结果
  */
 const props = withDefaults(
@@ -43,9 +44,21 @@ const pending = computed(() => {
   })
 })
 
-watch(inProgress, (busy) => {
-  if (busy) expanded.value = false
-})
+/** 有操作开始跑时自动展开，避免「全部做完才看见任务列表」。 */
+watch(
+  inProgress,
+  (busy) => {
+    if (busy) expanded.value = true
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.items.length,
+  (n, prev) => {
+    if (props.streaming && n > (prev ?? 0)) expanded.value = true
+  },
+)
 
 function toggleDetail(id: string): void {
   const next = new Set(openDetail.value)
