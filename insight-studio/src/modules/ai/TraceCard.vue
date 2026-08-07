@@ -2,12 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
+import { briefOpLabel, fullArgs, fullSummary } from './traceLabels'
 
 /**
  * 工具调用轨迹卡：
- * - 标题「已处理 N 个操作（完成 M）」；任一子项 running 时标题与子项文字 shimmer
+ * - 标题「已处理 N 个操作（完成 M）」；进行中标题/子项光影掠过
  * - 进行中保持折叠；待确认审批卡始终外露
- * - 展开后子项默认一行（名+状态），点开再看参数/结果
+ * - 子项一行显示精简操作内容；展开后完整参数与结果
  */
 const props = withDefaults(
   defineProps<{
@@ -43,7 +44,6 @@ const pending = computed(() => {
 })
 
 watch(inProgress, (busy) => {
-  // 进行中强制折叠；完成后不自动展开，由用户点开
   if (busy) expanded.value = false
 })
 
@@ -59,19 +59,11 @@ function isDetailOpen(id: string): boolean {
 }
 
 function hasDetail(t: TraceItem): boolean {
-  return !!(briefArgs(t) || t.summary)
-}
-
-function briefArgs(t: TraceItem): string {
-  if (!t.args) return ''
-  const s = JSON.stringify(t.args)
-  return s.length > 90 ? `${s.slice(0, 90)}…` : s
+  return !!(fullArgs(t) || fullSummary(t))
 }
 
 function pendingAction(t: TraceItem): string {
-  return (t.summary || '')
-    .replace(/^NEEDS_CONFIRMATION:\s*/, '')
-    .split('。不要重试')[0]
+  return fullSummary(t)
 }
 
 const headLabel = computed(() => `已处理 ${props.items.length} 个操作（完成 ${doneCount.value}）`)
@@ -119,7 +111,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
             <IIcon v-else-if="t.ok" name="check" :size="11" class="trace__ok" />
             <IIcon v-else name="close" :size="11" class="trace__fail" />
           </span>
-          <span class="trace__name" :class="{ 'trace__shimmer': t.running }">{{ t.name }}</span>
+          <span class="trace__label" :class="{ 'trace__shimmer': t.running }">{{ briefOpLabel(t) }}</span>
           <IIcon
             v-if="hasDetail(t)"
             name="chevron-right"
@@ -129,15 +121,13 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
           />
         </button>
         <div v-if="isDetailOpen(t.id)" class="trace__detail">
-          <div v-if="briefArgs(t)" class="trace__args">{{ briefArgs(t) }}</div>
-          <div v-if="t.summary" class="trace__summary">
-            {{ t.needsConfirmation ? pendingAction(t) : t.summary }}
-          </div>
+          <div class="trace__tool">工具：{{ t.name }}</div>
+          <pre v-if="fullArgs(t)" class="trace__args">{{ fullArgs(t) }}</pre>
+          <div v-if="fullSummary(t)" class="trace__summary">{{ fullSummary(t) }}</div>
         </div>
       </div>
     </div>
 
-    <!-- 待确认：折叠状态下也始终外露（可被 hidePending 关掉） -->
     <template v-if="!hidePending">
       <div v-for="t in pending" :key="`cf-${t.id}`" class="trace__pending">
         <div class="trace__pending-head">
@@ -192,45 +182,54 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
   transform: rotate(90deg);
 }
 
-/* 光影掠过：进行中标题 / running 子项名 */
+/*
+ * 光影掠过：窄而亮的高光带 + linear 匀速；
+ * 背景拉大、行程拉长，避免两端停顿感，对比更明显。
+ */
 .trace__shimmer {
-  background: linear-gradient(
+  display: inline-block;
+  color: transparent;
+  background-image: linear-gradient(
     105deg,
-    var(--is-text-tertiary) 0%,
-    var(--is-text-tertiary) 38%,
-    color-mix(in srgb, var(--is-text) 88%, #fff) 50%,
-    var(--is-text-tertiary) 62%,
-    var(--is-text-tertiary) 100%
+    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 0%,
+    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 38%,
+    color-mix(in srgb, var(--is-text) 55%, #fff) 46%,
+    #fff 50%,
+    color-mix(in srgb, var(--is-text) 55%, #fff) 54%,
+    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 62%,
+    color-mix(in srgb, var(--is-text-tertiary) 55%, transparent) 100%
   );
-  background-size: 220% 100%;
+  background-size: 320% 100%;
   background-clip: text;
   -webkit-background-clip: text;
-  color: transparent;
   -webkit-text-fill-color: transparent;
-  animation: tr-shimmer 1.6s ease-in-out infinite;
+  animation: tr-shimmer 1.55s linear infinite;
+  will-change: background-position;
 }
-.trace__name.trace__shimmer {
+.trace__label.trace__shimmer {
   background-image: linear-gradient(
     105deg,
     var(--is-text) 0%,
-    var(--is-text) 38%,
-    color-mix(in srgb, var(--is-accent) 55%, #fff) 50%,
-    var(--is-text) 62%,
+    var(--is-text) 36%,
+    color-mix(in srgb, var(--is-accent) 45%, #fff) 45%,
+    #fff 50%,
+    color-mix(in srgb, var(--is-accent) 45%, #fff) 55%,
+    var(--is-text) 64%,
     var(--is-text) 100%
   );
-  background-size: 220% 100%;
+  background-size: 320% 100%;
 }
 @keyframes tr-shimmer {
   0% {
-    background-position: 100% 0;
+    background-position: 140% 50%;
   }
   100% {
-    background-position: -100% 0;
+    background-position: -140% 50%;
   }
 }
 
 .trace__spin {
-  animation: tr-spin 1s linear infinite;
+  animation: tr-spin 0.85s linear infinite;
   color: var(--is-accent);
 }
 @keyframes tr-spin {
@@ -245,7 +244,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 260px;
+  max-height: 320px;
   overflow-y: auto;
 }
 .trace__item {
@@ -257,7 +256,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 4px 4px 0;
+  padding: 5px 4px 5px 0;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -285,13 +284,16 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
 .trace__warn {
   color: var(--is-warning-text);
 }
-.trace__name {
+.trace__label {
   flex: 1;
   min-width: 0;
   font-weight: 500;
   color: var(--is-text);
-  font-family: var(--is-font-mono);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .trace__item-chev {
   flex-shrink: 0;
@@ -302,17 +304,34 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
   transform: rotate(90deg);
 }
 .trace__detail {
-  padding: 0 4px 6px 20px;
+  padding: 2px 4px 10px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.trace__args {
+.trace__tool {
+  font-size: 10px;
   color: var(--is-text-tertiary);
   font-family: var(--is-font-mono);
+}
+.trace__args {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--is-radius-sm);
+  background: var(--is-surface-hover);
+  color: var(--is-text-secondary);
+  font-family: var(--is-font-mono);
   font-size: 11px;
-  word-break: break-all;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: none;
+  overflow: visible;
 }
 .trace__summary {
-  margin-top: 2px;
-  color: var(--is-text-secondary);
+  color: var(--is-text);
+  font-size: var(--is-text-xs);
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
