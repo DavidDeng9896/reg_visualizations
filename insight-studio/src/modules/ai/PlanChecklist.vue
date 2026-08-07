@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { IIcon } from '../../ui'
 
-/** 计划清单：逐项打勾（对齐参考图「进展」）。 */
+/**
+ * 计划清单：逐项打勾。
+ * 仅当前轮 streaming 时，下一步显示转圈；历史/已结束回答一律静止（done / todo）。
+ */
 const props = defineProps<{
   steps: string[]
   done: number[]
   streaming?: boolean
 }>()
 
-const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props.done.length ? Math.max(...props.done) + 1 : 0) ? 'doing' : 'todo')
+function stepState(i: number): 'done' | 'doing' | 'todo' {
+  if (props.done.includes(i)) return 'done'
+  // 已结束（含历史回看）：剩余步骤不再标为 doing，避免转圈/进行中态
+  if (!props.streaming) return 'todo'
+  const next = props.done.length ? Math.max(...props.done) + 1 : 0
+  return i === next ? 'doing' : 'todo'
+}
 </script>
 
 <template>
@@ -18,11 +27,11 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
       v-for="(s, i) in steps"
       :key="i"
       class="plan__step"
-      :class="`plan__step--${nextIndex(i)}`"
+      :class="`plan__step--${stepState(i)}`"
     >
       <span class="plan__icon">
-        <span v-if="nextIndex(i) === 'done'" class="plan__circle plan__circle--done"><IIcon name="check" :size="10" /></span>
-        <IIcon v-else-if="nextIndex(i) === 'doing'" name="spinner" :size="12" class="plan__spin" />
+        <span v-if="stepState(i) === 'done'" class="plan__circle plan__circle--done"><IIcon name="check" :size="10" /></span>
+        <IIcon v-else-if="stepState(i) === 'doing'" name="spinner" :size="12" class="plan__spin" />
         <span v-else class="plan__circle" />
       </span>
       <span class="plan__text">{{ s }}</span>

@@ -9,6 +9,7 @@ import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
+import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 
@@ -215,13 +216,12 @@ export const useAiStore = defineStore('ai', {
         const doc = await aiConvApi.get(id)
         this.currentId = doc.id
         this.messages = Array.isArray(doc.messages) ? (doc.messages as UiMessage[]) : []
-        // 回看时清理瞬态
+        // 回看时清理瞬态：历史回答绝不能带着 streaming/running 转圈
         for (const m of this.messages) {
-          m.streaming = false
           if (!Array.isArray(m.trace)) m.trace = []
           if (!Array.isArray(m.artifacts)) m.artifacts = []
-          for (const t of m.trace) t.running = false
         }
+        clearTransientProgress(this.messages)
       } catch (e) {
         console.error('[aiStore.selectConversation]', e)
         throw e
@@ -249,6 +249,8 @@ export const useAiStore = defineStore('ai', {
       const input = text.trim()
       if (!input || this.running) return
       autoContinueCount = 0
+      // 新一轮前先清掉历史消息上残留的 streaming/running，避免旧进展继续转圈
+      clearTransientProgress(this.messages)
       await this.ensureConversation()
       // 上下文超过阈值（上限 80%）先自动压缩：最近 2 个用户轮保留，更早历史折叠为摘要
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
@@ -260,6 +262,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
 
       const analysis = useAnalysisStore().current
       const chatMessages: ChatMessage[] = [
@@ -305,9 +308,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -318,13 +321,17 @@ export const useAiStore = defineStore('ai', {
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        // stop() 可能已提前清 running；仅本轮 ac 仍挂着时再清，避免误伤新一轮
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
       if (!aborted) await this.maybeAutoContinue(assistant)
@@ -338,6 +345,7 @@ export const useAiStore = defineStore('ai', {
       const prev = this.resumableAssistant as UiMessage | null
       if (!prev?.planSteps?.length || prev.planDismissed) return
       if (!opts?.auto) autoContinueCount = 0
+      clearTransientProgress(this.messages)
       await this.ensureConversation()
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
@@ -357,6 +365,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
 
       // 系统提示 + 检查点之前历史 + 上一轮工具轨迹 + 续跑指令
       const chatMessages: ChatMessage[] = [
@@ -399,9 +408,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           initialPlan: { steps: prev.planSteps, done: doneSnapshot },
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
@@ -415,14 +424,18 @@ export const useAiStore = defineStore('ai', {
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
-        syncPlanCheckpoint(prev, assistant)
+        // 用户中止后不再同步 incomplete，避免「继续任务」回弹
+        if (!aborted) syncPlanCheckpoint(prev, assistant)
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
       if (!aborted) await this.maybeAutoContinue(assistant)
@@ -542,6 +555,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
       assistant.streaming = true
       const { tools, exec } = await this.buildToolsAndExec()
       const baseLen = messages.length
@@ -552,9 +566,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -564,13 +578,16 @@ export const useAiStore = defineStore('ai', {
           assistant.error = err.message
         } else if (err instanceof DOMException && err.name === 'AbortError') {
           assistant.error = '已中止'
+          applyUserAbortToMessages(this.messages)
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
     },
@@ -673,10 +690,19 @@ export const useAiStore = defineStore('ai', {
       return true
     },
 
+    /** 用户主动结束：中止 loop/工人，立刻停掉进行中 UI，关闭「继续任务」提示。 */
     stop() {
-      this.abort?.abort()
+      const ac = this.abort
+      ac?.abort()
       this.settleAsk('（用户中止了本次生成）')
       this.settleConfirm('用户中止了本次生成，危险操作未执行。')
+      this.pendingAsk = null
+      autoContinueCount = 0
+      applyUserAbortToMessages(this.messages)
+      // 立刻结束全局「正在生成」态（光影/转圈/停止按钮），不等 finally
+      this.running = false
+      if (this.abort === ac) this.abort = null
+      void this.persist()
     },
 
     async retry(): Promise<void> {
@@ -692,8 +718,14 @@ export const useAiStore = defineStore('ai', {
       if (!this.currentId) return
       const firstUser = this.messages.find((m) => m.role === 'user')
       const title = firstUser ? firstUser.content.slice(0, 24) : '新会话'
+      // 落盘时去掉 streaming/running，避免历史回看仍转圈
+      const messages = this.messages.map((m) => ({
+        ...m,
+        streaming: false,
+        trace: (m.trace ?? []).map((t) => ({ ...t, running: false })),
+      }))
       try {
-        await aiConvApi.update(this.currentId, { title, messages: this.messages as unknown[] })
+        await aiConvApi.update(this.currentId, { title, messages: messages as unknown[] })
         await this.refreshConversations()
       } catch {
         /* 持久化失败不打断 */
