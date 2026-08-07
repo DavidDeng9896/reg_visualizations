@@ -15,6 +15,8 @@ import { validateChartMapping } from '../../charts/registry'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
+import { emptyReport, readReportConfig } from '../../steps/report/reportModel'
+import type { AnalysisReport } from '../../../shared/types'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
 import { refreshSqlSourceStep } from '../../table/refreshSqlSource'
 import { useAnalysisStore } from '../../../stores/analysisStore'
@@ -40,6 +42,8 @@ const WRITE_TOOLS = new Set([
   'add_hide_columns_step',
   'add_custom_code_step',
   'update_custom_code_step',
+  'create_report_step',
+  'update_report_step',
   'run_step',
   'rerun_stale_steps',
   'refresh_sql_source',
@@ -465,6 +469,46 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       applyDraftStepResult(analysis, target, draft, draftStep)
     })
     return ok(`已更新并执行 Custom Code「${nextName}」`)
+  },
+
+  create_report_step(args) {
+    const name =
+      typeof args.name === 'string' && args.name.trim() ? args.name.trim() : '分析报告'
+    let report: AnalysisReport = emptyReport(name)
+    if (args.report && typeof args.report === 'object') {
+      report = readReportConfig({ report: args.report })
+      report.title = report.title || name
+    }
+    let stepId = ''
+    store().mutate((a) => {
+      const step = createStepNode('report', name)
+      step.config.report = report
+      step.status = 'configured'
+      a.steps.push(step)
+      stepId = step.id
+    })
+    return ok(`已创建分析报告「${name}」（step id: ${stepId}）`, artifactOf('report', name, { stepId }))
+  },
+
+  update_report_step(args) {
+    const stepId = String(args.stepId ?? '')
+    const a = requireAnalysis()
+    const step = a.steps.find((s) => s.id === stepId)
+    if (!step || step.type !== 'report') return fail('报告步骤不存在')
+    if (!args.report && !(typeof args.name === 'string' && args.name.trim())) {
+      return fail('请提供 report 或 name')
+    }
+    store().mutate((analysis) => {
+      const target = analysis.steps.find((s) => s.id === stepId)
+      if (!target || target.type !== 'report') return
+      if (typeof args.name === 'string' && args.name.trim()) target.name = args.name.trim()
+      if (args.report && typeof args.report === 'object') {
+        target.config.report = readReportConfig({ report: args.report })
+      }
+      target.status = 'configured'
+      target.error = undefined
+    })
+    return ok(`已更新报告「${step.name}」`, artifactOf('report', step.name, { stepId }))
   },
 
   async run_step(args) {

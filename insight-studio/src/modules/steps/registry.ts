@@ -263,6 +263,17 @@ const STEP_DEFS: StepDef[] = [
       code: '', // filled from CUSTOM_CODE_DEFAULT_TEMPLATE in factory when empty
     },
   },
+  {
+    type: 'report',
+    label: '分析报告',
+    category: 'output',
+    description: '独立报告节点：科研风格 HTML 总结，可预览与 AI 辅助改写，无需连线。',
+    inputs: [],
+    outputs: [],
+    defaultConfig: {
+      report: null, // filled in factory via emptyReport()
+    },
+  },
 ]
 
 const STEP_DEF_MAP = new Map<StepType, StepDef>(STEP_DEFS.map((d) => [d.type, d]))

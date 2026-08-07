@@ -26,6 +26,8 @@ const typeMeta = computed(() => {
       return { icon: 'grid' as const, label: '看板' }
     case 'step':
       return { icon: 'flowchart' as const, label: '步骤' }
+    case 'report':
+      return { icon: 'file-text' as const, label: '报告' }
     default:
       return { icon: 'database' as const, label: '产物' }
   }

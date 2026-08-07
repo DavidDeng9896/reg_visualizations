@@ -10,8 +10,12 @@ import { uuid } from '../../../shared/id'
 import { operatorArity, operatorsFor, parseConditionValue } from '../../table/filterForm'
 import PythonEditor, { type PythonCompletionSource } from './PythonEditor.vue'
 import CustomCodeAiAssist from './CustomCodeAiAssist.vue'
+import ReportAiAssist from './ReportAiAssist.vue'
+import ReportPreview from './ReportPreview.vue'
 import PlotlyArtifactPreview from './PlotlyArtifactPreview.vue'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../customCodeTemplate'
+import { emptyReport, readReportConfig } from '../report/reportModel'
+import type { AnalysisReport } from '../../../shared/types'
 
 const props = defineProps<{ step: StepNode }>()
 const emit = defineEmits<{ (e: 'change'): void }>()
@@ -124,6 +128,38 @@ const computedCfg = computed<{ name: string; expression: string }>(() => {
   ensureConfig({ name: '', expression: '' })
   return props.step.config as { name: string; expression: string }
 })
+
+/* ------------------------------ report ------------------------------ */
+
+const reportDoc = computed({
+  get(): AnalysisReport {
+    if (props.step.type !== 'report') return emptyReport()
+    const r = readReportConfig(props.step.config)
+    if (!props.step.config.report) props.step.config.report = r
+    return r
+  },
+  set(v: AnalysisReport) {
+    props.step.config.report = v
+    emit('change')
+  },
+})
+
+function applyReport(r: AnalysisReport) {
+  props.step.config.report = r
+  emit('change')
+}
+
+function onReportTitleInput(v: string) {
+  const next = { ...reportDoc.value, title: v }
+  props.step.config.report = next
+  emit('change')
+}
+
+function onReportSubtitleInput(v: string) {
+  const next = { ...reportDoc.value, subtitle: v }
+  props.step.config.report = next
+  emit('change')
+}
 
 /* ------------------------------ custom-code ------------------------------ */
 
@@ -511,6 +547,37 @@ watch(() => props.step.type, () => {
       </section>
     </template>
 
+    <!-- Report -->
+    <template v-else-if="step.type === 'report'">
+      <section class="scf__section scf__section--report">
+        <ReportAiAssist
+          :step="step"
+          :analysis="current"
+          :report="reportDoc"
+          @apply="applyReport"
+        />
+        <div class="scf__field">
+          <label class="scf__label">报告标题</label>
+          <ITextField
+            :model-value="reportDoc.title"
+            size="sm"
+            @update:model-value="onReportTitleInput(String($event ?? ''))"
+          />
+        </div>
+        <div class="scf__field">
+          <label class="scf__label">副标题</label>
+          <ITextField
+            :model-value="reportDoc.subtitle ?? ''"
+            size="sm"
+            placeholder="可选"
+            @update:model-value="onReportSubtitleInput(String($event ?? ''))"
+          />
+        </div>
+        <h4 class="scf__section-title">预览</h4>
+        <ReportPreview :report="reportDoc" :analysis="current" />
+      </section>
+    </template>
+
     <!-- Custom code -->
     <template v-else-if="step.type === 'custom-code'">
       <section class="scf__section scf__section--code">
@@ -738,11 +805,18 @@ watch(() => props.step.type, () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 .scf__section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.scf__section--report,
+.scf__section--code {
+  flex: 1;
+  min-height: 0;
 }
 .scf__section-title {
   font-size: 11px;

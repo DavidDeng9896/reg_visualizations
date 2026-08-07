@@ -26,6 +26,7 @@ import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
 import type { PortType, StepInputRef, StepNode, StepType } from '../../shared/types'
 import { debounce } from '../charts/draft'
+import { createStepNode } from '../steps/factory'
 import { runStepAsync, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 
@@ -106,8 +107,19 @@ const alive = ref(true)
 const activeNode = computed(() => (activeId.value ? nodeById.value.get(activeId.value) ?? null : null))
 const activeInputs = computed(() => (activeId.value ? upstreamOf(graph.value, activeId.value) : []))
 const activeOutputs = computed(() => (activeId.value ? downstreamOf(graph.value, activeId.value) : []))
-/** 详情卡是否展示（固定模式下无选中时收起第二栏，避免空白面板）。 */
-const detailOpen = computed(() => !!activeNode.value && !editingStep.value)
+/**
+ * 右侧/下侧分栏是否展示：选中节点详情，或正在编辑步骤配置。
+ * 步骤配置与节点详情共用 ISplitPane，避免绝对定位抽屉盖住画布。
+ */
+const detailOpen = computed(() => !!editingStepData.value || !!activeNode.value)
+
+/** 编辑宽面板（Custom Code / 报告）时略提高第二栏下限，便于预览。 */
+const splitMinSecond = computed(() => {
+  if (detailLayout.value === 'bottom') return 160
+  const t = editingStepData.value?.type
+  if (t === 'custom-code' || t === 'report') return 380
+  return 300
+})
 const zoomPercent = computed(() => Math.round((viewport.value.zoom || 1) * 100))
 
 const linkedIds = computed<Set<string>>(() => {
@@ -343,12 +355,12 @@ async function centerOn(id: string): Promise<void> {
 }
 
 /**
- * 适应视图：右侧配置/目录面板打开时，为面板预留右侧 padding，
- * 避免节点被面板遮挡（对齐 Benchling 画布与面板共存的行为）。
+ * 适应视图：仅「添加步骤」仍为叠层抽屉时预留右侧 padding；
+ * 步骤配置已进 ISplitPane，画布宽度会随分割自动收缩，无需额外 padding。
  */
 const FIT_PANEL_WIDTH = 340
 function fitAll(duration = 300): void {
-  const panelOpen = addStepOpen.value || !!editingStep.value
+  const panelOpen = addStepOpen.value
   void fitView({
     duration,
     maxZoom: 1.25,
@@ -567,6 +579,20 @@ function onStepSelected(type: StepType): void {
   })
 }
 
+/** 添加独立报告节点（无需连线）。 */
+function addReportNode(): void {
+  if (!current.value) return
+  const step = createStepNode('report', '分析报告')
+  store.mutate((a) => {
+    a.steps.push(step)
+  })
+  const newNodeId = stepNodeId(step.id)
+  void nextTick(() => {
+    openStepEditor(step.id, true)
+    setActive(newNodeId)
+  })
+}
+
 /* --------------------------------- 步骤编辑面板 -------------------------------- */
 
 const editingStep = ref<string | null>(null)
@@ -711,7 +737,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       :direction="detailLayout === 'bottom' ? 'vertical' : 'horizontal'"
       :default-ratio="detailLayout === 'bottom' ? 0.6 : 0.65"
       :min-first="detailLayout === 'bottom' ? 200 : 320"
-      :min-second="detailLayout === 'bottom' ? 160 : 300"
+      :min-second="splitMinSecond"
       storage-key="flow-detail"
     >
       <template #first>
@@ -792,6 +818,17 @@ function minimapNodeColor(node: { data?: unknown }): string {
             <IIcon name="arrange" :size="14" />
           </button>
         </ITooltip>
+        <ITooltip content="添加分析报告">
+          <button
+            type="button"
+            class="flow-controls__btn"
+            aria-label="添加分析报告"
+            :disabled="!current"
+            @click="addReportNode()"
+          >
+            <IIcon name="file-text" :size="14" />
+          </button>
+        </ITooltip>
         <ITooltip v-if="hasStale" content="重新运行所有待更新步骤">
           <button type="button" class="flow-controls__btn flow-controls__btn--run" aria-label="重新运行" @click="runAll()">
             <IIcon name="play" :size="14" />
@@ -838,8 +875,18 @@ function minimapNodeColor(node: { data?: unknown }): string {
         </div>
       </template>
       <template #second>
+        <StepConfigPanel
+          v-if="editingStepData"
+          :step="editingStepData"
+          docked
+          :layout="detailLayout"
+          @update:layout="setDetailLayout"
+          @close="closeStepEditor(true)"
+          @save="onStepSaved"
+          @delete="onStepDeleted(editingStep!)"
+        />
         <NodeDetailCard
-          v-if="activeNode && !editingStep"
+          v-else-if="activeNode"
           :key="activeNode.id"
           :node="activeNode"
           :inputs="activeInputs"
@@ -861,14 +908,6 @@ function minimapNodeColor(node: { data?: unknown }): string {
       :source-port-type="addStepSourcePortType"
       @update:open="addStepOpen = $event"
       @select="onStepSelected"
-    />
-
-    <StepConfigPanel
-      v-if="editingStepData"
-      :step="editingStepData"
-      @close="closeStepEditor(true)"
-      @save="onStepSaved"
-      @delete="onStepDeleted(editingStep!)"
     />
   </div>
 </template>

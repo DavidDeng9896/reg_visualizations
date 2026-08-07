@@ -56,6 +56,10 @@ const icon = computed<IconName>(() => {
       return 'type-number'
     case 'interpolation':
       return 'line'
+    case 'custom-code':
+      return 'database'
+    case 'report':
+      return 'file-text'
     default:
       return 'database'
   }

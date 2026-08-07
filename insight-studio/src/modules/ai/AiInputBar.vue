@@ -508,6 +508,10 @@ watch(
               <span class="bar__perm-name is-ellipsis">{{ permissionOption.label }}</span>
               <IIcon name="chevron-down" :size="12" />
             </button>
+            <label class="bar__report" title="分析任务完成后自动创建/更新科研风格报告节点" data-testid="ai-want-report">
+              <input v-model="ai.wantReport" type="checkbox" />
+              <span>完成后生成报告</span>
+            </label>
             <span class="bar__spacer" />
             <button
               type="button"
@@ -867,6 +871,27 @@ watch(
 }
 .bar__perm-name {
   min-width: 0;
+}
+.bar__report {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: var(--is-radius-full);
+  color: var(--is-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+.bar__report:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
+}
+.bar__report input {
+  margin: 0;
+  accent-color: var(--is-accent, #2563eb);
 }
 .bar__model {
   display: inline-flex;

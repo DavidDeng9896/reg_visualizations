@@ -81,6 +81,8 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
       'set_chart_config',
       'create_dashboard',
       'add_dashboard_widget',
+      'create_report_step',
+      'update_report_step',
     ],
     allowMcp: false,
   },
