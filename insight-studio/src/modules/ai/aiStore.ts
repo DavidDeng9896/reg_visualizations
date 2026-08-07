@@ -261,6 +261,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
 
       const analysis = useAnalysisStore().current
       const chatMessages: ChatMessage[] = [
@@ -306,9 +307,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -325,8 +326,11 @@ export const useAiStore = defineStore('ai', {
         }
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        // stop() 可能已提前清 running；仅本轮 ac 仍挂着时再清，避免误伤新一轮
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
       if (!aborted) await this.maybeAutoContinue(assistant)
@@ -359,6 +363,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
 
       // 系统提示 + 检查点之前历史 + 上一轮工具轨迹 + 续跑指令
       const chatMessages: ChatMessage[] = [
@@ -401,9 +406,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           initialPlan: { steps: prev.planSteps, done: doneSnapshot },
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
@@ -425,8 +430,10 @@ export const useAiStore = defineStore('ai', {
         if (!aborted) syncPlanCheckpoint(prev, assistant)
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
       if (!aborted) await this.maybeAutoContinue(assistant)
@@ -546,6 +553,7 @@ export const useAiStore = defineStore('ai', {
 
       this.running = true
       this.abort = new AbortController()
+      const ac = this.abort
       assistant.streaming = true
       const { tools, exec } = await this.buildToolsAndExec()
       const baseLen = messages.length
@@ -556,9 +564,9 @@ export const useAiStore = defineStore('ai', {
           exec,
           maxIterations: this.config?.maxIterations ?? 100,
           model: this.modelOverride ?? undefined,
-          signal: this.abort.signal,
-          askUser: this.makeAskUser(this.abort.signal),
-          waitConfirm: this.makeWaitConfirm(this.abort.signal),
+          signal: ac.signal,
+          askUser: this.makeAskUser(ac.signal),
+          waitConfirm: this.makeWaitConfirm(ac.signal),
           onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -574,8 +582,10 @@ export const useAiStore = defineStore('ai', {
         }
       } finally {
         assistant.streaming = false
-        this.running = false
-        this.abort = null
+        if (this.abort === ac) {
+          this.running = false
+          this.abort = null
+        }
         await this.persist()
       }
     },
@@ -678,14 +688,18 @@ export const useAiStore = defineStore('ai', {
       return true
     },
 
-    /** 用户主动结束：中止 loop/工人，关闭所有「继续任务」提示，结算挂起交互。 */
+    /** 用户主动结束：中止 loop/工人，立刻停掉进行中 UI，关闭「继续任务」提示。 */
     stop() {
-      this.abort?.abort()
+      const ac = this.abort
+      ac?.abort()
       this.settleAsk('（用户中止了本次生成）')
       this.settleConfirm('用户中止了本次生成，危险操作未执行。')
       this.pendingAsk = null
       autoContinueCount = 0
       applyUserAbortToMessages(this.messages)
+      // 立刻结束全局「正在生成」态（光影/转圈/停止按钮），不等 finally
+      this.running = false
+      if (this.abort === ac) this.abort = null
       void this.persist()
     },
 

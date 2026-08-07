@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { IIcon } from '../../ui'
 
-/** 计划清单：逐项打勾（对齐参考图「进展」）。 */
+/** 计划清单：逐项打勾（对齐参考图「进展」）。仅在 streaming 时对当前步转圈。 */
 const props = defineProps<{
   steps: string[]
   done: number[]
@@ -22,7 +22,8 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
     >
       <span class="plan__icon">
         <span v-if="nextIndex(i) === 'done'" class="plan__circle plan__circle--done"><IIcon name="check" :size="10" /></span>
-        <IIcon v-else-if="nextIndex(i) === 'doing'" name="spinner" :size="12" class="plan__spin" />
+        <IIcon v-else-if="nextIndex(i) === 'doing' && streaming" name="spinner" :size="12" class="plan__spin" />
+        <span v-else-if="nextIndex(i) === 'doing'" class="plan__circle plan__circle--paused" title="已暂停" />
         <span v-else class="plan__circle" />
       </span>
       <span class="plan__text">{{ s }}</span>
@@ -78,6 +79,10 @@ const nextIndex = (i: number) => (props.done.includes(i) ? 'done' : i === (props
   background: var(--is-success);
   border-color: var(--is-success);
   color: #fff;
+}
+.plan__circle--paused {
+  border-color: var(--is-text-tertiary);
+  border-style: dashed;
 }
 .plan__step--doing .plan__icon {
   color: var(--is-accent);

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { applyUserAbortToMessages } from '../../../src/modules/ai/userAbort'
 
 describe('applyUserAbortToMessages', () => {
-  it('关闭继续任务检查点并结算进行中的工具', () => {
+  it('关闭继续任务检查点并立刻停掉 streaming / 转圈 / 进行中工具', () => {
     const messages = [
       {
         role: 'assistant',
+        streaming: true,
         planSteps: ['a', 'b'],
         planDone: [0],
         incomplete: true,
@@ -23,6 +24,7 @@ describe('applyUserAbortToMessages', () => {
       },
     ]
     applyUserAbortToMessages(messages)
+    expect(messages[0].streaming).toBe(false)
     expect(messages[0].planDismissed).toBe(true)
     expect(messages[0].incomplete).toBe(false)
     expect(messages[0].trace[0].running).toBe(false)

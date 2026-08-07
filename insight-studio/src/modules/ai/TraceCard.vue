@@ -30,8 +30,8 @@ const expanded = ref(false)
 const openDetail = ref<Set<string>>(new Set())
 
 const doneCount = computed(() => props.items.filter((t) => !t.running).length)
-/** 任一子操作仍在执行 → 进行中（与整轮 streaming 解耦）。 */
-const inProgress = computed(() => props.items.some((t) => t.running))
+/** 子操作仍在执行且整轮未结束 → 进行中（中止后 streaming/running 都会清掉）。 */
+const inProgress = computed(() => !!props.streaming && props.items.some((t) => t.running))
 
 const pending = computed(() => {
   const seen = new Set<string>()
@@ -101,7 +101,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
           @click="hasDetail(t) && toggleDetail(t.id)"
         >
           <span class="trace__status">
-            <IIcon v-if="t.running" name="spinner" :size="11" class="trace__spin" />
+            <IIcon v-if="t.running && streaming" name="spinner" :size="11" class="trace__spin" />
             <IIcon
               v-else-if="t.needsConfirmation && !t.confirmed && !t.rejected"
               name="warning"
@@ -111,7 +111,7 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
             <IIcon v-else-if="t.ok" name="check" :size="11" class="trace__ok" />
             <IIcon v-else name="close" :size="11" class="trace__fail" />
           </span>
-          <span class="trace__label" :class="{ 'trace__shimmer': t.running }">{{ briefOpLabel(t) }}</span>
+          <span class="trace__label" :class="{ 'trace__shimmer': t.running && streaming }">{{ briefOpLabel(t) }}</span>
           <IIcon
             v-if="hasDetail(t)"
             name="chevron-right"

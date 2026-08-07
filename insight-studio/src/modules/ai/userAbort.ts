@@ -1,6 +1,6 @@
 /**
  * 用户主动中止生成时，清理会话内「可续跑 / 进行中」状态，
- * 避免再弹出「继续任务」卡片。
+ * 避免再弹出「继续任务」卡片，并立刻停掉光影/转圈等进行中 UI。
  */
 export interface AbortableTrace {
   running?: boolean
@@ -15,6 +15,8 @@ export interface AbortableTrace {
 
 export interface AbortableMessage {
   role: string
+  /** 流式/生成中标记：中止后必须立刻清掉，否则进展转圈与思考卡会挂住。 */
+  streaming?: boolean
   planSteps?: string[]
   incomplete?: boolean
   planDismissed?: boolean
@@ -25,6 +27,7 @@ export interface AbortableMessage {
 export function applyUserAbortToMessages(messages: AbortableMessage[]): void {
   for (const m of messages) {
     if (m.role !== 'assistant') continue
+    m.streaming = false
     if (m.planSteps?.length || m.incomplete) {
       m.planDismissed = true
       m.incomplete = false
