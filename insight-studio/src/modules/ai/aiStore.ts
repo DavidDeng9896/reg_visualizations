@@ -821,7 +821,7 @@ export const useAiStore = defineStore('ai', {
       return true
     },
 
-    /** 用户主动结束：中止 loop/工人，立刻停掉进行中 UI，关闭「继续任务」提示。 */
+    /** 用户主动结束：中止 loop/子代理，立刻停掉进行中 UI，关闭「继续任务」提示。 */
     stop() {
       const ac = this.abort
       ac?.abort()

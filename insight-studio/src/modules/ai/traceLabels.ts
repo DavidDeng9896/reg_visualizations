@@ -33,10 +33,10 @@ const TOOL_LABELS: Record<string, string> = {
   list_skills: '列出 Skills',
   read_skill: '读取 Skill',
   save_memory: '保存分析记忆',
-  delegate_skill_worker: '派发 Skill 工人',
-  delegate_mcp_worker: '派发 MCP 工人',
-  delegate_analysis_worker: '派发分析工人',
-  delegate_code_worker: '派发代码工人',
+  delegate_skill_worker: '派发规划师',
+  delegate_mcp_worker: '派发 MCP 专家',
+  delegate_analysis_worker: '派发分析师',
+  delegate_code_worker: '派发工程师',
 }
 
 function firstStr(args: Record<string, unknown> | undefined, keys: string[]): string {

@@ -48,7 +48,7 @@ export type AgentEvent =
   | { type: 'incomplete'; reason: string; pendingSteps: Array<{ index: number; text: string }> }
   | { type: 'done'; content: string }
   | { type: 'error'; message: string }
-  /** 工人内部进展（用于 Trace 上显示「工人进行中：xxx」）。 */
+  /** 子代理内部进展（用于 Trace 上显示「分析师进行中：xxx」）。 */
   | { type: 'worker_progress'; id: string; summary: string }
 
 export class MaxIterError extends Error {
@@ -109,7 +109,7 @@ export interface RunAgentOptions {
   maxPlanNudges?: number
   /**
    * Worker 严格模式：无 tool_calls / 仅探路就收工时催促继续。
-   * 与 planGate 独立；工人子 loop 应开启。
+   * 与 planGate 独立；分析师/工程师子 loop 应开启。
    */
   workerStrict?: boolean
 }
@@ -237,7 +237,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           messages.push({
             role: 'system',
             content:
-              '【工人未完成】目标尚未落地。请立即继续 tool_calls（加工/Custom Code/建图/配置），禁止只 list_tables/get_table_schema 就结束；不要复述目标长文。',
+              '【任务未完成】目标尚未落地。请立即继续 tool_calls（加工/Custom Code/建图/配置），禁止只 list_tables/get_table_schema 就结束；不要复述目标长文。',
           })
           continue
         }
@@ -351,7 +351,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           })
         } catch (e) {
           if (e instanceof DOMException && e.name === 'AbortError') throw e
-          result = { ok: false, summary: `工人执行失败：${e instanceof Error ? e.message : String(e)}` }
+          result = { ok: false, summary: `子代理执行失败：${e instanceof Error ? e.message : String(e)}` }
         }
         pushToolContent(call, name, result.summary, result)
         continue

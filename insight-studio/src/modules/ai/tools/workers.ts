@@ -1,5 +1,6 @@
 /**
- * Subagent Workers：受限工具集 + 独立短 loop，摘要回灌主 Planner。
+ * Subagent 角色：受限工具集 + 独立短 loop，摘要回灌主 Planner。
+ * 展示名：规划师 / MCP 专家 / 分析师 / 工程师。
  */
 import type { ChatMessage, ChatPayload } from '../client'
 import { contentText } from '../client'
@@ -15,7 +16,7 @@ export interface WorkerSpec {
   toolName: string
   role: string
   maxIterations: number
-  /** 内置工具名白名单；mcp 工人额外允许全部 mcp_*。 */
+  /** 内置工具名白名单；MCP 专家额外允许全部 mcp_*。 */
   allowBuiltin: string[]
   allowMcp: boolean
 }
@@ -29,8 +30,8 @@ export const WORKER_READ_ONLY_TOOLS = new Set([
   'read_skill',
 ])
 
-/** 分析/代码工人速查：补全冷启动缺失的平台知识。 */
-const WORKER_PLATFORM_BRIEF = `## 平台要点（工人速查）
+/** 分析师/工程师速查：补全冷启动缺失的平台知识。 */
+const WORKER_PLATFORM_BRIEF = `## 平台要点（速查）
 - 列名用原始 field（可含空格/特殊字符），title 仅展示名。
 - Custom Code 入口：def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]；写完后 run_step。
 - line：x + values[]；scatter：x + values，可用 color；分组用 series/color。
@@ -40,7 +41,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_skill_worker: {
     kind: 'skill',
     toolName: 'delegate_skill_worker',
-    role: 'Skill 工人',
+    role: '规划师',
     maxIterations: 8,
     allowBuiltin: ['list_skills', 'read_skill'],
     allowMcp: false,
@@ -48,7 +49,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_mcp_worker: {
     kind: 'mcp',
     toolName: 'delegate_mcp_worker',
-    role: 'MCP 工人',
+    role: 'MCP 专家',
     maxIterations: 12,
     allowBuiltin: [],
     allowMcp: true,
@@ -56,7 +57,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_analysis_worker: {
     kind: 'analysis',
     toolName: 'delegate_analysis_worker',
-    role: '分析工人',
+    role: '分析师',
     // 清洗 + 多图配置常需 20+ 轮；过低会未跑完就超轮
     maxIterations: 36,
     allowBuiltin: [
@@ -86,7 +87,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_code_worker: {
     kind: 'code',
     toolName: 'delegate_code_worker',
-    role: 'Custom Code 工人',
+    role: '工程师',
     maxIterations: 24,
     allowBuiltin: [
       'list_tables',
@@ -145,7 +146,7 @@ function toolNamesUsed(messages: ChatMessage[]): string[] {
     .map((m) => String(m.name))
 }
 
-/** 是否只做了只读探路、没有任何落地工具（分析/代码工人用）。 */
+/** 是否只做了只读探路、没有任何落地工具（分析师/工程师用）。 */
 export function workerOnlyExplored(messages: ChatMessage[]): boolean {
   const names = toolNamesUsed(messages)
   if (!names.length) return true
@@ -153,8 +154,8 @@ export function workerOnlyExplored(messages: ChatMessage[]): boolean {
 }
 
 /**
- * 从主循环消息提取工人可用的工作区上下文（分析表结构、@ 引用、记忆）
- * 以及最近非工人工具观察，避免工人冷启动一无所知。
+ * 从主循环消息提取子代理可用的工作区上下文（分析表结构、@ 引用、记忆）
+ * 以及最近非子代理工具观察，避免冷启动一无所知。
  */
 export function extractParentContextForWorker(parentMessages: ChatMessage[] | undefined): string {
   if (!parentMessages?.length) return ''
@@ -197,8 +198,8 @@ export function extractParentContextForWorker(parentMessages: ChatMessage[] | un
   return joined.length > 10000 ? `${joined.slice(0, 10000)}\n…` : joined
 }
 
-/** 从工人会话中提炼末条助手文本作为摘要。 */
-function summarizeWorkerMessages(messages: ChatMessage[], goal: string): string {
+/** 从子代理会话中提炼末条助手文本作为摘要。 */
+function summarizeWorkerMessages(messages: ChatMessage[], goal: string, role: string): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const m = messages[i]
     const text = contentText(m.content).trim()
@@ -208,9 +209,9 @@ function summarizeWorkerMessages(messages: ChatMessage[], goal: string): string 
   }
   const tools = messages.filter((m) => m.role === 'tool').map((m) => contentText(m.content))
   if (tools.length) {
-    return clipToolResult(`工人已执行 ${tools.length} 个工具。目标：${goal}\n末次观察：${tools[tools.length - 1]}`)
+    return clipToolResult(`${role}已执行 ${tools.length} 个工具。目标：${goal}\n末次观察：${tools[tools.length - 1]}`)
   }
-  return `工人未产出有效结果。目标：${goal}`
+  return `${role}未产出有效结果。目标：${goal}`
 }
 
 export interface RunWorkerOpts {
@@ -220,16 +221,16 @@ export interface RunWorkerOpts {
   parent: Pick<RunAgentOptions, 'exec' | 'model' | 'signal' | 'askUser' | 'waitConfirm' | 'postChatFn'>
   /** 主循环当前 messages，用于注入工作区上下文。 */
   parentMessages?: ChatMessage[]
-  /** 工人内部进展回调（供 Trace 显示「工人进行中：xxx」）。 */
+  /** 子代理内部进展回调（供 Trace 显示「分析师进行中：xxx」）。 */
   onProgress?: (summary: string) => void
 }
 
-/** 跑一个 Worker 短 loop，返回摘要型 ToolExecResult。 */
+/** 跑一个子代理短 loop，返回摘要型 ToolExecResult。 */
 export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecResult> {
   const spec = WORKER_SPECS[opts.workerName]
-  if (!spec) return { ok: false, summary: `未知工人：${opts.workerName}` }
+  if (!spec) return { ok: false, summary: `未知子代理：${opts.workerName}` }
   const goal = opts.goal.trim()
-  if (!goal) return { ok: false, summary: '缺少 goal（请说明工人要完成的具体目标）' }
+  if (!goal) return { ok: false, summary: `缺少 goal（请说明「${spec?.role ?? '子代理'}」要完成的具体目标）` }
 
   const tools = filterToolsForWorker(opts.parentTools, spec)
   if (!tools.length) {
@@ -237,7 +238,7 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
       ok: false,
       summary: spec.allowMcp
         ? '当前无可用 MCP 工具（请先在设置中启用 MCP 服务器）'
-        : `工人 ${spec.role} 无可用工具`,
+        : `「${spec.role}」无可用工具`,
     }
   }
 
@@ -261,9 +262,9 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
     const { runAgent } = await import('../agentLoop')
     const onWorkerEvent = (e: AgentEvent) => {
       if (!opts.onProgress) return
-      if (e.type === 'tool_call') opts.onProgress(`工人进行中：${e.call.function.name}…`)
-      else if (e.type === 'tool_result') opts.onProgress(`工人完成：${e.name}${e.ok === false ? '（失败）' : ''}`)
-      else if (e.type === 'round') opts.onProgress(`工人第 ${e.n} 轮…`)
+      if (e.type === 'tool_call') opts.onProgress(`${spec.role}进行中：${e.call.function.name}…`)
+      else if (e.type === 'tool_result') opts.onProgress(`${spec.role}完成：${e.name}${e.ok === false ? '（失败）' : ''}`)
+      else if (e.type === 'round') opts.onProgress(`${spec.role}第 ${e.n} 轮…`)
     }
     const messages = await runAgent({
       messages: seed,
@@ -276,16 +277,16 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
       waitConfirm: opts.parent.waitConfirm,
       postChatFn: opts.parent.postChatFn,
       planGate: false,
-      // 分析/代码工人禁止只读探路就收工；Skill/MCP 以读/调用本身为交付
+      // 分析师/工程师禁止只读探路就收工；规划师/MCP 专家以读/调用本身为交付
       workerStrict: spec.kind === 'analysis' || spec.kind === 'code',
       onEvent: onWorkerEvent,
     })
-    const summary = summarizeWorkerMessages(messages, goal)
-    // 分析/代码：只读探路就收工 → 视为未完成
+    const summary = summarizeWorkerMessages(messages, goal, spec.role)
+    // 分析师/工程师：只读探路就收工 → 视为未完成
     if ((spec.kind === 'analysis' || spec.kind === 'code') && workerOnlyExplored(messages)) {
       return {
         ok: false,
-        summary: `【${spec.role}】未完成：仅做了探路（list/schema），未落地加工/建图/写代码。请缩小 goal 或再派工人继续。\n${summary}`,
+        summary: `【${spec.role}】未完成：仅做了探路（list/schema），未落地加工/建图/写代码。请缩小 goal 或再派分析师/工程师继续。\n${summary}`,
       }
     }
     return { ok: true, summary: `【${spec.role}】${summary}` }

@@ -294,7 +294,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     let depth = 0
     const post = async (p: ChatPayload) => {
       const isWorker = p.messages.some(
-        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('Skill 工人'),
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('规划师'),
       )
       if (isWorker) {
         depth += 1
@@ -337,7 +337,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     })
     expect(depth).toBeGreaterThan(0)
     const workerResult = messages.find((m) => m.role === 'tool' && m.name === 'delegate_skill_worker')
-    expect(workerResult?.content).toContain('Skill 工人')
+    expect(workerResult?.content).toContain('规划师')
     expect(workerResult?.content).toContain('要点')
     expect(evts.some((e) => e.type === 'done' && e.content === '主循环完成')).toBe(true)
   })
@@ -478,7 +478,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     const post = async (p: ChatPayload) => {
       n += 1
       const nudged = p.messages.some(
-        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('工人未完成'),
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('任务未完成'),
       )
       if (!nudged && n === 1) return sseOf({ toolCalls: [call('get_table_schema', { tableId: 't1' })] })
       if (!nudged) return sseOf({ content: '' }) // 试图空收工
@@ -506,7 +506,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
   it('workerStrict：已有落地工具后短总结可收工（不因文案短误催促）', async () => {
     let nudgeCount = 0
     const post = async (p: ChatPayload) => {
-      if (p.messages.some((m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('工人未完成'))) {
+      if (p.messages.some((m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('任务未完成'))) {
         nudgeCount += 1
       }
       const tools = p.messages.filter((m) => m.role === 'tool').length

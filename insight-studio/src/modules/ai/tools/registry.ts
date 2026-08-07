@@ -237,26 +237,26 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'delegate_skill_worker',
     description:
-      '派发 Skill 工人：在独立短循环中 list/read Skill，提炼与 goal 相关的要点后摘要返回。适合隔离 Skill 全文，避免塞进主对话。',
-    parameters: { type: 'object', properties: { goal: str('工人要完成的具体目标（含相关 skill 线索）') }, required: ['goal'] },
+      '派发「规划师」：在独立短循环中 list/read Skill，提炼与 goal 相关的要点后摘要返回。适合隔离 Skill 全文，避免塞进主对话。',
+    parameters: { type: 'object', properties: { goal: str('规划师要完成的具体目标（含相关 skill 线索）') }, required: ['goal'] },
   },
   {
     name: 'delegate_mcp_worker',
     description:
-      '派发 MCP 工人：在独立短循环中调用已启用的 mcp_* 工具，返回结构化摘要。外部系统多步查询/写入时可用。',
-    parameters: { type: 'object', properties: { goal: str('工人要完成的具体 MCP 目标') }, required: ['goal'] },
+      '派发「MCP 专家」：在独立短循环中调用已启用的 mcp_* 工具，返回结构化摘要。外部系统多步查询/写入时可用。',
+    parameters: { type: 'object', properties: { goal: str('MCP 专家要完成的具体目标') }, required: ['goal'] },
   },
   {
     name: 'delegate_analysis_worker',
     description:
-      '派发分析工人：独立循环做表加工、Custom Code、出图、看板（不含删除）。主循环也可直接做同类操作；步骤很多或需隔离时再派。goal 须含表 id 与字段线索。',
-    parameters: { type: 'object', properties: { goal: str('工人要完成的分析/出图目标（含表 id、字段名）') }, required: ['goal'] },
+      '派发「分析师」：独立循环做表加工、Custom Code、出图、看板（不含删除）。主循环也可直接做同类操作；步骤很多或需隔离时再派。goal 须含表 id 与字段线索。',
+    parameters: { type: 'object', properties: { goal: str('分析师要完成的分析/出图目标（含表 id、字段名）') }, required: ['goal'] },
   },
   {
     name: 'delegate_code_worker',
     description:
-      '派发 Custom Code 工人：编写/更新 Python Custom Code 步骤并执行自测，返回结论与步骤/表 id。短代码主循环可直接写。',
-    parameters: { type: 'object', properties: { goal: str('工人要完成的代码目标') }, required: ['goal'] },
+      '派发「工程师」：编写/更新 Python Custom Code 步骤并执行自测，返回结论与步骤/表 id。短代码主循环可直接写。',
+    parameters: { type: 'object', properties: { goal: str('工程师要完成的代码目标') }, required: ['goal'] },
   },
 ]
 
