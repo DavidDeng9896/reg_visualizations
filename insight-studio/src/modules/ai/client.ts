@@ -61,6 +61,55 @@ interface SseChunk {
 /* ------------------------------- SSE 解析 ------------------------------- */
 
 /**
+ * 合并 SSE 中的 tool function.name。
+ * OpenAI 多为增量片段；部分上游（如豆包）每帧重发完整 name——盲 += 会变成
+ * `add_custom_code_stepadd_custom_code_step` 导致「未知工具」。
+ */
+export function mergeStreamedToolName(existing: string, incoming: string): string {
+  if (!incoming) return existing
+  if (!existing) return incoming
+  if (incoming === existing) return existing
+  if (incoming.startsWith(existing)) return incoming
+  if (existing.startsWith(incoming)) return existing
+  return existing + incoming
+}
+
+/**
+ * 发往上游前规范化 messages，避免豆包等返回 Invalid request body：
+ * - 带 tool_calls 的 assistant：空 content 必须为 null（不能是 ""）
+ * - 去掉无内容且无 tool_calls 的空消息
+ */
+export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = []
+  for (const m of messages) {
+    const next: ChatMessage = { ...m }
+    if (next.tool_calls?.length) {
+      next.tool_calls = next.tool_calls.map((c) => ({
+        ...c,
+        type: 'function' as const,
+        function: {
+          name: c.function.name,
+          arguments: c.function.arguments ?? '',
+        },
+      }))
+    }
+    if (next.role === 'assistant' && next.tool_calls?.length) {
+      if (contentText(next.content).trim() === '') {
+        next.content = null
+      }
+    } else if (next.role !== 'tool') {
+      const empty =
+        next.content == null ||
+        (typeof next.content === 'string' && next.content.trim() === '') ||
+        (Array.isArray(next.content) && next.content.length === 0)
+      if (empty && !next.tool_calls?.length) continue
+    }
+    out.push(next)
+  }
+  return out
+}
+
+/**
  * 解析 OpenAI SSE 流：逐 chunk 回调 delta 文本与 tool_calls 增量，
  * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文）。
  */
@@ -97,7 +146,9 @@ export async function readSseStream(
           function: { name: '', arguments: '' },
         }
         if (part.id) cur.id = part.id
-        if (part.function?.name) cur.function.name += part.function.name
+        if (part.function?.name) {
+          cur.function.name = mergeStreamedToolName(cur.function.name, part.function.name)
+        }
         if (part.function?.arguments) cur.function.arguments += part.function.arguments
         calls.set(idx, cur)
       }
@@ -195,7 +246,11 @@ export async function postChat(payload: ChatPayload, signal?: AbortSignal): Prom
   const res = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, stream: true }),
+    body: JSON.stringify({
+      ...payload,
+      messages: sanitizeChatMessages(payload.messages),
+      stream: true,
+    }),
     signal,
   })
   if (!res.ok) {

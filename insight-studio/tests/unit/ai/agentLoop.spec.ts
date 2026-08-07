@@ -362,7 +362,34 @@ describe('agentLoop（ReAct 多轮循环）', () => {
       postChatFn: post,
     })
     const withTools = messages.find((m) => m.role === 'assistant' && (m.tool_calls?.length ?? 0) > 0)
-    expect(withTools?.content ?? '').toBe('')
+    expect(withTools?.content).toBeNull()
+  })
+
+  it('下一轮请求中 tool_calls assistant 的 content 为 null（非空串）', async () => {
+    const seen: ChatPayload[] = []
+    const post = async (p: ChatPayload) => {
+      seen.push(p)
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) {
+        return sseOf({
+          content: '先看一眼表',
+          toolCalls: [call('list_tables', {})],
+        })
+      }
+      return sseOf({ content: '完成' })
+    }
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'ok' }),
+      maxIterations: 4,
+      planGate: false,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    expect(seen.length).toBeGreaterThanOrEqual(2)
+    const asst = seen[1].messages.find((m) => m.role === 'assistant' && (m.tool_calls?.length ?? 0) > 0)
+    expect(asst?.content).toBeNull()
   })
 
   it('连续复读无工具 → 强制收束并 incomplete', async () => {
@@ -454,7 +481,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */
-import { readSseStream } from '../../../src/modules/ai/client'
+import { readSseStream, sanitizeChatMessages, mergeStreamedToolName } from '../../../src/modules/ai/client'
 
 describe('readSseStream（OpenAI SSE 聚合）', () => {
   it('分片 tool_calls 聚合：id/name/arguments 拼接', async () => {
@@ -473,5 +500,56 @@ describe('readSseStream（OpenAI SSE 聚合）', () => {
     expect(msg.tool_calls).toHaveLength(1)
     expect(msg.tool_calls![0].function.name).toBe('list_tables')
     expect(msg.tool_calls![0].function.arguments).toBe('{"a":1}')
+  })
+
+  it('每帧重发完整 tool name 时不翻倍', async () => {
+    const name = 'add_custom_code_step'
+    const chunks = [
+      {
+        choices: [
+          {
+            delta: {
+              role: 'assistant',
+              tool_calls: [{ index: 0, id: 'call_x', type: 'function', function: { name, arguments: '{' } }],
+            },
+          },
+        ],
+      },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { name, arguments: '"a":1}' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { name } }] } }] },
+    ]
+    const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n'
+    const res = new Response(new ReadableStream({ start: (c) => { c.enqueue(new TextEncoder().encode(body)); c.close() } }))
+    const msg = await readSseStream(res)
+    expect(msg.tool_calls).toHaveLength(1)
+    expect(msg.tool_calls![0].function.name).toBe('add_custom_code_step')
+    expect(msg.tool_calls![0].function.arguments).toBe('{"a":1}')
+  })
+})
+
+describe('sanitizeChatMessages / mergeStreamedToolName', () => {
+  it('assistant+tool_calls 的空 content 规范为 null', () => {
+    const out = sanitizeChatMessages([
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'list_tables', arguments: '{}' } }],
+      },
+      { role: 'tool', tool_call_id: 'c1', name: 'list_tables', content: 'ok' },
+      { role: 'assistant', content: '   ' },
+      { role: 'system', content: '' },
+    ])
+    expect(out).toHaveLength(3)
+    expect(out[1].content).toBeNull()
+    expect(out[1].tool_calls?.[0].function.name).toBe('list_tables')
+  })
+
+  it('mergeStreamedToolName：重发/前缀/增量', () => {
+    expect(mergeStreamedToolName('', 'list_tables')).toBe('list_tables')
+    expect(mergeStreamedToolName('list_tables', 'list_tables')).toBe('list_tables')
+    expect(mergeStreamedToolName('list_', 'list_tables')).toBe('list_tables')
+    expect(mergeStreamedToolName('list_tables', 'list_')).toBe('list_tables')
+    expect(mergeStreamedToolName('list_', 'tables')).toBe('list_tables')
   })
 })
