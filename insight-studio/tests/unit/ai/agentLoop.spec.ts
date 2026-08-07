@@ -421,6 +421,36 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(evts.filter((e) => e.type === 'plan')).toHaveLength(1)
     expect(evts.some((e) => e.type === 'done' && e.content === '续跑完成')).toBe(true)
   })
+
+  it('workerStrict：仅 schema 后空回复会催促继续 tool_calls', async () => {
+    let n = 0
+    const post = async (p: ChatPayload) => {
+      n += 1
+      const nudged = p.messages.some(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('工人未完成'),
+      )
+      if (!nudged && n === 1) return sseOf({ toolCalls: [call('get_table_schema', { tableId: 't1' })] })
+      if (!nudged) return sseOf({ content: '' }) // 试图空收工
+      // 被催促后真正落地
+      if (nudged && p.messages.filter((m) => m.role === 'tool').length === 1) {
+        return sseOf({ toolCalls: [call('create_view', { type: 'line', name: 'g' }, 'cv')] })
+      }
+      return sseOf({ content: '已建图' })
+    }
+    const exec: ToolExecutor = async (c) => ({ ok: true, summary: `ok ${c.function.name}` })
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: '出图' }],
+      tools: [],
+      exec,
+      maxIterations: 10,
+      planGate: false,
+      workerStrict: true,
+      onEvent: () => {},
+      postChatFn: post,
+    })
+    expect(messages.some((m) => m.role === 'tool' && m.name === 'create_view')).toBe(true)
+    expect(messages.some((m) => m.role === 'assistant' && m.content === '已建图')).toBe(true)
+  })
 })
 
 /* ------------------------------- SSE 解析 ------------------------------- */

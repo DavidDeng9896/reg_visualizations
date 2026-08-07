@@ -3,7 +3,7 @@
  */
 import type { ChatMessage, ChatPayload } from '../client'
 import { contentText } from '../client'
-import type { RunAgentOptions, ToolExecResult } from '../agentLoop'
+import type { AgentEvent, RunAgentOptions, ToolExecResult } from '../agentLoop'
 import { clipToolResult } from '../taskState'
 import { OPENAI_TOOLS } from './registry'
 
@@ -18,6 +18,15 @@ export interface WorkerSpec {
   allowBuiltin: string[]
   allowMcp: boolean
 }
+
+/** 只读探路工具：仅这些不足以视为目标完成。 */
+export const WORKER_READ_ONLY_TOOLS = new Set([
+  'list_analyses',
+  'list_tables',
+  'get_table_schema',
+  'list_skills',
+  'read_skill',
+])
 
 export const WORKER_SPECS: Record<string, WorkerSpec> = {
   delegate_skill_worker: {
@@ -40,7 +49,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
     kind: 'analysis',
     toolName: 'delegate_analysis_worker',
     role: '分析工人',
-    maxIterations: 16,
+    maxIterations: 20,
     allowBuiltin: [
       'list_analyses',
       'list_tables',
@@ -52,6 +61,9 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
       'add_union_step',
       'add_computed_column_step',
       'add_hide_columns_step',
+      // 清洗常需 Custom Code，与出图同属分析流水线
+      'add_custom_code_step',
+      'update_custom_code_step',
       'run_step',
       'rerun_stale_steps',
       'refresh_sql_source',
@@ -66,7 +78,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
     kind: 'code',
     toolName: 'delegate_code_worker',
     role: 'Custom Code 工人',
-    maxIterations: 12,
+    maxIterations: 14,
     allowBuiltin: [
       'list_tables',
       'get_table_schema',
@@ -108,8 +120,25 @@ function filterToolsForWorker(all: ChatPayload['tools'], spec: WorkerSpec): Open
 
 function workerSystemPrompt(role: string, goal: string): string {
   return `你是「${role}」子代理。只完成下列目标，禁止调用与目标无关的工具。
-完成后用简洁中文给出：结论、关键产物 id/名称、未完成项（如有）。不要宣称用户总任务已全部完成。
+硬性要求：
+1. 必须持续 tool_calls 直到目标落地（写出步骤/建图/改配置）；禁止只 list_tables / get_table_schema 就结束。
+2. 禁止复述目标长文；不要过程独白，直接调用工具。
+3. 若某工具失败，换参数或换工具继续，不要空回复收工。
+4. 全部做完后用简洁中文给出：结论、关键产物 id/名称、未完成项（如有）。不要宣称用户总任务已全部完成。
 目标：${goal}`
+}
+
+function toolNamesUsed(messages: ChatMessage[]): string[] {
+  return messages
+    .filter((m) => m.role === 'tool' && typeof m.name === 'string')
+    .map((m) => String(m.name))
+}
+
+/** 是否只做了只读探路、没有任何落地工具（分析/代码工人用）。 */
+export function workerOnlyExplored(messages: ChatMessage[]): boolean {
+  const names = toolNamesUsed(messages)
+  if (!names.length) return true
+  return names.every((n) => WORKER_READ_ONLY_TOOLS.has(n))
 }
 
 /** 从工人会话中提炼末条助手文本作为摘要。 */
@@ -133,6 +162,8 @@ export interface RunWorkerOpts {
   goal: string
   parentTools: ChatPayload['tools']
   parent: Pick<RunAgentOptions, 'exec' | 'model' | 'signal' | 'askUser' | 'waitConfirm' | 'postChatFn'>
+  /** 工人内部进展回调（供 Trace 显示「工人进行中：xxx」）。 */
+  onProgress?: (summary: string) => void
 }
 
 /** 跑一个 Worker 短 loop，返回摘要型 ToolExecResult。 */
@@ -163,6 +194,12 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
 
   try {
     const { runAgent } = await import('../agentLoop')
+    const onWorkerEvent = (e: AgentEvent) => {
+      if (!opts.onProgress) return
+      if (e.type === 'tool_call') opts.onProgress(`工人进行中：${e.call.function.name}…`)
+      else if (e.type === 'tool_result') opts.onProgress(`工人完成：${e.name}${e.ok === false ? '（失败）' : ''}`)
+      else if (e.type === 'round') opts.onProgress(`工人第 ${e.n} 轮…`)
+    }
     const messages = await runAgent({
       messages: [
         { role: 'system', content: workerSystemPrompt(spec.role, goal) },
@@ -177,9 +214,18 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
       waitConfirm: opts.parent.waitConfirm,
       postChatFn: opts.parent.postChatFn,
       planGate: false,
-      onEvent: () => undefined,
+      // 分析/代码工人禁止只读探路就收工；Skill/MCP 以读/调用本身为交付
+      workerStrict: spec.kind === 'analysis' || spec.kind === 'code',
+      onEvent: onWorkerEvent,
     })
     const summary = summarizeWorkerMessages(messages, goal)
+    // 分析/代码：只读探路就收工 → 视为未完成
+    if ((spec.kind === 'analysis' || spec.kind === 'code') && workerOnlyExplored(messages)) {
+      return {
+        ok: false,
+        summary: `【${spec.role}】未完成：仅做了探路（list/schema），未落地加工/建图/写代码。请缩小 goal 或再派工人继续。\n${summary}`,
+      }
+    }
     return { ok: true, summary: `【${spec.role}】${summary}` }
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
