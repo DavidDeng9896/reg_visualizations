@@ -149,12 +149,29 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       // P0 计划门禁：假结束 → 催促续跑
       if (planGate && planIncomplete(planSteps, planDone) && planNudges < maxNudges) {
         planNudges += 1
-        messages.push({ role: 'system', content: planNudgeMessage(planSteps, planDone) })
+        const last = messages[messages.length - 1]
+        if (last?.role === 'assistant' && (last.content?.length ?? 0) > 80) {
+          messages[messages.length - 1] = {
+            ...last,
+            content: '（计划未完成，请立即调用工具继续，禁止复述）',
+          }
+        }
+        messages.push({
+          role: 'system',
+          content:
+            planNudgeMessage(planSteps, planDone) +
+            '\n【禁止独白】本轮必须直接 tool_calls；不要重新 submit_plan。',
+        })
         continue
       }
       emitIncompleteIfNeeded()
       onEvent({ type: 'done', content: assistant.content ?? '' })
       return messages
+    }
+
+    // 工具轮过程独白不回灌，避免下一轮复读
+    if ((assistant.content ?? '').trim()) {
+      messages[messages.length - 1] = { ...assistant, content: '' }
     }
 
     for (const call of calls) {
@@ -166,6 +183,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
         const steps = Array.isArray(args.steps) ? args.steps.map((s) => String(s)) : []
+        const sameAsCurrent =
+          planSteps.length > 0 &&
+          planSteps.length === steps.length &&
+          planSteps.every((s, i) => s === steps[i])
+        // 续跑中禁止重置：已有进度时忽略重复 submit_plan
+        if (planDone.length > 0 && (sameAsCurrent || opts.initialPlan?.steps?.length)) {
+          pushToolContent(
+            call,
+            name,
+            `ok：续跑中沿用已有计划（已完成 ${planDone.length}/${planSteps.length || steps.length} 步）。请勿重新规划，直接执行未完成步骤并 mark_step_done。`,
+          )
+          continue
+        }
         planSteps = steps
         planDone = []
         onEvent({ type: 'plan', steps })

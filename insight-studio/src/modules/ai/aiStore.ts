@@ -25,8 +25,10 @@ export interface TraceItem {
   confirmed?: boolean
   /** 用户已拒绝该操作（与 needsConfirmation 配对）。 */
   rejected?: boolean
-  /** ask_user 提问内容（交互卡片渲染用）。 */
+  /** ask_user 提问内容（交互卡片渲染用；结算后清空，结果写入正文）。 */
   ask?: { question: string; options: string[]; allowOther: boolean }
+  /** 已结算的 ask，不再渲染卡片。 */
+  askSettled?: boolean
 }
 
 export interface UiMessage {
@@ -49,6 +51,10 @@ export interface UiMessage {
   maxIter?: boolean
   /** 计划门禁耗尽或超轮时仍有未完成步骤。 */
   incomplete?: boolean
+  /** 用户主动关闭「继续任务」，不再提示续跑。 */
+  planDismissed?: boolean
+  /** 问答/批准等交互备注（普通文本）；done 时并入 content。 */
+  interactionNotes?: string
   /** 本轮 runAgent 追加的模型可见消息尾（assistant/tool 交替），确认/拒绝后重入循环续轮用。 */
   rawTail?: ChatMessage[]
 }
@@ -109,11 +115,11 @@ export const useAiStore = defineStore('ai', {
     /** 模型可见上下文估算 token（系统提示词 + 摘要/历史）。 */
     contextTokens: (s) =>
       estimateTokens(SYSTEM_PROMPT) + estimateChatTokens(s.messages.map((m) => ({ role: m.role, content: m.content }))),
-    /** 最近一条带未完成计划的助手消息（供「继续任务」）。 */
+    /** 最近一条仍可续跑的助手消息（已关闭的检查点忽略）。 */
     resumableAssistant: (s): UiMessage | null => {
       for (let i = s.messages.length - 1; i >= 0; i -= 1) {
         const m = s.messages[i]
-        if (m.role !== 'assistant' || !m.planSteps?.length) continue
+        if (m.role !== 'assistant' || !m.planSteps?.length || m.planDismissed) continue
         if (m.incomplete || planIncomplete(m.planSteps, m.planDone)) return m
       }
       return null
@@ -298,16 +304,17 @@ export const useAiStore = defineStore('ai', {
     },
 
     /**
-     * 从检查点续跑未完成计划：不新增用户气泡，注入 system 催促后开新一轮 assistant。
+     * 从检查点续跑未完成计划：不新增用户气泡；带上 rawTail 工具历史，避免重做已完成步骤。
      */
     async continueTask(opts?: { auto?: boolean }): Promise<void> {
       if (this.running) return
       const prev = this.resumableAssistant as UiMessage | null
-      if (!prev?.planSteps?.length) return
+      if (!prev?.planSteps?.length || prev.planDismissed) return
       if (!opts?.auto) autoContinueCount = 0
       await this.ensureConversation()
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
+      const doneSnapshot = [...(prev.planDone ?? [])]
       this.messages.push({
         id: nextId(),
         role: 'assistant',
@@ -317,21 +324,22 @@ export const useAiStore = defineStore('ai', {
         streaming: true,
         at: Date.now(),
         planSteps: [...prev.planSteps],
-        planDone: [...(prev.planDone ?? [])],
+        planDone: [...doneSnapshot],
       })
       const assistant = this.messages[this.messages.length - 1] as UiMessage
 
       this.running = true
       this.abort = new AbortController()
 
-      const analysis = useAnalysisStore().current
+      // 系统提示 + 检查点之前历史 + 上一轮工具轨迹 + 续跑指令
       const chatMessages: ChatMessage[] = [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'system', content: buildAnalysisContext(analysis) },
-        ...this.messages
-          .filter((m) => m.id !== assistant.id)
-          .map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
-        { role: 'system', content: continueTaskSystemMessage(prev.planSteps, prev.planDone) },
+        ...this.buildBase(prev),
+        ...(prev.rawTail?.length
+          ? prev.rawTail
+          : prev.content
+            ? [{ role: 'assistant' as const, content: prev.content }]
+            : []),
+        { role: 'system', content: continueTaskSystemMessage(prev.planSteps, doneSnapshot) },
       ]
 
       try {
@@ -367,11 +375,12 @@ export const useAiStore = defineStore('ai', {
           signal: this.abort.signal,
           askUser: this.makeAskUser(this.abort.signal),
           waitConfirm: this.makeWaitConfirm(this.abort.signal),
-          initialPlan: { steps: prev.planSteps, done: prev.planDone ?? [] },
+          initialPlan: { steps: prev.planSteps, done: doneSnapshot },
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
-        if (!assistant.incomplete) prev.incomplete = false
+        // 把进度合并回检查点，避免旧消息仍显示「可继续」导致死循环
+        syncPlanCheckpoint(prev, assistant)
       } catch (err) {
         if (err instanceof MaxIterError) {
           assistant.maxIter = true
@@ -382,6 +391,7 @@ export const useAiStore = defineStore('ai', {
         } else {
           assistant.error = err instanceof Error ? err.message : String(err)
         }
+        syncPlanCheckpoint(prev, assistant)
       } finally {
         assistant.streaming = false
         this.running = false
@@ -391,8 +401,18 @@ export const useAiStore = defineStore('ai', {
       if (!aborted) await this.maybeAutoContinue(assistant)
     },
 
+    /** 用户关闭「继续任务」卡片，不再自动/手动提示续跑。 */
+    dismissContinueTask(): void {
+      const m = this.resumableAssistant as UiMessage | null
+      if (!m) return
+      m.planDismissed = true
+      m.incomplete = false
+      void this.persist()
+    },
+
     /** 本轮结束后若仍 incomplete，自动续跑（同会话连续 ≤ MAX_AUTO_CONTINUE）。 */
     async maybeAutoContinue(assistant: UiMessage): Promise<void> {
+      if (assistant.planDismissed) return
       if (!assistant.incomplete && !planIncomplete(assistant.planSteps, assistant.planDone)) return
       if (autoContinueCount >= MAX_AUTO_CONTINUE) return
       if (this.running) return
@@ -458,12 +478,14 @@ export const useAiStore = defineStore('ai', {
         item.needsConfirmation = false
         if (res.artifact) pushArtifactSafe(assistant, res.artifact)
         resultText = `用户已批准并执行该操作，执行结果：${res.summary}`
+        appendPlainNote(assistant, `已批准并执行「${item.name}」：${res.summary}`)
       } else {
         item.rejected = true
         item.ok = false
         item.summary = '用户已拒绝执行该操作'
         item.needsConfirmation = false
         resultText = '用户已拒绝执行该操作。不要重试此操作；向用户简短说明并给出替代方案。'
+        appendPlainNote(assistant, `已拒绝操作「${item.name}」`)
       }
       await this.persist()
 
@@ -557,10 +579,26 @@ export const useAiStore = defineStore('ai', {
         })
     },
 
-    /** ask_user 提问卡作答；answer 为空表示用户取消。 */
+    /** ask_user 提问卡作答；answer 为空表示用户取消。结果写入正文，不再保留特殊卡片。 */
     answerAsk(id: string, answer: string | null): void {
       if (!this.pendingAsk || this.pendingAsk.id !== id) return
-      this.settleAsk(answer?.trim() ? answer.trim() : '（用户取消了本次提问）')
+      const assistant = [...this.messages]
+        .reverse()
+        .find((m) => m.role === 'assistant' && m.trace.some((t) => t.id === id))
+      const item = assistant?.trace.find((t) => t.id === id)
+      const question = item?.ask?.question ?? this.pendingAsk.question
+      const trimmed = answer?.trim()
+      if (assistant && item) {
+        item.askSettled = true
+        item.ask = undefined
+        if (trimmed) {
+          appendPlainNote(assistant, `问：${question}\n答：${trimmed}`)
+        } else {
+          appendPlainNote(assistant, `（已取消提问：${question}）`)
+        }
+      }
+      this.settleAsk(trimmed ? trimmed : '（用户取消了本次提问）')
+      void this.persist()
     },
 
     /** 危险操作确认通道：挂起 agent-loop 直到用户批准/拒绝（保持 running，会话不中断）。 */
@@ -658,11 +696,15 @@ export const useAiStore = defineStore('ai', {
 /** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用）。 */
 function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
   return (e) => {
-    if (e.type === 'token') {
+    if (e.type === 'round') {
+      // 工具轮独白不堆进气泡；最终轮由 done 写入
+      assistant.content = ''
+    } else if (e.type === 'token') {
       assistant.content += e.text
     } else if (e.type === 'reasoning') {
       assistant.reasoning = (assistant.reasoning ?? '') + e.text
     } else if (e.type === 'tool_call') {
+      assistant.content = ''
       let args: Record<string, unknown> = {}
       try {
         args = JSON.parse(e.call.function.arguments || '{}') as Record<string, unknown>
@@ -676,9 +718,7 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
         running: true,
         summary: '',
       })
-    } else     if (e.type === 'tool_result') {
-      // 同 id 重复（模型偶发复用 call id）时优先匹配仍在 running 的那条；
-      // 确认通道会二次发 tool_result（先 needsConfirmation，再最终结果）。
+    } else if (e.type === 'tool_result') {
       const item =
         assistant.trace.find((t) => t.id === e.id && t.running) ??
         assistant.trace.find((t) => t.id === e.id) ??
@@ -702,16 +742,41 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
       assistant.planDone = []
       assistant.incomplete = false
     } else if (e.type === 'step_done') {
-      if (assistant.planDone && !assistant.planDone.includes(e.index)) assistant.planDone.push(e.index)
+      if (!assistant.planDone) assistant.planDone = []
+      if (!assistant.planDone.includes(e.index)) assistant.planDone.push(e.index)
       if (assistant.planSteps && !planIncomplete(assistant.planSteps, assistant.planDone)) {
         assistant.incomplete = false
       }
     } else if (e.type === 'incomplete') {
       assistant.incomplete = true
     } else if (e.type === 'done') {
-      assistant.content = e.content || assistant.content
+      const body = (e.content || '').trim()
+      const notes = (assistant.interactionNotes ?? '').trim()
+      assistant.content = [notes, body].filter(Boolean).join('\n\n')
+      assistant.interactionNotes = undefined
     }
   }
+}
+
+/** 续跑后把进度合并回检查点消息，避免旧 incomplete 一直可点。 */
+function syncPlanCheckpoint(prev: UiMessage, assistant: UiMessage): void {
+  const merged = new Set<number>([...(prev.planDone ?? []), ...(assistant.planDone ?? [])])
+  prev.planDone = [...merged].sort((a, b) => a - b)
+  if (assistant.planSteps?.length) prev.planSteps = [...assistant.planSteps]
+  const still = planIncomplete(prev.planSteps, prev.planDone)
+  prev.incomplete = still
+  assistant.incomplete = still ? !!assistant.incomplete || still : false
+  if (!still) {
+    prev.incomplete = false
+    assistant.incomplete = false
+  }
+}
+
+/** 交互结果以普通对话文本落盘（非特殊卡片）；写入 notes，避免被 round 清空。 */
+function appendPlainNote(msg: UiMessage, note: string): void {
+  const n = note.trim()
+  if (!n) return
+  msg.interactionNotes = msg.interactionNotes?.trim() ? `${msg.interactionNotes.trim()}\n\n${n}` : n
 }
 
 function pushArtifactSafe(msg: UiMessage, a?: Artifact): void {

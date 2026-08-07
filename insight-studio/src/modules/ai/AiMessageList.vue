@@ -24,8 +24,8 @@ const ai = useAiStore()
 const { pendingAsk } = storeToRefs(ai)
 
 function askSettled(t: TraceItem): boolean {
-  // 待答的 ask 提到输入框上方悬浮区，会话流里只保留已答态
-  return pendingAsk.value?.id !== t.id
+  // 待答的 ask 提到输入框上方悬浮区；已结算的不再渲染卡片（正文普通文本已写入）
+  return pendingAsk.value?.id !== t.id && !t.askSettled && !!t.ask
 }
 function fmtTime(at: number): string {
   try {
@@ -161,9 +161,19 @@ function renderMd(src: string): string {
   return out.join('')
 }
 
-const rendered = computed(() => props.messages.map((m) => ({ id: m.id, html: m.role === 'assistant' ? renderMd(m.content) : '' })))
+const rendered = computed(() =>
+  props.messages.map((m) => ({
+    id: m.id,
+    html: m.role === 'assistant' ? renderMd(displayContent(m)) : '',
+  })),
+)
 function htmlOf(id: string): string {
   return rendered.value.find((r) => r.id === id)?.html ?? ''
+}
+function displayContent(m: UiMessage): string {
+  const notes = (m.interactionNotes ?? '').trim()
+  const body = (m.content ?? '').trim()
+  return [notes, body].filter(Boolean).join('\n\n')
 }
 </script>
 
@@ -190,15 +200,15 @@ function htmlOf(id: string): string {
           @reject="emit('reject', $event)"
         />
         <AskCard
-          v-for="t in m.trace.filter((x) => x.ask && askSettled(x))"
+          v-for="t in m.trace.filter((x) => askSettled(x))"
           :key="`ask-${t.id}`"
           :item="t"
         />
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div v-if="m.content" class="msg__ai md" v-html="htmlOf(m.id)" />
-        <div v-if="m.streaming && !m.content && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
-        <div v-if="m.incomplete && !m.streaming" class="msg__incomplete" data-testid="ai-incomplete">
-          任务未完成：计划中仍有未执行步骤，可点击下方「继续任务」从检查点续跑。
+        <div v-if="displayContent(m)" class="msg__ai md" v-html="htmlOf(m.id)" />
+        <div v-if="m.streaming && !displayContent(m) && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
+        <div v-if="m.incomplete && !m.streaming && !m.planDismissed" class="msg__incomplete" data-testid="ai-incomplete">
+          任务未完成：可点击下方「继续任务」从检查点续跑，或关闭该提示。
         </div>
         <ArtifactCard v-for="a in m.artifacts" :key="`${a.kind}-${a.name}`" :artifact="a" />
         <div v-if="m.error" class="msg__error">{{ m.error }}<button type="button" class="msg__retry" data-testid="ai-retry" @click="emit('retry')">重试</button></div>

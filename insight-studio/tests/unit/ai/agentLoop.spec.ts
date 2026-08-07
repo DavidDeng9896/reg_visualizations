@@ -193,8 +193,8 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(posts).toBe(2)
     const confirms = evts.filter((e) => e.type === 'tool_result' && e.id === 'call_del')
     expect(confirms.length).toBe(2)
-    expect(confirms[0].needsConfirmation).toBe(true)
-    expect(confirms[1].needsConfirmation).toBe(false)
+    expect(confirms[0].type === 'tool_result' && confirms[0].needsConfirmation).toBe(true)
+    expect(confirms[1].type === 'tool_result' && confirms[1].needsConfirmation).toBe(false)
     expect(evts.some((e) => e.type === 'done' && e.content.includes('完成'))).toBe(true)
   })
 
@@ -340,6 +340,40 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(workerResult?.content).toContain('Skill 工人')
     expect(workerResult?.content).toContain('要点')
     expect(evts.some((e) => e.type === 'done' && e.content === '主循环完成')).toBe(true)
+  })
+  it('续跑中重复 submit_plan 不重置已完成步骤', async () => {
+    const post = async (p: ChatPayload) => {
+      const tools = p.messages.filter((m) => m.role === 'tool')
+      if (!tools.length) {
+        return sseOf({ toolCalls: [call('submit_plan', { steps: ['A', 'B'] }, 'p1')] })
+      }
+      if (tools.length === 1) {
+        return sseOf({ toolCalls: [call('mark_step_done', { index: 0 }, 'd0')] })
+      }
+      if (tools.length === 2) {
+        // 模型试图重新 submit_plan
+        return sseOf({ toolCalls: [call('submit_plan', { steps: ['A', 'B'] }, 'p2')] })
+      }
+      if (tools.length === 3) {
+        return sseOf({ toolCalls: [call('mark_step_done', { index: 1 }, 'd1')] })
+      }
+      return sseOf({ content: '续跑完成' })
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: '续' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 10,
+      initialPlan: { steps: ['A', 'B'], done: [] },
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    // 不应因第二次 submit_plan 丢掉 step 0
+    const dones = evts.filter((e) => e.type === 'step_done').map((e) => (e.type === 'step_done' ? e.index : -1))
+    expect(dones).toEqual([0, 1])
+    expect(evts.filter((e) => e.type === 'plan')).toHaveLength(1)
+    expect(evts.some((e) => e.type === 'done' && e.content === '续跑完成')).toBe(true)
   })
 })
 
