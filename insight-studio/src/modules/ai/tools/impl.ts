@@ -4,7 +4,7 @@
  */
 import Papa from 'papaparse'
 import { toRaw } from 'vue'
-import type { Analysis, AnalysisTable, ChartConfig, DashboardWidget, Filter, Row, StepNode, StepType } from '../../../shared/types'
+import type { Analysis, AnalysisTable, ChartConfig, DashboardWidget, Filter, Row, StepNode, StepType, ViewNode } from '../../../shared/types'
 import { createEmptyAnalysis, createTable, createViewNode, defaultViewName, createDashboard, createDashboardWidget, sealRows } from '../../../shared/factories'
 import { uuid } from '../../../shared/id'
 import { analysisRepository } from '../../../shared/repository'
@@ -27,6 +27,7 @@ import type { Artifact } from '../types'
 import { aiSkillsApi, aiMemoriesApi, aiFilesApi } from '../client'
 import { normalizeExpressionColumns } from '../../../shared/pipeline'
 import { attachmentFromMeta, importAiAttachment } from '../attachments'
+import { coerceParsedToolArgs } from '../toolArgs'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -85,9 +86,88 @@ function requireAnalysis(): Analysis {
 }
 
 function requireTable(tableId: string): AnalysisTable {
-  const t = findTable(requireAnalysis(), tableId)
-  if (!t) throw new Error(`表不存在：${tableId}（可先用 list_tables 查看）`)
+  const t = resolveTableRef(tableId)
+  if (!t) throw new Error(`表不存在：${tableId || '（未提供 tableId）'}（可先用 list_tables 查看 id）`)
   return t
+}
+
+/** 按 id / 名称 / id 前缀解析表。 */
+function resolveTableRef(ref: string): AnalysisTable | null {
+  const a = store().current
+  if (!a) return null
+  const key = ref.trim()
+  if (!key) return null
+  const byId = findTable(a, key)
+  if (byId) return byId
+  const lower = key.toLowerCase()
+  return (
+    a.tables.find((t) => t.name === key) ??
+    a.tables.find((t) => t.name.toLowerCase() === lower) ??
+    a.tables.find((t) => t.id.startsWith(key)) ??
+    null
+  )
+}
+
+function findViewByRef(views: ViewNode[], ref: string): ViewNode | null {
+  const key = ref.trim()
+  if (!key) return null
+  const byId = findView(views, key)
+  if (byId) return byId
+  const lower = key.toLowerCase()
+  const walk = (nodes: ViewNode[]): ViewNode | null => {
+    for (const v of nodes) {
+      if (v.name === key || v.name.toLowerCase() === lower || v.id.startsWith(key)) return v
+      const sub = walk(v.children)
+      if (sub) return sub
+    }
+    return null
+  }
+  return walk(views)
+}
+
+/** 解析图表视图：缺 tableId 时按 viewId/视图名反查所属表。 */
+function resolveChartView(tableRef: string, viewRef: string): { table: AnalysisTable; view: ViewNode } {
+  const a = requireAnalysis()
+  const tableKey = tableRef.trim()
+  const viewKey = viewRef.trim()
+  if (!viewKey) {
+    throw new Error('缺少 viewId（create_view 返回的 view id；list_tables 可查看各表视图 id）')
+  }
+  if (tableKey) {
+    const t = resolveTableRef(tableKey)
+    if (t) {
+      const v = findViewByRef(t.views, viewKey)
+      if (v?.chart) return { table: t, view: v }
+    }
+  }
+  for (const t of a.tables) {
+    const v = findViewByRef(t.views, viewKey)
+    if (v?.chart) return { table: t, view: v }
+  }
+  throw new Error(
+    `表/视图不存在：table=${tableRef || '（未提供）'} view=${viewRef}。请用 list_tables 核对表 id 与 viewId。`,
+  )
+}
+
+function extractChartConfigure(
+  args: Record<string, unknown>,
+  chartType: string,
+): Partial<ChartConfig['configure']> {
+  const raw = args.configure ?? args.mapping ?? args.config
+  if (Array.isArray(raw)) {
+    return normalizeAiChartConfigure(chartType, { values: raw as ChartConfig['configure']['values'] })
+  }
+  if (raw && typeof raw === 'object') {
+    return normalizeAiChartConfigure(chartType, raw as Partial<ChartConfig['configure']>)
+  }
+  const loose: Partial<ChartConfig['configure']> = {}
+  for (const key of ['x', 'y', 'series', 'color', 'shape', 'size', 'categories', 'measure', 'values'] as const) {
+    if (args[key] != null) loose[key] = args[key] as never
+  }
+  if (typeof args.field === 'string' && args.field.trim()) {
+    loose.values = [{ field: args.field.trim() }]
+  }
+  return normalizeAiChartConfigure(chartType, loose)
 }
 
 /** 找到产出某表的步骤（输入连线的上游）；源表缺产出步骤时补一个 upload-csv 源步骤（与 migrateSteps 同构）。 */
@@ -267,7 +347,14 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
         '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴 CSV。',
       )
     }
-    const lines = analysis.tables.map((t) => `- ${t.name}（id: ${t.id}，${t.rows.length} 行，${t.columns.length} 列${t.stepId ? '，步骤产出' : '，源表'}）`)
+    const lines = analysis.tables.map((t) => {
+      const base = `- ${t.name}（id: ${t.id}，${t.rows.length} 行，${t.columns.length} 列${t.stepId ? '，步骤产出' : '，源表'}）`
+      if (!t.views.length) return base
+      const views = t.views
+        .map((v) => `「${v.name}」(${v.type}, viewId: ${v.id}${v.chart ? `, chartType: ${v.chart.chartType}` : ''})`)
+        .join('、')
+      return `${base}\n  视图：${views}`
+    })
     return ok(`分析「${analysis.name}」的表：\n${lines.join('\n')}`)
   },
 
@@ -632,16 +719,18 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   set_chart_config(args) {
-    const t = requireTable(String(args.tableId ?? ''))
-    const v = findView(t.views, String(args.viewId ?? ''))
-    if (!v?.chart) return fail('该视图不是图表视图')
-    const chartType = typeof args.chartType === 'string' ? args.chartType : undefined
-    const effectiveType = String(chartType || v.chart.chartType || 'bar')
-    const configure = normalizeAiChartConfigure(
-      effectiveType,
-      (args.configure ?? {}) as Partial<ChartConfig['configure']>,
+    const coerced = coerceParsedToolArgs('set_chart_config', args)
+    const { table, view } = resolveChartView(
+      String(coerced.tableId ?? coerced.table ?? ''),
+      String(coerced.viewId ?? coerced.view ?? ''),
     )
-    const style = (args.style ?? {}) as Partial<ChartConfig['style']>
+    const v = view
+    const t = table
+    if (!v?.chart) return fail('该视图不是图表视图')
+    const chartType = typeof coerced.chartType === 'string' ? coerced.chartType : undefined
+    const effectiveType = String(chartType || v.chart.chartType || 'bar')
+    const configure = extractChartConfigure(coerced, effectiveType)
+    const style = (coerced.style ?? {}) as Partial<ChartConfig['style']>
     store().mutate((a) => {
       const table = findTable(a, t.id)
       const view = table ? findView(table.views, v.id) : null
@@ -794,10 +883,11 @@ export async function execTool(name: string, args: Record<string, unknown>, ctx:
   const fn = impl[name]
   if (!fn) return fail(`未知工具：${name}`)
   try {
-    if (ctx.confirmWrite && WRITE_TOOLS.has(name) && args.__confirmed !== true) {
+    const parsed = coerceParsedToolArgs(name, args)
+    if (ctx.confirmWrite && WRITE_TOOLS.has(name) && parsed.__confirmed !== true) {
       return needConfirm(`执行写入操作「${name}」`)
     }
-    return await fn(args, ctx)
+    return await fn(parsed, ctx)
   } catch (e) {
     return fail(e instanceof Error ? e.message : String(e))
   }
