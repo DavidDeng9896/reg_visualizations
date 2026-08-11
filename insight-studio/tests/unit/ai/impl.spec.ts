@@ -40,6 +40,45 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.artifact?.tableId).toBe(t!.id)
   })
 
+  it('import_ai_file：按 fileId 导入 CSV 附件', async () => {
+    const { analysis } = await seedStore()
+    const before = analysis.tables.length
+    const { aiFilesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
+      id: 'file-csv-1',
+      name: 'hits.csv',
+      mime: 'text/csv',
+      sizeBytes: 20,
+      createdAt: new Date().toISOString(),
+      kind: 'csv',
+    })
+    const csvBytes = new TextEncoder().encode('id,od450\nc1,0.8\nc2,1.2')
+    vi.spyOn(aiFilesApi, 'downloadBlob').mockResolvedValue({
+      arrayBuffer: async () => csvBytes.buffer.slice(csvBytes.byteOffset, csvBytes.byteOffset + csvBytes.byteLength),
+      text: async () => 'id,od450\nc1,0.8\nc2,1.2',
+    } as unknown as Blob)
+
+    const res = await execTool('import_ai_file', { fileId: 'file-csv-1', tableName: 'ELISA' }, ctx)
+    expect(res.summary).toBeTruthy()
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toContain('ELISA')
+    expect(analysis.tables.length).toBe(before + 1)
+    const t = analysis.tables.find((x) => x.name === 'ELISA')
+    expect(t?.rows).toHaveLength(2)
+    expect(res.artifact?.tableId).toBe(t?.id)
+  })
+
+  it('list_tables 空提示引导 import_ai_file', async () => {
+    const { store } = await seedStore()
+    store.mutate((a) => {
+      a.tables = []
+      a.steps = []
+    })
+    const res = await execTool('list_tables', {}, ctx)
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain('import_ai_file')
+  })
+
   it('add_filter_step：下游过滤步骤产出新表，id 回执在摘要中', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]

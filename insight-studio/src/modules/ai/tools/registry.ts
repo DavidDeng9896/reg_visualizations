@@ -63,8 +63,27 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'import_csv_text',
-    description: '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。',
+    description: '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。用户已上传文件时优先用 import_ai_file。',
     parameters: { type: 'object', properties: { tableName: str('表名'), csv: str('完整 CSV 文本，首行为表头') }, required: ['tableName', 'csv'] },
+  },
+  {
+    name: 'import_ai_file',
+    description:
+      '将对话附件（fileId）导入为当前分析的表。支持 csv / excel；Excel 可指定 sheetNames（多表则每个工作表一张分析表）。用户上传了附件时必须用本工具，不要让用户再粘贴 CSV。',
+    parameters: {
+      type: 'object',
+      properties: {
+        fileId: str('附件 id（见系统提示中的附件目录 / 附件上下文）'),
+        tableName: str('表名（可选；多工作表时作前缀）'),
+        sheetNames: strArr('Excel 要导入的工作表名（可选；默认全部可选表）'),
+      },
+      required: ['fileId'],
+    },
+  },
+  {
+    name: 'list_ai_files',
+    description: '列出当前用户近期上传的 AI 聊天附件（id/name/kind），便于 import_ai_file。',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'add_filter_step',

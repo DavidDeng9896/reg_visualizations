@@ -167,20 +167,77 @@ export async function extractAttachmentText(att: ChatAttachment): Promise<string
 export async function buildAttachmentContext(atts: ChatAttachment[]): Promise<string> {
   const targets = atts.filter((a) => a.forAi && a.kind !== 'image')
   if (!targets.length) return ''
-  const parts: string[] = ['用户本轮上传了以下附件（请结合内容回答）：']
+  const parts: string[] = [
+    '## 用户本轮上传了以下附件',
+    'CSV/Excel 请用 import_ai_file({ fileId }) 导入为分析表，不要向用户索要 CSV 文本；下方预览仅供理解结构。',
+  ]
   for (const att of targets) {
     const body = await extractAttachmentText(att)
-    parts.push(`## 附件「${att.name}」(id: ${att.id}, kind: ${att.kind})\n${body || '（无文本内容）'}`)
+    const sheets =
+      att.kind === 'excel' && att.selectedSheets?.length
+        ? ` sheets=[${att.selectedSheets.join(', ')}]`
+        : att.kind === 'excel' && att.availableSheets?.length
+          ? ` sheets=[${att.availableSheets.join(', ')}]`
+          : ''
+    parts.push(
+      `## 附件「${att.name}」(id: ${att.id}, kind: ${att.kind}${sheets})\n${body || '（无文本内容）'}`,
+    )
   }
   return parts.join('\n\n')
 }
 
-/** csv / excel → commitImportedTable（excel 每个选中 sheet 一张表）。 */
-export async function importAttachmentAsTables(att: ChatAttachment): Promise<void> {
-  if (!att.importAsTable) return
-  if (att.kind !== 'csv' && att.kind !== 'excel') return
+/** 会话内附件目录（跨轮可见，轻量，不含全文）。 */
+export function buildAttachmentCatalog(
+  items: Array<Pick<ChatAttachment, 'id' | 'name' | 'kind' | 'selectedSheets' | 'availableSheets'>>,
+): string {
+  const seen = new Set<string>()
+  const lines: string[] = []
+  for (const a of items) {
+    if (!a?.id || seen.has(a.id)) continue
+    if (a.kind === 'image' || a.kind === 'other') continue
+    seen.add(a.id)
+    const sheets =
+      a.kind === 'excel'
+        ? ` sheets=[${(a.selectedSheets?.length ? a.selectedSheets : a.availableSheets ?? []).join(', ') || '未探测'}]`
+        : ''
+    lines.push(`- 「${a.name}」id=${a.id} kind=${a.kind}${sheets}`)
+  }
+  if (!lines.length) return ''
+  return `## 会话附件目录（可用 import_ai_file 导入为分析表）
+${lines.join('\n')}
+导入：import_ai_file({ fileId, tableName?, sheetNames? })。有 CSV/Excel 附件时直接导入，不要让用户再粘贴 CSV。`
+}
+
+/** 写入用户消息正文的附件摘要（含 id，便于多轮引用）。 */
+export function formatUserAttachmentLine(atts: ChatAttachment[]): string {
+  if (!atts.length) return ''
+  return `（附件：${atts.map((a) => `${a.name} id=${a.id} kind=${a.kind}`).join('；')}）`
+}
+
+export interface ImportedTableInfo {
+  tableId: string
+  stepId: string
+  name: string
+  rowCount: number
+  columnCount: number
+  sheetName?: string
+}
+
+/**
+ * 将 CSV/Excel 附件导入当前分析为表（供 UI 勾选导入与 AI 工具共用）。
+ * 不依赖 att.importAsTable 标志。
+ */
+export async function importAiAttachment(
+  att: ChatAttachment,
+  opts?: { tableNameHint?: string; sheetNames?: string[] },
+): Promise<ImportedTableInfo[]> {
+  if (att.kind !== 'csv' && att.kind !== 'excel') {
+    throw new Error(`附件 kind=${att.kind} 不支持导入为表（仅 csv/excel）`)
+  }
 
   const blob = await aiFilesApi.downloadBlob(att.id)
+  const out: ImportedTableInfo[] = []
+
   if (att.kind === 'csv') {
     const { text } = decodeCsvBytes(await blob.arrayBuffer())
     const parsed = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' })
@@ -189,8 +246,9 @@ export async function importAttachmentAsTables(att: ChatAttachment): Promise<voi
     const headers = rows[0].map((c) => String(c ?? ''))
     const dataRows = rows.slice(1).map((r) => r.map((c) => String(c ?? '')))
     const columns = inferColumnTypes(headers, dataRows)
-    const base = att.name.replace(/\.csv$/i, '') || '导入表'
-    commitImportedTable({
+    const base =
+      (opts?.tableNameHint?.trim() || att.name.replace(/\.csv$/i, '') || '导入表').trim() || '导入表'
+    const committed = commitImportedTable({
       name: base,
       headers,
       dataRows,
@@ -199,19 +257,29 @@ export async function importAttachmentAsTables(att: ChatAttachment): Promise<voi
       sourceLabel: 'AI 附件 · CSV',
       originalFileName: att.name,
     })
-    return
+    if (!committed) throw new Error('当前没有打开的分析，无法导入')
+    out.push(committed)
+    return out
   }
 
-  const sheets = att.selectedSheets?.length ? att.selectedSheets : att.availableSheets ?? []
-  if (!sheets.length) throw new Error(`Excel「${att.name}」请至少选择一个工作表`)
+  let sheets = opts?.sheetNames?.length
+    ? opts.sheetNames
+    : att.selectedSheets?.length
+      ? att.selectedSheets
+      : att.availableSheets?.length
+        ? att.availableSheets
+        : await probeExcelSheets(att.id)
+  sheets = sheets.map((s) => String(s).trim()).filter(Boolean)
+  if (!sheets.length) throw new Error(`Excel「${att.name}」请至少指定一个工作表`)
   const buf = await blob.arrayBuffer()
   const parsed = parseExcelBuffer(buf)
-  const base = att.name.replace(/\.(xlsx|xls)$/i, '') || '导入表'
+  const base =
+    (opts?.tableNameHint?.trim() || att.name.replace(/\.(xlsx|xls)$/i, '') || '导入表').trim() || '导入表'
   for (const sheetName of sheets) {
     const g = parsed.sheets[sheetName]
     if (!g?.dataRows.length) continue
     const columns = inferColumnTypes(g.headers, g.dataRows)
-    commitImportedTable({
+    const committed = commitImportedTable({
       name: sheets.length === 1 ? base : `${base}_${sheetName}`,
       headers: g.headers,
       dataRows: g.dataRows,
@@ -221,7 +289,17 @@ export async function importAttachmentAsTables(att: ChatAttachment): Promise<voi
       sourceLabel: `AI 附件 · Excel · ${sheetName}`,
       originalFileName: att.name,
     })
+    if (!committed) throw new Error('当前没有打开的分析，无法导入')
+    out.push({ ...committed, sheetName })
   }
+  if (!out.length) throw new Error(`Excel「${att.name}」所选工作表无可用数据行`)
+  return out
+}
+
+/** csv / excel → commitImportedTable（excel 每个选中 sheet 一张表）。仅当 importAsTable 时执行。 */
+export async function importAttachmentAsTables(att: ChatAttachment): Promise<void> {
+  if (!att.importAsTable) return
+  await importAiAttachment(att)
 }
 
 /** Excel：若开启 forAi 或 importAsTable，必须至少选中一张表。 */
