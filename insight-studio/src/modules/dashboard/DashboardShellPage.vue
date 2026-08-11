@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { createDashboardWidget, createLinkWidget } from '../../shared/factories'
 import { useDashboardStore } from '../../stores/dashboardStore'
-import { IButton, IEmptyState, IIcon, IPopover, toast } from '../../ui'
+import { IButton, IEmptyState, IIcon, toast } from '../../ui'
 import DashboardCanvas from './DashboardCanvas.vue'
 import AddWidgetDialog, { type AddWidgetPayload } from './AddWidgetDialog.vue'
 import CategorySidebar from './CategorySidebar.vue'
@@ -18,7 +18,6 @@ const { current, currentId, saving, dirty, loading } = storeToRefs(store)
 
 const editLayout = ref(false)
 const addOpen = ref(false)
-const menuOpen = ref(false)
 
 /** 分类样式侧栏开关（内嵌面板，非浮窗）。 */
 const categoryOpen = ref(false)
@@ -128,30 +127,29 @@ function onPickCategory(kind: 'table' | 'chart') {
         <div class="dash__toolbar">
           <h2 class="dash__name is-ellipsis">{{ current.name }}</h2>
           <div class="dash__actions">
-            <IPopover :open="menuOpen" placement="bottom-end" :arrow="false" @update:open="menuOpen = $event">
-              <template #anchor>
-                <IButton variant="ghost" icon="more" title="更多操作" aria-label="更多操作" @click="menuOpen = !menuOpen" />
-              </template>
-              <template #default="{ close }">
-                <div class="menu" role="menu">
-                  <button
-                    type="button"
-                    class="menu__item"
-                    role="menuitem"
-                    :aria-pressed="categoryOpen"
-                    @click="close(); categoryOpen = !categoryOpen"
-                  >
-                    <IIcon name="sliders" :size="13" /> 分类样式
-                  </button>
-                  <button type="button" class="menu__item" role="menuitem" @click="close(); editLayout = !editLayout">
-                    <IIcon name="drag" :size="13" /> {{ editLayout ? '完成布局' : '编辑布局' }}
-                  </button>
-                  <button type="button" class="menu__item" role="menuitem" @click="close(); addOpen = true">
-                    <IIcon name="plus" :size="13" /> 添加组件
-                  </button>
-                </div>
-              </template>
-            </IPopover>
+            <IButton
+              size="sm"
+              :variant="categoryOpen ? 'primary' : 'secondary'"
+              icon="sliders"
+              :aria-pressed="categoryOpen"
+              title="分类样式"
+              @click="categoryOpen = !categoryOpen"
+            >
+              分类样式
+            </IButton>
+            <IButton
+              size="sm"
+              :variant="editLayout ? 'primary' : 'secondary'"
+              icon="drag"
+              :aria-pressed="editLayout"
+              :title="editLayout ? '完成布局' : '编辑布局'"
+              @click="editLayout = !editLayout"
+            >
+              {{ editLayout ? '完成布局' : '编辑布局' }}
+            </IButton>
+            <IButton size="sm" variant="primary" icon="plus" title="添加组件" @click="addOpen = true">
+              添加组件
+            </IButton>
           </div>
         </div>
         <div class="dash__canvas-wrap">
@@ -236,38 +234,62 @@ function onPickCategory(kind: 'table' | 'chart') {
 }
 .dash__actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   flex-shrink: 0;
+}
+.dash__toolbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: var(--is-text-xs);
+  font-weight: 500;
+  color: var(--is-text);
+  background: var(--is-surface);
+  border: 1px solid var(--is-border-strong);
+  border-radius: var(--is-radius-sm);
+  box-shadow: var(--is-shadow-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--is-dur-fast) var(--is-ease),
+    border-color var(--is-dur-fast) var(--is-ease),
+    color var(--is-dur-fast) var(--is-ease);
+}
+.dash__toolbtn:hover {
+  background: var(--is-surface-hover);
+  border-color: var(--is-text-tertiary);
+  color: var(--is-text);
+}
+.dash__toolbtn--active {
+  background: var(--is-accent-soft);
+  border-color: var(--is-accent);
+  color: var(--is-accent-hover);
+}
+.dash__toolbtn--active:hover {
+  background: var(--is-accent-soft);
+  border-color: var(--is-accent-hover);
+  color: var(--is-accent-hover);
+}
+.dash__toolbtn--primary {
+  background: var(--is-primary);
+  border-color: var(--is-primary);
+  color: var(--is-text-inverse);
+  box-shadow: none;
+}
+.dash__toolbtn--primary:hover {
+  background: var(--is-primary-hover);
+  border-color: var(--is-primary-hover);
+  color: var(--is-text-inverse);
 }
 .dash__canvas-wrap {
   padding: 16px 20px 32px;
   flex: 1;
   min-height: 320px;
   background: var(--is-canvas-bg);
-}
-
-.menu {
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  min-width: 160px;
-}
-.menu__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: none;
-  border-radius: var(--is-radius-sm);
-  background: transparent;
-  font-size: var(--is-text-sm);
-  text-align: left;
-  color: var(--is-text);
-  cursor: pointer;
-  transition: background-color var(--is-dur-fast) var(--is-ease);
-}
-.menu__item:hover {
-  background: var(--is-surface-hover);
 }
 
 /* 分类样式侧栏（内嵌） */
