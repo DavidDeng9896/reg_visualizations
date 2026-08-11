@@ -13,6 +13,7 @@ import {
   type ToolCall,
 } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
+import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
 import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 
@@ -70,13 +71,13 @@ export class AgentRunError extends Error {
   }
 }
 
-function safeParseArgs(raw: string): Record<string, unknown> {
-  const normalized = normalizeToolArguments(raw)
+function safeParseArgs(raw: string, toolName?: string): Record<string, unknown> {
+  const normalized = normalizeToolArguments(raw, toolName)
   try {
     const v = JSON.parse(normalized) as unknown
-    // 模型偶发直接传步骤数组：["a","b"] → 视为 { steps: [...] }，便于 submit_plan
-    if (Array.isArray(v)) return { steps: v }
-    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+    if (Array.isArray(v)) return coerceArrayToolArgs(v, toolName)
+    const obj = v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+    return toolName ? coerceParsedToolArgs(toolName, obj) : obj
   } catch {
     return {}
   }
@@ -339,11 +340,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
     for (const call of calls) {
       throwIfAborted()
-      // 先规范化 arguments（合法 JSON 字符串），再解析；避免坏片段留在上下文触发上游 502
-      call.function.arguments = normalizeToolArguments(call.function.arguments)
-      onEvent({ type: 'tool_call', call })
-      const args = safeParseArgs(call.function.arguments)
       const name = call.function.name
+      // 先规范化 arguments（合法 JSON 字符串），再解析；避免坏片段留在上下文触发上游 502
+      call.function.arguments = normalizeToolArguments(call.function.arguments, name)
+      onEvent({ type: 'tool_call', call })
+      const args = safeParseArgs(call.function.arguments, name)
 
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {

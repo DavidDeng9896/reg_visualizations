@@ -719,6 +719,9 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(normalizeToolArguments('```json\n{"a":1}\n```')).toBe('{"a":1}')
     expect(normalizeToolArguments({ steps: ['x'] })).toBe(JSON.stringify({ steps: ['x'] }))
     expect(normalizeToolArguments('prefix {"steps":["a"]} trailing')).toBe('{"steps":["a"]}')
+    expect(normalizeToolArguments('[{"field":"y"}]', 'set_chart_config')).toBe(
+      JSON.stringify({ configure: { values: [{ field: 'y' }] } }),
+    )
     // sanitize 后发给上游的 arguments 必须可 parse
     const out = sanitizeChatMessages([
       {

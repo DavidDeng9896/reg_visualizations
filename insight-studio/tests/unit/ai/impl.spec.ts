@@ -144,6 +144,37 @@ describe('AI 工具实现（execTool）', () => {
     expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
   })
 
+  it('set_chart_config：可仅用 viewId 反查表；configure 可为 values 数组', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: 'kon vs koff' }, ctx)
+    const viewId = created.summary.match(/view id: ([0-9a-f-]+)/)?.[1]!
+    const res = await execTool(
+      'set_chart_config',
+      {
+        viewId,
+        configure: {
+          x: { field: 'sepal_length' },
+          values: [{ field: 'sepal_width' }],
+        },
+      },
+      ctx,
+    )
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain('配置完成')
+
+    const viaArray = await execTool(
+      'set_chart_config',
+      {
+        viewId,
+        configure: [{ field: 'petal_length' }],
+        x: { field: 'sepal_length' },
+      },
+      ctx,
+    )
+    expect(viaArray.ok).toBe(true)
+  })
+
   it('delete_table：需确认模式先返回 needs_confirmation，确认后删除', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
