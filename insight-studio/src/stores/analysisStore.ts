@@ -45,6 +45,8 @@ interface AnalysisState {
   saving: boolean
   dirty: boolean
   selected: SelectedNode | null
+  /** 侧栏选中的独立步骤节点（如分析报告），用于 flowchart 定位。 */
+  selectedStepId: string | null
   mode: WorkspaceMode
   undoStack: HistoryEntry[]
   redoStack: HistoryEntry[]
@@ -57,6 +59,7 @@ export const useAnalysisStore = defineStore('analysis', {
     saving: false,
     dirty: false,
     selected: null,
+    selectedStepId: null,
     mode: 'flowchart',
     undoStack: [],
     redoStack: [],
@@ -78,6 +81,7 @@ export const useAnalysisStore = defineStore('analysis', {
       loadSeq += 1
       this.loading = true
       this.selected = null
+      this.selectedStepId = null
       this.mode = 'flowchart'
       if (this.current?.id !== id) {
         this.current = null
@@ -93,6 +97,7 @@ export const useAnalysisStore = defineStore('analysis', {
       cancelScheduledSave()
       this.current = null
       this.selected = null
+      this.selectedStepId = null
       this.loading = false
       this.dirty = false
       this.undoStack = []
@@ -104,6 +109,7 @@ export const useAnalysisStore = defineStore('analysis', {
       const seq = ++loadSeq
       this.loading = true
       this.selected = null
+      this.selectedStepId = null
       // 切换到另一份分析时立刻清空，避免 KeepAlive/侧栏仍渲染旧表数据
       if (this.current?.id !== id) {
         this.current = null
@@ -183,6 +189,14 @@ export const useAnalysisStore = defineStore('analysis', {
     /** 仅更新选中态，不切换模式（流程图内选中同步用）。 */
     setSelected(node: SelectedNode | null): void {
       this.selected = node
+      if (node) this.selectedStepId = null
+    },
+
+    /** 选中独立步骤节点（如分析报告），并切到流程图模式。 */
+    selectStep(stepId: string | null): void {
+      this.selected = null
+      this.selectedStepId = stepId
+      if (stepId) this.mode = 'flowchart'
     },
 
     setMode(mode: WorkspaceMode): void {

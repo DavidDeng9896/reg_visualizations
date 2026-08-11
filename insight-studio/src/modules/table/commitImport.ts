@@ -3,8 +3,9 @@
  * 产品拍板：只持久化数据内容（列/行），不保存原始 File/Blob。
  */
 import type { ColumnMeta, DataType, Row, StepType } from '../../shared/types'
-import { createTable, ensureRowIds } from '../../shared/factories'
+import { createTable, ensureRowIds, sealRows } from '../../shared/factories'
 import { createStepNode } from '../steps/factory'
+import { schedulePropagateTableEdit } from '../steps/rerun'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { toast } from '../../ui'
 import { coerceValue, inferColumnTypes } from './csv'
@@ -56,6 +57,49 @@ export function commitImportedTable(opts: CommitImportOptions): boolean {
   toast.success(
     `已导入「${name}」（${rows.length} 行 × ${columns.length} 列）${opts.sourceLabel ? ` · ${opts.sourceLabel}` : ''}`,
   )
+  return true
+}
+
+/** 替换既有表的数据（上传节点重传）：保留表 id/视图，更新列与行，并同步下游。 */
+export function commitReplacedTable(tableId: string, opts: Omit<CommitImportOptions, 'stepType'>): boolean {
+  const store = useAnalysisStore()
+  const a = store.current
+  if (!a) return false
+  const table = a.tables.find((t) => t.id === tableId)
+  if (!table) return false
+  const columns: ColumnMeta[] = inferColumnTypes(opts.headers, []).map((c, i) => ({
+    ...c,
+    dataType: opts.columnTypes[i] ?? 'string',
+  }))
+  const rows: Row[] = opts.dataRows.map((line) => {
+    const row: Row = {}
+    columns.forEach((c, i) => {
+      row[c.field] = coerceValue(line[i] ?? '', c.dataType)
+    })
+    return row
+  })
+  ensureRowIds(rows)
+  const name = opts.name.trim() || table.name
+  const stepId = table.stepId
+  store.mutate((an) => {
+    const t = an.tables.find((x) => x.id === tableId)
+    if (!t) return
+    t.name = name
+    t.columns = columns
+    t.rows = sealRows(rows)
+    if (stepId) {
+      const s = an.steps.find((x) => x.id === stepId)
+      if (s) {
+        s.status = 'configured'
+        s.error = undefined
+        s.config.tableName = name
+        if (opts.originalFileName) s.config.originalFileName = opts.originalFileName
+        if (opts.stepConfig) Object.assign(s.config, opts.stepConfig)
+      }
+    }
+  })
+  schedulePropagateTableEdit((fn) => store.mutate(fn), tableId)
+  toast.success(`已替换「${name}」（${rows.length} 行 × ${columns.length} 列），下游将同步更新`)
   return true
 }
 

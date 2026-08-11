@@ -136,8 +136,15 @@ export function previewStep(
       const tables = (inputs['Input tables'] ?? []) as AnalysisTable[]
       return previewUnion(tables, step.config, limit)
     }
-    default:
+    default: {
+      // 源步骤（upload-csv / query-sql 等）无独立预览逻辑：直接展示其产出表
+      const tableId = step.output.tables[0]
+      const table = tableId ? findTable(analysis, tableId) : null
+      if (table) {
+        return { columns: table.columns, rows: table.rows.slice(0, limit), totalRows: table.rows.length }
+      }
       return { columns: [], rows: [], totalRows: 0, error: `步骤 "${step.type}" 尚未实现预览逻辑` }
+    }
   }
 }
 

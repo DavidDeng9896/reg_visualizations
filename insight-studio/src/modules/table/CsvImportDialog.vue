@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import Papa from 'papaparse'
 import type { DataType } from '../../shared/types'
 import { IButton, IIcon, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
-import { commitImportedTable } from './commitImport'
+import { useAnalysisStore } from '../../stores/analysisStore'
+import { commitImportedTable, commitReplacedTable } from './commitImport'
 import { inferColumnTypes, readCsvFileText } from './csv'
 
-/** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。 */
-defineProps<{ open: boolean }>()
+/** CSV 导入对话框：拖放/选择文件 → 类型推断 → 预览前 50 行（可改列类型）→ 建表并生成 upload-csv 步骤节点。
+ *  传 replaceTableId 时为替换模式：不新建表/步骤，替换指定表的数据并同步下游。 */
+const props = defineProps<{ open: boolean; replaceTableId?: string | null }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+
+const store = useAnalysisStore()
+watch(
+  () => props.open,
+  (o) => {
+    if (o && props.replaceTableId) {
+      const t = store.current?.tables.find((x) => x.id === props.replaceTableId)
+      if (t) tableName.value = t.name
+    }
+  },
+)
 
 const fileName = ref('')
 const tableName = ref('')
@@ -126,15 +139,24 @@ async function confirm() {
   // 让按钮 loading 先绘制一帧，再跑同步 coerce/mutate
   await new Promise<void>((r) => requestAnimationFrame(() => r()))
   try {
-    const ok = commitImportedTable({
-      name: tableName.value,
-      headers: headers.value,
-      dataRows: dataRows.value,
-      columnTypes: columnTypes.value,
-      stepType: 'upload-csv',
-      sourceLabel: 'CSV',
-      originalFileName: fileName.value || undefined,
-    })
+    const ok = props.replaceTableId
+      ? commitReplacedTable(props.replaceTableId, {
+          name: tableName.value,
+          headers: headers.value,
+          dataRows: dataRows.value,
+          columnTypes: columnTypes.value,
+          sourceLabel: 'CSV',
+          originalFileName: fileName.value || undefined,
+        })
+      : commitImportedTable({
+          name: tableName.value,
+          headers: headers.value,
+          dataRows: dataRows.value,
+          columnTypes: columnTypes.value,
+          stepType: 'upload-csv',
+          sourceLabel: 'CSV',
+          originalFileName: fileName.value || undefined,
+        })
     if (ok) close()
   } finally {
     committing.value = false
@@ -143,7 +165,7 @@ async function confirm() {
 </script>
 
 <template>
-  <IModal :open="open" title="Import CSV" :width="760" @update:open="emit('update:open', $event)">
+  <IModal :open="open" :title="replaceTableId ? '替换数据 · CSV' : 'Import CSV'" :width="760" @update:open="emit('update:open', $event)">
     <div class="csv">
       <label
         class="csv__drop"
@@ -199,7 +221,7 @@ async function confirm() {
 
     <template #footer>
       <IButton @click="close">取消</IButton>
-      <IButton variant="primary" :disabled="!hasData || parsing" :loading="committing" @click="confirm">Add table</IButton>
+      <IButton variant="primary" :disabled="!hasData || parsing" :loading="committing" @click="confirm">{{ replaceTableId ? '替换数据' : 'Add table' }}</IButton>
     </template>
   </IModal>
 </template>

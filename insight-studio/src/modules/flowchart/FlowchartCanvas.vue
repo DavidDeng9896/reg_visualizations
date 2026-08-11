@@ -15,12 +15,11 @@ import { buildFlowGraph, downstreamOf, resolveStepSourceRef, stepNodeId, upstrea
 import { autoLayout, resolvePositions } from './layout'
 import FlowNode from './FlowNode.vue'
 import FlowEdge from './FlowEdge.vue'
-import type { DetailLayout } from './NodeDetailCard.vue'
+import type { DetailLayout } from './StepDetailPanel.vue'
 
 /** 详情/配置面板按需加载，避免首开 flowchart 连带 ChartPanel 等重模块 */
-const NodeDetailCard = defineAsyncComponent(() => import('./NodeDetailCard.vue'))
+const StepDetailPanel = defineAsyncComponent(() => import('./StepDetailPanel.vue'))
 const AddStepPanel = defineAsyncComponent(() => import('./AddStepPanel.vue'))
-const StepConfigPanel = defineAsyncComponent(() => import('../steps/panel/StepConfigPanel.vue'))
 import { canConnectPorts } from './connection'
 import { getStepDef } from '../steps/registry'
 import { uuid } from '../../shared/id'
@@ -41,7 +40,7 @@ import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
 const emit = defineEmits<{ (e: 'add-data'): void }>()
 
 const store = useAnalysisStore()
-const { current, selected, loading } = storeToRefs(store)
+const { current, selected, selectedStepId, loading } = storeToRefs(store)
 
 /* --------------------------------- 数据派生 --------------------------------- */
 
@@ -111,12 +110,12 @@ const activeOutputs = computed(() => (activeId.value ? downstreamOf(graph.value,
  * 右侧/下侧分栏是否展示：选中节点详情，或正在编辑步骤配置。
  * 步骤配置与节点详情共用 ISplitPane，避免绝对定位抽屉盖住画布。
  */
-const detailOpen = computed(() => !!editingStepData.value || !!activeNode.value)
+const detailOpen = computed(() => !!activeNode.value)
 
 /** 编辑宽面板（Custom Code / 报告）时略提高第二栏下限，便于预览。 */
 const splitMinSecond = computed(() => {
   if (detailLayout.value === 'bottom') return 160
-  const t = editingStepData.value?.type
+  const t = activeNode.value?.stepType
   if (t === 'custom-code' || t === 'report') return 380
   return 300
 })
@@ -326,11 +325,18 @@ function selectionToFlowId(sel: SelectedNode | null): string | null {
   return null
 }
 
+function stepSelectionToFlowId(stepId: string | null): string | null {
+  if (!stepId) return null
+  const id = stepNodeId(stepId)
+  return nodeById.value.has(id) ? id : null
+}
+
 function setActive(id: string | null): void {
   activeId.value = id
   const n = id ? nodeById.value.get(id) : null
   if (!n) {
     store.setSelected(null)
+    store.selectedStepId = null
     return
   }
   if (n.kind === 'view' && n.viewId && n.tableId) {
@@ -338,11 +344,19 @@ function setActive(id: string | null): void {
   } else if (n.kind === 'step' && n.stepId) {
     const table = current.value?.tables.find((t) => t.stepId === n.stepId)
     if (table) store.setSelected({ kind: 'table', tableId: table.id })
+    else store.selectedStepId = n.stepId
   }
 }
 
 watch(selected, (sel) => {
   const flowId = selectionToFlowId(sel)
+  if (flowId === activeId.value) return
+  activeId.value = flowId
+  if (flowId) void centerOn(flowId)
+})
+
+watch(selectedStepId, (stepId) => {
+  const flowId = stepSelectionToFlowId(stepId)
   if (flowId === activeId.value) return
   activeId.value = flowId
   if (flowId) void centerOn(flowId)
@@ -389,7 +403,7 @@ onMounted(() => {
   requestAnimationFrame(() => {
     minimapOpen.value = true
   })
-  const flowId = selectionToFlowId(selected.value)
+  const flowId = selectionToFlowId(selected.value) ?? stepSelectionToFlowId(selectedStepId.value)
   if (flowId) {
     activeId.value = flowId
     void centerOn(flowId)
@@ -459,7 +473,6 @@ function closePanels(): void {
   addStepOpen.value = false
   addStepSource.value = null
   skipNextPaneClick.value = false
-  if (editingStep.value) closeStepEditor(true)
 }
 
 function onConnectStart({ nodeId, handleId }: { nodeId?: string; handleId?: string | null }): void {
@@ -565,6 +578,10 @@ function onStepSelected(type: StepType): void {
   // 避免写入 flowchartLayout 导致与既有节点重叠。
   const newNodeId = stepNodeId(newStep.id)
 
+  // 项目逻辑：上游数据已接入则立即执行（与 onConnect 手动连线行为一致）
+  const hasInput = newStep.inputs.length > 0
+  if (hasInput) newStep.status = 'running'
+
   store.mutate((a) => {
     a.steps.push(newStep)
   })
@@ -572,11 +589,25 @@ function onStepSelected(type: StepType): void {
   addStepOpen.value = false
   addStepSource.value = null
 
-  // 打开配置面板（标记为新建，Cancel/Esc 将撤销该节点）
+  // 选中新节点、自动进入编辑，并居中视图避免新节点落在视口外。
+  // 画布 vfNodes 由 64ms 防抖 rebuild 更新，需等其完成后再 fitView，否则找不到新节点。
   void nextTick(() => {
-    openStepEditor(newStep.id, true)
+    newStepEditingId.value = newStep.id
     setActive(newNodeId)
+    setTimeout(() => {
+      void centerOn(newNodeId)
+    }, 220)
   })
+
+  if (hasInput) {
+    void nextTick(async () => {
+      const s = current.value?.steps.find((x) => x.id === newStep.id)
+      if (s && current.value) {
+        await runStepAsync(current.value, s)
+        store.mutate(() => {})
+      }
+    })
+  }
 }
 
 /** 添加独立报告节点（无需连线）。 */
@@ -588,78 +619,15 @@ function addReportNode(): void {
   })
   const newNodeId = stepNodeId(step.id)
   void nextTick(() => {
-    openStepEditor(step.id, true)
+    newStepEditingId.value = step.id
     setActive(newNodeId)
   })
 }
 
-/* --------------------------------- 步骤编辑面板 -------------------------------- */
+/* --------------------------------- 步骤编辑 -------------------------------- */
 
-const editingStep = ref<string | null>(null)
-/** 本次编辑是否为「拖线新建的步骤」（Cancel/Esc 时撤销节点与连线）。 */
-const editingIsNew = ref(false)
-/** 打开编辑时的草稿快照（name + config），Cancel/Esc/点空白时恢复。 */
-const editingSnapshot = ref<{ name: string; config: string; inputs: string } | null>(null)
-
-const editingStepData = computed(() => {
-  if (!editingStep.value || !current.value) return null
-  return current.value.steps.find((s) => s.id === editingStep.value) ?? null
-})
-
-function openStepEditor(stepId: string, isNew: boolean): void {
-  const s = current.value?.steps.find((s) => s.id === stepId)
-  if (!s) return
-  editingStep.value = stepId
-  editingIsNew.value = isNew
-  editingSnapshot.value = {
-    name: s.name,
-    config: JSON.stringify(s.config),
-    inputs: JSON.stringify(s.inputs),
-  }
-}
-
-/** 关闭编辑面板；cancel=true 时恢复快照，新建的步骤连同布局一起撤销。 */
-function closeStepEditor(cancel: boolean): void {
-  if (!editingStep.value || !current.value) {
-    editingStep.value = null
-    return
-  }
-  const stepId = editingStep.value
-  if (cancel && editingIsNew.value) {
-    deleteStep(stepId)
-  } else if (cancel && editingSnapshot.value) {
-    const s = current.value.steps.find((s) => s.id === stepId)
-    if (s) {
-      s.name = editingSnapshot.value.name
-      s.config = JSON.parse(editingSnapshot.value.config)
-      s.inputs = JSON.parse(editingSnapshot.value.inputs)
-    }
-  }
-  editingStep.value = null
-  editingIsNew.value = false
-  editingSnapshot.value = null
-}
-
-function onStepSaved(name: string): void {
-  if (!editingStepData.value || !current.value) return
-  const step = editingStepData.value
-  store.mutate(() => {
-    step.name = name
-    // 源步骤（upload-csv 等无执行逻辑）：重命名同步到输出表
-    if (!IMPLEMENTED_STEP_TYPES.has(step.type)) {
-      const outTable = step.output.tables[0] ? current.value!.tables.find((t) => t.id === step.output.tables[0]) : undefined
-      if (outTable) outTable.name = name
-    }
-  })
-  if (IMPLEMENTED_STEP_TYPES.has(step.type)) {
-    void runStepAsync(current.value, step).then(() => {
-      store.mutate(() => {})
-    })
-  }
-  editingStep.value = null
-  editingIsNew.value = false
-  editingSnapshot.value = null
-}
+/** 新建步骤后需要自动进入编辑态的步骤 id。 */
+const newStepEditingId = ref<string | null>(null)
 
 /** 删除步骤及其输出表（调用方需先确认无下游依赖）。 */
 function deleteStep(stepId: string): void {
@@ -668,7 +636,7 @@ function deleteStep(stepId: string): void {
     a.tables = a.tables.filter((t) => t.stepId !== stepId)
     delete a.flowchartLayout[stepNodeId(stepId)]
   })
-  if (editingStep.value === stepId) editingStep.value = null
+  if (newStepEditingId.value === stepId) newStepEditingId.value = null
   if (activeId.value === stepNodeId(stepId)) activeId.value = null
 }
 
@@ -689,10 +657,6 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     if (addStepOpen.value) {
       addStepOpen.value = false
-      return
-    }
-    if (editingStep.value) {
-      closeStepEditor(true)
       return
     }
     if (activeId.value) setActive(null)
@@ -875,28 +839,15 @@ function minimapNodeColor(node: { data?: unknown }): string {
         </div>
       </template>
       <template #second>
-        <StepConfigPanel
-          v-if="editingStepData"
-          :step="editingStepData"
-          docked
-          :layout="detailLayout"
-          @update:layout="setDetailLayout"
-          @close="closeStepEditor(true)"
-          @save="onStepSaved"
-          @delete="onStepDeleted(editingStep!)"
-        />
-        <NodeDetailCard
-          v-else-if="activeNode"
+        <StepDetailPanel
+          v-if="activeNode"
           :key="activeNode.id"
           :node="activeNode"
-          :inputs="activeInputs"
-          :outputs="activeOutputs"
           :layout="detailLayout"
+          :initial-editing="newStepEditingId === activeNode.stepId"
           @update:layout="setDetailLayout"
           @close="setActive(null)"
-          @focus="focusNode"
           @open="openInWorkspace(activeNode.id)"
-          @edit="activeNode.stepId && openStepEditor(activeNode.stepId, false)"
           @delete="onStepDeleted"
         />
       </template>

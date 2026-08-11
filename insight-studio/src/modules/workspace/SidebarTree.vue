@@ -39,6 +39,14 @@ const tableForest = computed(() => {
   return q ? filterTableForest(forest, q) : forest
 })
 
+const reportSteps = computed(() => {
+  const a = current.value
+  if (!a) return []
+  const q = props.search.trim().toLowerCase()
+  const list = a.steps.filter((s) => s.type === 'report')
+  return q ? list.filter((s) => s.name.toLowerCase().includes(q)) : list
+})
+
 /* 选中 */
 /**
  * 树节点选择：流程图模式下只更新选中态、不切回工作区，
@@ -223,8 +231,27 @@ function pickViewType(type: ViewType) {
 <template>
   <div class="tree-wrap">
     <div class="tree" role="tree">
-      <div v-if="!tableForest.length" class="tree__empty">
+      <div v-if="!tableForest.length && !reportSteps.length" class="tree__empty">
         {{ loading || !current ? '加载中…' : search ? '无匹配结果' : '还没有数据，点击上方 + 添加数据' }}
+      </div>
+
+      <!-- 分析报告节点 -->
+      <div
+        v-for="step in reportSteps"
+        :key="step.id"
+        class="rnode"
+        role="treeitem"
+        data-testid="sidebar-report"
+        :data-name="step.name"
+        :class="{ 'rnode--selected': store.selectedStepId === step.id }"
+        tabindex="0"
+        @click="store.selectStep(step.id)"
+        @keydown.enter="store.selectStep(step.id)"
+      >
+        <span class="rnode__icon" aria-hidden="true">
+          <IIcon name="file-text" :size="16" />
+        </span>
+        <span class="rnode__name is-ellipsis" :title="step.name">{{ step.name }}</span>
       </div>
 
       <SidebarTableNode
@@ -370,6 +397,47 @@ function pickViewType(type: ViewType) {
   border-color: var(--is-accent);
   background: var(--is-accent-soft);
   color: var(--is-accent);
+}
+
+/* 分析报告节点 */
+.rnode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin: 0 8px;
+  padding: 0 8px;
+  border-radius: var(--is-radius-sm);
+  cursor: pointer;
+  color: var(--is-text);
+}
+.rnode:hover {
+  background: var(--is-surface-hover);
+}
+.rnode--selected,
+.rnode--selected:hover {
+  background: var(--is-accent-soft);
+}
+.rnode--selected .rnode__name {
+  font-weight: 600;
+  color: var(--is-accent);
+}
+.rnode--selected .rnode__icon {
+  color: var(--is-accent);
+}
+.rnode__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--is-text-secondary);
+  flex-shrink: 0;
+}
+.rnode__name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--is-text-sm);
 }
 .confirm-text {
   font-size: var(--is-text-sm);

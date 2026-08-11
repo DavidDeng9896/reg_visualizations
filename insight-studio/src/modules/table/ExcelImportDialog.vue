@@ -3,11 +3,24 @@ import { computed, nextTick, ref, watch } from 'vue'
 import type { DataType } from '../../shared/types'
 import { IButton, IIcon, IModal, ISelect, ITextField, type SelectOption } from '../../ui'
 import { inferColumnTypes } from './csv'
-import { commitImportedTable } from './commitImport'
+import { commitImportedTable, commitReplacedTable } from './commitImport'
 import { listSheetInfo, parseExcelFile, type ExcelParseResult } from './excel'
+import { useAnalysisStore } from '../../stores/analysisStore'
 
-defineProps<{ open: boolean }>()
+/** 传 replaceTableId 时为替换模式：不新建表/步骤，替换指定表的数据并同步下游。 */
+const props = defineProps<{ open: boolean; replaceTableId?: string | null }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+
+const store = useAnalysisStore()
+watch(
+  () => props.open,
+  (o) => {
+    if (o && props.replaceTableId) {
+      const t = store.current?.tables.find((x) => x.id === props.replaceTableId)
+      if (t) tableName.value = t.name
+    }
+  },
+)
 
 const fileName = ref('')
 const tableName = ref('')
@@ -138,16 +151,26 @@ async function confirm() {
   committing.value = true
   await new Promise<void>((r) => requestAnimationFrame(() => r()))
   try {
-    const ok = commitImportedTable({
-      name: tableName.value,
-      headers: headers.value,
-      dataRows: dataRows.value,
-      columnTypes: columnTypes.value,
-      stepType: 'upload-xlsx',
-      stepConfig: { sheetName: sheetName.value },
-      sourceLabel: `Excel · ${sheetName.value}`,
-      originalFileName: fileName.value || undefined,
-    })
+    const ok = props.replaceTableId
+      ? commitReplacedTable(props.replaceTableId, {
+          name: tableName.value,
+          headers: headers.value,
+          dataRows: dataRows.value,
+          columnTypes: columnTypes.value,
+          stepConfig: { sheetName: sheetName.value },
+          sourceLabel: `Excel · ${sheetName.value}`,
+          originalFileName: fileName.value || undefined,
+        })
+      : commitImportedTable({
+          name: tableName.value,
+          headers: headers.value,
+          dataRows: dataRows.value,
+          columnTypes: columnTypes.value,
+          stepType: 'upload-xlsx',
+          stepConfig: { sheetName: sheetName.value },
+          sourceLabel: `Excel · ${sheetName.value}`,
+          originalFileName: fileName.value || undefined,
+        })
     if (ok) close()
   } finally {
     committing.value = false
@@ -163,7 +186,7 @@ watch(
 </script>
 
 <template>
-  <IModal :open="open" title="Import Excel" :width="800" @update:open="emit('update:open', $event)">
+  <IModal :open="open" :title="replaceTableId ? '替换数据 · Excel' : 'Import Excel'" :width="800" @update:open="emit('update:open', $event)">
     <div class="xlsx">
       <label
         class="xlsx__drop"
@@ -229,7 +252,7 @@ watch(
 
     <template #footer>
       <IButton @click="close">取消</IButton>
-      <IButton variant="primary" :disabled="!hasData || parsing" :loading="committing" @click="confirm">Add table</IButton>
+      <IButton variant="primary" :disabled="!hasData || parsing" :loading="committing" @click="confirm">{{ replaceTableId ? '替换数据' : 'Add table' }}</IButton>
     </template>
   </IModal>
 </template>

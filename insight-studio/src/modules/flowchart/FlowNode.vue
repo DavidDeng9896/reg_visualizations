@@ -34,6 +34,8 @@ const isDataStep = computed(() => {
   )
 })
 
+const isReportStep = computed(() => props.data.stepType === 'report')
+
 const icon = computed<IconName>(() => {
   const d = props.data
   if (d.kind === 'view') return (d.viewType ?? 'table') as IconName
@@ -128,6 +130,7 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
     class="flow-node flow-node--step"
     :class="{
       'flow-node--data': isDataStep,
+      'flow-node--report': isReportStep,
       'flow-node--pending': data.status === 'pending' || (!data.valid && data.status !== 'failed'),
       'flow-node--failed': data.status === 'failed',
     }"
@@ -267,6 +270,29 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
 }
 .flow-node--failed {
   border-color: var(--is-danger);
+}
+
+/* 分析报告节点：独立报告卡片，比普通步骤更醒目 */
+.flow-node--report {
+  min-width: 320px;
+  max-width: 420px;
+  background: linear-gradient(135deg, #f6f0ff 0%, #eef4ff 100%);
+  border-color: #b8a9e8;
+}
+.flow-node--report .flow-node__header {
+  padding: 14px 16px 10px;
+}
+.flow-node--report .flow-node__label {
+  font-size: 14px;
+}
+.flow-node--report .flow-node__sub {
+  font-size: 12px;
+}
+.flow-node--report .flow-node__icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(124, 92, 191, 0.14);
+  color: #6d4fc2;
 }
 
 .flow-node__header {

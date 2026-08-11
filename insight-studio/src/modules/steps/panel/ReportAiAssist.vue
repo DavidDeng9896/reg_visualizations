@@ -14,9 +14,12 @@ const props = defineProps<{
   report: AnalysisReport
 }>()
 
-const emit = defineEmits<{ (e: 'apply', report: AnalysisReport): void }>()
+const emit = defineEmits<{
+  (e: 'apply', report: AnalysisReport): void
+  (e: 'minimize'): void
+  (e: 'close'): void
+}>()
 
-const open = ref(true)
 const prompt = ref('')
 const loading = ref(false)
 const draft = ref('')
@@ -111,13 +114,16 @@ function apply() {
 <template>
   <section class="rai">
     <header class="rai__head">
-      <button type="button" class="rai__toggle" @click="open = !open">
-        <IIcon name="sparkle" :size="14" />
-        <span>AI 写报告</span>
-        <IIcon :name="open ? 'chevron-up' : 'chevron-down'" :size="14" />
+      <IIcon name="sparkle" :size="14" class="rai__head-ico" />
+      <span class="rai__title">AI 写报告</span>
+      <button type="button" class="rai__head-btn" title="最小化" aria-label="最小化" @click="emit('minimize')">
+        <IIcon name="minus" :size="14" />
+      </button>
+      <button type="button" class="rai__head-btn" title="关闭" aria-label="关闭" @click="emit('close')">
+        <IIcon name="close" :size="14" />
       </button>
     </header>
-    <div v-if="open" class="rai__body">
+    <div class="rai__body">
       <p class="rai__hint">根据当前分析生成或改写科研风格报告；写入后可在预览中查看，并用「导出 PDF」打印。</p>
       <div class="rai__row">
         <ITextField
@@ -149,18 +155,38 @@ function apply() {
 }
 .rai__head {
   display: flex;
-}
-.rai__toggle {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
   padding: 8px 10px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+  border-bottom: 1px solid var(--is-border, #d0d5dd);
+  flex-shrink: 0;
+}
+.rai__head-ico {
+  color: var(--is-accent, #3b82f6);
+  flex-shrink: 0;
+}
+.rai__title {
+  flex: 1;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
+  color: var(--is-text, #1a1d21);
+}
+.rai__head-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--is-text-tertiary, #667085);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rai__head-btn:hover {
+  background: var(--is-surface-hover, #f2f4f7);
   color: var(--is-text, #1a1d21);
 }
 .rai__body {
