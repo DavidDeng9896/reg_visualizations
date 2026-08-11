@@ -29,6 +29,7 @@ import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
+import { capReasoningText } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -910,12 +911,13 @@ export const useAiStore = defineStore('ai', {
 function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
   return (e) => {
     if (e.type === 'round') {
-      // 每轮重新累计可见正文；工具轮独白会在 tool_call 时清空，避免多轮复读堆进气泡
+      // 每轮重新累计可见正文与思考；避免多轮独白/reasoning 堆成墙
       assistant.content = ''
+      assistant.reasoning = ''
     } else if (e.type === 'token') {
       assistant.content += e.text
     } else if (e.type === 'reasoning') {
-      assistant.reasoning = (assistant.reasoning ?? '') + e.text
+      assistant.reasoning = capReasoningText((assistant.reasoning ?? '') + e.text)
     } else if (e.type === 'tool_call') {
       // 本轮若进入工具调用，过程独白不展示（进展看 TraceCard）
       assistant.content = ''

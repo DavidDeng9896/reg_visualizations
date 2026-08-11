@@ -82,8 +82,16 @@ describe('AI 工具实现（execTool）', () => {
     expect(viewId).toBeTruthy()
 
     const bad = await execTool('set_chart_config', { tableId: iris.id, viewId, configure: { x: { field: 'nope' } } }, ctx)
-    expect(bad.ok).toBe(true)
+    expect(bad.ok).toBe(false)
     expect(bad.summary).toContain('校验未通过')
+
+    const viaY = await execTool(
+      'set_chart_config',
+      { tableId: iris.id, viewId, configure: { x: { field: 'sepal_length' }, y: { field: 'sepal_width' } } },
+      ctx,
+    )
+    expect(viaY.ok).toBe(true)
+    expect(viaY.summary).toContain('配置完成')
 
     const good = await execTool(
       'set_chart_config',
@@ -94,6 +102,7 @@ describe('AI 工具实现（execTool）', () => {
     expect(good.summary).toContain('配置完成')
     const view = findView(findTable(analysis, iris.id)!.views, viewId!)
     expect(view!.chart!.style.fitAnnotation).toBe(true)
+    expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
   })
 
   it('delete_table：需确认模式先返回 needs_confirmation，确认后删除', async () => {

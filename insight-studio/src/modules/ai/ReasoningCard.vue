@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { IIcon } from '../../ui'
+import { REASONING_DISPLAY_CAP } from './contentScrub'
 
-/** 思考过程卡：推理模型的 reasoning 流，流式时展开、结束后可折叠回看。 */
+/** 思考过程卡：推理模型的 reasoning 流；流式时展开，结束后折叠；过长截断展示。 */
 const props = defineProps<{
   reasoning: string
   streaming?: boolean
@@ -12,10 +13,15 @@ const open = ref(!!props.streaming)
 watch(
   () => props.streaming,
   (s) => {
-    // 流式时展开看思考，结束后自动折叠（可手动再展开）
     open.value = !!s
   },
 )
+
+const displayText = computed(() => {
+  const t = props.reasoning
+  if (t.length <= REASONING_DISPLAY_CAP) return t
+  return `…(已截断冗长思考)…\n${t.slice(-REASONING_DISPLAY_CAP)}`
+})
 </script>
 
 <template>
@@ -25,7 +31,7 @@ watch(
       <span>思考过程</span>
       <IIcon v-if="streaming" name="spinner" :size="12" class="reason__spin" />
     </button>
-    <div v-if="open" class="reason__body">{{ reasoning }}</div>
+    <div v-if="open" class="reason__body">{{ displayText }}</div>
   </div>
 </template>
 
@@ -65,9 +71,8 @@ watch(
   color: var(--is-text-tertiary);
   white-space: pre-wrap;
   word-break: break-word;
-  /* 随会话区整体滚动，避免思考块自带滚动条 */
-  max-height: none;
-  overflow: visible;
+  max-height: 10.5em;
+  overflow-y: auto;
 }
 @keyframes reason-spin {
   to {

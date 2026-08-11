@@ -176,6 +176,31 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   let stallRounds = 0
   let lastStallText = ''
   const MAX_STALL_ROUNDS = 3
+  /** 同一工具连续失败或同参成功重复次数；打断 set_chart_config 等空转。 */
+  let toolSpinCount = 0
+  let lastToolSpinKey = ''
+  const MAX_TOOL_SPIN = 3
+  let toolSpinNudges = 0
+  const MAX_TOOL_SPIN_NUDGES = 2
+
+  const noteToolSpin = (name: string, args: Record<string, unknown>, result: ToolExecResult) => {
+    const argKey = JSON.stringify(args ?? {})
+    const key = result.ok ? `ok:${name}:${argKey}` : `fail:${name}`
+    if (key === lastToolSpinKey) toolSpinCount += 1
+    else {
+      lastToolSpinKey = key
+      toolSpinCount = 1
+    }
+    if (toolSpinCount < MAX_TOOL_SPIN || toolSpinNudges >= MAX_TOOL_SPIN_NUDGES) return
+    toolSpinNudges += 1
+    toolSpinCount = 0
+    lastToolSpinKey = ''
+    messages.push({
+      role: 'system',
+      content:
+        `【停止空转】工具「${name}」已连续重复。若已返回成功/配置完成：立刻 mark_step_done 并做下一步；若失败：换字段或 ask_user，禁止再用相同参数重试。禁止过程独白。`,
+    })
+  }
 
   const throwIfAborted = () => {
     if (signal?.aborted) throw new DOMException('已中止', 'AbortError')
@@ -399,6 +424,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
           result = { ok: false, summary: `子代理执行失败：${e instanceof Error ? e.message : String(e)}` }
         }
         pushToolContent(call, name, result.summary, result)
+        noteToolSpin(name, { goal }, result)
         continue
       }
 
@@ -430,6 +456,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       }
 
       pushToolContent(call, name, result.summary, result)
+      noteToolSpin(name, args, result)
     }
   }
 
