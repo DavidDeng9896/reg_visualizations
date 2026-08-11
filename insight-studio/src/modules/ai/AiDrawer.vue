@@ -295,11 +295,13 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
       :data-mode="mode"
     >
         <header class="ai-drawer__head ai-drawer__head--drag" @pointerdown="onDragStart">
-          <div class="ai-drawer__title">
-            <IIcon name="sparkle" :size="16" class="ai-drawer__logo" />
-            <span>{{ historyOpen ? '会话历史' : 'AI 助手' }}</span>
-          </div>
-          <div class="ai-drawer__actions" data-no-drag>
+          <div class="ai-drawer__drag-handle" aria-hidden="true" />
+          <div class="ai-drawer__head-row">
+            <div class="ai-drawer__title">
+              <IIcon name="sparkle" :size="16" class="ai-drawer__logo" />
+              <span>{{ historyOpen ? '会话历史' : 'AI 助手' }}</span>
+            </div>
+            <div class="ai-drawer__actions" data-no-drag>
             <button
               v-if="!historyOpen"
               type="button"
@@ -338,6 +340,7 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
             <button type="button" class="ai-drawer__btn" title="关闭" aria-label="关闭" @click="drawerOpen = false">
               <IIcon name="close" :size="15" />
             </button>
+          </div>
           </div>
         </header>
 
@@ -441,12 +444,26 @@ const historyEmpty = computed(() => !historyLoading.value && !conversations.valu
 }
 .ai-drawer__head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
+  flex-direction: column;
+  padding: 6px 12px 12px;
   background: var(--is-surface);
   border-bottom: 1px solid var(--is-border);
   flex-shrink: 0;
+}
+.ai-drawer__drag-handle {
+  width: 36px;
+  height: 5px;
+  margin: 2px auto 10px;
+  border-radius: 999px;
+  background: var(--is-border-strong, color-mix(in srgb, var(--is-text-tertiary, #9ca3af) 55%, transparent));
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.ai-drawer__head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
 }
 .ai-drawer__head--drag {
   cursor: grab;
