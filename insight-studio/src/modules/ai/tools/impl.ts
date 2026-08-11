@@ -12,6 +12,7 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
+import { normalizeAiChartConfigure } from '../normalizeChartConfigure'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
@@ -574,7 +575,11 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const v = findView(t.views, String(args.viewId ?? ''))
     if (!v?.chart) return fail('该视图不是图表视图')
     const chartType = typeof args.chartType === 'string' ? args.chartType : undefined
-    const configure = (args.configure ?? {}) as Partial<ChartConfig['configure']>
+    const effectiveType = String(chartType || v.chart.chartType || 'bar')
+    const configure = normalizeAiChartConfigure(
+      effectiveType,
+      (args.configure ?? {}) as Partial<ChartConfig['configure']>,
+    )
     const style = (args.style ?? {}) as Partial<ChartConfig['style']>
     store().mutate((a) => {
       const table = findTable(a, t.id)
@@ -584,12 +589,14 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       Object.assign(view.chart.configure, configure)
       Object.assign(view.chart.style, style)
     })
-    // 校验映射完整性
+    // 校验映射完整性：失败返回 ok:false，避免模型把软成功当「可继续空转」
     const updated = findView(requireTable(t.id).views, v.id)
     const errors = validateChartMapping(updated!.chart!, requireTable(t.id).columns)
     if (errors.length) {
       const msgs = errors.map((e) => e.message).join('；')
-      return ok(`配置已写入，但校验未通过：${msgs}（可继续用 set_chart_config 补齐映射）`, artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }))
+      return fail(
+        `图表映射校验未通过：${msgs}。请一次给出完整映射后重试（line/scatter/bignumber 的 Y 用 values:[{field}]，不要只写 y）；不要对同一错误配置反复调用。`,
+      )
     }
     return ok(`图表「${v.name}」配置完成`, artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }))
   },

@@ -196,15 +196,20 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'set_chart_config',
-    description: '配置图表视图：图种、映射（x/y/values/series/color/shape/categories/measure）、聚合、误差棒、回归（model: none/point-to-point/linear/quadratic/4pl）、样式（标题/图例/边距/透明度/线型/拟合注释/参考线/柱模式/箱形态/bignumber 布局）。',
+    description:
+      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 必须用 configure.values:[{field}]（不要只用 y）；bar/box 用 y。一次写全必填槽；已返回「配置完成」勿重复调用。',
     parameters: {
       type: 'object',
       properties: {
         tableId: str('表 id'),
         viewId: str('视图 id'),
         chartType: str('图种（可选，改图种时必填）'),
-        configure: { type: 'object', description: '映射与回归配置（部分更新，深合并）' },
-        style: { type: 'object', description: '样式（部分更新，深合并）' },
+        configure: {
+          type: 'object',
+          description:
+            '映射与回归。例 scatter: {x:{field}, values:[{field}], color?:{field}}；bar: {x:{field}, y:{field}}',
+        },
+        style: { type: 'object', description: '样式（部分更新）' },
       },
       required: ['tableId', 'viewId'],
     },
