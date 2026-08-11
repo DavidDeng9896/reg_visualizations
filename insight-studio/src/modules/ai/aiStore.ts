@@ -19,7 +19,9 @@ import { execTool } from './tools/impl'
 import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
 import {
   blobToDataUrl,
+  buildAttachmentCatalog,
   buildAttachmentContext,
+  formatUserAttachmentLine,
   importAttachmentAsTables,
   serializeAttachment,
   type ChatAttachment,
@@ -29,6 +31,7 @@ import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
+import { capReasoningText } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -293,15 +296,23 @@ export const useAiStore = defineStore('ai', {
       // 新一轮前先清掉历史消息上残留的 streaming/running，避免旧进展继续转圈
       clearTransientProgress(this.messages)
       await this.ensureConversation()
+      await this.refreshSessionFiles()
       // 上下文超过阈值（上限 80%）先自动压缩：最近 2 个用户轮保留，更早历史折叠为摘要
       if (this.contextTokens > AUTO_COMPRESS_AT) await this.compressContext()
 
       const userContent =
-        input || (atts.length ? `（附件：${atts.map((a) => a.name).join('、')}）` : '')
+        input ||
+        (atts.length ? formatUserAttachmentLine(atts) : '') ||
+        ''
+      // 有正文时也附上附件 id，便于多轮引用
+      const userContentWithAtts =
+        input && atts.length
+          ? `${input}\n${formatUserAttachmentLine(atts)}`
+          : userContent
       this.messages.push({
         id: nextId(),
         role: 'user',
-        content: userContent,
+        content: userContentWithAtts,
         trace: [],
         artifacts: [],
         at: Date.now(),
@@ -349,10 +360,33 @@ export const useAiStore = defineStore('ai', {
       }
 
       try {
+        // 跨轮：会话里已上传附件目录（含历史消息）
+        const catalogItems: ChatAttachmentSnapshot[] = []
+        for (const m of this.messages) {
+          if (m.attachments?.length) catalogItems.push(...m.attachments)
+        }
+        for (const f of this.sessionFiles) {
+          catalogItems.push({
+            id: f.id,
+            name: f.name,
+            mime: f.mime,
+            sizeBytes: f.sizeBytes,
+            kind: f.kind,
+            forAi: true,
+            importAsTable: false,
+          })
+        }
+        const catalog = buildAttachmentCatalog(catalogItems)
+        if (catalog) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: catalog })
+
         const attachCtx = await buildAttachmentContext(atts)
         if (attachCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: attachCtx })
-      } catch {
-        /* 附件上下文失败时跳过 */
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        chatMessages.splice(chatMessages.length - 1, 0, {
+          role: 'system',
+          content: `（附件上下文读取失败：${msg}。仍可用 list_ai_files / import_ai_file。）`,
+        })
       }
 
       // 图片走 vision：替换最后一条 user 消息为 multimodal
@@ -734,14 +768,31 @@ export const useAiStore = defineStore('ai', {
       }
     },
 
-    /** 续轮时模型可见上下文：system + 分析上下文 + 该 assistant 消息之前的历史。 */
+    /** 续轮时模型可见上下文：system + 分析上下文 + 附件目录 + 该 assistant 消息之前的历史。 */
     buildBase(assistant: UiMessage): ChatMessage[] {
       const analysis = useAnalysisStore().current
       const idx = this.messages.indexOf(assistant)
       const prior = idx >= 0 ? this.messages.slice(0, idx) : this.messages
+      const catalogItems: ChatAttachmentSnapshot[] = []
+      for (const m of prior) {
+        if (m.attachments?.length) catalogItems.push(...m.attachments)
+      }
+      for (const f of this.sessionFiles) {
+        catalogItems.push({
+          id: f.id,
+          name: f.name,
+          mime: f.mime,
+          sizeBytes: f.sizeBytes,
+          kind: f.kind,
+          forAi: true,
+          importAsTable: false,
+        })
+      }
+      const catalog = buildAttachmentCatalog(catalogItems)
       return [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'system', content: buildAnalysisContext(analysis) },
+        ...(catalog ? [{ role: 'system' as const, content: catalog }] : []),
         ...prior.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
       ]
     },
@@ -910,12 +961,13 @@ export const useAiStore = defineStore('ai', {
 function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
   return (e) => {
     if (e.type === 'round') {
-      // 每轮重新累计可见正文；工具轮独白会在 tool_call 时清空，避免多轮复读堆进气泡
+      // 每轮重新累计可见正文与思考；避免多轮独白/reasoning 堆成墙
       assistant.content = ''
+      assistant.reasoning = ''
     } else if (e.type === 'token') {
       assistant.content += e.text
     } else if (e.type === 'reasoning') {
-      assistant.reasoning = (assistant.reasoning ?? '') + e.text
+      assistant.reasoning = capReasoningText((assistant.reasoning ?? '') + e.text)
     } else if (e.type === 'tool_call') {
       // 本轮若进入工具调用，过程独白不展示（进展看 TraceCard）
       assistant.content = ''

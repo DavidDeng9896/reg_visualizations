@@ -3,6 +3,7 @@
  */
 
 import { getCurrentUserId, USER_ID_HEADER } from '../shell/currentUser'
+import { coerceArrayToolArgs } from './toolArgs'
 
 /* ------------------------------- 消息类型 ------------------------------- */
 
@@ -103,10 +104,12 @@ function looksLikeJsonObject(s: string): boolean {
  * 保证 tool function.arguments 为合法 JSON 字符串（豆包要求）。
  * 无法修复时回退 "{}"，避免续跑 502 invalid_parameter_error。
  */
-export function normalizeToolArguments(raw: unknown): string {
+export function normalizeToolArguments(raw: unknown, toolName?: string): string {
   if (raw == null) return '{}'
   if (typeof raw === 'object') {
     try {
+      const obj = raw as unknown
+      if (Array.isArray(obj)) return JSON.stringify(coerceArrayToolArgs(obj, toolName))
       return JSON.stringify(raw)
     } catch {
       return '{}'
@@ -118,7 +121,8 @@ export function normalizeToolArguments(raw: unknown): string {
   const fence = s.match(/^```(?:json)?\s*([\s\S]*?)```$/i)
   if (fence) s = fence[1].trim()
   try {
-    JSON.parse(s)
+    const parsed = JSON.parse(s) as unknown
+    if (Array.isArray(parsed)) return JSON.stringify(coerceArrayToolArgs(parsed, toolName))
     return s
   } catch {
     /* continue */
@@ -184,7 +188,7 @@ export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
           type: 'function' as const,
           function: {
             name: c.function.name,
-            arguments: normalizeToolArguments(c.function.arguments),
+            arguments: normalizeToolArguments(c.function.arguments, c.function.name),
           },
         }))
       if (!next.tool_calls.length) delete next.tool_calls

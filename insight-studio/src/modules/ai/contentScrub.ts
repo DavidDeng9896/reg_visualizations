@@ -1,4 +1,15 @@
 /**
+ * 思考过程展示预算：跨轮清空 + 单轮封顶，避免 reasoning 墙。
+ */
+export const REASONING_DISPLAY_CAP = 2800
+
+export function capReasoningText(text: string, cap = REASONING_DISPLAY_CAP): string {
+  const s = String(text ?? '')
+  if (s.length <= cap) return s
+  return `…(前文思考已省略 ${s.length - cap} 字)…\n${s.slice(-cap)}`
+}
+
+/**
  * 可见回复去重：折叠连续高度相似的短句/段落，抑制 agent 复读墙。
  */
 const FILLER_LINE =

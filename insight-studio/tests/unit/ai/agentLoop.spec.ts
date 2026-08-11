@@ -719,6 +719,9 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(normalizeToolArguments('```json\n{"a":1}\n```')).toBe('{"a":1}')
     expect(normalizeToolArguments({ steps: ['x'] })).toBe(JSON.stringify({ steps: ['x'] }))
     expect(normalizeToolArguments('prefix {"steps":["a"]} trailing')).toBe('{"steps":["a"]}')
+    expect(normalizeToolArguments('[{"field":"y"}]', 'set_chart_config')).toBe(
+      JSON.stringify({ configure: { values: [{ field: 'y' }] } }),
+    )
     // sanitize 后发给上游的 arguments 必须可 parse
     const out = sanitizeChatMessages([
       {
@@ -736,5 +739,41 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(extractPlanSteps({ plan: ['A', ' B '] })).toEqual(['A', 'B'])
     expect(extractPlanSteps({ steps: '1. 看表\n2. 出图' })).toEqual(['看表', '出图'])
     expect(extractPlanSteps({ steps: ['A', { text: 'B' }, { title: 'C' }] })).toEqual(['A', 'B', 'C'])
+  })
+
+  it('同一工具连续失败 → 注入停止空转提示', async () => {
+    const rounds: ChatPayload[] = []
+    const post = async (p: ChatPayload) => {
+      rounds.push(p)
+      if (p.messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('已达到最大工具调用轮数'))) {
+        return sseOf({ content: '收尾' })
+      }
+      const tools = p.messages.filter((m) => m.role === 'tool')
+      if (!tools.length) return sseOf({ toolCalls: [call('submit_plan', { steps: ['配图', '总结'] })] })
+      if (p.messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('停止空转'))) {
+        return sseOf({
+          toolCalls: [call('mark_step_done', { index: 0 }, 'd0'), call('mark_step_done', { index: 1 }, 'd1')],
+        })
+      }
+      if (tools.some((m) => m.name === 'mark_step_done')) {
+        return sseOf({ content: '完成' })
+      }
+      return sseOf({
+        toolCalls: [call('set_chart_config', { tableId: 't', viewId: 'v', configure: { x: { field: 'bad' } } })],
+      })
+    }
+    const exec: ToolExecutor = async () => ({ ok: false, summary: '图表映射校验未通过' })
+    await runAgent({
+      messages: [{ role: 'user', content: '出图' }],
+      tools: [],
+      exec,
+      maxIterations: 20,
+      onEvent: () => {},
+      postChatFn: post,
+    })
+    const spun = rounds.some((r) =>
+      r.messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('停止空转')),
+    )
+    expect(spun).toBe(true)
   })
 })

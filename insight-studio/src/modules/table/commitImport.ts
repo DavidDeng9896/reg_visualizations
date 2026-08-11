@@ -23,9 +23,15 @@ export interface CommitImportOptions {
   originalFileName?: string
 }
 
-export function commitImportedTable(opts: CommitImportOptions): boolean {
+export function commitImportedTable(opts: CommitImportOptions): {
+  tableId: string
+  stepId: string
+  name: string
+  rowCount: number
+  columnCount: number
+} | null {
   const store = useAnalysisStore()
-  if (!store.current) return false
+  if (!store.current) return null
   const name = opts.name.trim() || 'Untitled table'
   const columns: ColumnMeta[] = inferColumnTypes(opts.headers, []).map((c, i) => ({
     ...c,
@@ -57,7 +63,13 @@ export function commitImportedTable(opts: CommitImportOptions): boolean {
   toast.success(
     `已导入「${name}」（${rows.length} 行 × ${columns.length} 列）${opts.sourceLabel ? ` · ${opts.sourceLabel}` : ''}`,
   )
-  return true
+  return {
+    tableId: table.id,
+    stepId: step.id,
+    name,
+    rowCount: rows.length,
+    columnCount: columns.length,
+  }
 }
 
 /** 替换既有表的数据（上传节点重传）：保留表 id/视图，更新列与行，并同步下游。 */
