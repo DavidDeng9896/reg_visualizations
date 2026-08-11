@@ -12,6 +12,8 @@ const TOOL_LABELS: Record<string, string> = {
   get_table_schema: '查看表结构',
   create_analysis: '创建分析',
   import_csv_text: '导入 CSV',
+  import_ai_file: '导入附件为表',
+  list_ai_files: '列出聊天附件',
   add_filter_step: '添加过滤步骤',
   add_join_step: '添加连接步骤',
   add_union_step: '添加合并步骤',
@@ -109,6 +111,10 @@ function buildOpLabel(t: TraceItem, maxHint: number): string {
   if (name === 'import_csv_text') {
     const nm = firstStr(args, ['tableName'])
     return nm ? `导入 CSV「${clip(nm, maxHint)}」` : base
+  }
+  if (name === 'import_ai_file') {
+    const nm = firstStr(args, ['tableName', 'fileId'])
+    return nm ? `导入附件「${clip(nm, maxHint)}」` : base
   }
   if (name === 'read_skill') {
     const id = firstStr(args, ['skillId'])

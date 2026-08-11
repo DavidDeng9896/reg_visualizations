@@ -66,6 +66,8 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
       'get_table_schema',
       'create_analysis',
       'import_csv_text',
+      'import_ai_file',
+      'list_ai_files',
       'add_filter_step',
       'add_join_step',
       'add_union_step',
@@ -169,7 +171,9 @@ export function extractParentContextForWorker(parentMessages: ChatMessage[] | un
     if (
       t.includes(CONTEXT_HEADER) ||
       t.includes('用户特别引用') ||
-      t.includes('## 用户分析记忆')
+      t.includes('## 用户分析记忆') ||
+      t.includes('## 用户本轮上传了以下附件') ||
+      t.includes('## 会话附件目录')
     ) {
       parts.push(t)
     }

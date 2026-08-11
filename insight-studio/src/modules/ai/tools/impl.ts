@@ -23,8 +23,9 @@ import { useAnalysisStore } from '../../../stores/analysisStore'
 import { useDashboardStore } from '../../../stores/dashboardStore'
 import type { ToolExecResult } from '../agentLoop'
 import type { Artifact } from '../types'
-import { aiSkillsApi, aiMemoriesApi } from '../client'
+import { aiSkillsApi, aiMemoriesApi, aiFilesApi } from '../client'
 import { normalizeExpressionColumns } from '../../../shared/pipeline'
+import { attachmentFromMeta, importAiAttachment } from '../attachments'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -35,6 +36,7 @@ export interface ToolCtx {
 const WRITE_TOOLS = new Set([
   'create_analysis',
   'import_csv_text',
+  'import_ai_file',
   'add_filter_step',
   'add_computed_column_step',
   'add_join_step',
@@ -259,7 +261,11 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (!a && !args.analysisId) return fail('未指定 analysisId 且当前没有打开的分析')
     const analysis = a ?? requireAnalysis()
     void args
-    if (!analysis.tables.length) return ok('当前分析还没有表，可以用 import_csv_text 导入数据。')
+    if (!analysis.tables.length) {
+      return ok(
+        '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴 CSV。',
+      )
+    }
     const lines = analysis.tables.map((t) => `- ${t.name}（id: ${t.id}，${t.rows.length} 行，${t.columns.length} 列${t.stepId ? '，步骤产出' : '，源表'}）`)
     return ok(`分析「${analysis.name}」的表：\n${lines.join('\n')}`)
   },
@@ -320,6 +326,61 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       `已导入表「${tableName}」（${rows.length} 行 × ${columns.length} 列）到分析「${a.name}」`,
       artifactOf('table', tableName, { tableId: table.id, stepId: step.id }),
     )
+  },
+
+  async list_ai_files() {
+    try {
+      const list = await aiFilesApi.list()
+      if (!list.length) return ok('暂无上传附件。请用户在输入栏用 + / 回形针上传 CSV 或 Excel。')
+      const lines = list.map(
+        (f) => `- 「${f.name}」id=${f.id} kind=${f.kind}（${Math.round(f.sizeBytes / 1024)} KB）`,
+      )
+      return ok(
+        `共 ${list.length} 个附件：\n${lines.join('\n')}\nCSV/Excel 用 import_ai_file({ fileId }) 导入为分析表。`,
+      )
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : '列出附件失败')
+    }
+  },
+
+  async import_ai_file(args) {
+    requireAnalysis()
+    const fileId = String(args.fileId ?? '').trim()
+    if (!fileId) return fail('fileId 不能为空')
+    let meta
+    try {
+      meta = await aiFilesApi.meta(fileId)
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : '附件不存在或无法读取')
+    }
+    if (meta.kind !== 'csv' && meta.kind !== 'excel') {
+      return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）`)
+    }
+    const tableName =
+      typeof args.tableName === 'string' && args.tableName.trim() ? args.tableName.trim() : undefined
+    const sheetNames = Array.isArray(args.sheetNames)
+      ? args.sheetNames.map((s) => String(s).trim()).filter(Boolean)
+      : undefined
+    const att = attachmentFromMeta(meta, {
+      importAsTable: true,
+      ...(sheetNames?.length ? { selectedSheets: sheetNames } : {}),
+    })
+    try {
+      const imported = await importAiAttachment(att, { tableNameHint: tableName, sheetNames })
+      const lines = imported.map(
+        (t) =>
+          `- 「${t.name}」id=${t.tableId}（${t.rowCount} 行 × ${t.columnCount} 列${t.sheetName ? `，sheet=${t.sheetName}` : ''}）`,
+      )
+      const first = imported[0]
+      return ok(
+        `已从附件「${meta.name}」导入 ${imported.length} 张表：\n${lines.join('\n')}`,
+        first
+          ? artifactOf('table', first.name, { tableId: first.tableId, stepId: first.stepId })
+          : undefined,
+      )
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : '导入附件失败')
+    }
   },
 
   add_filter_step(args) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clipText, excelSelectionValid, type ChatAttachment } from '../../../src/modules/ai/attachments'
+import { clipText, excelSelectionValid, buildAttachmentCatalog, formatUserAttachmentLine, type ChatAttachment } from '../../../src/modules/ai/attachments'
 import { buildMentionContext } from '../../../src/modules/ai/context'
 import { attachmentKindIcon, mentionIcon } from '../../../src/modules/ai/mentionIcons'
 import type { Analysis } from '../../../src/shared/types'
@@ -97,5 +97,29 @@ describe('attachmentKindIcon', () => {
     expect(attachmentKindIcon('excel')).toBe('table')
     expect(attachmentKindIcon('text')).toBe('file-text')
     expect(attachmentKindIcon('other')).toBe('file')
+  })
+})
+
+describe('buildAttachmentCatalog / formatUserAttachmentLine', () => {
+  it('生成含 fileId 的目录与用户摘要', () => {
+    const catalog = buildAttachmentCatalog([
+      att({ id: 'f1', name: 'antibody.xlsx', kind: 'excel', selectedSheets: ['Sheet1'] }),
+      att({ id: 'f1', name: 'dup', kind: 'excel' }),
+      att({ id: 'f2', name: 'pic.png', kind: 'image' }),
+    ])
+    expect(catalog).toContain('## 会话附件目录')
+    expect(catalog).toContain('id=f1')
+    expect(catalog).toContain('antibody.xlsx')
+    expect(catalog).toContain('import_ai_file')
+    expect(catalog).not.toContain('pic.png')
+
+    expect(formatUserAttachmentLine([att({ id: 'f1', name: 'antibody.xlsx', kind: 'excel' })])).toContain(
+      'id=f1',
+    )
+  })
+
+  it('空列表返回空串', () => {
+    expect(buildAttachmentCatalog([])).toBe('')
+    expect(formatUserAttachmentLine([])).toBe('')
   })
 })
