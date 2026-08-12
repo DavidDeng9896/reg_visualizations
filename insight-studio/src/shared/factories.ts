@@ -199,7 +199,7 @@ export function createChartConfig(chartType: ChartType): ChartConfig {
         ? { bar: { direction: 'vertical' as const, mode: 'grouped' as const, lineWidth: 0, lineColor: '#1d2939' } }
         : {}),
       ...(chartType === 'line'
-        ? { line: { facet: 'one' as const, pointShape: 'circle' } }
+        ? { line: { facet: 'one' as const, pointShape: 'circle' }, fitAnnotation: true, fitLineStyle: 'solid' as const }
         : {}),
       ...(chartType === 'scatter'
         ? {
@@ -212,6 +212,8 @@ export function createChartConfig(chartType: ChartType): ChartConfig {
               sizeMax: 24,
               facet: 'one' as const,
             },
+            fitAnnotation: true,
+            fitLineStyle: 'solid' as const,
           }
         : {}),
       ...(chartType === 'box' ? { box: { showPoints: 'outliers' as const, pointSize: 5, lineWidth: 1.5 } } : {}),

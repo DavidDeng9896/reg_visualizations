@@ -396,7 +396,7 @@ function removeRefLine(i: number) {
       </div>
       <div class="sty__row sty__row--switch">
         <span class="sty__label">拟合注释</span>
-        <IToggle :model-value="!!style.fitAnnotation" aria-label="显示方程与 R²" @update:model-value="style.fitAnnotation = $event; ctx.touch()" />
+        <IToggle :model-value="style.fitAnnotation !== false" aria-label="显示方程与 R²" @update:model-value="style.fitAnnotation = $event; ctx.touch()" />
       </div>
     </section>
 
