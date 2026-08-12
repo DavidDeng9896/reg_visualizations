@@ -318,19 +318,13 @@ function displayContent(m: UiMessage): string {
   color: var(--is-text);
   word-break: break-word;
 }
+.msg__ai + .msg__ai {
+  margin-top: 10px;
+}
 .msg__thinking {
   color: var(--is-text-tertiary);
   font-size: var(--is-text-xs);
   padding: 4px 2px;
-}
-.msg__incomplete {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: var(--is-radius-sm);
-  background: var(--is-warning-soft, color-mix(in srgb, var(--is-warning, #b45309) 12%, transparent));
-  color: var(--is-warning, #b45309);
-  font-size: var(--is-text-xs);
-  line-height: 1.5;
 }
 .msg__error {
   margin-top: 6px;
