@@ -355,7 +355,7 @@ export const useAiStore = defineStore('ai', {
         chatMessages.splice(chatMessages.length - 1, 0, {
           role: 'system',
           content:
-            '【用户已勾选「完成后生成报告」】在分析相关步骤落地后，必须调用 create_report_step（或更新已有报告）生成科研风格 HTML 分析报告节点；报告须含摘要、关键图表引用（tableId/viewId）、结论。不要只在正文里贴长文代替报告节点。',
+            '【用户已勾选「完成后生成报告」】在分析相关步骤落地后，必须调用 create_report_step（可用 templateId=research|antibody|dashboard-review；或传入完整 report）生成独立报告节点。报告须含：目标、数据概况、关键图表（tableId/viewId）+ caption + 解读段落、结论；解读由你自动写，内容可较长。不要只在聊天正文贴长文代替报告节点。',
         })
       }
 

@@ -17,6 +17,7 @@ import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
 import { emptyReport, readReportConfig } from '../../steps/report/reportModel'
+import { resolveTemplateId, scaffoldReportFromAnalysis } from '../../steps/report/reportTemplates'
 import type { AnalysisReport } from '../../../shared/types'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
 import { refreshSqlSourceStep } from '../../table/refreshSqlSource'
@@ -694,10 +695,19 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   create_report_step(args) {
     const name =
       typeof args.name === 'string' && args.name.trim() ? args.name.trim() : '分析报告'
-    let report: AnalysisReport = emptyReport(name)
+    const templateId = resolveTemplateId(args.templateId)
+    let report: AnalysisReport
     if (args.report && typeof args.report === 'object') {
       report = readReportConfig({ report: args.report })
       report.title = report.title || name
+      report.templateId = report.templateId ?? templateId
+    } else {
+      // 无完整 report 时按内置模板从当前分析脚手架生成（图+说明+解读）
+      try {
+        report = scaffoldReportFromAnalysis(requireAnalysis(), templateId, name)
+      } catch {
+        report = emptyReport(name, templateId)
+      }
     }
     let stepId = ''
     store().mutate((a) => {
@@ -707,7 +717,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       a.steps.push(step)
       stepId = step.id
     })
-    return ok(`已创建分析报告「${name}」（step id: ${stepId}）`, artifactOf('report', name, { stepId }))
+    return ok(
+      `已创建分析报告「${name}」（模板 ${templateId}，step id: ${stepId}）`,
+      artifactOf('report', name, { stepId }),
+    )
   },
 
   update_report_step(args) {
