@@ -110,16 +110,32 @@ describe('拟合置信带与注释', () => {
     expect((band[0].y as number[]).length).toBeGreaterThan(0)
   })
 
-  it('fitAnnotation 关闭时无注释，开启后方程 + R² 上屏', () => {
-    const off = buildScatterOption({ result: vr(pts, cols), config: scatterCfg() })
+  it('fitAnnotation 关闭时无注释，默认/开启后方程 + R² 在右下角', () => {
+    const offCfg = scatterCfg()
+    offCfg.style.fitAnnotation = false
+    const off = buildScatterOption({ result: vr(pts, cols), config: offCfg })
     expect(off.option.layout.annotations ?? []).toHaveLength(0)
 
     const c = scatterCfg()
     c.style.fitAnnotation = true
     const on = buildScatterOption({ result: vr(pts, cols), config: c })
-    const annotations = on.option.layout.annotations as Array<{ text: string }>
+    const annotations = on.option.layout.annotations as Array<{
+      text: string
+      x: number
+      y: number
+      xanchor: string
+      yanchor: string
+    }>
     expect(annotations).toHaveLength(1)
     expect(annotations[0].text).toContain('y =')
     expect(annotations[0].text).toContain('R²=1.000')
+    expect(annotations[0].x).toBeGreaterThan(0.5)
+    expect(annotations[0].y).toBeLessThan(0.5)
+    expect(annotations[0].xanchor).toBe('right')
+    expect(annotations[0].yanchor).toBe('bottom')
+
+    // 未显式关闭时：有拟合即显示注释（恢复默认可见）
+    const auto = buildScatterOption({ result: vr(pts, cols), config: scatterCfg() })
+    expect((auto.option.layout.annotations as unknown[])?.length ?? 0).toBe(1)
   })
 })

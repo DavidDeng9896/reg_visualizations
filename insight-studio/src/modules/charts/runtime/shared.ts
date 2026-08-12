@@ -248,7 +248,7 @@ export function ciBandTraces(
   ]
 }
 
-/** 拟合注释（方程 + R²）：左上角文本块。 */
+/** 拟合注释（方程 + R²）：右下角文本块（避开顶部图例）。 */
 export function fitAnnotations(items: Array<{ name: string; equation: string; r2: number | null }>): Array<Record<string, unknown>> {
   if (!items.length) return []
   const text = items.map((i) => `${i.name}: ${i.equation}${i.r2 !== null ? `，R²=${i.r2.toFixed(3)}` : ''}`).join('<br>')
@@ -257,14 +257,14 @@ export function fitAnnotations(items: Array<{ name: string; equation: string; r2
       text,
       xref: 'paper',
       yref: 'paper',
-      x: 0.01,
-      y: 0.99,
-      xanchor: 'left',
-      yanchor: 'top',
+      x: 0.99,
+      y: 0.02,
+      xanchor: 'right',
+      yanchor: 'bottom',
       showarrow: false,
-      align: 'left',
+      align: 'right',
       font: { size: 10, color: '#667085' },
-      bgcolor: 'rgba(255,255,255,0.85)',
+      bgcolor: 'rgba(255,255,255,0.9)',
       bordercolor: '#e4e7ec',
       borderwidth: 1,
       borderpad: 4,

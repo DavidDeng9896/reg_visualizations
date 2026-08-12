@@ -204,7 +204,7 @@ export function buildScatterOption({ result, config, viewName, flags }: BuildInp
     ...baseLayout(style, '', { legend: seriesNames.length > 1, legendItemCount: seriesNames.length }),
     shapes,
   }, style)
-  if (style.fitAnnotation && annotationItems.length) {
+  if (style.fitAnnotation !== false && annotationItems.length) {
     layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
   }
   const useRight = measures.some((m) => m.axis?.side === 'right')

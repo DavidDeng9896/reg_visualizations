@@ -25,27 +25,29 @@ async function setupScatterFit(page: Page): Promise<void> {
 }
 
 test.describe('Prism 差距补齐（UI）', () => {
-  test('拟合注释：开关后注释块含方程与 R²；置信带渲染', async ({ page }) => {
+  test('拟合注释：开启拟合后右下角显示方程与 R²；可关闭；置信带渲染', async ({ page }) => {
     await setupScatterFit(page)
 
-    // 默认无注释
+    // Linear 拟合 → 默认显示方程注释（右下角）+ 置信带
+    await expect
+      .poll(async () => JSON.stringify((await gdLayout(page)).annotations ?? []))
+      .toContain('R²=')
     let layout = await gdLayout(page)
-    expect((layout.annotations as unknown[] | undefined) ?? []).toHaveLength(0)
-    // Linear 拟合 → 有 fill=tonexty 置信带（等重建完成再断言，避免时序抖动）
+    const ann = (layout.annotations as Array<{ text: string; x: number; y: number; xanchor: string; yanchor: string }>)[0]
+    expect(ann.text).toContain('y =')
+    expect(ann.text).toContain('R²=')
+    expect(ann.xanchor).toBe('right')
+    expect(ann.yanchor).toBe('bottom')
     await expect
       .poll(async () => (await gdData(page)).filter((t) => t.fill === 'tonexty').length)
       .toBeGreaterThan(0)
 
-    // STYLE → 拟合注释开
+    // STYLE → 关掉拟合注释
     await page.getByRole('tab', { name: 'STYLE' }).click()
     await page.locator('[aria-label="显示方程与 R²"]').click()
     await expect
-      .poll(async () => JSON.stringify((await gdLayout(page)).annotations ?? []))
-      .toContain('R²=')
-    layout = await gdLayout(page)
-    const text = String((layout.annotations as Array<{ text: string }>)[0].text)
-    expect(text).toContain('y =')
-    expect(text).toContain('R²=')
+      .poll(async () => ((await gdLayout(page)).annotations as unknown[] | undefined)?.length ?? 0)
+      .toBe(0)
   })
 
   test('参考线：STYLE 添加 Y 轴参考线 → shapes 出现对应虚线', async ({ page }) => {

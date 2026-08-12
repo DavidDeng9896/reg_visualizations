@@ -205,7 +205,7 @@ export function buildLineOption({ result, config, viewName, flags }: BuildInput)
     ...baseLayout(style, '', { legend: seriesNames.length > 1, legendItemCount: seriesNames.length }),
     shapes,
   }, style)
-  if (style.fitAnnotation && annotationItems.length) {
+  if (style.fitAnnotation !== false && annotationItems.length) {
     layout.annotations = [...(Array.isArray(layout.annotations) ? (layout.annotations as unknown[]) : []), ...fitAnnotations(annotationItems)]
   }
   const xLabel = style.xAxis?.label ?? cfg.x?.label ?? xField

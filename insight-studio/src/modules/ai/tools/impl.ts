@@ -801,7 +801,15 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     configure = resolveConfigureFields(configure, t.columns)
     const autofilled = autofillRequiredChartSlots(effectiveType, configure, t.columns)
     configure = autofilled.configure
-    const style = (coerced.style ?? {}) as Partial<ChartConfig['style']>
+    const style = { ...((coerced.style ?? {}) as Partial<ChartConfig['style']>) }
+    const regModel = (configure.regression as { model?: string } | undefined)?.model
+      ?? (typeof coerced.configure === 'object' && coerced.configure && 'regression' in (coerced.configure as object)
+        ? (coerced.configure as { regression?: { model?: string } }).regression?.model
+        : undefined)
+    // 开启拟合时默认带上方程注释（可被 style.fitAnnotation:false 显式关掉）
+    if (regModel && regModel !== 'none' && style.fitAnnotation === undefined) {
+      style.fitAnnotation = true
+    }
     store().mutate((a) => {
       const table = findTable(a, t.id)
       const view = table ? findView(table.views, v.id) : null
