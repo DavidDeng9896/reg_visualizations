@@ -158,6 +158,26 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.summary).toContain('50 行')
   })
 
+  it('set_chart_config：bar 的 y 数组写法可成功', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    await execTool('create_view', { tableId: iris.id, type: 'bar', name: 'EC50柱' }, ctx)
+    const res = await execTool(
+      'set_chart_config',
+      {
+        configure: {
+          x: { field: 'species' },
+          y: [{ field: 'sepal_length', aggregate: 'sum' }],
+        },
+      },
+      ctx,
+    )
+    expect(res.ok).toBe(true)
+    const view = iris.views.find((v) => v.name === 'EC50柱')
+    expect(view?.chart?.configure.y?.field).toBe('sepal_length')
+    expect(view?.chart?.configure.y?.aggregation).toBe('sum')
+  })
+
   it('set_chart_config：仅传 values 时自动补齐 X', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]

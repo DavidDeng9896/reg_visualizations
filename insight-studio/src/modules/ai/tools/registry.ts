@@ -217,7 +217,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'set_chart_config',
     description:
-      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 用 configure.values:[{field}]；bar/box 用 y。缺 x 等必填槽时会按表列自动补齐。tableId/viewId 可省略。一次尽量写全；已「配置完成」勿重复调用。',
+      '配置图表。务必一次给出完整 configure。示例 bar: {x:{field}, y:{field, aggregation:"sum"}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}。y 是对象不是数组；聚合用 aggregation 不是 aggregate。缺槽会尽量自动补齐。tableId/viewId 可省略。已「配置完成」勿重复调用。勿为配图去 read_skill。',
     parameters: {
       type: 'object',
       properties: {
@@ -227,7 +227,7 @@ export const TOOL_DEFS: ToolDef[] = [
         configure: {
           type: 'object',
           description:
-            '映射与回归。例 scatter: {x:{field}, values:[{field}], color?:{field}}；bar: {x:{field}, y:{field}}',
+            '映射。bar: {x:{field}, y:{field, aggregation?}}；scatter: {x:{field}, values:[{field}], color?:{field}}',
         },
         style: { type: 'object', description: '样式（部分更新）' },
       },

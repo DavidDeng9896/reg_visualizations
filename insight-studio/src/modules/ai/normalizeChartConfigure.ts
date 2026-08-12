@@ -13,10 +13,25 @@ import type { MappingError } from '../charts/types'
 function asMapping(v: unknown): FieldMapping | undefined {
   if (!v) return undefined
   if (typeof v === 'string' && v.trim()) return { field: v.trim() }
+  // 模型常把 bar 的 y 写成 [{field, aggregate}] 数组
+  if (Array.isArray(v)) {
+    for (const item of v) {
+      const m = asMapping(item)
+      if (m) return m
+    }
+    return undefined
+  }
   if (typeof v === 'object' && v !== null && 'field' in v) {
-    const field = String((v as FieldMapping).field ?? '').trim()
+    const raw = v as FieldMapping & { aggregate?: string }
+    const field = String(raw.field ?? '').trim()
     if (!field) return undefined
-    return { ...(v as FieldMapping), field }
+    const next: FieldMapping = { ...raw, field }
+    const agg = raw.aggregation ?? raw.aggregate
+    if (typeof agg === 'string' && agg.trim()) {
+      next.aggregation = agg.trim() as FieldMapping['aggregation']
+    }
+    delete (next as { aggregate?: string }).aggregate
+    return next
   }
   return undefined
 }
@@ -35,7 +50,7 @@ const VALUES_TYPES = new Set(['line', 'scatter', 'bignumber'])
 const Y_TYPES = new Set(['bar', 'box'])
 
 const X_NAME_HINT =
-  /^(clone|parent|sample|name|id|label|category|group|series|species|campaign|batch|well|antibody)/i
+  /^(clone|parent|sample|name|id|label|category|group|series|species|campaign|batch|well|antibody|pur)/i
 
 /** 返回浅拷贝后的 configure，不修改入参。 */
 export function normalizeAiChartConfigure(
@@ -48,7 +63,7 @@ export function normalizeAiChartConfigure(
     if (key in next) {
       const mapped = asMapping(next[key])
       if (mapped) next[key] = mapped
-      else if (next[key] != null && typeof next[key] === 'string') delete next[key]
+      else delete next[key]
     }
   }
   if ('values' in next) {
