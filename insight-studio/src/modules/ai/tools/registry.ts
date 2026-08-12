@@ -49,8 +49,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_table_schema',
-    description: '获取表的列信息与前 5 行样例数据，用于了解字段含义。',
-    parameters: { type: 'object', properties: { tableId: str('表 id'), analysisId: str('分析 id；缺省为当前分析') }, required: ['tableId'] },
+    description: '获取表的列信息与前 5 行样例数据，用于了解字段含义。tableId 可省略（回退当前选中表/唯一表）。',
+    parameters: { type: 'object', properties: { tableId: str('表 id（可省略）'), analysisId: str('分析 id；缺省为当前分析') } },
   },
   {
     name: 'create_analysis',
@@ -87,11 +87,12 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_filter_step',
-    description: '在某表下游添加 Filter 过滤步骤并执行，产出新表。conditions 操作符：eq/neq/gt/gte/lt/lte/between/contains/isBlank/notBlank。',
+    description:
+      '在某表下游添加 Filter 过滤步骤并执行，产出新表。tableId 可省略（回退当前选中表/分析内唯一表）。conditions 操作符：eq/neq/gt/gte/lt/lte/between/contains/isBlank/notBlank。',
     parameters: {
       type: 'object',
       properties: {
-        tableId: str('输入表 id'),
+        tableId: str('输入表 id（可省略：当前选中表或唯一表）'),
         conditions: {
           type: 'array',
           description: '过滤条件（and 组合）',
@@ -216,12 +217,12 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'set_chart_config',
     description:
-      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 必须用 configure.values:[{field}]（不要只用 y）；bar/box 用 y。一次写全必填槽；已返回「配置完成」勿重复调用。',
+      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 必须用 configure.values:[{field}]（不要只用 y）；bar/box 用 y。tableId/viewId 可省略（回退最近/选中图表视图）。一次写全必填槽；已返回「配置完成」勿重复调用。',
     parameters: {
       type: 'object',
       properties: {
-        tableId: str('表 id'),
-        viewId: str('视图 id'),
+        tableId: str('表 id（可省略）'),
+        viewId: str('视图 id（可省略：回退选中/最近图表）'),
         chartType: str('图种（可选，改图种时必填）'),
         configure: {
           type: 'object',
@@ -230,7 +231,7 @@ export const TOOL_DEFS: ToolDef[] = [
         },
         style: { type: 'object', description: '样式（部分更新）' },
       },
-      required: ['tableId', 'viewId'],
+      required: [],
     },
   },
   {
