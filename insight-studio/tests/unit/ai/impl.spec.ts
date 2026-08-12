@@ -158,6 +158,22 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.summary).toContain('50 行')
   })
 
+  it('set_chart_config：仅传 values 时自动补齐 X', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '只给Y' }, ctx)
+    const res = await execTool(
+      'set_chart_config',
+      { configure: { values: [{ field: 'sepal_width' }] } },
+      ctx,
+    )
+    expect(res.ok).toBe(true)
+    expect(res.summary).toMatch(/配置完成|自动补齐/)
+    const view = iris.views.find((v) => v.name === '只给Y')
+    expect(view?.chart?.configure.values?.[0]?.field).toBe('sepal_width')
+    expect(view?.chart?.configure.x?.field).toBeTruthy()
+  })
+
   it('set_chart_config：可缺 viewId，回退最近创建的图表视图', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
