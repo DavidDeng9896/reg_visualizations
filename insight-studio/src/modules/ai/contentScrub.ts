@@ -13,7 +13,20 @@ export function capReasoningText(text: string, cap = REASONING_DISPLAY_CAP): str
  * 可见回复去重：折叠连续高度相似的短句/段落，抑制 agent 复读墙。
  */
 const FILLER_LINE =
-  /^(好的?[，,.。！!\s]*)?(让我|我来|开始执行|先确认|直接调用|直接执行|开始创建)/
+  /^(好的?[，,.。！!\s]*)?(让我|我来|开始执行|先确认|直接调用|直接执行|开始创建|完全停止|先读取|系统提示明确)/
+
+/** 过程独白 / 读技能纠结：无工具时计为 stall，即使与上一轮不完全相同。 */
+export function isProcessMonologue(text: string): boolean {
+  const t = String(text ?? '').trim()
+  if (!t) return false
+  if (FILLER_LINE.test(t)) return true
+  if (/完全停止|先读取.{0,12}技能|读取图表.{0,8}技能|不要输出过程|set_chart_config 一直失败/.test(t)) {
+    return true
+  }
+  // 同一句「让我读取」重复出现 ≥3
+  const hits = t.match(/读取.{0,20}技能|完全停止/g)
+  return !!hits && hits.length >= 2
+}
 
 /** 规范化一行便于比较。 */
 export function normalizeLine(s: string): string {

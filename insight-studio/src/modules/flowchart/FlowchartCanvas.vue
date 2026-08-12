@@ -731,7 +731,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       @connect="onConnect"
       @connect-end="onConnectEnd"
     >
-      <Background v-if="alive" variant="dots" :gap="20" :size="1" pattern-color="#d0d5dd" />
+      <Background v-if="alive" variant="dots" :gap="20" :size="1.8" pattern-color="#b8c0cc" />
 
       <MiniMap
         v-if="alive && minimapOpen && !isEmpty && !perfMode"

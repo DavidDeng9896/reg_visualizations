@@ -12,7 +12,7 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
-import { normalizeAiChartConfigure } from '../normalizeChartConfigure'
+import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
@@ -85,18 +85,49 @@ function requireAnalysis(): Analysis {
   return a
 }
 
+/** 从工具参数中抽出表引用（兼容 tableId / table / tableName / fromTableId）。 */
+function tableRefFromArgs(args: Record<string, unknown>): string {
+  for (const k of ['tableId', 'table', 'tableName', 'fromTableId', 'sourceTableId']) {
+    const v = args[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return ''
+}
+
+/** 从工具参数中抽出视图引用。 */
+function viewRefFromArgs(args: Record<string, unknown>): string {
+  for (const k of ['viewId', 'view', 'viewName']) {
+    const v = args[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return ''
+}
+
 function requireTable(tableId: string): AnalysisTable {
   const t = resolveTableRef(tableId)
   if (!t) throw new Error(`表不存在：${tableId || '（未提供 tableId）'}（可先用 list_tables 查看 id）`)
   return t
 }
 
-/** 按 id / 名称 / id 前缀解析表。 */
+/** 缺 tableId 时：当前选中表 → 仅一张表 → 最近一张表。 */
+function pickDefaultTable(): AnalysisTable | null {
+  const a = store().current
+  if (!a?.tables.length) return null
+  const sel = store().selected
+  if (sel?.tableId) {
+    const t = findTable(a, sel.tableId)
+    if (t) return t
+  }
+  if (a.tables.length === 1) return a.tables[0]!
+  return a.tables[a.tables.length - 1]!
+}
+
+/** 按 id / 名称 / id 前缀解析表；空引用时回退默认表。 */
 function resolveTableRef(ref: string): AnalysisTable | null {
   const a = store().current
   if (!a) return null
   const key = ref.trim()
-  if (!key) return null
+  if (!key) return pickDefaultTable()
   const byId = findTable(a, key)
   if (byId) return byId
   const lower = key.toLowerCase()
@@ -106,6 +137,18 @@ function resolveTableRef(ref: string): AnalysisTable | null {
     a.tables.find((t) => t.id.startsWith(key)) ??
     null
   )
+}
+
+function collectChartViews(table: AnalysisTable): Array<{ table: AnalysisTable; view: ViewNode }> {
+  const out: Array<{ table: AnalysisTable; view: ViewNode }> = []
+  const walk = (nodes: ViewNode[]) => {
+    for (const v of nodes) {
+      if (v.chart) out.push({ table, view: v })
+      if (v.children?.length) walk(v.children)
+    }
+  }
+  walk(table.views)
+  return out
 }
 
 function findViewByRef(views: ViewNode[], ref: string): ViewNode | null {
@@ -125,27 +168,52 @@ function findViewByRef(views: ViewNode[], ref: string): ViewNode | null {
   return walk(views)
 }
 
-/** 解析图表视图：缺 tableId 时按 viewId/视图名反查所属表。 */
+/**
+ * 解析图表视图：
+ * - 有 viewId/视图名：按 id/名反查（可缺 tableId）
+ * - 均缺：选中图表视图 → 指定表上最近一张图表 → 分析内唯一/最近图表
+ */
 function resolveChartView(tableRef: string, viewRef: string): { table: AnalysisTable; view: ViewNode } {
   const a = requireAnalysis()
   const tableKey = tableRef.trim()
   const viewKey = viewRef.trim()
-  if (!viewKey) {
-    throw new Error('缺少 viewId（create_view 返回的 view id；list_tables 可查看各表视图 id）')
-  }
-  if (tableKey) {
-    const t = resolveTableRef(tableKey)
-    if (t) {
+
+  if (viewKey) {
+    if (tableKey) {
+      const t = resolveTableRef(tableKey)
+      if (t) {
+        const v = findViewByRef(t.views, viewKey)
+        if (v?.chart) return { table: t, view: v }
+      }
+    }
+    for (const t of a.tables) {
       const v = findViewByRef(t.views, viewKey)
       if (v?.chart) return { table: t, view: v }
     }
+    throw new Error(
+      `表/视图不存在：table=${tableRef || '（未提供）'} view=${viewRef}。请用 list_tables 核对表 id 与 viewId。`,
+    )
   }
-  for (const t of a.tables) {
-    const v = findViewByRef(t.views, viewKey)
-    if (v?.chart) return { table: t, view: v }
+
+  const sel = store().selected
+  if (sel?.kind === 'view' && sel.viewId) {
+    const t = findTable(a, sel.tableId)
+    const v = t ? findView(t.views, sel.viewId) : null
+    if (t && v?.chart) return { table: t, view: v }
   }
+
+  const preferred = tableKey ? resolveTableRef(tableKey) : pickDefaultTable()
+  if (preferred) {
+    const onTable = collectChartViews(preferred)
+    if (onTable.length) return onTable[onTable.length - 1]!
+  }
+
+  const all = a.tables.flatMap((t) => collectChartViews(t))
+  if (all.length === 1) return all[0]!
+  if (all.length > 1) return all[all.length - 1]!
+
   throw new Error(
-    `表/视图不存在：table=${tableRef || '（未提供）'} view=${viewRef}。请用 list_tables 核对表 id 与 viewId。`,
+    '缺少 viewId：当前分析没有可配置的图表视图。请先 create_view，或用 list_tables 查看 viewId。',
   )
 }
 
@@ -359,10 +427,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   get_table_schema(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
     const sample = t.rows.slice(0, 5).map((r) => t.columns.map((c) => String(r[c.field] ?? '')).join(' | '))
-    return ok(`表「${t.name}」（${t.rows.length} 行）：\n列：${cols}\n样例：\n${sample.join('\n')}`)
+    return ok(`表「${t.name}」（id: ${t.id}，${t.rows.length} 行）：\n列：${cols}\n样例：\n${sample.join('\n')}`)
   },
 
   async create_analysis(args) {
@@ -472,7 +540,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   add_filter_step(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const filters = toConditions(args)
     const { step, table } = appendStep({
       type: 'filter',
@@ -480,7 +548,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       fromTableIds: [t.id],
       config: { filters },
     })
-    return ok(`已创建过滤步骤（step id: ${step.id}，产出表 id: ${table.id}，${table.rows.length} 行）`, artifactOf('table', table.name, { tableId: table.id, stepId: step.id }))
+    return ok(
+      `已创建过滤步骤（输入表「${t.name}」${t.id}，step id: ${step.id}，产出表 id: ${table.id}，${table.rows.length} 行）`,
+      artifactOf('table', table.name, { tableId: table.id, stepId: step.id }),
+    )
   },
 
   add_join_step(args) {
@@ -513,7 +584,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   add_computed_column_step(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const name = String(args.name ?? '').trim()
     const rawExpr = String(args.expression ?? '').trim()
     if (!name || !rawExpr) return fail('name 与 expression 不能为空')
@@ -536,7 +607,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   add_hide_columns_step(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const columns = (Array.isArray(args.columns) ? args.columns : []).map(String)
     if (!columns.length) return fail('columns 不能为空')
     const { step, table } = appendStep({
@@ -549,7 +620,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   async add_custom_code_step(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const code = typeof args.code === 'string' && args.code.trim() ? String(args.code) : CUSTOM_CODE_DEFAULT_TEMPLATE
     const name = typeof args.name === 'string' && args.name.trim() ? String(args.name).trim() : 'Custom code'
 
@@ -708,7 +779,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   create_view(args) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const type = String(args.type ?? '') as Parameters<typeof createViewNode>[0]
     const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : defaultViewName(type, t.views)
     const view = createViewNode(type, name)
@@ -720,17 +791,25 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   set_chart_config(args) {
     const coerced = coerceParsedToolArgs('set_chart_config', args)
-    const { table, view } = resolveChartView(
-      String(coerced.tableId ?? coerced.table ?? ''),
-      String(coerced.viewId ?? coerced.view ?? ''),
-    )
+    const { table, view } = resolveChartView(tableRefFromArgs(coerced), viewRefFromArgs(coerced))
     const v = view
     const t = table
     if (!v?.chart) return fail('该视图不是图表视图')
     const chartType = typeof coerced.chartType === 'string' ? coerced.chartType : undefined
     const effectiveType = String(chartType || v.chart.chartType || 'bar')
-    const configure = extractChartConfigure(coerced, effectiveType)
-    const style = (coerced.style ?? {}) as Partial<ChartConfig['style']>
+    let configure = extractChartConfigure(coerced, effectiveType)
+    configure = resolveConfigureFields(configure, t.columns)
+    const autofilled = autofillRequiredChartSlots(effectiveType, configure, t.columns)
+    configure = autofilled.configure
+    const style = { ...((coerced.style ?? {}) as Partial<ChartConfig['style']>) }
+    const regModel = (configure.regression as { model?: string } | undefined)?.model
+      ?? (typeof coerced.configure === 'object' && coerced.configure && 'regression' in (coerced.configure as object)
+        ? (coerced.configure as { regression?: { model?: string } }).regression?.model
+        : undefined)
+    // 开启拟合时默认带上方程注释（可被 style.fitAnnotation:false 显式关掉）
+    if (regModel && regModel !== 'none' && style.fitAnnotation === undefined) {
+      style.fitAnnotation = true
+    }
     store().mutate((a) => {
       const table = findTable(a, t.id)
       const view = table ? findView(table.views, v.id) : null
@@ -739,16 +818,19 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       Object.assign(view.chart.configure, configure)
       Object.assign(view.chart.style, style)
     })
-    // 校验映射完整性：失败返回 ok:false，避免模型把软成功当「可继续空转」
+    // 校验映射完整性：失败返回 ok:false，并给出可用列 + 完整示例，避免同参空转
     const updated = findView(requireTable(t.id).views, v.id)
     const errors = validateChartMapping(updated!.chart!, requireTable(t.id).columns)
     if (errors.length) {
-      const msgs = errors.map((e) => e.message).join('；')
       return fail(
-        `图表映射校验未通过：${msgs}。请一次给出完整映射后重试（line/scatter/bignumber 的 Y 用 values:[{field}]，不要只写 y）；不要对同一错误配置反复调用。`,
+        formatChartMappingFailHint(effectiveType, requireTable(t.id).columns, errors, configure),
       )
     }
-    return ok(`图表「${v.name}」配置完成`, artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }))
+    const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
+    return ok(
+      `图表「${v.name}」配置完成${fillNote}`,
+      artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }),
+    )
   },
 
   async create_dashboard(args) {
@@ -783,7 +865,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   delete_table(args, ctx) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     if (ctx.confirmDestructive && args.__confirmed !== true) {
       return needConfirm(`删除表「${t.name}」（连带其步骤）`)
     }
@@ -802,7 +884,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   delete_view(args, ctx) {
-    const t = requireTable(String(args.tableId ?? ''))
+    const t = requireTable(tableRefFromArgs(args))
     const viewId = String(args.viewId ?? '')
     const v = findView(t.views, viewId)
     if (!v) return fail('视图不存在')
