@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeAiChartConfigure } from '../../../src/modules/ai/normalizeChartConfigure'
+import {
+  normalizeAiChartConfigure,
+  autofillRequiredChartSlots,
+  resolveColumnField,
+  resolveConfigureFields,
+  formatChartMappingFailHint,
+} from '../../../src/modules/ai/normalizeChartConfigure'
 import { capReasoningText } from '../../../src/modules/ai/contentScrub'
+import type { ColumnMeta } from '../../../src/shared/types'
+
+const cols: ColumnMeta[] = [
+  { field: 'clone_id', title: 'Clone', dataType: 'string' },
+  { field: 'KD_nM', title: 'KD', dataType: 'number' },
+  { field: 'Expression_mg_L', title: 'Expression', dataType: 'number' },
+  { field: 'parent', title: 'Parent', dataType: 'string' },
+]
 
 describe('normalizeAiChartConfigure', () => {
   it('scatter：y 提升为 values', () => {
@@ -27,6 +41,43 @@ describe('normalizeAiChartConfigure', () => {
     })
     expect(out.x?.field).toBe('weight')
     expect(out.values?.[0]?.field).toBe('length')
+  })
+})
+
+describe('autofillRequiredChartSlots', () => {
+  it('scatter 只传 values 时自动补 x', () => {
+    const { configure, filled } = autofillRequiredChartSlots(
+      'scatter',
+      { values: [{ field: 'Expression_mg_L' }] },
+      cols,
+    )
+    expect(configure.values?.[0]?.field).toBe('Expression_mg_L')
+    expect(configure.x?.field).toBeTruthy()
+    expect(configure.x!.field).not.toBe('Expression_mg_L')
+    expect(filled.some((f) => f.startsWith('x='))).toBe(true)
+  })
+
+  it('bar 缺 x 时优先选 clone/parent 类字符串列', () => {
+    const { configure } = autofillRequiredChartSlots('bar', {}, cols)
+    expect(configure.x?.field).toMatch(/clone_id|parent/)
+  })
+
+  it('字段名大小写模糊匹配', () => {
+    expect(resolveColumnField('expression_mg_l', cols)).toBe('Expression_mg_L')
+    const resolved = resolveConfigureFields({ values: [{ field: 'kd_nm' }] }, cols)
+    expect(resolved.values?.[0]?.field).toBe('KD_nM')
+  })
+
+  it('失败提示包含可用列与示例 configure', () => {
+    const hint = formatChartMappingFailHint(
+      'scatter',
+      cols,
+      [{ slot: 'x', kind: 'required', message: 'X Axis 为必填项' }],
+      { values: [{ field: 'Expression_mg_L' }] },
+    )
+    expect(hint).toContain('Expression_mg_L')
+    expect(hint).toContain('configure')
+    expect(hint).toContain('X Axis')
   })
 })
 

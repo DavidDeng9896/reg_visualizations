@@ -217,7 +217,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'set_chart_config',
     description:
-      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 必须用 configure.values:[{field}]（不要只用 y）；bar/box 用 y。tableId/viewId 可省略（回退最近/选中图表视图）。一次写全必填槽；已返回「配置完成」勿重复调用。',
+      '配置图表视图：图种、映射、回归与样式。line/scatter/bignumber 的 Y 用 configure.values:[{field}]；bar/box 用 y。缺 x 等必填槽时会按表列自动补齐。tableId/viewId 可省略。一次尽量写全；已「配置完成」勿重复调用。',
     parameters: {
       type: 'object',
       properties: {
