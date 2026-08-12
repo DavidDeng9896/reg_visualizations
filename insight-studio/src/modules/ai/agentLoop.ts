@@ -14,7 +14,7 @@ import {
 } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
-import { isNearDuplicate, scrubVisibleContent } from './contentScrub'
+import { isNearDuplicate, isProcessMonologue, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 
 /** 工具执行结果。 */
@@ -196,10 +196,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     toolSpinNudges += 1
     toolSpinCount = 0
     lastToolSpinKey = ''
+    const chartHint =
+      name === 'read_skill' || name === 'list_skills'
+        ? '配图参数已在系统提示与 set_chart_config 工具描述中，禁止再读 Skill；立刻 set_chart_config（含 x 与 Y）。'
+        : '若已返回成功/配置完成：立刻 mark_step_done 并做下一步；若失败：换字段或 ask_user，禁止再用相同参数重试。'
     messages.push({
       role: 'system',
-      content:
-        `【停止空转】工具「${name}」已连续重复。若已返回成功/配置完成：立刻 mark_step_done 并做下一步；若失败：换字段或 ask_user，禁止再用相同参数重试。禁止过程独白。`,
+      content: `【停止空转】工具「${name}」已连续重复。${chartHint}禁止过程独白。`,
     })
   }
 
@@ -264,9 +267,12 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     const calls = assistant.tool_calls ?? []
     if (!calls.length) {
       const text = contentText(assistant.content).trim()
-      // 空转复读：与上一轮高度相似且无工具 → 计 stall
+      // 空转复读 / 过程独白：无工具 → 计 stall
       if (text && lastStallText && isNearDuplicate(text, lastStallText)) {
         stallRounds += 1
+      } else if (text && isProcessMonologue(text)) {
+        stallRounds += 1
+        lastStallText = text
       } else if (text) {
         stallRounds = planIncomplete(planSteps, planDone) ? stallRounds + 1 : 0
         lastStallText = text
@@ -279,14 +285,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
         if (last?.role === 'assistant') {
           messages[messages.length - 1] = {
             ...last,
-            content: '（计划未完成，请立即调用工具继续，禁止复述「让我/好的/开始执行」）',
+            content: '（计划未完成，请立即调用工具继续，禁止复述「让我/好的/开始执行/读技能」）',
           }
         }
         messages.push({
           role: 'system',
           content:
             planNudgeMessage(planSteps, planDone) +
-            '\n【禁止独白】不要输出过程说明；本轮必须直接 tool_calls，不要再说「让我确认/开始创建」；不要重新 submit_plan。',
+            '\n【禁止独白】不要输出过程说明；本轮必须直接 tool_calls（配图直接 set_chart_config，禁止再 read_skill）；不要重新 submit_plan。',
         })
         continue
       }

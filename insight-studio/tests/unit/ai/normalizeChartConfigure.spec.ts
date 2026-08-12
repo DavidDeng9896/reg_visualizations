@@ -6,7 +6,7 @@ import {
   resolveConfigureFields,
   formatChartMappingFailHint,
 } from '../../../src/modules/ai/normalizeChartConfigure'
-import { capReasoningText } from '../../../src/modules/ai/contentScrub'
+import { capReasoningText, isProcessMonologue } from '../../../src/modules/ai/contentScrub'
 import type { ColumnMeta } from '../../../src/shared/types'
 
 const cols: ColumnMeta[] = [
@@ -32,6 +32,15 @@ describe('normalizeAiChartConfigure', () => {
       values: [{ field: 'metric' }],
     })
     expect(out.y?.field).toBe('metric')
+  })
+
+  it('bar：y 写成数组 + aggregate 别名可规范化', () => {
+    const out = normalizeAiChartConfigure('bar', {
+      x: { field: 'Pur_No' },
+      y: [{ field: 'EC50', aggregate: 'sum' }] as unknown as { field: string },
+    })
+    expect(out.y?.field).toBe('EC50')
+    expect(out.y?.aggregation).toBe('sum')
   })
 
   it('字符串字段简写转为 mapping', () => {
@@ -92,5 +101,13 @@ describe('capReasoningText', () => {
     expect(out.startsWith('…(前文思考已省略')).toBe(true)
     expect(out.endsWith('尾部标记') || out.includes('尾部标记')).toBe(true)
     expect(out.length).toBeLessThan(long.length)
+  })
+})
+
+describe('isProcessMonologue', () => {
+  it('识别读技能/完全停止类独白', () => {
+    expect(isProcessMonologue('完全停止。我需要先读取图表最佳实践技能。')).toBe(true)
+    expect(isProcessMonologue('让我读取该技能以获取确切的参数格式。')).toBe(true)
+    expect(isProcessMonologue('已完成：Top 3 候选为 A/B/C。')).toBe(false)
   })
 })
