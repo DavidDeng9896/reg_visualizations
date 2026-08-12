@@ -216,7 +216,7 @@ function displayContent(m: UiMessage): string {
         <div v-if="m.streaming && !displayContent(m) && !m.trace.length && !m.reasoning" class="msg__thinking">思考中…</div>
         <div
           v-if="(m.incomplete || m.error) && !m.streaming && !m.planDismissed && (m.planSteps?.length || m.rawTail?.length || m.trace.length)"
-          class="msg__incomplete"
+          class="msg__ai"
           data-testid="ai-incomplete"
         >
           <template v-if="m.error">
