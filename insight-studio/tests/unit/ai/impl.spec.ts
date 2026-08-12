@@ -144,6 +144,39 @@ describe('AI 工具实现（execTool）', () => {
     expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
   })
 
+  it('add_filter_step：缺 tableId 时回退分析内唯一/最近表', async () => {
+    const { analysis, store } = await seedStore()
+    const iris = analysis.tables[0]
+    store.select({ kind: 'table', tableId: iris.id })
+    const res = await execTool(
+      'add_filter_step',
+      { conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+      ctx,
+    )
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain(iris.id)
+    expect(res.summary).toContain('50 行')
+  })
+
+  it('set_chart_config：可缺 viewId，回退最近创建的图表视图', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '自动回退视图' }, ctx)
+    expect(created.ok).toBe(true)
+    const res = await execTool(
+      'set_chart_config',
+      {
+        configure: {
+          x: { field: 'sepal_length' },
+          values: [{ field: 'sepal_width' }],
+        },
+      },
+      ctx,
+    )
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain('配置完成')
+  })
+
   it('set_chart_config：可仅用 viewId 反查表；configure 可为 values 数组', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
