@@ -14,6 +14,8 @@
 - `hai-club-data-lifecycle.md`：对话附件参考文档
 - `r1-prompt.md` / `r2-prompt.md`：两轮用户指令
 - `snapshot_conversations.py`：会话快照采集（输出在 `audit-snapshots/`，不入库）
+- `CAPABILITY-MATRIX.md`：主 agent / 子代理 / 流程图节点 / 对话 UX 分层测试协议
+- `CAPABILITY-RESULTS.md`：本轮矩阵实测结论
 - `AUDIT.md`：修前审计 + P0 修复后复测
 - `evidence/`：关键截图（`post-fix-*` 为复测）
 - `r1-traces-compact.json`：修前 r1 工具轨迹（无 Key）
