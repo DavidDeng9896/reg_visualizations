@@ -98,10 +98,10 @@ async function waitRound(page, label, maxMs) {
         continues += 1
         log('continue', { note: `${label} click #${continues}` })
         await cont.click()
-        await page.waitForTimeout(2000)
+        await page.waitForTimeout(8000)
         continue
       }
-      await page.waitForTimeout(2500)
+      await page.waitForTimeout(4000)
       if (await idle(page)) {
         log('round_idle', { note: label, elapsed_s: Math.round((Date.now() - start) / 1000) })
         return

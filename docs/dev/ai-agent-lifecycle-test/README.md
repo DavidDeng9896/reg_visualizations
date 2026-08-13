@@ -1,6 +1,6 @@
 # AI Agent 数据生命周期测试协议
 
-已确认口径（执行中，确认分析报告前不改代码）。
+已确认口径。P0（端口对齐 + 502 退避）已落地并按原计划复测，结果见 `AUDIT.md` §9。
 
 | 项 | 值 |
 | --- | --- |
@@ -14,6 +14,7 @@
 - `hai-club-data-lifecycle.md`：对话附件参考文档
 - `r1-prompt.md` / `r2-prompt.md`：两轮用户指令
 - `snapshot_conversations.py`：会话快照采集（输出在 `audit-snapshots/`，不入库）
-- `AUDIT.md`：r1 实测问题与效率分析（确认前不修代码）
-- `evidence/`：关键截图
-- `r1-traces-compact.json`：正式 r1 工具轨迹（无 Key）
+- `AUDIT.md`：修前审计 + P0 修复后复测
+- `evidence/`：关键截图（`post-fix-*` 为复测）
+- `r1-traces-compact.json`：修前 r1 工具轨迹（无 Key）
+- `post-fix-traces-compact.json`：复测 r1/r2 工具轨迹（无 Key）
