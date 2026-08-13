@@ -44,6 +44,26 @@ def test_dataframe_pass_through():
     assert output["rows"] == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
 
+def test_dict_output_accepted():
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "n", "dataType": "number"}],
+            "rows": [{"n": 3}],
+        }
+    ]
+    code = """
+def custom_code(inputs):
+    df = inputs[0].data
+    return [{"name": "out", "data": df}]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    assert result["outputs"][0]["name"] == "out"
+    assert result["outputs"][0]["rows"] == [{"n": 3}]
+
+
 def test_invalid_return_not_list():
     inputs = [
         {

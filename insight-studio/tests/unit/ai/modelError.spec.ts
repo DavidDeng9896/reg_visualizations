@@ -1,5 +1,13 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { sanitizeModelError, postChat, CHAT_RETRY } from '../../../src/modules/ai/client'
+import {
+  sanitizeModelError,
+  postChat,
+  CHAT_RETRY,
+  classifyChatUpstreamError,
+  shouldRetryChatError,
+  chatRetryDelayMs,
+  formatChatFailure,
+} from '../../../src/modules/ai/client'
 import { AgentRunError, runAgent, type ToolExecutor } from '../../../src/modules/ai/agentLoop'
 import type { ToolCall } from '../../../src/modules/ai/client'
 
@@ -67,10 +75,12 @@ describe('postChat 对 RPM 502 重试', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     CHAT_RETRY.minDelayMs = 400
+    CHAT_RETRY.rpmMinDelayMs = 20_000
   })
 
   it('上游 max RPM 502 后重试直至成功', async () => {
     CHAT_RETRY.minDelayMs = 0
+    CHAT_RETRY.rpmMinDelayMs = 0
     let n = 0
     vi.stubGlobal(
       'fetch',
@@ -90,5 +100,47 @@ describe('postChat 对 RPM 502 重试', () => {
     const res = await postChat({ messages: [{ role: 'user', content: 'hi' }] })
     expect(res.ok).toBe(true)
     expect(n).toBe(3)
+  })
+
+  it('TPD 配额耗尽不重试', async () => {
+    CHAT_RETRY.minDelayMs = 0
+    CHAT_RETRY.rpmMinDelayMs = 0
+    let n = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        n += 1
+        return new Response(
+          JSON.stringify({
+            message: 'request reached organization TPD rate limit, current: 1509374, limit: 1500000',
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        )
+      }),
+    )
+    await expect(postChat({ messages: [{ role: 'user', content: 'hi' }] })).rejects.toThrow(/日配额/)
+    expect(n).toBe(1)
+  })
+})
+
+describe('classifyChatUpstreamError / chatRetryDelayMs', () => {
+  afterEach(() => {
+    CHAT_RETRY.minDelayMs = 400
+    CHAT_RETRY.rpmMinDelayMs = 20_000
+  })
+
+  it('RPM 忽略 after 1 seconds，至少等 rpmMinDelayMs', () => {
+    const msg = 'request reached organization max RPM: 3, please try again after 1 seconds'
+    expect(classifyChatUpstreamError(msg)).toBe('rpm')
+    expect(shouldRetryChatError(502, msg)).toBe(true)
+    expect(chatRetryDelayMs(msg, 0)).toBeGreaterThanOrEqual(20_000)
+    expect(formatChatFailure(502, msg)).toContain('频率超限')
+  })
+
+  it('TPD 不重试并给出日配额文案', () => {
+    const msg = 'organization TPD rate limit, current: 1, limit: 1'
+    expect(classifyChatUpstreamError(msg)).toBe('quota')
+    expect(shouldRetryChatError(502, msg)).toBe(false)
+    expect(formatChatFailure(502, msg)).toContain('日配额')
   })
 })

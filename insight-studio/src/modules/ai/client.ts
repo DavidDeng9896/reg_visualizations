@@ -365,19 +365,52 @@ export const CHAT_RETRY = {
   maxAttempts: 4,
   /** 单次等待下限（测试可改为 0）。 */
   minDelayMs: 400,
+  /** RPM 类错误最短等待。Moonshot 常写 after 1 seconds，对 RPM=3 无意义。测试可改为 0。 */
+  rpmMinDelayMs: 20_000,
+}
+
+export type ChatUpstreamKind = 'quota' | 'rpm' | 'retryable' | 'fatal'
+
+/** 从上游错误正文判断配额 / RPM / 其它。 */
+export function classifyChatUpstreamError(message: string): ChatUpstreamKind {
+  const m = `${message}`
+  if (/tpd|tokens?\s*per\s*day|daily (token )?quota|organization tpd/i.test(m)) return 'quota'
+  if (/\bmax rpm\b|rpm:\s*\d+/i.test(m)) return 'rpm'
+  if (/invalid_parameter|invalid request|ai 未配置/i.test(m)) return 'fatal'
+  return 'retryable'
 }
 
 export function shouldRetryChatError(status: number, message: string): boolean {
   if (status === 409) return false
+  const kind = classifyChatUpstreamError(message)
+  if (kind === 'quota' || kind === 'fatal') return false
   if (status === 429 || status === 503 || status === 504) return true
   if (status !== 502) return false
-  return !/invalid_parameter|invalid request|ai 未配置/i.test(`${message}`)
+  return true
 }
 
 export function chatRetryDelayMs(message: string, attempt: number): number {
   const hinted = Number(/after\s+(\d+)\s+seconds?/i.exec(message)?.[1] ?? 0) * 1000
   const exp = Math.min(16_000, 400 * 2 ** attempt)
+  if (classifyChatUpstreamError(message) === 'rpm') {
+    const rpmFloor = CHAT_RETRY.rpmMinDelayMs
+    const usefulHint = hinted >= rpmFloor ? hinted : 0
+    return Math.max(CHAT_RETRY.minDelayMs, rpmFloor, usefulHint, exp)
+  }
   return Math.max(CHAT_RETRY.minDelayMs, hinted, exp)
+}
+
+/** 用户可见的 chat 失败文案：把 TPD/RPM 从 raw 502 里拆开。 */
+export function formatChatFailure(status: number, message: string): string {
+  const kind = classifyChatUpstreamError(message)
+  const clean = sanitizeModelError(String(message))
+  if (kind === 'quota') {
+    return `模型日配额已用尽（${status}）：${clean}。请明天再试或更换 Key；继续任务不会自动重试。`
+  }
+  if (kind === 'rpm') {
+    return `模型请求频率超限（${status}）：${clean}。请等待约 20 秒后再点「继续任务」。`
+  }
+  return `模型请求失败（${status}）：${clean}`
 }
 
 function sleepChatRetry(ms: number, signal?: AbortSignal): Promise<void> {
@@ -433,7 +466,7 @@ export async function postChat(payload: ChatPayload, signal?: AbortSignal): Prom
     if (!retry) break
     await sleepChatRetry(chatRetryDelayMs(lastMsg, attempt), signal)
   }
-  throw new Error(`模型请求失败（${lastStatus}）：${sanitizeModelError(String(lastMsg))}`)
+  throw new Error(formatChatFailure(lastStatus, lastMsg))
 }
 
 /** 去掉 gzip/二进制噪声，保留可读错误文案。 */

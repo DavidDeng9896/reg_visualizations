@@ -169,7 +169,7 @@ export async function buildAttachmentContext(atts: ChatAttachment[]): Promise<st
   if (!targets.length) return ''
   const parts: string[] = [
     '## 用户本轮上传了以下附件',
-    'CSV/Excel 请用 import_ai_file({ fileId }) 导入为分析表，不要向用户索要 CSV 文本；下方预览仅供理解结构。',
+    'CSV/Excel 请用 import_ai_file({ fileId }) 导入为分析表，不要向用户索要 CSV 文本。text/md/pdf 仅供阅读，禁止 import_ai_file。下方预览仅供理解结构。',
   ]
   for (const att of targets) {
     const body = await extractAttachmentText(att)
@@ -200,12 +200,13 @@ export function buildAttachmentCatalog(
       a.kind === 'excel'
         ? ` sheets=[${(a.selectedSheets?.length ? a.selectedSheets : a.availableSheets ?? []).join(', ') || '未探测'}]`
         : ''
-    lines.push(`- 「${a.name}」id=${a.id} kind=${a.kind}${sheets}`)
+    const importHint = a.kind === 'csv' || a.kind === 'excel' ? '（可导入）' : '（仅阅读，勿 import_ai_file）'
+    lines.push(`- 「${a.name}」id=${a.id} kind=${a.kind}${sheets}${importHint}`)
   }
   if (!lines.length) return ''
-  return `## 会话附件目录（可用 import_ai_file 导入为分析表）
+  return `## 会话附件目录
 ${lines.join('\n')}
-导入：import_ai_file({ fileId, tableName?, sheetNames? })。有 CSV/Excel 附件时直接导入，不要让用户再粘贴 CSV。`
+导入：仅 csv/excel 用 import_ai_file({ fileId, tableName?, sheetNames? })。text/md 已在对话上下文中，禁止导入为表。`
 }
 
 /** 写入用户消息正文的附件摘要（含 id，便于多轮引用）。 */

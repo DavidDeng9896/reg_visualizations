@@ -123,12 +123,12 @@ SOP `.md` 被 `import_ai_file`。BLI 有 >3 倍重复，summary 只给 min/max�
 ## 7. 建议修复项
 
 1. ~~Custom Code → 下游步骤端口对齐~~ **已做，复测通过**  
-2. ~~chat 502/429 退避 + 结束 running + 可续跑~~ **已做，loop 不再挂死**；RPM=3 的退避仍偏短（见 §10）  
-3. Custom Code 失败回执带 IOData 样例；拒绝非 UUID 的 `stepId`  
-4. 续跑禁止再 `create_analysis` 出重复项目（应 `list_analyses` 复用）  
-5. md 附件勿走 `import_ai_file`；BLI >3 倍差异要显式提醒  
-6. 中止后有计划仍显示「继续任务」  
-7. （新）RPM 类 502 不要信 `after 1 seconds`，至少按 20s+ 退避；TPD 配额耗尽应停止自动续跑并明确提示「日配额」而非只显示 502  
+2. ~~chat 502/429 退避 + 结束 running + 可续跑~~ **已做**；RPM 现忽略 `after 1 seconds`，最短 20s；TPD **不重试**并单独提示日配额  
+3. ~~Custom Code 失败回执带 IOData 样例；拒绝非 UUID 的 `stepId`~~ **已做**（dict `{"name","data"}` 也接受）  
+4. ~~续跑禁止再 `create_analysis` 出重复项目~~ **已做**（同名则复用并打开）  
+5. ~~md 附件勿走 `import_ai_file`~~ **已做**；BLI >3 倍差异已写入系统提示，agent 是否遵守待下次有配额时复测  
+6. ~~中止后有计划仍显示「继续任务」~~ **已做**  
+7. ~~RPM 类 502 不要信 `after 1 seconds`；TPD 停止自动重试并明确提示~~ **已做**  
 
 **不做：** 预置 CSV、Key 入库。
 
@@ -197,29 +197,20 @@ SOP `.md` 被 `import_ai_file`。BLI 有 >3 倍重复，summary 只给 min/max�
 
 ---
 
-## 10. 复测仍开放的问题
+## 10. 复测后已补的产品修复（本轮代码，待 TPD 重置后再跑 UI）
 
-### P0 残余 — RPM=3 的退避太短
+下列问题已在产品里修掉，单测覆盖；**当日 TPD 用尽，未再跑 Playwright r1/r2**。
 
-Moonshot 返回 `please try again after 1 seconds`。当前 `chatRetryDelayMs` 取 `after N seconds` 与指数退避的较大值，N=1 时大约 1–1.6s 连打 4 次，**仍然打满 RPM=3**。工程师子请求也会 502。驱动/用户立刻点「继续任务」同样瞬间再 502。
+- **RPM**：忽略 `after 1 seconds`，最短等待 20s；文案改为「频率超限」。
+- **TPD**：不重试，文案改为「日配额已用尽」。
+- **IOData**：worker 接受 `{"name","data"}` dict；失败回执带最小示例。
+- **stepId**：拒绝「待获取」等非 UUID。
+- **create_analysis**：同名则打开已有分析，不新建。
+- **import_ai_file**：text/md 明确拒绝并说明是文档。
+- **中止**：有计划时仍显示「继续任务」。
+- 驱动 continue 间隔改为 25s。
 
-建议：识别 `max RPM` 时忽略 1s 提示，至少等 20–25s；连续 RPM 失败不要 auto-continue。
-
-### 账号配额 — TPD
-
-`organization TPD rate limit, current: 1509374, limit: 1500000`。当天两次完整 agent 跑把日 token 用尽，再续跑没有意义。产品应把 TPD 与 RPM 分开提示，并停止自动重试。
-
-### P1 仍在 — IOData
-
-连续三次 Custom Code 因 `Each output must be an IOData object with name and data`（另一次 f-string）失败，最后靠 `delegate_code_worker` 才写出 4333 行。失败回执仍无最小可运行示例。
-
-### P2 仍在
-
-- `import_ai_file` 导入 SOP `.md`（kind=text，仅 csv/excel）修前修后都有  
-- Custom Code 仍需要一张锚点表（`anchor_wt` 1 行）才能挂步骤  
-- 主区停在分析列表，未自动打开 4333 行表  
-
-驱动侧：空闲后最多点 3 次「继续任务」就发下一轮。r1 其实还停在 502，r2 被提前发出。已把两次 continue 间隔从 2s 调到 8s，对 RPM=3 仍不够。
+仍开放：Custom Code 需要锚点表；主区不自动打开大表；BLI >3× 提醒依赖模型遵守提示。
 
 ---
 
@@ -233,4 +224,4 @@ Moonshot 返回 `please try again after 1 seconds`。当前 `chatRetryDelayMs` �
 | 用平台 Filter 表达 SOP | **通过（到候选池）**；送检名单未做完 |
 | 命名 / 表达 / BLI / r2 | **未完成**（RPM=3 + 当日 TPD） |
 
-TPD 重置或换更高 RPM 的 Key 之后，**同一分析 `7e12eb3c` 从「继续任务」接着造 aism 名单即可**，不必重造 4333 行宽表。确认前不继续改产品代码。
+TPD 重置或换更高 RPM 的 Key 之后，**同一分析 `7e12eb3c` 从「继续任务」接着造 aism 名单即可**，不必重造 4333 行宽表。

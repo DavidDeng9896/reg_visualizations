@@ -98,7 +98,7 @@ async function waitRound(page, label, maxMs) {
         continues += 1
         log('continue', { note: `${label} click #${continues}` })
         await cont.click()
-        await page.waitForTimeout(8000)
+        await page.waitForTimeout(25_000)
         continue
       }
       await page.waitForTimeout(4000)

@@ -426,4 +426,37 @@ describe('AI 工具实现（execTool）', () => {
     expect((await execTool('nope_tool', {}, ctx)).ok).toBe(false)
     expect((await execTool('get_table_schema', { tableId: 'missing' }, ctx)).summary).toContain('表不存在')
   })
+
+  it('create_analysis：当前已打开同名分析则复用', async () => {
+    const { analysis } = await seedStore()
+    const res = await execTool('create_analysis', { name: analysis.name }, ctx)
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain('不要再 create_analysis')
+    expect(res.artifact?.analysisId).toBe(analysis.id)
+  })
+
+  it('update_custom_code_step：拒绝占位 stepId', async () => {
+    await seedStore()
+    const res = await execTool('update_custom_code_step', { stepId: '待获取', code: 'x = 1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('UUID')
+    expect(res.summary).toContain('待获取')
+  })
+
+  it('import_ai_file：md 说明文档拒绝导入并提示勿当表', async () => {
+    await seedStore()
+    const { aiFilesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
+      id: 'file-md-1',
+      name: 'hai-club-data-lifecycle.md',
+      mime: 'text/markdown',
+      sizeBytes: 20,
+      createdAt: new Date().toISOString(),
+      kind: 'text',
+    })
+    const res = await execTool('import_ai_file', { fileId: 'file-md-1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('说明文档')
+    expect(res.summary).toContain('不要 import_ai_file')
+  })
 })

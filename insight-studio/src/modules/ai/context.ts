@@ -45,8 +45,14 @@ export function buildMentionContext(analysis: Analysis | null, targets: MentionT
   for (const target of targets) {
     if (target.kind === 'attachment') {
       const label = target.name?.trim() || target.fileId
+      const importable =
+        target.fileKind === 'csv' ||
+        target.fileKind === 'excel' ||
+        ((target.fileKind == null || target.fileKind === 'other') && /\.(csv|xlsx|xls)$/i.test(label))
       parts.push(
-        `用户特别引用了附件「${label}」(id: ${target.fileId})。如需导入，请调用 import_ai_file({ fileId: "${target.fileId}" })。`,
+        importable
+          ? `用户特别引用了附件「${label}」(id: ${target.fileId})。如需导入，请调用 import_ai_file({ fileId: "${target.fileId}" })。`
+          : `用户特别引用了附件「${label}」(id: ${target.fileId}，kind=${target.fileKind ?? 'text'})。这是说明文档，内容见对话上下文，禁止 import_ai_file。`,
       )
       continue
     }

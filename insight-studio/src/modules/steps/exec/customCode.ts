@@ -16,6 +16,7 @@ import { ensureRowIds, sealRows } from '../../../shared/factories'
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { findTable } from '../../../shared/tree'
 import { getStepDef, resolveTableOutputPort } from '../registry'
+import { annotateCustomCodeError } from '../customCodeTemplate'
 import type { StepExecCtx, StepExecResult } from './types'
 
 export interface PythonExecuteResponse {
@@ -227,7 +228,7 @@ export async function execCustomCode(
   }
 
   if (!resp.ok) {
-    const msg = resp.error?.message || 'Python 执行失败'
+    const msg = annotateCustomCodeError(resp.error?.message || 'Python 执行失败')
     return {
       status: 'failed',
       error: resp.error?.line ? `Line ${resp.error.line}: ${msg}` : msg,

@@ -111,7 +111,12 @@ describe('buildAttachmentCatalog / formatUserAttachmentLine', () => {
     expect(catalog).toContain('id=f1')
     expect(catalog).toContain('antibody.xlsx')
     expect(catalog).toContain('import_ai_file')
+    expect(catalog).toContain('可导入')
     expect(catalog).not.toContain('pic.png')
+
+    const docs = buildAttachmentCatalog([att({ id: 'md1', name: 'sop.md', kind: 'text' })])
+    expect(docs).toContain('仅阅读')
+    expect(docs).toContain('禁止导入')
 
     expect(formatUserAttachmentLine([att({ id: 'f1', name: 'antibody.xlsx', kind: 'excel' })])).toContain(
       'id=f1',
