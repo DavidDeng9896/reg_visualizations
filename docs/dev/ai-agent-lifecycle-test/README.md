@@ -14,4 +14,6 @@
 - `hai-club-data-lifecycle.md`：对话附件参考文档
 - `r1-prompt.md` / `r2-prompt.md`：两轮用户指令
 - `snapshot_conversations.py`：会话快照采集（输出在 `audit-snapshots/`，不入库）
-- `AUDIT.md`：测试结束后的问题与效率分析（待写入）
+- `AUDIT.md`：r1 实测问题与效率分析（确认前不修代码）
+- `evidence/`：关键截图
+- `r1-traces-compact.json`：正式 r1 工具轨迹（无 Key）
