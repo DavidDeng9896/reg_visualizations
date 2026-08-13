@@ -54,3 +54,16 @@ func TestPutAnalysisPersistsSnapshot(t *testing.T) {
 		t.Fatalf("snap=%+v", snap)
 	}
 }
+
+func TestOpenUsesExplicitDSN(t *testing.T) {
+	base := store.ConfigFromEnv()
+	dsn := base.FormatDSN()
+	st, err := store.Open(store.Config{DSN: dsn, Host: "no-such-host", Port: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.DB.Ping(); err != nil {
+		t.Fatal(err)
+	}
+}
