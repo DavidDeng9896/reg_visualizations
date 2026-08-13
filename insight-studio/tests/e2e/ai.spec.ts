@@ -180,7 +180,7 @@ function extractRe(text: string, re: RegExp, label: string): string {
 }
 
 function isResume(messages: Msg[]): boolean {
-  return messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('续跑检查点'))
+  return messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('【续跑检查点】'))
 }
 
 /** 多节点管道：两表导入 → filter → join → computed → hide → report → 图 → 看板。 */
@@ -294,7 +294,7 @@ function mockSsePipeline(messages: Msg[]): string {
 function mockSseQuotaThenContinue(messages: Msg[]): ChatScriptOut {
   if (isResume(messages)) {
     const resumeAt = messages.reduce((idx, m, i) =>
-      m.role === 'system' && String(m.content ?? '').includes('续跑检查点') ? i : idx, -1)
+      m.role === 'system' && String(m.content ?? '').includes('【续跑检查点】') ? i : idx, -1)
     const after = messages.slice(resumeAt + 1).filter((m) => m.role === 'tool').length
     if (after === 0) return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 0 })] })
     if (after === 1) return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 1 })] })
@@ -313,7 +313,7 @@ function mockSseAbortThenContinue(messages: Msg[]): ChatScriptOut {
   }
   const round = messages.filter((m) => m.role === 'tool').length + 1
   if (round === 1) return sseOf({ toolCalls: [toolCall('submit_plan', { steps: ['看表', '出图'] })] })
-  return { delayMs: 15_000, sse: sseOf({ toolCalls: [toolCall('list_tables', {})] }) }
+  return { delayMs: 8_000, sse: sseOf({ toolCalls: [toolCall('list_tables', {})] }) }
 }
 
 test.describe('AI 助手（mock SSE 回放）', () => {
@@ -362,7 +362,7 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await expect(chartCard).toBeVisible({ timeout: 15_000 })
     await chartCard.click()
     await expect(page).toHaveURL(/viewId=/)
-    await expect(page.getByTestId('ai-drawer')).toHaveCount(0)
+    await expect(page.getByTestId('ai-drawer')).toBeHidden()
 
     // 工作区真实生效：侧栏出现新视图节点
     await expect(viewNode(page, 'AI 散点分析')).toBeVisible()
@@ -381,8 +381,9 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 待确认块折叠状态也外露，表未被删
     const confirmBtn = page.getByTestId('ai-trace-confirm')
     await expect(confirmBtn).toBeVisible()
-    await expect(page.locator('.trace__pending')).toContainText('需要你的批准')
-    await expect(page.locator('.trace__pending')).toContainText('删除表「Iris measurements」')
+    const pending = page.getByTestId('ai-pending-actions')
+    await expect(pending).toContainText('需要你的批准')
+    await expect(pending).toContainText('删除表「Iris measurements」')
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
 
     // 确认执行 → 表真实删除，且同一会话自动续跑给出总结
@@ -419,8 +420,8 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 单选后提交 → 已答态 + 循环续轮收尾
     await ask.locator('.ask__opt', { hasText: '按 species 分组' }).click()
     await page.getByTestId('ai-ask-submit').click()
-    await expect(ask).toContainText('已提交回答')
-    await expect(ask).toContainText('按 species 分组')
+    await expect(page.getByTestId('ai-pending-actions')).toHaveCount(0)
+    await expect(page.getByTestId('ai-messages')).toContainText('按 species 分组')
     await expect(page.getByTestId('ai-messages')).toContainText('收到，按你的选择继续配置图表')
   })
 

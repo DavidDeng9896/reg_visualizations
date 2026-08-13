@@ -6,5 +6,6 @@ screenshots/*-t*s.png
 r1-drawer.txt
 r2-drawer.txt
 ui-test-log.jsonl
-ui-test-console.log
+capability-live.json
+screenshots/cap-*.png
 

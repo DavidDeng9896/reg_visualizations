@@ -164,7 +164,7 @@ const SCENES = [
   {
     id: 'analysis-worker',
     prompt:
-      '派「分析师」子代理（delegate_analysis_worker）：给 Iris measurements 建一个 bar 图，x=species，y=sepal_length。goal 里写清表名。不要工程师，不要 Custom Code。',
+      '先用 import_csv_text 导入表 iris_tiny：\nspecies,sepal_length\nsetosa,5.1\nsetosa,4.9\nversicolor,7.0\n然后派「分析师」子代理（delegate_analysis_worker）给这张表建 bar 图，x=species，y=sepal_length。不要工程师，不要 Custom Code。',
     expect: [/分析师|bar|柱|Iris/i],
     timeoutMs: 240_000,
   },
@@ -193,18 +193,11 @@ page.setDefaultTimeout(20_000)
 try {
   await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await page.waitForTimeout(2000)
-  // 进入已有 demo：若首页有分析则打开第一个，否则新建
-  const first = page.locator('a[href*="/analysis/"]').first()
-  if (await first.count()) {
-    await first.click()
-    await page.waitForURL(/\/analysis\//, { timeout: 20_000 })
-  } else {
-    await page.getByRole('button', { name: '新建分析' }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByRole('textbox').first().fill('capability-live')
-    await dialog.getByRole('button', { name: '创建' }).click()
-    await page.waitForURL(/\/analysis\//)
-  }
+  await page.getByRole('button', { name: '新建分析' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('textbox').first().fill('capability-live')
+  await dialog.getByRole('button', { name: '创建' }).click()
+  await page.waitForURL(/\/analysis\//)
   await page.waitForTimeout(1000)
 
   for (const spec of SCENES) {
