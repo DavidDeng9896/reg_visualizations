@@ -9,19 +9,44 @@
 | 项 | 选择 |
 | --- | --- |
 | 语言 | **Go 1.22+** |
-| 本地开发库 | SQLite（`modernc.org/sqlite`，纯 Go） |
-| 生产库 | PostgreSQL（`migrations/001_init.pg.sql`） |
+| 数据库 | **MariaDB**（`github.com/go-sql-driver/mysql`） |
+| Schema | `internal/store/schema.sql` |
 | 协议 | REST（兼容前端 `HttpAnalysisRepository`） |
 
 产品规则：**只存数据内容，不存导入原始文件**。
 
+Skills / MCP / AI 配置仍在 `INSIGHT_DATA_DIR`（默认 `data/`）的文件里，不进 MariaDB。
+
 ## 运行
+
+先起 MariaDB（默认账号 `insight` / `insight`，库 `insight`，端口 3306，缓冲池 128MB）：
+
+```bash
+cd insight-api-go
+docker compose up -d
+```
+
+或用环境变量连已有实例：
+
+```bash
+export INSIGHT_DB_HOST=127.0.0.1
+export INSIGHT_DB_PORT=3306
+export INSIGHT_DB_USER=insight
+export INSIGHT_DB_PASSWORD=insight
+export INSIGHT_DB_NAME=insight
+# 也可直接：
+# export INSIGHT_DB_DSN='insight:insight@tcp(127.0.0.1:3306)/insight'
+```
 
 ```bash
 cd insight-api-go
 go run ./cmd/server          # http://127.0.0.1:8787
-# 或
-PORT=8787 INSIGHT_DB_PATH=./data/insight.sqlite go run ./cmd/server
+```
+
+从旧 SQLite 迁一次（不删源文件，可重复执行）：
+
+```bash
+go run ./cmd/migrate-sqlite --from data/insight.sqlite
 ```
 
 前端：
@@ -52,17 +77,11 @@ cd python-worker && npm run install-deps && npm start
 
 健康检查：`http://127.0.0.1:8091/health` → `{"ok":true}`
 
-PostgreSQL（生产 schema）：
-
-```bash
-docker compose up -d
-```
-
 ## API
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/health` | 健康检查（`runtime: go`） |
+| GET | `/health` | 健康检查（`runtime: go`，`storage: mariadb`） |
 | GET/PUT/DELETE | `/api/analyses/:id` | Analysis 文档（含表数据内容） |
 | GET | `/api/analyses/:id/tables/:tableId/snapshot` | 最新数据内容快照 |
 | GET/PUT/DELETE | `/api/dashboards/:id` | 看板 |
@@ -76,13 +95,14 @@ docker compose up -d
 
 ## 测试
 
+需要本机可连的 MariaDB（同上 `docker compose up -d` 或 `INSIGHT_DB_*`）。每个测试会建独立 `insight_test_*` 库并在结束后删除。
+
 ```bash
 go test ./...
 ```
 
 ## 后续（高性能路线）
 
-- PG 驱动替换 SQLite（同一 store 接口）
 - SSE `/events` + outbox publisher
 - 独立 `rerun-worker` 跑 flowchart DAG
 - 大表 rows → 对象存储 / Parquet

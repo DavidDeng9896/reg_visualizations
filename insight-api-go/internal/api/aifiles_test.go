@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/api"
-	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/storetest"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userid"
 )
 
@@ -34,11 +34,7 @@ func multipartBody(t *testing.T, field, filename string, content []byte) (*bytes
 
 func TestAiFilesUploadDownloadMetaDelete(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
 
@@ -121,11 +117,7 @@ func TestAiFilesUploadDownloadMetaDelete(t *testing.T) {
 
 func TestAiFilesIsolatedByUser(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
 
@@ -169,11 +161,7 @@ func TestAiFilesIsolatedByUser(t *testing.T) {
 
 func TestAiFilesRejectBadType(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
 

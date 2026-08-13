@@ -1,6 +1,6 @@
 /**
  * Insight Studio SQL 代理（本地）。
- * 浏览器无法直连 Postgres/MySQL，经此前端同源 /api/sql/* 转发。
+ * 浏览器无法直连 Postgres/MySQL/MariaDB，经此前端同源 /api/sql/* 转发。
  *
  * 启动：npm run dev:api   （默认 http://127.0.0.1:7120）
  * Vite 已把 /api/sql 代理到本服务。
@@ -27,8 +27,8 @@ app.get('/api/sql/health', (c) => c.json({ ok: true, service: 'insight-sql-proxy
 
 function readConfig(body: Record<string, unknown>): DbConnectionConfig {
   const dialect = body.dialect as SqlDialect
-  if (dialect !== 'postgres' && dialect !== 'mysql') {
-    throw new Error('dialect 仅支持 postgres / mysql')
+  if (dialect !== 'postgres' && dialect !== 'mysql' && dialect !== 'mariadb') {
+    throw new Error('dialect 仅支持 postgres / mysql / mariadb')
   }
   const host = String(body.host ?? '').trim()
   const database = String(body.database ?? '').trim()

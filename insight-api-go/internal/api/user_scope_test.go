@@ -11,18 +11,14 @@ import (
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/api"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/skills"
-	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/storetest"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userid"
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/userscope"
 )
 
 func TestConversationsIsolatedByUser(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
 
@@ -85,11 +81,7 @@ func TestSkillsIsolatedByUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, filepath.Join(dir, "seed"))
 	h := srv.Handler()
 
@@ -128,11 +120,7 @@ func TestSkillsIsolatedByUser(t *testing.T) {
 
 func TestMcpIsolatedByUser(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	_ = userscope.MigrateOnce(dir, "")
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
@@ -166,11 +154,7 @@ func TestMcpIsolatedByUser(t *testing.T) {
 
 func TestMemoriesIsolatedByUser(t *testing.T) {
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "db.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 	srv := api.NewWithUserData(st, filepath.Join(dir, "ai-config.json"), dir, "")
 	h := srv.Handler()
 

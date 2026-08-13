@@ -99,6 +99,7 @@ const typeOptions: SelectOption[] = [
 const dialectOptions: SelectOption[] = [
   { value: 'postgres', label: 'PostgreSQL' },
   { value: 'mysql', label: 'MySQL' },
+  { value: 'mariadb', label: 'MariaDB' },
 ]
 
 const connectionOptions = computed<SelectOption[]>(() =>

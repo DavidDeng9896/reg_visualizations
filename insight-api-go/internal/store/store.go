@@ -6,13 +6,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 	"time"
 
+	_ "embed"
+
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
 )
+
+//go:embed schema.sql
+var schemaSQL string
 
 const DefaultWorkspace = "00000000-0000-0000-0000-000000000001"
 
@@ -38,25 +42,24 @@ type Store struct {
 	DB *sql.DB
 }
 
-func Open(dbPath string) (*Store, error) {
-	if dbPath == "" {
-		dbPath = os.Getenv("INSIGHT_DB_PATH")
+func OpenFromEnv() (*Store, error) {
+	return Open(ConfigFromEnv())
+}
+
+func Open(cfg Config) (*Store, error) {
+	if cfg.DSN == "" && cfg.Host == "" {
+		cfg = ConfigFromEnv()
 	}
-	if dbPath == "" {
-		dbPath = filepath.Join("data", "insight.sqlite")
-	}
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
-	// SQLite: single writer; raise busy timeout for concurrent reads.
-	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;`); err != nil {
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	if err := db.Ping(); err != nil {
 		_ = db.Close()
-		return nil, err
+		return nil, fmt.Errorf("mariadb ping %s:%d/%s: %w (start: cd insight-api-go && docker compose up -d)", cfg.Host, cfg.Port, cfg.Database, err)
 	}
 	s := &Store{DB: db}
 	if err := s.migrate(); err != nil {
@@ -67,83 +70,56 @@ func Open(dbPath string) (*Store, error) {
 }
 
 func (s *Store) Close() error {
+	if s == nil || s.DB == nil {
+		return nil
+	}
 	return s.DB.Close()
 }
 
-func (s *Store) migrate() error {
-	_, err := s.DB.Exec(`
-      CREATE TABLE IF NOT EXISTS analyses (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT NOT NULL DEFAULT '` + DefaultWorkspace + `',
-        name TEXT NOT NULL,
-        revision INTEGER NOT NULL DEFAULT 0,
-        document TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        deleted_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS analyses_workspace_updated
-        ON analyses (workspace_id, updated_at DESC);
-
-      CREATE TABLE IF NOT EXISTS dashboards (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT NOT NULL DEFAULT '` + DefaultWorkspace + `',
-        name TEXT NOT NULL,
-        revision INTEGER NOT NULL DEFAULT 0,
-        document TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS dashboards_workspace_updated
-        ON dashboards (workspace_id, updated_at DESC);
-
-      CREATE TABLE IF NOT EXISTS table_snapshots (
-        id TEXT PRIMARY KEY,
-        analysis_id TEXT NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
-        table_id TEXT NOT NULL,
-        step_id TEXT,
-        data_version TEXT NOT NULL,
-        columns TEXT NOT NULL,
-        rows TEXT NOT NULL,
-        row_count INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        UNIQUE (analysis_id, table_id, data_version)
-      );
-      CREATE INDEX IF NOT EXISTS table_snapshots_latest
-        ON table_snapshots (analysis_id, table_id, created_at DESC);
-
-      CREATE TABLE IF NOT EXISTS event_outbox (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        workspace_id TEXT NOT NULL DEFAULT '` + DefaultWorkspace + `',
-        event_type TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        published_at TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS ai_conversations (
-        id TEXT PRIMARY KEY,
-        analysis_id TEXT,
-        title TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        messages TEXT NOT NULL DEFAULT '[]',
-        user_id TEXT NOT NULL DEFAULT 'david'
-      );
-      CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations(updated_at DESC);
-    `)
-	if err != nil {
-		return err
+func splitSQL(src string) []string {
+	var stmts []string
+	var b strings.Builder
+	for _, line := range strings.Split(src, "\n") {
+		trim := strings.TrimSpace(line)
+		if strings.HasPrefix(trim, "--") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+		if strings.HasSuffix(trim, ";") {
+			s := strings.TrimSpace(b.String())
+			s = strings.TrimSuffix(s, ";")
+			s = strings.TrimSpace(s)
+			if s != "" {
+				stmts = append(stmts, s)
+			}
+			b.Reset()
+		}
 	}
-	// Existing DBs created before user_id: add column first, then index (ignore duplicate-column error).
-	_, _ = s.DB.Exec(`ALTER TABLE ai_conversations ADD COLUMN user_id TEXT NOT NULL DEFAULT 'david'`)
-	_, _ = s.DB.Exec(`UPDATE ai_conversations SET user_id = 'david' WHERE user_id IS NULL OR user_id = ''`)
-	_, _ = s.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations(user_id, updated_at DESC)`)
+	if s := strings.TrimSpace(b.String()); s != "" {
+		stmts = append(stmts, s)
+	}
+	return stmts
+}
+
+func (s *Store) migrate() error {
+	for _, stmt := range splitSQL(schemaSQL) {
+		if _, err := s.DB.Exec(stmt); err != nil {
+			return fmt.Errorf("migrate %s: %w", stmt, err)
+		}
+	}
 	return nil
 }
 
 func nowISO() string {
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
+func unmarshalJSON(raw []byte, dest any) error {
+	if len(raw) == 0 {
+		return json.Unmarshal([]byte("null"), dest)
+	}
+	return json.Unmarshal(raw, dest)
 }
 
 func (s *Store) ListAnalyses(workspaceID string) ([]AnalysisDoc, error) {
@@ -160,12 +136,12 @@ func (s *Store) ListAnalyses(workspaceID string) ([]AnalysisDoc, error) {
 	defer rows.Close()
 	out := make([]AnalysisDoc, 0)
 	for rows.Next() {
-		var raw string
+		var raw []byte
 		if err := rows.Scan(&raw); err != nil {
 			return nil, err
 		}
 		var doc AnalysisDoc
-		if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		if err := unmarshalJSON(raw, &doc); err != nil {
 			return nil, err
 		}
 		out = append(out, doc)
@@ -174,7 +150,7 @@ func (s *Store) ListAnalyses(workspaceID string) ([]AnalysisDoc, error) {
 }
 
 func (s *Store) GetAnalysis(id string) (AnalysisDoc, bool, error) {
-	var raw string
+	var raw []byte
 	err := s.DB.QueryRow(
 		`SELECT document FROM analyses WHERE id = ? AND deleted_at IS NULL`, id,
 	).Scan(&raw)
@@ -185,7 +161,7 @@ func (s *Store) GetAnalysis(id string) (AnalysisDoc, bool, error) {
 		return nil, false, err
 	}
 	var doc AnalysisDoc
-	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+	if err := unmarshalJSON(raw, &doc); err != nil {
 		return nil, false, err
 	}
 	return doc, true, nil
@@ -250,11 +226,11 @@ func (s *Store) PutAnalysis(analysis AnalysisDoc, workspaceID string) (AnalysisD
 	_, err = tx.Exec(
 		`INSERT INTO analyses (id, workspace_id, name, revision, document, created_at, updated_at, deleted_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name,
-		   revision = excluded.revision,
-		   document = excluded.document,
-		   updated_at = excluded.updated_at,
+		 ON DUPLICATE KEY UPDATE
+		   name = VALUES(name),
+		   revision = VALUES(revision),
+		   document = VALUES(document),
+		   updated_at = VALUES(updated_at),
 		   deleted_at = NULL`,
 		id, workspaceID, asString(doc["name"], id), revision, string(raw),
 		asString(doc["createdAt"], now), asString(doc["updatedAt"], now),
@@ -295,14 +271,14 @@ func (s *Store) PutAnalysis(analysis AnalysisDoc, workspaceID string) (AnalysisD
 		}
 		_, err = tx.Exec(
 			`INSERT INTO table_snapshots
-			   (id, analysis_id, table_id, step_id, data_version, columns, rows, row_count, created_at)
+			   (id, analysis_id, table_id, step_id, data_version, columns, row_data, row_count, created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-			 ON CONFLICT(analysis_id, table_id, data_version) DO UPDATE SET
-			   columns = excluded.columns,
-			   rows = excluded.rows,
-			   row_count = excluded.row_count,
-			   step_id = excluded.step_id,
-			   created_at = excluded.created_at`,
+			 ON DUPLICATE KEY UPDATE
+			   columns = VALUES(columns),
+			   row_data = VALUES(row_data),
+			   row_count = VALUES(row_count),
+			   step_id = VALUES(step_id),
+			   created_at = VALUES(created_at)`,
 			uuid.NewString(), id, tableID, stepID, dataVersion,
 			string(cols), string(rowBytes), rowCount, asString(doc["updatedAt"], now),
 		)
@@ -352,12 +328,12 @@ func (s *Store) ListDashboards(workspaceID string) ([]DashboardDoc, error) {
 	defer rows.Close()
 	out := make([]DashboardDoc, 0)
 	for rows.Next() {
-		var raw string
+		var raw []byte
 		if err := rows.Scan(&raw); err != nil {
 			return nil, err
 		}
 		var doc DashboardDoc
-		if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		if err := unmarshalJSON(raw, &doc); err != nil {
 			return nil, err
 		}
 		out = append(out, doc)
@@ -366,7 +342,7 @@ func (s *Store) ListDashboards(workspaceID string) ([]DashboardDoc, error) {
 }
 
 func (s *Store) GetDashboard(id string) (DashboardDoc, bool, error) {
-	var raw string
+	var raw []byte
 	err := s.DB.QueryRow(`SELECT document FROM dashboards WHERE id = ?`, id).Scan(&raw)
 	if err == sql.ErrNoRows {
 		return nil, false, nil
@@ -375,7 +351,7 @@ func (s *Store) GetDashboard(id string) (DashboardDoc, bool, error) {
 		return nil, false, err
 	}
 	var doc DashboardDoc
-	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+	if err := unmarshalJSON(raw, &doc); err != nil {
 		return nil, false, err
 	}
 	return doc, true, nil
@@ -405,11 +381,11 @@ func (s *Store) PutDashboard(dashboard DashboardDoc, workspaceID string) (Dashbo
 	_, err = s.DB.Exec(
 		`INSERT INTO dashboards (id, workspace_id, name, revision, document, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET
-		   name = excluded.name,
-		   revision = excluded.revision,
-		   document = excluded.document,
-		   updated_at = excluded.updated_at`,
+		 ON DUPLICATE KEY UPDATE
+		   name = VALUES(name),
+		   revision = VALUES(revision),
+		   document = VALUES(document),
+		   updated_at = VALUES(updated_at)`,
 		id, workspaceID, asString(doc["name"], id), revision, string(raw),
 		asString(doc["createdAt"], now), asString(doc["updatedAt"], now),
 	)
@@ -430,9 +406,9 @@ func (s *Store) DeleteDashboard(id string) (bool, error) {
 
 func (s *Store) GetLatestSnapshot(analysisID, tableID string) (*Snapshot, error) {
 	var snap Snapshot
-	var cols, rows string
+	var cols, rows []byte
 	err := s.DB.QueryRow(
-		`SELECT id, data_version, columns, rows, row_count, created_at
+		`SELECT id, data_version, columns, row_data, row_count, created_at
 		 FROM table_snapshots
 		 WHERE analysis_id = ? AND table_id = ?
 		 ORDER BY created_at DESC LIMIT 1`,

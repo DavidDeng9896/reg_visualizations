@@ -1,5 +1,5 @@
 /**
- * HTTP AnalysisRepository：对接 insight-api（PostgreSQL/SQLite）。
+ * HTTP AnalysisRepository：对接 insight-api（MariaDB）。
  * 通过 VITE_API_BASE_URL 启用；未设置时仍用 Dexie。
  */
 import type { Analysis } from './types'

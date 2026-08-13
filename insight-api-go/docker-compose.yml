@@ -1,15 +1,22 @@
 services:
-  postgres:
-    image: postgres:16-alpine
+  mariadb:
+    image: mariadb:11.4
     environment:
-      POSTGRES_USER: insight
-      POSTGRES_PASSWORD: insight
-      POSTGRES_DB: insight
+      MARIADB_USER: insight
+      MARIADB_PASSWORD: insight
+      MARIADB_DATABASE: insight
+      MARIADB_ROOT_PASSWORD: insight
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    command:
+      - --innodb-buffer-pool-size=128M
+      - --max-allowed-packet=64M
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./migrations/001_init.pg.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - mariadb_data:/var/lib/mysql
+      - ./internal/store/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./migrations/02-grants.sql:/docker-entrypoint-initdb.d/02-grants.sql:ro
 
 volumes:
-  pgdata:
+  mariadb_data:

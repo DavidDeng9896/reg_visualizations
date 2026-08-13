@@ -40,4 +40,4 @@ cd insight-api-go && go test ./...
 
 ## 技术栈
 
-Vue3 · Vite · TypeScript · Pinia · vxe-table · Vue Flow · Plotly · Dexie · Go · SQLite/PostgreSQL
+Vue3 · Vite · TypeScript · Pinia · vxe-table · Vue Flow · Plotly · Dexie · Go · MariaDB

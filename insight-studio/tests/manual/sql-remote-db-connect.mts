@@ -14,7 +14,7 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:7100'
 
 type DbTarget = {
   id: string
-  dialect: 'postgres' | 'mysql'
+  dialect: 'postgres' | 'mysql' | 'mariadb'
   name: string
   host: string
   port: string

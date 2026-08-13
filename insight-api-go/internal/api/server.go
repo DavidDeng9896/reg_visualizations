@@ -17,9 +17,9 @@ import (
 type Server struct {
 	Store      *store.Store
 	Mux        *http.ServeMux
-	ConfigPath string // AI 配置 JSON 路径；空则 data/ai-config.json
-	DataDir    string // when set, Skills/MCP/memory/files resolve under users/<id>/
-	SkillsSeed string // official skills seed source
+	ConfigPath string        // AI 配置 JSON 路径；空则 data/ai-config.json
+	DataDir    string        // when set, Skills/MCP/memory/files resolve under users/<id>/
+	SkillsSeed string        // official skills seed source
 	Skills     *skills.Store // legacy single-store fallback (tests / DataDir empty)
 	MCP        *mcp.Store
 	Memory     *memory.Store
@@ -134,9 +134,9 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"service": "insight-api",
-		"storage": "sqlite",
+		"storage": "mariadb",
 		"runtime": "go",
-		"note":    "Mirrors PostgreSQL schema; see migrations/001_init.pg.sql",
+		"note":    "MariaDB schema; see internal/store/schema.sql",
 	})
 }
 

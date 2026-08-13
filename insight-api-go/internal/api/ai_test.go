@@ -10,17 +10,13 @@ import (
 	"testing"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/api"
-	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/storetest"
 )
 
 func newTestServer(t *testing.T) *api.Server {
 	t.Helper()
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "t.sqlite"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
+	st := storetest.Open(t)
 	return api.NewWithConfigPath(st, filepath.Join(dir, "ai-config.json"))
 }
 
