@@ -15,7 +15,7 @@ import { nowIso } from '../../../shared/datetime'
 import { ensureRowIds, sealRows } from '../../../shared/factories'
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { findTable } from '../../../shared/tree'
-import { getStepDef } from '../registry'
+import { getStepDef, resolveTableOutputPort } from '../registry'
 import type { StepExecCtx, StepExecResult } from './types'
 
 export interface PythonExecuteResponse {
@@ -111,8 +111,10 @@ export function findOutputTables(
 ): AnalysisTable[] {
   const step = analysis.steps.find((s) => s.id === nodeId)
   if (!step) return []
+  const resolved = resolveTableOutputPort(step.type, port)
+  if (!resolved) return []
   const def = getStepDef(step.type)
-  const portDef = def.outputs.find((o) => o.name === port)
+  const portDef = def.outputs.find((o) => o.name === resolved)
   if (!portDef || portDef.type !== 'table') return []
   return (step.output.tables ?? [])
     .map((id) => findTable(analysis, id))

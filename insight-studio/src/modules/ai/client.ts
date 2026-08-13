@@ -360,31 +360,80 @@ export const aiConfigApi = {
   ) => req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
 }
 
-/** 发送一轮对话（SSE）。缺配置时后端返回 409 → 抛错。 */
-export async function postChat(payload: ChatPayload, signal?: AbortSignal): Promise<Response> {
-  const res = await fetch('/api/ai/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...payload,
-      messages: sanitizeChatMessages(payload.messages),
-      stream: true,
-    }),
-    signal,
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    let msg = text
-    try {
-      const j = JSON.parse(text) as { error?: string; message?: string }
-      msg = j.message ?? j.error ?? text
-    } catch {
-      /* ignore */
+/** 发送一轮对话（SSE）。缺配置时后端返回 409 → 抛错。对 429/可重试 502 做有限次退避。 */
+export const CHAT_RETRY = {
+  maxAttempts: 4,
+  /** 单次等待下限（测试可改为 0）。 */
+  minDelayMs: 400,
+}
+
+export function shouldRetryChatError(status: number, message: string): boolean {
+  if (status === 409) return false
+  if (status === 429 || status === 503 || status === 504) return true
+  if (status !== 502) return false
+  return !/invalid_parameter|invalid request|ai 未配置/i.test(`${message}`)
+}
+
+export function chatRetryDelayMs(message: string, attempt: number): number {
+  const hinted = Number(/after\s+(\d+)\s+seconds?/i.exec(message)?.[1] ?? 0) * 1000
+  const exp = Math.min(16_000, 400 * 2 ** attempt)
+  return Math.max(CHAT_RETRY.minDelayMs, hinted, exp)
+}
+
+function sleepChatRetry(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('已中止', 'AbortError'))
+      return
     }
-    if (res.status === 409) throw new Error('AI 未配置：请先在设置中填写 API Key')
-    throw new Error(`模型请求失败（${res.status}）：${sanitizeModelError(String(msg))}`)
+    const t = setTimeout(() => resolve(), ms)
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(t)
+        reject(new DOMException('已中止', 'AbortError'))
+      },
+      { once: true },
+    )
+  })
+}
+
+function parseChatErrorBody(text: string): string {
+  try {
+    const j = JSON.parse(text) as { error?: string; message?: string }
+    return j.message ?? j.error ?? text
+  } catch {
+    return text
   }
-  return res
+}
+
+export async function postChat(payload: ChatPayload, signal?: AbortSignal): Promise<Response> {
+  const body = JSON.stringify({
+    ...payload,
+    messages: sanitizeChatMessages(payload.messages),
+    stream: true,
+  })
+  let lastMsg = ''
+  let lastStatus = 0
+  for (let attempt = 0; attempt < CHAT_RETRY.maxAttempts; attempt += 1) {
+    if (signal?.aborted) throw new DOMException('已中止', 'AbortError')
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal,
+    })
+    if (res.ok) return res
+    const text = await res.text().catch(() => '')
+    lastStatus = res.status
+    lastMsg = parseChatErrorBody(text)
+    if (res.status === 409) throw new Error('AI 未配置：请先在设置中填写 API Key')
+    const retry = attempt < CHAT_RETRY.maxAttempts - 1 && shouldRetryChatError(res.status, lastMsg)
+    if (!retry) break
+    await sleepChatRetry(chatRetryDelayMs(lastMsg, attempt), signal)
+  }
+  throw new Error(`模型请求失败（${lastStatus}）：${sanitizeModelError(String(lastMsg))}`)
 }
 
 /** 去掉 gzip/二进制噪声，保留可读错误文案。 */

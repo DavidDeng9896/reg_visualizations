@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { sanitizeModelError } from '../../../src/modules/ai/client'
+import { describe, expect, it, vi, afterEach } from 'vitest'
+import { sanitizeModelError, postChat, CHAT_RETRY } from '../../../src/modules/ai/client'
 import { AgentRunError, runAgent, type ToolExecutor } from '../../../src/modules/ai/agentLoop'
 import type { ToolCall } from '../../../src/modules/ai/client'
 
@@ -60,5 +60,35 @@ describe('AgentRunError 保留进度', () => {
       expect(err.partialMessages.some((m) => m.role === 'tool')).toBe(true)
       expect(err.message).toContain('502')
     }
+  })
+})
+
+describe('postChat 对 RPM 502 重试', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    CHAT_RETRY.minDelayMs = 400
+  })
+
+  it('上游 max RPM 502 后重试直至成功', async () => {
+    CHAT_RETRY.minDelayMs = 0
+    let n = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        n += 1
+        if (n < 3) {
+          return new Response(
+            JSON.stringify({
+              message: 'request reached organization max RPM: 3, please try again after 1 seconds',
+            }),
+            { status: 502, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return new Response('data: [DONE]\n\n', { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+      }),
+    )
+    const res = await postChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(res.ok).toBe(true)
+    expect(n).toBe(3)
   })
 })

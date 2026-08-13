@@ -322,6 +322,105 @@ describe('AI 工具实现（execTool）', () => {
     }
   })
 
+  it('add_filter_step：接在 Custom Code 产出表之后应成功', async () => {
+    const { analysis } = await seedStore()
+    sealAnalysisRows(analysis)
+    const iris = analysis.tables[0]
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [
+              { field: 'species', dataType: 'string' },
+              { field: 'n', dataType: 'number' },
+            ],
+            rows: [
+              { species: 'setosa', n: 1 },
+              { species: 'setosa', n: 2 },
+              { species: 'versicolor', n: 3 },
+            ],
+          },
+        ],
+        stdout: '',
+        stderr: '',
+      }),
+    })) as unknown as typeof fetch
+    const prev = globalThis.fetch
+    globalThis.fetch = fetchImpl
+    try {
+      const created = await execTool(
+        'add_custom_code_step',
+        {
+          tableId: iris.id,
+          name: '宽表',
+          code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n',
+        },
+        ctx,
+      )
+      expect(created.ok, created.summary).toBe(true)
+      const outId = created.artifact?.tableId
+      expect(outId).toBeTruthy()
+      const filtered = await execTool(
+        'add_filter_step',
+        { tableId: outId, conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+        ctx,
+      )
+      expect(filtered.ok, filtered.summary).toBe(true)
+      expect(filtered.summary).toContain('2 行')
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
+
+  it('add_custom_code_step：上游也是 Custom Code 时应能解析产出表', async () => {
+    const { analysis } = await seedStore()
+    sealAnalysisRows(analysis)
+    const iris = analysis.tables[0]
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [{ field: 'species', dataType: 'string' }],
+            rows: [{ species: 'setosa' }],
+          },
+        ],
+        stdout: '',
+        stderr: '',
+      }),
+    })) as unknown as typeof fetch
+    const prev = globalThis.fetch
+    globalThis.fetch = fetchImpl
+    try {
+      const first = await execTool(
+        'add_custom_code_step',
+        { tableId: iris.id, name: '第一步', code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n' },
+        ctx,
+      )
+      expect(first.ok, first.summary).toBe(true)
+      const second = await execTool(
+        'add_custom_code_step',
+        {
+          tableId: first.artifact?.tableId,
+          name: '第二步',
+          code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n',
+        },
+        ctx,
+      )
+      expect(second.ok, second.summary).toBe(true)
+      expect(second.summary).not.toContain('无法解析上游表')
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
+
   it('未知工具与缺表错误', async () => {
     await seedStore()
     expect((await execTool('nope_tool', {}, ctx)).ok).toBe(false)

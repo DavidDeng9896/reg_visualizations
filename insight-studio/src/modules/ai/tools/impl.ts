@@ -15,6 +15,7 @@ import { validateChartMapping } from '../../charts/registry'
 import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
+import { tableOutputPortName } from '../../steps/registry'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
 import { emptyReport, readReportConfig } from '../../steps/report/reportModel'
 import type { AnalysisReport } from '../../../shared/types'
@@ -273,7 +274,7 @@ function appendStep(opts: {
     const inputs = opts.fromTableIds.map((tid, i) => {
       const up = producingStep(a, tid)
       const port = opts.portNames?.[i] ?? (opts.fromTableIds.length > 1 ? (i === 0 ? 'Left table' : 'Right table') : 'Input dataset')
-      return { port, from: { nodeId: up.id, port: 'Output dataset' } }
+      return { port, from: { nodeId: up.id, port: tableOutputPortName(up.type) } }
     })
     const step: StepNode = {
       id: uuid(),
@@ -634,7 +635,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     const up = producingStep(draft, t.id)
     const step = createStepNode('custom-code', name)
-    step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
+    step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: tableOutputPortName(up.type) } }]
     step.config.code = code
     draft.steps.push(step)
     const result = await runStepAsync(draft, step)
@@ -647,7 +648,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       const realUp = producingStep(a, t.id)
       const real = createStepNode('custom-code', name)
       real.id = step.id
-      real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: 'Output dataset' } }]
+      real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: tableOutputPortName(realUp.type) } }]
       real.config.code = code
       a.steps.push(real)
       // 复用自测产物（表/文件/图）
