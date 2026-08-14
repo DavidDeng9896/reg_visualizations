@@ -23,6 +23,26 @@ def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]:
     raise NotImplementedError("TODO: Return list of IOData")
 `
 
+/** Custom Code 失败时附给 agent 的最小可运行示例。 */
+export const CUSTOM_CODE_IODATA_HINT = `返回必须是 list[IOData]。最小示例：
+from typing import NamedTuple
+import pandas as pd
+class IOData(NamedTuple):
+    name: str
+    data: pd.DataFrame
+def custom_code(inputs, **kwargs):
+    df = pd.DataFrame([{"col": 1}])
+    return [IOData(name="out", data=df)]
+# 也可用 dict：return [{"name": "out", "data": df}]
+Worker 已注入 IOData；data 须为 DataFrame / BytesIO / Figure。`
+
+export function annotateCustomCodeError(msg: string): string {
+  const s = String(msg ?? '')
+  if (!/IOData|must return a list/i.test(s)) return s
+  if (s.includes('最小示例') || s.includes('Example:')) return s
+  return `${s}\n\n${CUSTOM_CODE_IODATA_HINT}`
+}
+
 /** rdkit + plotly 示例（文档/AI 可引用；不作为默认模板以免无 SMILES 列时失败）。 */
 export const CUSTOM_CODE_RDKIT_EXAMPLE = `"""
 Example: count atoms with rdkit and emit a Plotly bar chart.

@@ -42,5 +42,6 @@ describe('taskState', () => {
     const cont = continueTaskSystemMessage(['A', 'B'], [])
     expect(cont).toContain('续跑检查点')
     expect(cont).toContain('1. A')
+    expect(cont).toContain('禁止 create_analysis')
   })
 })

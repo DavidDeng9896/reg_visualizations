@@ -51,7 +51,8 @@ ${doneBlock}剩余（仅做这些）：
 ${list}
 硬性要求：
 1. 禁止再次调用 submit_plan（计划已存在，重置会丢掉进度）。
-2. 已完成步骤的产物若上下文/工具历史中已有，直接复用。
-3. 从未完成的最小 index 继续；每完成一步 mark_step_done(index)。
-4. 禁止过程独白；直接 tool_calls。全部完成后简短总结。`
+2. 禁止 create_analysis（当前分析已打开）；用 list_tables / get_table_schema 复用已有表。
+3. 已完成步骤的产物若上下文/工具历史中已有，直接复用。
+4. 从未完成的最小 index 继续；每完成一步 mark_step_done(index)。
+5. 禁止过程独白；直接 tool_calls。全部完成后简短总结。`
 }

@@ -1,0 +1,11 @@
+audit-snapshots/
+playwright-state.json
+screenshots/r1-t*.png
+screenshots/r2-t*.png
+screenshots/*-t*s.png
+r1-drawer.txt
+r2-drawer.txt
+ui-test-log.jsonl
+capability-live.json
+screenshots/cap-*.png
+

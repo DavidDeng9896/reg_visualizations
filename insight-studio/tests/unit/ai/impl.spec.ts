@@ -322,9 +322,330 @@ describe('AI 工具实现（execTool）', () => {
     }
   })
 
+  it('add_filter_step：接在 Custom Code 产出表之后应成功', async () => {
+    const { analysis } = await seedStore()
+    sealAnalysisRows(analysis)
+    const iris = analysis.tables[0]
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [
+              { field: 'species', dataType: 'string' },
+              { field: 'n', dataType: 'number' },
+            ],
+            rows: [
+              { species: 'setosa', n: 1 },
+              { species: 'setosa', n: 2 },
+              { species: 'versicolor', n: 3 },
+            ],
+          },
+        ],
+        stdout: '',
+        stderr: '',
+      }),
+    })) as unknown as typeof fetch
+    const prev = globalThis.fetch
+    globalThis.fetch = fetchImpl
+    try {
+      const created = await execTool(
+        'add_custom_code_step',
+        {
+          tableId: iris.id,
+          name: '宽表',
+          code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n',
+        },
+        ctx,
+      )
+      expect(created.ok, created.summary).toBe(true)
+      const outId = created.artifact?.tableId
+      expect(outId).toBeTruthy()
+      const filtered = await execTool(
+        'add_filter_step',
+        { tableId: outId, conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+        ctx,
+      )
+      expect(filtered.ok, filtered.summary).toBe(true)
+      expect(filtered.summary).toContain('2 行')
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
+
+  it('add_custom_code_step：上游也是 Custom Code 时应能解析产出表', async () => {
+    const { analysis } = await seedStore()
+    sealAnalysisRows(analysis)
+    const iris = analysis.tables[0]
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [{ field: 'species', dataType: 'string' }],
+            rows: [{ species: 'setosa' }],
+          },
+        ],
+        stdout: '',
+        stderr: '',
+      }),
+    })) as unknown as typeof fetch
+    const prev = globalThis.fetch
+    globalThis.fetch = fetchImpl
+    try {
+      const first = await execTool(
+        'add_custom_code_step',
+        { tableId: iris.id, name: '第一步', code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n' },
+        ctx,
+      )
+      expect(first.ok, first.summary).toBe(true)
+      const second = await execTool(
+        'add_custom_code_step',
+        {
+          tableId: first.artifact?.tableId,
+          name: '第二步',
+          code: 'def custom_code(inputs, **kwargs):\n    return [inputs[0]]\n',
+        },
+        ctx,
+      )
+      expect(second.ok, second.summary).toBe(true)
+      expect(second.summary).not.toContain('无法解析上游表')
+    } finally {
+      globalThis.fetch = prev
+    }
+  })
+
   it('未知工具与缺表错误', async () => {
     await seedStore()
     expect((await execTool('nope_tool', {}, ctx)).ok).toBe(false)
     expect((await execTool('get_table_schema', { tableId: 'missing' }, ctx)).summary).toContain('表不存在')
+  })
+
+  it('create_analysis：当前已打开同名分析则复用', async () => {
+    const { analysis } = await seedStore()
+    const res = await execTool('create_analysis', { name: analysis.name }, ctx)
+    expect(res.ok).toBe(true)
+    expect(res.summary).toContain('不要再 create_analysis')
+    expect(res.artifact?.analysisId).toBe(analysis.id)
+  })
+
+  it('update_custom_code_step：拒绝占位 stepId', async () => {
+    await seedStore()
+    const res = await execTool('update_custom_code_step', { stepId: '待获取', code: 'x = 1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('UUID')
+    expect(res.summary).toContain('待获取')
+  })
+
+  it('add_join_step：按 key 连接两表并写下正确端口', async () => {
+    await seedStore()
+    const left = await execTool('import_csv_text', { tableName: 'left', csv: 'id,v\na,1\nb,2' }, ctx)
+    const right = await execTool('import_csv_text', { tableName: 'right', csv: 'id,label\na,Alpha' }, ctx)
+    expect(left.ok && right.ok).toBe(true)
+    const res = await execTool(
+      'add_join_step',
+      {
+        leftTableId: left.artifact?.tableId,
+        rightTableId: right.artifact?.tableId,
+        joinType: 'left',
+        keys: [{ left: 'id', right: 'id' }],
+      },
+      ctx,
+    )
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toContain('2 行')
+    const live = useAnalysisStore().current!
+    const step = live.steps.find((s) => s.type === 'join')
+    expect(step).toBeTruthy()
+    expect(step!.inputs.map((i) => i.port)).toEqual(['Left table', 'Right table'])
+    expect(step!.inputs.every((i) => i.from.port === 'Output dataset')).toBe(true)
+    const out = live.tables.find((t) => t.id === res.artifact?.tableId)
+    expect(out!.rows).toHaveLength(2)
+    expect(out!.rows[0].label).toBe('Alpha')
+  })
+
+  it('add_union_step：纵向合并结构兼容表', async () => {
+    await seedStore()
+    const a = await execTool('import_csv_text', { tableName: 'u1', csv: 'id,v\na,1' }, ctx)
+    const b = await execTool('import_csv_text', { tableName: 'u2', csv: 'id,v\nb,2' }, ctx)
+    const res = await execTool('add_union_step', { tableIds: [a.artifact?.tableId, b.artifact?.tableId] }, ctx)
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toContain('2 行')
+    const step = useAnalysisStore().current!.steps.find((s) => s.type === 'union')
+    expect(step!.inputs.every((i) => i.port === 'Input tables')).toBe(true)
+  })
+
+  it('add_hide_columns_step：去掉指定列', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.columns.length
+    const res = await execTool('add_hide_columns_step', { tableId: iris.id, columns: ['species'] }, ctx)
+    expect(res.ok, res.summary).toBe(true)
+    const out = analysis.tables.find((t) => t.id === res.artifact?.tableId)
+    expect(out!.columns.map((c) => c.field)).not.toContain('species')
+    expect(out!.columns.length).toBe(before - 1)
+  })
+
+  it('create_report_step + update_report_step', async () => {
+    await seedStore()
+    const created = await execTool(
+      'create_report_step',
+      { name: '亲和力小结', report: { title: 'hlx69', theme: 'research', sections: [] } },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
+    expect(created.artifact?.kind).toBe('report')
+    const stepId = created.artifact?.stepId
+    expect(stepId).toBeTruthy()
+    const updated = await execTool(
+      'update_report_step',
+      { stepId, name: '更新后的报告', report: { title: 'r1 结论', theme: 'research', sections: [{ heading: '达标', body: '23/70' }] } },
+      ctx,
+    )
+    expect(updated.ok, updated.summary).toBe(true)
+    const step = useAnalysisStore().current!.steps.find((s) => s.id === stepId)
+    expect(step!.name).toBe('更新后的报告')
+    expect((step!.config.report as { title?: string })?.title).toBe('r1 结论')
+  })
+
+  it('create_dashboard + add_dashboard_widget', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const dash = await execTool('create_dashboard', { name: 'hlx69 看板' }, ctx)
+    expect(dash.ok, dash.summary).toBe(true)
+    const dashboardId = dash.artifact?.dashboardId
+    expect(dashboardId).toBeTruthy()
+    const widget = await execTool(
+      'add_dashboard_widget',
+      { dashboardId, analysisId: analysis.id, tableId: iris.id },
+      ctx,
+    )
+    expect(widget.ok, widget.summary).toBe(true)
+    expect(widget.artifact?.kind).toBe('dashboard')
+  })
+
+  it('delete_step：需确认，批准后去掉步骤与产出表', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const filtered = await execTool(
+      'add_filter_step',
+      { tableId: iris.id, conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+      ctx,
+    )
+    const stepId = filtered.summary.match(/step id: ([0-9a-f-]+)/)?.[1]
+    expect(stepId).toBeTruthy()
+    const need = await execTool('delete_step', { stepId }, ctx)
+    expect(need.needsConfirmation).toBe(true)
+    expect(analysis.steps.some((s) => s.id === stepId)).toBe(true)
+    const done = await execTool('delete_step', { stepId, __confirmed: true }, ctx)
+    expect(done.ok).toBe(true)
+    expect(analysis.steps.some((s) => s.id === stepId)).toBe(false)
+    expect(analysis.tables.find((t) => t.id === filtered.artifact?.tableId)).toBeUndefined()
+  })
+
+  it('run_step：按 UUID 重跑已有步骤', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const filtered = await execTool(
+      'add_filter_step',
+      { tableId: iris.id, conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+      ctx,
+    )
+    const stepId = filtered.summary.match(/step id: ([0-9a-f-]+)/)?.[1]
+    const rerun = await execTool('run_step', { stepId }, ctx)
+    expect(rerun.ok, rerun.summary).toBe(true)
+    expect(rerun.summary).toContain('已重新执行')
+  })
+
+  it('confirmWrite：写入类工具先挂起确认', async () => {
+    const { analysis } = await seedStore()
+    const writeCtx = { confirmDestructive: true, confirmWrite: true }
+    const need = await execTool(
+      'add_filter_step',
+      { tableId: analysis.tables[0].id, conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }] },
+      writeCtx,
+    )
+    expect(need.needsConfirmation).toBe(true)
+    const done = await execTool(
+      'add_filter_step',
+      {
+        tableId: analysis.tables[0].id,
+        conditions: [{ column: 'species', operator: 'eq', value: 'setosa' }],
+        __confirmed: true,
+      },
+      writeCtx,
+    )
+    expect(done.ok, done.summary).toBe(true)
+  })
+
+  it('csv → filter → join → computed → hide → report：端口可解析', async () => {
+    await seedStore()
+    const left = await execTool('import_csv_text', { tableName: 'hits', csv: 'id,score\n1,10\n2,1\n3,8' }, ctx)
+    const right = await execTool('import_csv_text', { tableName: 'meta', csv: 'id,batch\n1,A\n2,B\n3,A' }, ctx)
+    const filtered = await execTool(
+      'add_filter_step',
+      { tableId: left.artifact?.tableId, conditions: [{ column: 'score', operator: 'gt', value: 5 }] },
+      ctx,
+    )
+    expect(filtered.ok, filtered.summary).toBe(true)
+    const joined = await execTool(
+      'add_join_step',
+      {
+        leftTableId: filtered.artifact?.tableId,
+        rightTableId: right.artifact?.tableId,
+        joinType: 'inner',
+        keys: [{ left: 'id', right: 'id' }],
+      },
+      ctx,
+    )
+    expect(joined.ok, joined.summary).toBe(true)
+    const computed = await execTool(
+      'add_computed_column_step',
+      { tableId: joined.artifact?.tableId, name: 'score2', expression: 'score * 2' },
+      ctx,
+    )
+    expect(computed.ok, computed.summary).toBe(true)
+    const hidden = await execTool(
+      'add_hide_columns_step',
+      { tableId: computed.artifact?.tableId, columns: ['batch'] },
+      ctx,
+    )
+    expect(hidden.ok, hidden.summary).toBe(true)
+    const report = await execTool('create_report_step', { name: '管道报告' }, ctx)
+    expect(report.ok).toBe(true)
+
+    const a = useAnalysisStore().current!
+    const byType = (t: string) => a.steps.find((s) => s.type === t)!
+    expect(byType('filter').inputs[0].from.port).toBe('Output dataset')
+    expect(byType('join').inputs[0].from.port).toBe('Output dataset')
+    expect(byType('computed-column').inputs[0].from.port).toBe('Output dataset')
+    expect(byType('hide-columns').inputs[0].from.port).toBe('Output dataset')
+    const out = a.tables.find((t) => t.id === hidden.artifact?.tableId)
+    expect(out!.rows).toHaveLength(2)
+    expect(out!.columns.map((c) => c.field)).toContain('score2')
+    expect(out!.columns.map((c) => c.field)).not.toContain('batch')
+  })
+
+  it('import_ai_file：md 说明文档拒绝导入并提示勿当表', async () => {
+    await seedStore()
+    const { aiFilesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
+      id: 'file-md-1',
+      name: 'hai-club-data-lifecycle.md',
+      mime: 'text/markdown',
+      sizeBytes: 20,
+      createdAt: new Date().toISOString(),
+      kind: 'text',
+    })
+    const res = await execTool('import_ai_file', { fileId: 'file-md-1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('说明文档')
+    expect(res.summary).toContain('不要 import_ai_file')
   })
 })

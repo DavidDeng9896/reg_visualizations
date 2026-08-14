@@ -1,0 +1,300 @@
+#!/usr/bin/env node
+/**
+ * 短实跑：能力矩阵 C 层。小表、短 prompt，四个子代理各一条（能跑才跑）。
+ * 不点 ai-stop。TPD/配额耗尽时记阻塞并退出 0（A/B 层已覆盖）。
+ */
+import { createRequire } from 'node:module'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const require = createRequire('/workspace/insight-studio/package.json')
+const { chromium } = require('playwright')
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url))
+const OUT = path.join(ROOT, 'capability-live.json')
+const SHOT = path.join(ROOT, 'screenshots')
+fs.mkdirSync(SHOT, { recursive: true })
+
+const ORIGIN = process.env.INSIGHT_ORIGIN || 'http://127.0.0.1:7100'
+
+const results = []
+
+function redact(s) {
+  return String(s ?? '')
+    .replace(/org-[a-z0-9]+/gi, 'org-***')
+    .replace(/proj-[a-z0-9]+/gi, 'proj-***')
+    .replace(/ak-[a-z0-9]+/gi, 'ak-***')
+}
+
+function record(id, status, note, extra = {}) {
+  const row = { ts: new Date().toISOString(), id, status, note: redact(note), ...extra }
+  if (typeof row.preview === 'string') row.preview = redact(row.preview)
+  results.push(row)
+  console.log(`[${status}] ${id}: ${row.note}`)
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+async function snapshotAnalysis(page) {
+  const m = page.url().match(/\/analysis\/([^/?#]+)/)
+  if (!m) return null
+  const res = await fetch(`${ORIGIN}/api/analyses/${m[1]}`)
+  if (!res.ok) return { error: res.status }
+  const doc = await res.json()
+  const tables = (doc.tables || []).map((t) => ({
+    name: t.name,
+    rows: Array.isArray(t.rows) ? t.rows.length : t.rowCount,
+    cols: (t.columns || []).map((c) => c.field || c.name).slice(0, 12),
+    views: (t.views || []).map((v) => `${v.name}:${v.type || v.chart?.chartType || ''}`),
+  }))
+  const steps = (doc.steps || []).map((s) => ({
+    type: s.type,
+    name: s.name,
+    status: s.status,
+    fromPorts: (s.inputs || []).map((i) => (i.from || {}).port),
+  }))
+  return { id: doc.id, name: doc.name, tables, steps }
+}
+
+async function probeQuota() {
+  try {
+    const cfg = await fetch(`${ORIGIN}/api/ai/config`).then((r) => r.json())
+    if (!cfg?.configured) {
+      record('probe', 'skip', 'AI 未配置')
+      return 'unconfigured'
+    }
+    const res = await fetch(`${ORIGIN}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: '只回复一个字：通。不要调用工具。' }],
+        stream: true,
+      }),
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      const kind = /tpd|per day|quota/i.test(text) ? 'quota' : /rpm/i.test(text) ? 'rpm' : 'error'
+      record('probe', kind === 'quota' ? 'blocked' : 'fail', `chat ${res.status}`, { preview: text.slice(0, 400) })
+      return kind
+    }
+    record('probe', 'ok', `model=${cfg.model || '?'}`, { preview: text.slice(0, 200) })
+    return 'ok'
+  } catch (e) {
+    record('probe', 'fail', e instanceof Error ? e.message : String(e))
+    return 'error'
+  }
+}
+
+async function openAi(page) {
+  const drawer = page.getByTestId('ai-drawer')
+  if (await drawer.isVisible().catch(() => false)) return
+  await page.getByTestId('ai-fab').click()
+  await drawer.waitFor({ state: 'visible', timeout: 20_000 })
+}
+
+async function setAllowAll(page) {
+  await page.getByTestId('ai-permission').click()
+  await page.getByTestId('ai-permission-allow').click()
+}
+
+async function idle(page) {
+  return (await page.getByTestId('ai-stop').count()) === 0 && (await page.getByTestId('ai-send').count()) > 0
+}
+
+async function handlePrompts(page) {
+  const confirms = page.getByTestId('ai-trace-confirm')
+  if (await confirms.count()) {
+    await confirms.first().click()
+    return true
+  }
+  const ask = page.getByTestId('ai-ask')
+  if (await ask.count()) {
+    const opt = ask.locator('.ask__opt').first()
+    if (await opt.count()) await opt.click().catch(() => {})
+    const submit = page.getByTestId('ai-ask-submit')
+    if (await submit.isEnabled().catch(() => false)) await submit.click()
+    return true
+  }
+  return false
+}
+
+async function waitIdle(page, maxMs) {
+  const start = Date.now()
+  let continues = 0
+  while (Date.now() - start < maxMs) {
+    await handlePrompts(page)
+    if (await idle(page)) {
+      const cont = page.getByTestId('ai-continue')
+      if ((await cont.count()) && continues < 2) {
+        continues += 1
+        await sleep(20_000)
+        await cont.click()
+        continue
+      }
+      await page.waitForTimeout(2500)
+      if (await idle(page)) return { elapsed: Date.now() - start, continues }
+    }
+    await page.waitForTimeout(1000)
+  }
+  throw new Error(`idle timeout ${maxMs}ms`)
+}
+
+async function drawerText(page) {
+  return (await page.getByTestId('ai-drawer').innerText().catch(() => '')).slice(0, 4000)
+}
+
+async function runScenario(page, spec) {
+  await openAi(page)
+  await page.getByTestId('ai-newconv').click()
+  await page.waitForTimeout(400)
+  await setAllowAll(page)
+  await page.getByTestId('ai-input').fill(spec.prompt)
+  await page.getByTestId('ai-send').click()
+  await page.getByTestId('ai-stop').waitFor({ state: 'visible', timeout: 20_000 })
+  try {
+    const wait = await waitIdle(page, spec.timeoutMs ?? 180_000)
+    const text = await drawerText(page)
+    const blocked = /日配额|TPD|token per day/i.test(text)
+    const tables = await page.getByTestId('sidebar-table').allInnerTexts().catch(() => [])
+    const analysis = await snapshotAnalysis(page).catch((e) => ({ error: String(e) }))
+    await page.screenshot({ path: path.join(SHOT, `cap-${spec.id}.png`) })
+    const blob = JSON.stringify(analysis || {})
+    if (blocked) {
+      record(spec.id, 'blocked', '配额打断', { wait, preview: text.slice(0, 800), tables, analysis })
+      return 'blocked'
+    }
+    const ok = spec.expect.every((re) => re.test(text) || tables.some((t) => re.test(t)) || re.test(blob))
+    record(spec.id, ok ? 'ok' : 'fail', ok ? '断言通过' : '未看到期望产物', {
+      wait,
+      preview: text.slice(0, 800),
+      tables,
+      analysis,
+    })
+    return ok ? 'ok' : 'fail'
+  } catch (e) {
+    const text = await drawerText(page)
+    const tables = await page.getByTestId('sidebar-table').allInnerTexts().catch(() => [])
+    const analysis = await snapshotAnalysis(page).catch((err) => ({ error: String(err) }))
+    await page.screenshot({ path: path.join(SHOT, `cap-${spec.id}-err.png`) }).catch(() => {})
+    const blob = `${text}\n${JSON.stringify(analysis || {})}`
+    const ok = spec.expect.every((re) => re.test(text) || tables.some((t) => re.test(t)) || re.test(blob))
+    if (ok) {
+      record(spec.id, 'ok', `产物已齐（${e instanceof Error ? e.message : String(e)}）`, {
+        preview: text.slice(0, 800),
+        tables,
+        analysis,
+      })
+      return 'ok'
+    }
+    record(spec.id, 'fail', e instanceof Error ? e.message : String(e), { preview: text.slice(0, 800), tables, analysis })
+    return 'fail'
+  }
+}
+
+const ALL_SCENES = {
+  first: [
+    {
+      id: 'filter-chart',
+      prompt:
+        '用 import_csv_text 导入表 demo_hits，CSV 如下：\nid,score\nA,3\nB,8\nC,1\n然后 Filter score>2，再画柱状图（x=id, y=score）。不要 Custom Code，不要新建第二个分析。',
+      expect: [/Filter|过滤|demo_hits|柱/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'join',
+      prompt:
+        '当前分析里用 import_csv_text 建两张表 left(id,v: 1,10 / 2,20) 和 right(id,label: 1,Alpha / 2,Beta)，再 add_join_step inner join on id。不要 Custom Code。',
+      expect: [/Join|合并|left/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'analysis-worker',
+      prompt:
+        '先用 import_csv_text 导入表 iris_tiny：\nspecies,sepal_length\nsetosa,5.1\nsetosa,4.9\nversicolor,7.0\n然后派「分析师」子代理（delegate_analysis_worker）给这张表建 bar 图，x=species，y=sepal_length。不要工程师，不要 Custom Code。',
+      expect: [/分析师|bar|柱|Iris/i],
+      timeoutMs: 240_000,
+    },
+    {
+      id: 'skill-worker',
+      prompt:
+        '派「规划师」子代理（delegate_skill_worker）列出已安装 skill 的要点，用一两句话中文告诉我。不要改表。',
+      expect: [/规划师|skill|没有已安装|要点/i],
+      timeoutMs: 120_000,
+    },
+  ],
+  rest: [
+    {
+      id: 'union',
+      prompt:
+        '用 import_csv_text 建两张结构相同的表 u1 和 u2。\nu1 的 CSV：\nid,v\n1,10\n2,20\nu2 的 CSV：\nid,v\n3,30\n4,40\n然后必须调用 add_union_step 把 u1 与 u2 纵向合并。不要 Custom Code，不要 Join。',
+      expect: [/Union|union|u1/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'hide',
+      prompt:
+        '用 import_csv_text 导入表 wide，CSV：\nid,keep,dropme\n1,A,x\n2,B,y\n然后必须调用 add_hide_columns_step 隐藏 dropme 列。不要 Custom Code。',
+      expect: [/hide|隐藏|Hide|wide/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'report',
+      prompt:
+        '必须调用 create_report_step，节点名「短跑报告」，标题写 capability live。不要改已有表，不要 Custom Code。',
+      expect: [/报告|report/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'dashboard',
+      prompt:
+        '必须调用 create_dashboard 建看板「短跑看板」，若当前分析已有表，再用 add_dashboard_widget 把其中一张表放上去。不要 Custom Code。',
+      expect: [/看板|dashboard/i],
+      timeoutMs: 180_000,
+    },
+  ],
+}
+
+const pack = process.env.LIVE_SCENES === 'rest' ? 'rest' : 'first'
+const SCENES = ALL_SCENES[pack]
+const analysisName = pack === 'rest' ? 'capability-live-rest' : 'capability-live'
+
+const quota = await probeQuota()
+if (quota === 'quota' || quota === 'unconfigured') {
+  fs.writeFileSync(OUT, JSON.stringify({ quota, results }, null, 2))
+  process.exit(0)
+}
+
+await sleep(5_000)
+
+const browser = await chromium.launch({
+  headless: false,
+  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+})
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+page.setDefaultTimeout(20_000)
+
+try {
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.waitForTimeout(2000)
+  await page.getByRole('button', { name: '新建分析' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('textbox').first().fill(analysisName)
+  await dialog.getByRole('button', { name: '创建' }).click()
+  await page.waitForURL(/\/analysis\//)
+  await page.waitForTimeout(1000)
+
+  for (let i = 0; i < SCENES.length; i += 1) {
+    const spec = SCENES[i]
+    const st = await runScenario(page, spec)
+    if (st === 'blocked') break
+    if (i < SCENES.length - 1) await sleep(25_000)
+  }
+} catch (e) {
+  record('runner', 'fail', e instanceof Error ? e.message : String(e))
+} finally {
+  fs.writeFileSync(OUT, JSON.stringify({ quota, results }, null, 2))
+  await browser.close().catch(() => {})
+}

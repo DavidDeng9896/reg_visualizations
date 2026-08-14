@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runAgent, MaxIterError, type AgentEvent, type ToolExecutor } from '../../../src/modules/ai/agentLoop'
 import type { ChatMessage, ChatPayload, ToolCall } from '../../../src/modules/ai/client'
+import { OPENAI_TOOLS } from '../../../src/modules/ai/tools/registry'
 
 /** 造一个 SSE Response：单 chunk 内含完整 tool_calls 或纯文本。 */
 function sseOf(payload: { toolCalls?: ToolCall[]; content?: string }): Response {
@@ -775,5 +776,75 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
       r.messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('停止空转')),
     )
     expect(spun).toBe(true)
+  })
+
+  it('delegate_analysis_worker：分析师落地工具后摘要回灌主循环', async () => {
+    const post = async (p: ChatPayload) => {
+      const isWorker = p.messages.some(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('分析师'),
+      )
+      if (isWorker) {
+        const tools = p.messages.filter((m) => m.role === 'tool')
+        if (!tools.length) return sseOf({ toolCalls: [call('add_join_step', { leftTableId: 'a' }, 'w_join')] })
+        return sseOf({ content: '已 Join 产出表 j1' })
+      }
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) {
+        return sseOf({ toolCalls: [call('delegate_analysis_worker', { goal: '把两表 join 后出图' }, 'd_an')] })
+      }
+      return sseOf({ content: '主循环收工' })
+    }
+    const exec: ToolExecutor = async (c) => {
+      if (c.function.name === 'add_join_step') return { ok: true, summary: '已创建 Join' }
+      return { ok: true, summary: 'x' }
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'join' }],
+      tools: OPENAI_TOOLS,
+      exec,
+      maxIterations: 8,
+      planGate: false,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    const workerResult = messages.find((m) => m.role === 'tool' && m.name === 'delegate_analysis_worker')
+    expect(workerResult?.content).toContain('分析师')
+    expect(workerResult?.content).toContain('Join')
+  })
+
+  it('delegate_code_worker：工程师写 Custom Code 后摘要回灌', async () => {
+    const post = async (p: ChatPayload) => {
+      const isWorker = p.messages.some(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('工程师'),
+      )
+      if (isWorker) {
+        const tools = p.messages.filter((m) => m.role === 'tool')
+        if (!tools.length) {
+          return sseOf({ toolCalls: [call('add_custom_code_step', { tableId: 't' }, 'w_cc')] })
+        }
+        return sseOf({ content: '已写清洗脚本，step id 就绪' })
+      }
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) {
+        return sseOf({ toolCalls: [call('delegate_code_worker', { goal: '清洗 IC50' }, 'd_code')] })
+      }
+      return sseOf({ content: '主循环完成' })
+    }
+    const exec: ToolExecutor = async (c) => {
+      if (c.function.name === 'add_custom_code_step') return { ok: true, summary: '已创建 Custom Code' }
+      return { ok: true, summary: 'x' }
+    }
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'code' }],
+      tools: OPENAI_TOOLS,
+      exec,
+      maxIterations: 8,
+      planGate: false,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    const workerResult = messages.find((m) => m.role === 'tool' && m.name === 'delegate_code_worker')
+    expect(workerResult?.content).toContain('工程师')
+    expect(workerResult?.content).toContain('清洗')
   })
 })

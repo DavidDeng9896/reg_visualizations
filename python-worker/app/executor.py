@@ -23,6 +23,14 @@ class IOData(NamedTuple):
     data: Any
 
 
+IODATA_RETURN_HINT = (
+    "Each output must be an IOData object with name and data. "
+    "Example: return [IOData(name='out', data=df)] "
+    "or return [{'name': 'out', 'data': df}]. "
+    "IOData is injected; data must be a DataFrame, BytesIO, or Figure."
+)
+
+
 class _TimeoutError(Exception):
     pass
 
@@ -106,6 +114,8 @@ def _serialize_output(item: IOData) -> dict:
 def _is_iodata_like(obj: Any) -> bool:
     if isinstance(obj, IOData):
         return True
+    if isinstance(obj, dict):
+        return "name" in obj and "data" in obj
     if isinstance(obj, tuple) and len(obj) == 2:
         return True
     name = getattr(obj, "name", None)
@@ -116,6 +126,8 @@ def _is_iodata_like(obj: Any) -> bool:
 def _normalize_iodata(obj: Any) -> IOData:
     if isinstance(obj, IOData):
         return obj
+    if isinstance(obj, dict):
+        return IOData(name=obj["name"], data=obj["data"])
     if isinstance(obj, tuple) and len(obj) == 2:
         return IOData(name=obj[0], data=obj[1])
     return IOData(name=obj.name, data=obj.data)
@@ -224,7 +236,7 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
 
             if not isinstance(outputs, list):
                 return _error_result(
-                    "custom_code must return a list of IOData objects",
+                    "custom_code must return a list of IOData objects. " + IODATA_RETURN_HINT,
                     stdout=stdout_buffer.getvalue(),
                     stderr=stderr_buffer.getvalue(),
                 )
@@ -233,7 +245,7 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
             for item in outputs:
                 if not _is_iodata_like(item):
                     return _error_result(
-                        "Each output must be an IOData object with name and data",
+                        IODATA_RETURN_HINT,
                         stdout=stdout_buffer.getvalue(),
                         stderr=stderr_buffer.getvalue(),
                     )

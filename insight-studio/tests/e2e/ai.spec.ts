@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createDemoAndEnter, viewNode } from './helpers'
+import { createDemoAndEnter, openFlowchart, viewNode } from './helpers'
 
 /**
  * AI 助手全链路 e2e：不依赖真实大模型——
@@ -134,8 +134,12 @@ function mockSseAsk(messages: Msg[]): string {
   }
 }
 
+type ChatScriptOut =
+  | string
+  | { status?: number; json?: Record<string, unknown>; sse?: string; delayMs?: number }
+
 /** 注册 config/chat 拦截（chat 走给定编排）。 */
-async function mockAi(page: import('@playwright/test').Page, script: (messages: Msg[]) => string): Promise<void> {
+async function mockAi(page: import('@playwright/test').Page, script: (messages: Msg[]) => ChatScriptOut): Promise<void> {
   await page.route('**/api/ai/config', (route) => {
     if (route.request().method() !== 'GET') return route.continue()
     return route.fulfill({
@@ -144,12 +148,172 @@ async function mockAi(page: import('@playwright/test').Page, script: (messages: 
   })
   await page.route('**/api/ai/chat', async (route) => {
     const body = route.request().postDataJSON() as { messages?: Msg[] }
-    await route.fulfill({
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
-      body: script(body.messages ?? []),
-    })
+    const out = script(body.messages ?? [])
+    if (typeof out === 'string') {
+      return route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+        body: out,
+      })
+    }
+    if (out.delayMs) await new Promise((r) => setTimeout(r, out.delayMs))
+    if (out.sse) {
+      return route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+        body: out.sse,
+      })
+    }
+    return route.fulfill({ status: out.status ?? 500, json: out.json ?? { error: 'mock error' } })
   })
+}
+
+function toolContent(messages: Msg[], name: string): string {
+  const hits = messages.filter((m) => m.role === 'tool' && m.name === name)
+  return String(hits[hits.length - 1]?.content ?? '')
+}
+
+function extractRe(text: string, re: RegExp, label: string): string {
+  const hit = text.match(re)
+  if (!hit?.[1]) throw new Error(`mock 未找到 ${label}：${text.slice(0, 200)}`)
+  return hit[1]
+}
+
+function isResume(messages: Msg[]): boolean {
+  return messages.some((m) => m.role === 'system' && String(m.content ?? '').includes('【续跑检查点】'))
+}
+
+/** 多节点管道：两表导入 → filter → join → computed → hide → report → 图 → 看板。 */
+function mockSsePipeline(messages: Msg[]): string {
+  const tools = messages.filter((m) => m.role === 'tool')
+  const round = tools.length + 1
+  switch (round) {
+    case 1:
+      return sseOf({
+        toolCalls: [toolCall('submit_plan', { steps: ['导入并过滤', 'Join 与派生列', '报告与出图', '放到看板'] })],
+      })
+    case 2:
+      return sseOf({
+        toolCalls: [toolCall('import_csv_text', { tableName: 'hits', csv: 'id,score\n1,10\n2,1\n3,8' })],
+      })
+    case 3:
+      return sseOf({
+        toolCalls: [toolCall('import_csv_text', { tableName: 'meta', csv: 'id,batch\n1,A\n2,B\n3,A' })],
+      })
+    case 4:
+      return sseOf({ toolCalls: [toolCall('list_tables', {})] })
+    case 5:
+      return sseOf({
+        toolCalls: [
+          toolCall('add_filter_step', {
+            tableId: extractTableId(messages, 'hits'),
+            conditions: [{ column: 'score', operator: 'gt', value: 5 }],
+          }),
+        ],
+      })
+    case 6:
+      return sseOf({
+        toolCalls: [
+          toolCall('add_join_step', {
+            leftTableId: extractRe(toolContent(messages, 'add_filter_step'), /产出表 id: ([0-9a-f-]+)/, 'filter 表'),
+            rightTableId: extractTableId(messages, 'meta'),
+            joinType: 'inner',
+            keys: [{ left: 'id', right: 'id' }],
+          }),
+        ],
+      })
+    case 7:
+      return sseOf({
+        toolCalls: [
+          toolCall('add_computed_column_step', {
+            tableId: extractRe(toolContent(messages, 'add_join_step'), /产出表 id: ([0-9a-f-]+)/, 'join 表'),
+            name: 'score2',
+            expression: 'score * 2',
+          }),
+        ],
+      })
+    case 8:
+      return sseOf({
+        toolCalls: [
+          toolCall('add_hide_columns_step', {
+            tableId: extractRe(toolContent(messages, 'add_computed_column_step'), /产出表 id: ([0-9a-f-]+)/, 'computed 表'),
+            columns: ['batch'],
+          }),
+        ],
+      })
+    case 9:
+      return sseOf({ toolCalls: [toolCall('create_report_step', { name: '管道报告' })] })
+    case 10:
+      return sseOf({
+        toolCalls: [
+          toolCall('create_view', {
+            tableId: extractRe(toolContent(messages, 'add_hide_columns_step'), /产出表 id: ([0-9a-f-]+)/, 'hide 表'),
+            type: 'bar',
+            name: '管道柱状',
+          }),
+        ],
+      })
+    case 11:
+      return sseOf({
+        toolCalls: [
+          toolCall('set_chart_config', {
+            viewId: extractViewId(messages),
+            configure: { x: { field: 'id' }, y: { field: 'score', aggregation: 'sum' } },
+          }),
+        ],
+      })
+    case 12:
+      return sseOf({ toolCalls: [toolCall('create_dashboard', { name: '管道看板' })] })
+    case 13:
+      return sseOf({
+        toolCalls: [
+          toolCall('add_dashboard_widget', {
+            dashboardId: extractRe(toolContent(messages, 'create_dashboard'), /id: ([0-9a-f-]+)/, '看板 id'),
+            analysisId: 'current',
+            tableId: extractRe(toolContent(messages, 'add_hide_columns_step'), /产出表 id: ([0-9a-f-]+)/, 'hide 表'),
+            viewId: extractViewId(messages),
+          }),
+        ],
+      })
+    case 14:
+      return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 0 })] })
+    case 15:
+      return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 1 })] })
+    case 16:
+      return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 2 })] })
+    case 17:
+      return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 3 })] })
+    default:
+      return sseOf({
+        content: '管道已完成：过滤、Join、派生列、报告、柱状图与看板均已落地。',
+      })
+  }
+}
+
+/** 计划后模拟日配额耗尽；续跑则收尾。 */
+function mockSseQuotaThenContinue(messages: Msg[]): ChatScriptOut {
+  if (isResume(messages)) {
+    const resumeAt = messages.reduce((idx, m, i) =>
+      m.role === 'system' && String(m.content ?? '').includes('【续跑检查点】') ? i : idx, -1)
+    const after = messages.slice(resumeAt + 1).filter((m) => m.role === 'tool').length
+    if (after === 0) return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 0 })] })
+    if (after === 1) return sseOf({ toolCalls: [toolCall('mark_step_done', { index: 1 })] })
+    return sseOf({ content: '已从检查点续跑完成。' })
+  }
+  const round = messages.filter((m) => m.role === 'tool').length + 1
+  if (round === 1) return sseOf({ toolCalls: [toolCall('submit_plan', { steps: ['看表', '收尾'] })] })
+  if (round === 2) return sseOf({ toolCalls: [toolCall('list_tables', {})] })
+  return { status: 502, json: { error: 'token per day limit reached: current: 1509374, limit: 1500000' } }
+}
+
+/** 计划提交后卡住第二轮，供测试点中止；续跑收尾。 */
+function mockSseAbortThenContinue(messages: Msg[]): ChatScriptOut {
+  if (isResume(messages)) {
+    return sseOf({ content: '中止后续跑已完成。' })
+  }
+  const round = messages.filter((m) => m.role === 'tool').length + 1
+  if (round === 1) return sseOf({ toolCalls: [toolCall('submit_plan', { steps: ['看表', '出图'] })] })
+  return { delayMs: 8_000, sse: sseOf({ toolCalls: [toolCall('list_tables', {})] }) }
 }
 
 test.describe('AI 助手（mock SSE 回放）', () => {
@@ -198,7 +362,7 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await expect(chartCard).toBeVisible({ timeout: 15_000 })
     await chartCard.click()
     await expect(page).toHaveURL(/viewId=/)
-    await expect(page.getByTestId('ai-drawer')).toHaveCount(0)
+    await expect(page.getByTestId('ai-drawer')).toBeHidden()
 
     // 工作区真实生效：侧栏出现新视图节点
     await expect(viewNode(page, 'AI 散点分析')).toBeVisible()
@@ -217,8 +381,9 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 待确认块折叠状态也外露，表未被删
     const confirmBtn = page.getByTestId('ai-trace-confirm')
     await expect(confirmBtn).toBeVisible()
-    await expect(page.locator('.trace__pending')).toContainText('需要你的批准')
-    await expect(page.locator('.trace__pending')).toContainText('删除表「Iris measurements」')
+    const pending = page.getByTestId('ai-pending-actions')
+    await expect(pending).toContainText('需要你的批准')
+    await expect(pending).toContainText('删除表「Iris measurements」')
     await expect(page.getByTestId('sidebar-table').filter({ hasText: 'Iris measurements' })).toBeVisible()
 
     // 确认执行 → 表真实删除，且同一会话自动续跑给出总结
@@ -255,8 +420,66 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     // 单选后提交 → 已答态 + 循环续轮收尾
     await ask.locator('.ask__opt', { hasText: '按 species 分组' }).click()
     await page.getByTestId('ai-ask-submit').click()
-    await expect(ask).toContainText('已提交回答')
-    await expect(ask).toContainText('按 species 分组')
+    await expect(page.getByTestId('ai-pending-actions')).toHaveCount(0)
+    await expect(page.getByTestId('ai-messages')).toContainText('按 species 分组')
     await expect(page.getByTestId('ai-messages')).toContainText('收到，按你的选择继续配置图表')
+  })
+
+  test('对话驱动多节点管道：Filter/Join/派生列/报告/图/看板落到流程图', async ({ page }) => {
+    test.setTimeout(120_000)
+    await mockAi(page, mockSsePipeline)
+    await createDemoAndEnter(page)
+    await page.getByTestId('ai-fab').click()
+    await page.getByTestId('ai-input').fill('把 hits 与 meta 做成过滤+Join 管道并出图放到看板')
+    await page.getByTestId('ai-send').click()
+
+    await expect(page.getByTestId('ai-plan').locator('.plan__step--done')).toHaveCount(4, { timeout: 60_000 })
+    await expect(page.getByTestId('ai-messages')).toContainText('管道已完成')
+    await expect(page.getByTestId('ai-artifact').filter({ hasText: '管道报告' })).toBeVisible()
+    await expect(page.getByTestId('ai-artifact').filter({ hasText: '管道看板' })).toBeVisible()
+    await expect(page.getByTestId('sidebar-table').filter({ hasText: 'hits' })).toBeVisible()
+
+    await page.getByTestId('ai-drawer').getByRole('button', { name: '关闭' }).click()
+    await openFlowchart(page)
+    await expect(page.locator('.vue-flow__node').filter({ hasText: /Filter table/i })).toBeVisible()
+    await expect(page.locator('.vue-flow__node').filter({ hasText: /Join tables/i })).toBeVisible()
+    await expect(page.locator('.vue-flow__node').filter({ hasText: /Computed column/i })).toBeVisible()
+    await expect(page.locator('.vue-flow__node').filter({ hasText: /Hide columns/i })).toBeVisible()
+    await expect(page.locator('.vue-flow__node').filter({ hasText: /管道报告/ })).toBeVisible()
+    expect(await page.locator('.vue-flow__edge').count()).toBeGreaterThanOrEqual(4)
+  })
+
+  test('日配额失败结束 running，继续任务从检查点收尾', async ({ page }) => {
+    await mockAi(page, mockSseQuotaThenContinue)
+    await createDemoAndEnter(page)
+    await page.getByTestId('ai-fab').click()
+    await page.getByTestId('ai-input').fill('先看表再收尾')
+    await page.getByTestId('ai-send').click()
+
+    await expect(page.getByTestId('ai-error')).toContainText('日配额', { timeout: 20_000 })
+    await expect(page.getByTestId('ai-continue')).toBeVisible()
+    await expect(page.getByTestId('ai-stop')).toHaveCount(0)
+
+    await page.getByTestId('ai-continue').click()
+    await expect(page.getByTestId('ai-messages')).toContainText('已从检查点续跑完成', { timeout: 20_000 })
+    await expect(page.getByTestId('ai-continue')).toHaveCount(0)
+  })
+
+  test('中止后保留继续任务，点续跑能收尾', async ({ page }) => {
+    await mockAi(page, mockSseAbortThenContinue)
+    await createDemoAndEnter(page)
+    await page.getByTestId('ai-fab').click()
+    await page.getByTestId('ai-input').fill('看表再出图')
+    await page.getByTestId('ai-send').click()
+
+    await expect(page.getByTestId('ai-plan')).toBeVisible()
+    await expect(page.getByTestId('ai-stop')).toBeVisible()
+    await page.getByTestId('ai-stop').click()
+
+    await expect(page.getByTestId('ai-error')).toContainText('已中止')
+    await expect(page.getByTestId('ai-continue')).toBeVisible()
+
+    await page.getByTestId('ai-continue').click()
+    await expect(page.getByTestId('ai-messages')).toContainText('中止后续跑已完成', { timeout: 20_000 })
   })
 })

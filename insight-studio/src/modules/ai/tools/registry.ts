@@ -54,7 +54,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'create_analysis',
-    description: '创建一个新分析并打开它。',
+    description:
+      '创建一个新分析并打开它。若已存在同名分析或当前已打开该分析，会复用已有项目而不会再新建。续跑时禁止调用。',
     parameters: {
       type: 'object',
       properties: { name: str('分析名称'), project: str('项目代码（可选）'), department: str('部门 id（可选）') },
@@ -69,7 +70,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'import_ai_file',
     description:
-      '将对话附件（fileId）导入为当前分析的表。支持 csv / excel；Excel 可指定 sheetNames（多表则每个工作表一张分析表）。用户上传了附件时必须用本工具，不要让用户再粘贴 CSV。',
+      '将对话附件（fileId）导入为当前分析的表。仅支持 csv / excel。text/md/pdf 是说明文档，禁止导入。Excel 可指定 sheetNames。',
     parameters: {
       type: 'object',
       properties: {
@@ -146,7 +147,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_custom_code_step',
-    description: '添加 Python Custom Code 步骤（list[IOData] 契约）。tableId 为上游表；可选 code（完整脚本，须含 custom_code）与 name。创建后立即执行。',
+    description:
+      '添加 Python Custom Code 步骤。tableId 为上游表；code 须含 custom_code 并 return list[IOData] 或 [{"name","data"}]。创建后立即执行。',
     parameters: {
       type: 'object',
       properties: { tableId: str('上游表 id'), code: str('Python 脚本（可选）'), name: str('步骤名（可选）') },
@@ -186,7 +188,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'update_custom_code_step',
-    description: '更新 Custom Code 步骤的 code/name 并重新执行。',
+    description: '更新 Custom Code 步骤的 code/name 并重新执行。stepId 必须是 UUID（来自 add_custom_code_step 回执），禁止「待获取」。',
     parameters: {
       type: 'object',
       properties: { stepId: str('步骤 id'), code: str('Python 脚本（可选）'), name: str('步骤名（可选）') },

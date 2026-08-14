@@ -284,6 +284,26 @@ export function getStepDef(type: StepType): StepDef {
   return def
 }
 
+const TABLE_OUTPUT_ALIASES = new Set(['Output dataset', 'Output datasets'])
+
+/** 步骤产出表所用的输出端口名（Custom Code 为 Output datasets，其余多为 Output dataset）。 */
+export function tableOutputPortName(type: StepType): string {
+  const tables = getStepDef(type).outputs.filter((o) => o.type === 'table')
+  return tables[0]?.name ?? 'Output dataset'
+}
+
+/** 解析 table 输出端口：精确名 → 单复数别名 → 唯一一张表端口。 */
+export function resolveTableOutputPort(type: StepType, port: string): string | null {
+  const tables = getStepDef(type).outputs.filter((o) => o.type === 'table')
+  if (!tables.length) return null
+  if (tables.some((o) => o.name === port)) return port
+  if (TABLE_OUTPUT_ALIASES.has(port)) {
+    const aliased = tables.find((o) => TABLE_OUTPUT_ALIASES.has(o.name))
+    if (aliased) return aliased.name
+  }
+  return tables.length === 1 ? tables[0]!.name : null
+}
+
 export function listStepDefs(): StepDef[] {
   return STEP_DEFS.slice()
 }

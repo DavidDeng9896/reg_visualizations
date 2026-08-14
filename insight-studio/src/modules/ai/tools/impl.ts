@@ -15,7 +15,8 @@ import { validateChartMapping } from '../../charts/registry'
 import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
-import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../steps/customCodeTemplate'
+import { tableOutputPortName } from '../../steps/registry'
+import { CUSTOM_CODE_DEFAULT_TEMPLATE, annotateCustomCodeError } from '../../steps/customCodeTemplate'
 import { emptyReport, readReportConfig } from '../../steps/report/reportModel'
 import type { AnalysisReport } from '../../../shared/types'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
@@ -70,6 +71,22 @@ function needConfirm(action: string): ToolExecResult {
     needsConfirmation: true,
     summary: `NEEDS_CONFIRMATION: ${action}。界面已出现确认按钮；会话会挂起等待用户批准，批准后自动继续，不要重试该危险操作。`,
   }
+}
+
+const STEP_ID_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function parseStepId(raw: unknown): { ok: true; id: string } | { ok: false; result: ToolExecResult } {
+  const id = String(raw ?? '').trim()
+  if (!id) {
+    return { ok: false, result: fail('缺少 stepId（须为工具回执中的 UUID）。禁止填「待获取」等占位。') }
+  }
+  if (/待获取|placeholder|tbd|^todo$/i.test(id) || !STEP_ID_UUID.test(id)) {
+    return {
+      ok: false,
+      result: fail(`stepId 必须是 UUID，收到「${id}」。请使用 add_* 回执中的 step id，禁止占位符。`),
+    }
+  }
+  return { ok: true, id }
 }
 
 function store() {
@@ -273,7 +290,7 @@ function appendStep(opts: {
     const inputs = opts.fromTableIds.map((tid, i) => {
       const up = producingStep(a, tid)
       const port = opts.portNames?.[i] ?? (opts.fromTableIds.length > 1 ? (i === 0 ? 'Left table' : 'Right table') : 'Input dataset')
-      return { port, from: { nodeId: up.id, port: 'Output dataset' } }
+      return { port, from: { nodeId: up.id, port: tableOutputPortName(up.type) } }
     })
     const step: StepNode = {
       id: uuid(),
@@ -436,6 +453,22 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   async create_analysis(args) {
     const name = String(args.name ?? '').trim()
     if (!name) return fail('name 不能为空')
+    const current = store().current
+    if (current && current.name.trim() === name) {
+      return ok(
+        `当前已打开同名分析「${name}」（id: ${current.id}）。请 list_tables 复用已有表，不要再 create_analysis。`,
+        artifactOf('analysis', name, { analysisId: current.id }),
+      )
+    }
+    const list = await analysisRepository.list()
+    const hit = list.find((a) => a.name.trim() === name)
+    if (hit) {
+      await store().load(hit.id)
+      return ok(
+        `已存在同名分析「${name}」（id: ${hit.id}），已打开。续跑请复用此分析与已有表，禁止再创建一个同名项目。`,
+        artifactOf('analysis', name, { analysisId: hit.id }),
+      )
+    }
     const a = createEmptyAnalysis(name, {
       project: typeof args.project === 'string' ? args.project : undefined,
       department: typeof args.department === 'string' ? args.department : undefined,
@@ -510,6 +543,11 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       return fail(e instanceof Error ? e.message : '附件不存在或无法读取')
     }
     if (meta.kind !== 'csv' && meta.kind !== 'excel') {
+      if (meta.kind === 'text' || /\.(md|txt|markdown)$/i.test(meta.name)) {
+        return fail(
+          `附件「${meta.name}」是说明文档（kind=${meta.kind}），内容已在对话上下文中，不要 import_ai_file。请用 Custom Code 或 import_csv_text 生成数据表。`,
+        )
+      }
       return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）`)
     }
     const tableName =
@@ -634,12 +672,12 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     const up = producingStep(draft, t.id)
     const step = createStepNode('custom-code', name)
-    step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: 'Output dataset' } }]
+    step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: tableOutputPortName(up.type) } }]
     step.config.code = code
     draft.steps.push(step)
     const result = await runStepAsync(draft, step)
     if (result.status !== 'configured') {
-      return fail(result.error ?? 'Custom Code 自测失败，未写入画布')
+      return fail(annotateCustomCodeError(result.error ?? 'Custom Code 自测失败，未写入画布'))
     }
 
     let outTableId = ''
@@ -647,7 +685,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       const realUp = producingStep(a, t.id)
       const real = createStepNode('custom-code', name)
       real.id = step.id
-      real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: 'Output dataset' } }]
+      real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: tableOutputPortName(realUp.type) } }]
       real.config.code = code
       a.steps.push(real)
       // 复用自测产物（表/文件/图）
@@ -664,7 +702,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   async update_custom_code_step(args) {
     const a = requireAnalysis()
-    const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
+    const parsed = parseStepId(args.stepId)
+    if (!parsed.ok) return parsed.result
+    const step = a.steps.find((s) => s.id === parsed.id)
     if (!step || step.type !== 'custom-code') return fail('Custom Code 步骤不存在')
     const prevCode = String(step.config.code ?? '')
     const prevName = step.name
@@ -678,7 +718,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     draftStep.name = nextName
     const result = await runStepAsync(draft, draftStep)
     if (result.status !== 'configured') {
-      return fail(result.error ?? '执行失败，画布未改动')
+      return fail(annotateCustomCodeError(result.error ?? '执行失败，画布未改动'))
     }
 
     store().mutate((analysis) => {
@@ -711,7 +751,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   update_report_step(args) {
-    const stepId = String(args.stepId ?? '')
+    const parsed = parseStepId(args.stepId)
+    if (!parsed.ok) return parsed.result
+    const stepId = parsed.id
     const a = requireAnalysis()
     const step = a.steps.find((s) => s.id === stepId)
     if (!step || step.type !== 'report') return fail('报告步骤不存在')
@@ -733,8 +775,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   async run_step(args) {
     const a = requireAnalysis()
-    const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
-    if (!step) return fail(`步骤不存在：${String(args.stepId ?? '')}`)
+    const parsed = parseStepId(args.stepId)
+    if (!parsed.ok) return parsed.result
+    const step = a.steps.find((s) => s.id === parsed.id)
+    if (!step) return fail(`步骤不存在：${parsed.id}`)
     const target = requireAnalysis().steps.find((s) => s.id === step.id)
     if (!target) return fail('步骤不存在')
     await runStepAsync(requireAnalysis(), target)
@@ -755,7 +799,11 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   async refresh_sql_source(args) {
     const a = requireAnalysis()
     let stepId = String(args.stepId ?? '').trim()
-    if (!stepId) {
+    if (stepId) {
+      const parsed = parseStepId(stepId)
+      if (!parsed.ok) return parsed.result
+      stepId = parsed.id
+    } else {
       const sqlSteps = a.steps.filter((s) => s.type === 'query-sql')
       if (sqlSteps.length === 0) return fail('当前分析没有 query-sql 数据源步骤')
       if (sqlSteps.length > 1) {
@@ -902,7 +950,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   delete_step(args, ctx) {
     const a = requireAnalysis()
-    const step = a.steps.find((s) => s.id === String(args.stepId ?? ''))
+    const parsed = parseStepId(args.stepId)
+    if (!parsed.ok) return parsed.result
+    const step = a.steps.find((s) => s.id === parsed.id)
     if (!step) return fail('步骤不存在')
     if (ctx.confirmDestructive && args.__confirmed !== true) {
       return needConfirm(`删除步骤「${step.name}」及其产出表`)

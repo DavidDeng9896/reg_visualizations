@@ -3,9 +3,29 @@ import {
   workerOnlyExplored,
   WORKER_SPECS,
   extractParentContextForWorker,
+  runDelegateWorker,
 } from '../../../src/modules/ai/tools/workers'
-import type { ChatMessage } from '../../../src/modules/ai/client'
+import type { ChatMessage, ChatPayload, ToolCall } from '../../../src/modules/ai/client'
 import { CONTEXT_HEADER } from '../../../src/modules/ai/prompts'
+import { OPENAI_TOOLS } from '../../../src/modules/ai/tools/registry'
+
+function sseOf(payload: { toolCalls?: ToolCall[]; content?: string }): Response {
+  const delta: Record<string, unknown> = { role: 'assistant' }
+  if (payload.toolCalls) delta.tool_calls = payload.toolCalls.map((c, i) => ({ index: i, ...c }))
+  if (payload.content) delta.content = payload.content
+  const body = `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\ndata: [DONE]\n\n`
+  return new Response(
+    new ReadableStream({
+      start: (c) => {
+        c.enqueue(new TextEncoder().encode(body))
+        c.close()
+      },
+    }),
+  )
+}
+function call(name: string, args: Record<string, unknown>, id = `call_${name}`): ToolCall {
+  return { id, type: 'function', function: { name, arguments: JSON.stringify(args) } }
+}
 
 describe('workerOnlyExplored', () => {
   it('无工具视为仅探路', () => {
@@ -56,5 +76,73 @@ describe('extractParentContextForWorker', () => {
     expect(ctx).toContain('get_table_schema')
     expect(ctx).toContain('field=天数')
     expect(ctx).not.toContain('旧分析师摘要')
+  })
+})
+
+describe('runDelegateWorker 工具过滤', () => {
+  it('分析师请求里没有删除工具，且能落地 filter', async () => {
+    const seen: string[][] = []
+    const post = async (p: ChatPayload) => {
+      seen.push((p.tools ?? []).map((t) => (t as { function: { name: string } }).function.name))
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) return sseOf({ toolCalls: [call('add_filter_step', { tableId: 't1' })] })
+      return sseOf({ content: '已过滤 setosa' })
+    }
+    const res = await runDelegateWorker({
+      workerName: 'delegate_analysis_worker',
+      goal: '过滤 iris',
+      parentTools: OPENAI_TOOLS,
+      parent: {
+        exec: async () => ({ ok: true, summary: '已创建过滤步骤' }),
+        postChatFn: post,
+      },
+    })
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toContain('分析师')
+    expect(seen[0]).toContain('add_join_step')
+    expect(seen[0]).not.toContain('delete_table')
+    expect(seen[0]).not.toContain('delegate_code_worker')
+  })
+
+  it('MCP 专家无 mcp 工具时直接失败', async () => {
+    const res = await runDelegateWorker({
+      workerName: 'delegate_mcp_worker',
+      goal: '查外部系统',
+      parentTools: OPENAI_TOOLS,
+      parent: {
+        exec: async () => ({ ok: true, summary: 'x' }),
+        postChatFn: async () => sseOf({ content: '不应发请求' }),
+      },
+    })
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('无可用 MCP')
+  })
+
+  it('MCP 专家只看到 mcp_* 并调用后摘要回灌', async () => {
+    const seen: string[][] = []
+    const mcpTools = [
+      {
+        type: 'function' as const,
+        function: { name: 'mcp_search', description: 'search', parameters: { type: 'object', properties: {} } },
+      },
+    ]
+    const post = async (p: ChatPayload) => {
+      seen.push((p.tools ?? []).map((t) => (t as { function: { name: string } }).function.name))
+      const n = p.messages.filter((m) => m.role === 'tool').length
+      if (n === 0) return sseOf({ toolCalls: [call('mcp_search', { q: 'x' })] })
+      return sseOf({ content: '查到 2 条' })
+    }
+    const res = await runDelegateWorker({
+      workerName: 'delegate_mcp_worker',
+      goal: '搜索',
+      parentTools: [...OPENAI_TOOLS, ...mcpTools],
+      parent: {
+        exec: async () => ({ ok: true, summary: 'hits' }),
+        postChatFn: post,
+      },
+    })
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toContain('MCP 专家')
+    expect(seen[0]).toEqual(['mcp_search'])
   })
 })

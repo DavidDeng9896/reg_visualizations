@@ -1,6 +1,6 @@
 import type { Analysis, AnalysisTable, StepNode } from '../../../shared/types'
 import { findTable } from '../../../shared/tree'
-import { getStepDef } from '../registry'
+import { getStepDef, resolveTableOutputPort } from '../registry'
 import type { StepExecCtx, StepExecResult, StepPreviewResult } from './types'
 import { execComputedColumn, previewComputedColumn } from './computedColumn'
 import { execFilter, previewFilter } from './filter'
@@ -57,8 +57,10 @@ export function resolveStepInputs(analysis: Analysis, step: StepNode): Record<st
 function findOutputTable(analysis: Analysis, nodeId: string, port: string): AnalysisTable | null {
   const step = analysis.steps.find((s) => s.id === nodeId)
   if (!step) return null
+  const resolved = resolveTableOutputPort(step.type, port)
+  if (!resolved) return null
   const def = getStepDef(step.type)
-  const portDef = def.outputs.find((o) => o.name === port)
+  const portDef = def.outputs.find((o) => o.name === resolved)
   if (!portDef || portDef.type !== 'table') return null
   const tableId = step.output.tables[0]
   if (!tableId) return null

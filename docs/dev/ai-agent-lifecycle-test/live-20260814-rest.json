@@ -1,0 +1,37 @@
+{
+  "date": "2026-08-14",
+  "model": "kimi-k2.6",
+  "analysisId": "1b7064af-a8e7-4347-bdd1-68b561d8f45c",
+  "analysisName": "capability-live-rest",
+  "probe": "ok",
+  "scenes": [
+    {
+      "id": "union",
+      "driver": "ok",
+      "product": "ok",
+      "note": "u1+u2 各 2 行 → add_union_step → Union tables 4 行 id,v。",
+      "elapsedMs": 129087
+    },
+    {
+      "id": "hide",
+      "driver": "ok",
+      "product": "ok",
+      "note": "wide(id,keep,dropme) → add_hide_columns_step 去掉 dropme → Hide columns 仅 id,keep。",
+      "elapsedMs": 145307
+    },
+    {
+      "id": "report",
+      "driver": "ok",
+      "product": "ok",
+      "note": "create_report_step 节点「短跑报告」，标题 capability live。",
+      "elapsedMs": 94004
+    },
+    {
+      "id": "dashboard",
+      "driver": "ok",
+      "product": "ok",
+      "note": "create_dashboard「短跑看板」+ add_dashboard_widget 放入 Union tables。",
+      "elapsedMs": 88944
+    }
+  ]
+}
