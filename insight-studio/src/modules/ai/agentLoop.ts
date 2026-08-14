@@ -17,6 +17,13 @@ import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
 import { isNearDuplicate, isProcessMonologue, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 
+/** 让出到下一个宏任务，使 Vue 能绘制 tool_call 的进行中态后再执行工具。 */
+export function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
 /** 工具执行结果。 */
 export interface ToolExecResult {
   ok: boolean
@@ -42,7 +49,7 @@ export type AgentEvent =
   | { type: 'token'; text: string }
   | { type: 'reasoning'; text: string }
   | { type: 'round'; n: number }
-  | { type: 'tool_call'; call: ToolCall }
+  | { type: 'tool_call'; call: ToolCall; running?: boolean }
   | { type: 'tool_result'; id: string; name: string; ok: boolean; summary: string; artifact?: import('./types').Artifact; needsConfirmation?: boolean }
   | { type: 'ask'; id: string; question: string; options: string[]; allowOther: boolean }
   | { type: 'plan'; steps: string[] }
@@ -344,12 +351,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       messages[messages.length - 1] = scrubbed
     }
 
+    // 本轮工具先全部挂上轨迹（queued），再逐条标 running 并让出一帧给 UI。
+    // 否则 tool_call + 同步 exec 落在同一轮 microtask，浏览器来不及绘制进行中态。
+    for (const call of calls) {
+      call.function.arguments = normalizeToolArguments(call.function.arguments, call.function.name)
+      onEvent({ type: 'tool_call', call, running: false })
+    }
+    await yieldToUi()
+
     for (const call of calls) {
       throwIfAborted()
       const name = call.function.name
-      // 先规范化 arguments（合法 JSON 字符串），再解析；避免坏片段留在上下文触发上游 502
-      call.function.arguments = normalizeToolArguments(call.function.arguments, name)
-      onEvent({ type: 'tool_call', call })
+      onEvent({ type: 'tool_call', call, running: true })
+      await yieldToUi()
       const args = safeParseArgs(call.function.arguments, name)
 
       // 协议级工具：计划与进展（不落到平台）

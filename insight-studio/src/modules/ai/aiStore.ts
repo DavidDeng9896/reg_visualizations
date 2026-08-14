@@ -977,13 +977,26 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
       } catch {
         /* ignore */
       }
-      assistant.trace.push({
-        id: e.call.id,
-        name: e.call.function.name,
-        args,
-        running: true,
-        summary: '',
-      })
+      const running = e.running !== false
+      const existing = assistant.trace.find((t) => t.id === e.call.id)
+      if (existing) {
+        existing.name = e.call.function.name
+        existing.args = args
+        existing.running = running
+        if (running) existing.ok = undefined
+      } else {
+        // 换新数组，避免异步回调里 push 时视图不刷新
+        assistant.trace = [
+          ...assistant.trace,
+          {
+            id: e.call.id,
+            name: e.call.function.name,
+            args,
+            running,
+            summary: '',
+          },
+        ]
+      }
     } else if (e.type === 'tool_result') {
       // 同 id 重复（模型偶发复用 call id）时优先匹配仍在 running 的那条；
       // 确认通道会二次发 tool_result（先 needsConfirmation，再最终结果）。

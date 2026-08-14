@@ -268,7 +268,7 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
     const { runAgent } = await import('../agentLoop')
     const onWorkerEvent = (e: AgentEvent) => {
       if (!opts.onProgress) return
-      if (e.type === 'tool_call') opts.onProgress(`${spec.role}进行中：${e.call.function.name}…`)
+      if (e.type === 'tool_call' && e.running !== false) opts.onProgress(`${spec.role}进行中：${e.call.function.name}…`)
       else if (e.type === 'tool_result') opts.onProgress(`${spec.role}完成：${e.name}${e.ok === false ? '（失败）' : ''}`)
       else if (e.type === 'round') opts.onProgress(`${spec.role}第 ${e.n} 轮…`)
     }
