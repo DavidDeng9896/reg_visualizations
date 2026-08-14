@@ -12,6 +12,7 @@ import { buildBoxOption } from './runtime/box'
 import { buildPieOption } from './runtime/pie'
 import { buildHeatmapOption } from './runtime/heatmap'
 import { buildBignumberOption } from './runtime/bignumber'
+import { CHART_MAPPING_SLOTS } from './chartSlots'
 import { validateMappingWith } from './runtime/mapping'
 import BarConfigure from './panel/configure/BarConfigure.vue'
 import LineConfigure from './panel/configure/LineConfigure.vue'
@@ -44,11 +45,7 @@ const barDef = makeDef({
   type: 'bar',
   label: 'Bar chart',
   icon: 'bar',
-  mappingSlots: [
-    { key: 'x', label: 'X Axis', required: true, axisSettings: true },
-    { key: 'y', label: 'Y Axis', aggregatable: true, axisSettings: true },
-    { key: 'series', label: 'Series' },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.bar,
   capabilities: { series: true, errorBars: true, horizontal: true, stack: true, swapXY: true },
   buildOption: (input: BuildInput) => buildBarOption(input),
   configureSection: BarConfigure,
@@ -59,11 +56,7 @@ const lineDef = makeDef({
   type: 'line',
   label: 'Line chart',
   icon: 'line',
-  mappingSlots: [
-    { key: 'x', label: 'X Axis', required: true, axisSettings: true, acceptTypes: ['number', 'string', 'date', 'datetime'] },
-    { key: 'values', label: 'Y Axis', required: true, multiple: true, aggregatable: true, axisSettings: true, ySide: true, acceptTypes: ['number'] },
-    { key: 'series', label: 'Series' },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.line,
   capabilities: { series: true, secondY: true, faceting: true, regression: true, swapXY: true },
   buildOption: (input: BuildInput) => buildLineOption(input),
   configureSection: LineConfigure,
@@ -74,13 +67,7 @@ const scatterDef = makeDef({
   type: 'scatter',
   label: 'Scatter plot',
   icon: 'scatter',
-  mappingSlots: [
-    { key: 'x', label: 'X Axis', required: true, axisSettings: true },
-    { key: 'values', label: 'Y Axis', required: true, multiple: true, aggregatable: true, axisSettings: true, ySide: true, acceptTypes: ['number'] },
-    { key: 'color', label: 'Color' },
-    { key: 'shape', label: 'Shape' },
-    { key: 'size', label: 'Size', acceptTypes: ['number'] },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.scatter,
   capabilities: { colorShape: true, size: true, errorBars: true, secondY: true, jitter: true, faceting: true, regression: true, swapXY: true },
   buildOption: (input: BuildInput) => buildScatterOption(input),
   configureSection: ScatterConfigure,
@@ -91,12 +78,7 @@ const boxDef = makeDef({
   type: 'box',
   label: 'Box plot',
   icon: 'box',
-  mappingSlots: [
-    { key: 'y', label: 'Y Axis', required: true, axisSettings: true, acceptTypes: ['number'] },
-    { key: 'x', label: 'X Axis Categories', axisSettings: true },
-    { key: 'color', label: 'Color' },
-    { key: 'shape', label: 'Shape' },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.box,
   capabilities: { colorShape: true, showPoints: true },
   buildOption: (input: BuildInput) => buildBoxOption(input),
   configureSection: BoxConfigure,
@@ -107,10 +89,7 @@ const pieDef = makeDef({
   type: 'pie',
   label: 'Pie chart',
   icon: 'pie',
-  mappingSlots: [
-    { key: 'categories', label: 'Categories', required: true },
-    { key: 'measure', label: 'Measure', aggregatable: true, acceptTypes: ['number'] },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.pie,
   capabilities: { donut: true },
   buildOption: (input: BuildInput) => buildPieOption(input),
   configureSection: PieConfigure,
@@ -121,22 +100,14 @@ const heatmapDef = makeDef({
   type: 'heatmap',
   label: 'Heatmap',
   icon: 'heatmap',
-  mappingSlots: [
-    { key: 'x', label: 'X（列坐标）', required: true, axisSettings: true },
-    { key: 'y', label: 'Y（行坐标）', required: true, axisSettings: true },
-    { key: 'color', label: 'Color value', required: true, acceptTypes: ['number'] },
-  ],
+  mappingSlots: CHART_MAPPING_SLOTS.heatmap,
   capabilities: { clustering: true },
   buildOption: (input: BuildInput) => buildHeatmapOption(input),
   configureSection: HeatmapConfigure,
   styleSection: HeatmapStyle,
 })
 
-const bignumberSlots = [
-  { key: 'values' as const, label: 'Metrics', multiple: true, aggregatable: true, acceptTypes: ['number' as const] },
-  { key: 'categories' as const, label: 'Categories' },
-  { key: 'measure' as const, label: 'Measure', aggregatable: true, acceptTypes: ['number' as const] },
-]
+const bignumberSlots = CHART_MAPPING_SLOTS.bignumber
 
 const bignumberDef: ChartTypeDefinition = {
   ...makeDef({

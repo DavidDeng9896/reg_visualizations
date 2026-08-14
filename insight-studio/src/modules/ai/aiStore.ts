@@ -1,21 +1,22 @@
 import { defineStore } from 'pinia'
-import { runAgent, MaxIterError, AgentRunError, type AgentEvent, type AskRequest, type ToolExecutor } from './agentLoop'
+import { type AgentEvent } from './agentLoop'
+import { dshAbort, dshAnswer, dshConfirm, dshPrompt } from './dshClient'
+import { listDbConnections } from '../table/dbConnections'
 import {
   aiConfigApi,
   aiConvApi,
   aiFilesApi,
-  aiMcpApi,
   aiMemoriesApi,
   aiSkillsApi,
+  classifyChatUpstreamError,
+  formatChatFailure,
   sanitizeModelError,
   type AiFileMeta,
   type AiPublicConfig,
   type ContentPart,
   type ConversationMeta,
+  type ChatMessage,
 } from './client'
-import type { ChatMessage, ChatPayload, ToolCall } from './client'
-import { OPENAI_TOOLS } from './tools/registry'
-import { execTool } from './tools/impl'
 import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
 import {
   blobToDataUrl,
@@ -28,7 +29,6 @@ import {
   type ChatAttachmentSnapshot,
 } from './attachments'
 import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
-import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
 import { capReasoningText } from './contentScrub'
@@ -110,11 +110,6 @@ interface AiState {
 
 let uid = 0
 const nextId = () => `m-${Date.now()}-${++uid}`
-/** ask_user 挂起 Promise 的结算函数（作答/取消/中止/切会话共用）。 */
-let pendingAskResolve: ((answer: string) => void) | null = null
-/** 危险操作确认挂起：与 ask_user 同构，保持 agent-loop 存活直到用户决定。 */
-let pendingConfirmResolve: ((resultText: string) => void) | null = null
-let pendingConfirmId: string | null = null
 /** 同会话连续自动续跑次数（用户新发送时清零）。 */
 let autoContinueCount = 0
 const MAX_AUTO_CONTINUE = 2
@@ -287,7 +282,7 @@ export const useAiStore = defineStore('ai', {
       this.panelMode = mode
     },
 
-    /** 发送用户消息并跑 agent-loop。允许纯附件（无文字）。 */
+    /** 发送用户消息：由 insight-dsh 跑 agent loop，本端只渲染 SSE 事件。允许纯附件（无文字）。 */
     async send(text: string, mentions: MentionTarget[] = [], attachments: ChatAttachment[] = []): Promise<void> {
       const input = text.trim()
       const atts = attachments.slice()
@@ -430,42 +425,50 @@ export const useAiStore = defineStore('ai', {
       } catch {
         /* memories 不可用时跳过 */
       }
-      const { tools, exec } = await this.buildToolsAndExec()
 
       const pushArtifact = (a?: Artifact) => {
         if (a && !assistant.artifacts.some((x) => x.name === a.name && x.kind === a.kind)) assistant.artifacts.push(a)
+        if (a?.analysisId) void useAnalysisStore().load(a.analysisId)
+        else if (useAnalysisStore().current?.id) void useAnalysisStore().load(useAnalysisStore().current!.id)
       }
 
-      const baseLen = chatMessages.length
+      const context = chatMessages
+        .filter((m) => m.role === 'system')
+        .map((m) => (typeof m.content === 'string' ? m.content : ''))
+        .filter(Boolean)
+        .join('\n\n')
+
       let aborted = false
       try {
-        const finalMessages = await runAgent({
-          messages: chatMessages,
-          tools,
-          exec,
-          maxIterations: this.config?.maxIterations ?? 100,
+        await dshPrompt({
+          sessionId: this.currentId!,
+          text: userContentWithAtts,
           model: this.modelOverride ?? undefined,
+          analysisId: analysis?.id,
+          context,
+          sqlConnections: listDbConnections(),
+          confirmDestructive: this.config?.confirmDestructive ?? true,
+          confirmWrite: this.config?.confirmWrite ?? false,
+          images: imageAtts.length
+            ? await Promise.all(
+                imageAtts.map(async (img) => {
+                  const blob = await aiFilesApi.downloadBlob(img.id)
+                  return { url: await blobToDataUrl(blob) }
+                }),
+              )
+            : undefined,
           signal: ac.signal,
-          askUser: this.makeAskUser(ac.signal),
-          waitConfirm: this.makeWaitConfirm(ac.signal),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
-        assistant.rawTail = finalMessages.slice(baseLen)
       } catch (err) {
-        if (err instanceof MaxIterError) {
-          assistant.maxIter = true
-          assistant.error = err.message
-          markErrorResumable(assistant)
-        } else if (err instanceof DOMException && err.name === 'AbortError') {
+        if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
           applyUserAbortToMessages(this.messages)
-        } else if (err instanceof AgentRunError) {
-          assistant.error = sanitizeModelError(err.message)
-          assistant.rawTail = err.partialMessages.slice(baseLen)
-          markErrorResumable(assistant)
         } else {
-          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
+          const raw = err instanceof Error ? err.message : String(err)
+          const kind = classifyChatUpstreamError(raw)
+          assistant.error = kind === 'quota' || kind === 'rpm' ? formatChatFailure(502, raw) : sanitizeModelError(raw)
           markErrorResumable(assistant)
         }
       } finally {
@@ -548,62 +551,51 @@ export const useAiStore = defineStore('ai', {
         /* skip */
       }
 
-      const { tools, exec } = await this.buildToolsAndExec()
       const pushArtifact = (a?: Artifact) => {
         if (a && !assistant.artifacts.some((x) => x.name === a.name && x.kind === a.kind)) assistant.artifacts.push(a)
+        if (useAnalysisStore().current?.id) void useAnalysisStore().load(useAnalysisStore().current!.id)
       }
-      const baseLen = chatMessages.length
+      const context = chatMessages
+        .filter((m) => m.role === 'system')
+        .map((m) => (typeof m.content === 'string' ? m.content : ''))
+        .filter(Boolean)
+        .join('\n\n')
       let aborted = false
       try {
-        const finalMessages = await runAgent({
-          messages: chatMessages,
-          tools,
-          exec,
-          maxIterations: this.config?.maxIterations ?? 100,
+        await dshPrompt({
+          sessionId: this.currentId!,
+          text: resumeHint,
           model: this.modelOverride ?? undefined,
+          analysisId: useAnalysisStore().current?.id,
+          context,
+          sqlConnections: listDbConnections(),
+          confirmDestructive: this.config?.confirmDestructive ?? true,
+          confirmWrite: this.config?.confirmWrite ?? false,
           signal: ac.signal,
-          askUser: this.makeAskUser(ac.signal),
-          waitConfirm: this.makeWaitConfirm(ac.signal),
-          ...(planSteps ? { initialPlan: { steps: planSteps, done: doneSnapshot } } : {}),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
-        assistant.rawTail = finalMessages.slice(baseLen)
-        // 把进度合并回检查点，避免旧消息仍显示「可继续」导致死循环
-        if (planSteps) syncPlanCheckpoint(prev, assistant)
-        else {
-          prev.incomplete = false
-          prev.error = undefined
-          assistant.incomplete = false
-        }
       } catch (err) {
-        if (err instanceof MaxIterError) {
-          assistant.maxIter = true
-          assistant.error = err.message
-          markErrorResumable(assistant)
-        } else if (err instanceof DOMException && err.name === 'AbortError') {
+        if (err instanceof DOMException && err.name === 'AbortError') {
           aborted = true
           assistant.error = '已中止'
           applyUserAbortToMessages(this.messages)
-        } else if (err instanceof AgentRunError) {
-          assistant.error = sanitizeModelError(err.message)
-          assistant.rawTail = err.partialMessages.slice(baseLen)
-          markErrorResumable(assistant)
         } else {
-          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
+          const raw = err instanceof Error ? err.message : String(err)
+          const kind = classifyChatUpstreamError(raw)
+          assistant.error = kind === 'quota' || kind === 'rpm' ? formatChatFailure(502, raw) : sanitizeModelError(raw)
           markErrorResumable(assistant)
-        }
-        // 用户中止后不再同步 incomplete，避免「继续任务」回弹
-        if (!aborted && planSteps) syncPlanCheckpoint(prev, assistant)
-        if (!aborted) {
-          // 检查点也标记可续跑，输入条能找到 resumableAssistant
-          markErrorResumable(prev)
-          if (assistant.rawTail?.length) prev.rawTail = [...(prev.rawTail ?? []), ...assistant.rawTail]
         }
       } finally {
         assistant.streaming = false
         if (this.abort === ac) {
           this.running = false
           this.abort = null
+        }
+        if (planSteps) syncPlanCheckpoint(prev, assistant)
+        else {
+          prev.incomplete = false
+          prev.error = undefined
+          assistant.incomplete = false
         }
         await this.persist()
       }
@@ -630,43 +622,8 @@ export const useAiStore = defineStore('ai', {
       await this.continueTask({ auto: true })
     },
 
-    /** 构建工具集与执行器（内置 + MCP）。 */
-    async buildToolsAndExec(): Promise<{ tools: ChatPayload['tools']; exec: ToolExecutor }> {
-      let mcpBundle = buildMcpToolsBundle([])
-      try {
-        const mcpTools = await aiMcpApi.listTools()
-        mcpBundle = buildMcpToolsBundle(mcpTools)
-      } catch {
-        /* mcp 不可用时跳过 */
-      }
-      const tools = [...OPENAI_TOOLS, ...mcpBundle.tools]
-
-      const confirmDestructive = this.config?.confirmDestructive ?? true
-      const confirmWrite = this.config?.confirmWrite ?? false
-      const exec: ToolExecutor = async (call: ToolCall, args: Record<string, unknown>) => {
-        const mcpRef = mcpBundle.resolve(call.function.name)
-        if (mcpRef) {
-          try {
-            const res = await aiMcpApi.callTool({
-              serverId: mcpRef.serverId,
-              name: mcpRef.name,
-              arguments: args,
-            })
-            const text = JSON.stringify(res.result ?? res)
-            return { ok: true, summary: text }
-          } catch (e) {
-            return { ok: false, summary: e instanceof Error ? e.message : String(e) }
-          }
-        }
-        return execTool(call.function.name, args, { confirmDestructive, confirmWrite })
-      }
-      return { tools, exec }
-    },
-
     /**
-     * 确认 / 拒绝待确认的危险操作。
-     * - 若 agent-loop 正挂起等待（waitConfirm）：结算 Promise，同一 loop 内继续（不中断会话）。
-     * - 否则回退到 resumeLoop（兼容旧会话 / rawTail 重入）。
+     * 确认 / 拒绝待确认的危险操作：通知 insight-dsh 恢复挂起的工具执行。
      */
     async decideTrace(traceId: string, decision: 'confirm' | 'reject'): Promise<void> {
       const assistant = [...this.messages]
@@ -674,98 +631,21 @@ export const useAiStore = defineStore('ai', {
         .find((m) => m.role === 'assistant' && m.trace.some((t) => t.id === traceId))
       const item = assistant?.trace.find((t) => t.id === traceId)
       if (!assistant || !item || !item.needsConfirmation || item.confirmed || item.rejected) return
-      // 正在跑其他任务且并非等待本条确认时，忽略
-      if (this.running && pendingConfirmId !== traceId) return
 
-      let resultText: string
       if (decision === 'confirm') {
         item.confirmed = true
         item.running = true
-        const res = await execTool(item.name, { ...(item.args ?? {}), __confirmed: true }, { confirmDestructive: false, confirmWrite: false })
-        item.running = false
-        item.ok = res.ok
-        item.summary = res.summary
         item.needsConfirmation = false
-        if (res.artifact) pushArtifactSafe(assistant, res.artifact)
-        resultText = `用户已批准并执行该操作，执行结果：${res.summary}`
-        appendPlainNote(assistant, `已批准并执行「${item.name}」：${res.summary}`)
+        appendPlainNote(assistant, `已批准操作「${item.name}」，等待执行结果`)
       } else {
         item.rejected = true
         item.ok = false
         item.summary = '用户已拒绝执行该操作'
         item.needsConfirmation = false
-        resultText = '用户已拒绝执行该操作。不要重试此操作；向用户简短说明并给出替代方案。'
         appendPlainNote(assistant, `已拒绝操作「${item.name}」`)
       }
       await this.persist()
-
-      // 优先：挂起中的 loop 直接续跑
-      if (pendingConfirmResolve && pendingConfirmId === traceId) {
-        const resolve = pendingConfirmResolve
-        pendingConfirmResolve = null
-        pendingConfirmId = null
-        resolve(resultText)
-        return
-      }
-
-      // 回退：loop 已结束时用 rawTail 重入
-      await this.resumeLoop(assistant, traceId, resultText)
-    },
-
-    /** 把确认/拒绝结果写回对应 tool 消息、截掉过时的收尾 assistant 消息，重入 runAgent 继续生成。 */
-    async resumeLoop(assistant: UiMessage, traceId: string, resultText: string): Promise<void> {
-      const tail = assistant.rawTail
-      const toolIdx = tail ? tail.findIndex((m) => m.role === 'tool' && m.tool_call_id === traceId) : -1
-      if (!tail || toolIdx < 0) return
-      const continued = tail
-        .slice(0, toolIdx + 1)
-        .map((m) => (m.tool_call_id === traceId ? { ...m, content: resultText } : { ...m }))
-      assistant.rawTail = continued
-      const messages = [...this.buildBase(assistant), ...continued]
-
-      this.running = true
-      this.abort = new AbortController()
-      const ac = this.abort
-      assistant.streaming = true
-      const { tools, exec } = await this.buildToolsAndExec()
-      const baseLen = messages.length
-      try {
-        const finalMessages = await runAgent({
-          messages,
-          tools,
-          exec,
-          maxIterations: this.config?.maxIterations ?? 100,
-          model: this.modelOverride ?? undefined,
-          signal: ac.signal,
-          askUser: this.makeAskUser(ac.signal),
-          waitConfirm: this.makeWaitConfirm(ac.signal),
-          onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
-        })
-        assistant.rawTail = finalMessages.slice(baseLen)
-      } catch (err) {
-        if (err instanceof MaxIterError) {
-          assistant.maxIter = true
-          assistant.error = err.message
-          markErrorResumable(assistant)
-        } else if (err instanceof DOMException && err.name === 'AbortError') {
-          assistant.error = '已中止'
-          applyUserAbortToMessages(this.messages)
-        } else if (err instanceof AgentRunError) {
-          assistant.error = sanitizeModelError(err.message)
-          assistant.rawTail = err.partialMessages.slice(baseLen)
-          markErrorResumable(assistant)
-        } else {
-          assistant.error = sanitizeModelError(err instanceof Error ? err.message : String(err))
-          markErrorResumable(assistant)
-        }
-      } finally {
-        assistant.streaming = false
-        if (this.abort === ac) {
-          this.running = false
-          this.abort = null
-        }
-        await this.persist()
-      }
+      if (this.currentId) await dshConfirm(this.currentId, traceId, decision)
     },
 
     /** 续轮时模型可见上下文：system + 分析上下文 + 附件目录 + 该 assistant 消息之前的历史。 */
@@ -797,23 +677,9 @@ export const useAiStore = defineStore('ai', {
       ]
     },
 
-    /** 结算挂起的 ask_user 等待（作答/取消/中止/切换会话共用）。 */
-    settleAsk(answer: string): void {
-      pendingAskResolve?.(answer)
-    },
-
-    /** ask_user 作答通道：挂起 agent-loop 直到用户作答；中止/切会话时兜底结算。 */
-    makeAskUser(signal?: AbortSignal): (req: AskRequest) => Promise<string> {
-      return (req) =>
-        new Promise<string>((resolve) => {
-          this.pendingAsk = { id: req.id, question: req.question, options: req.options, allowOther: req.allowOther }
-          pendingAskResolve = (answer) => {
-            pendingAskResolve = null
-            this.pendingAsk = null
-            resolve(answer)
-          }
-          signal?.addEventListener('abort', () => pendingAskResolve?.('（用户中止了本次生成）'), { once: true })
-        })
+    /** 结算挂起的 ask_user 卡片（作答/取消/中止/切换会话共用）。 */
+    settleAsk(_answer: string): void {
+      this.pendingAsk = null
     },
 
     /** ask_user 提问卡作答；answer 为空表示用户取消。结果写入正文，不再保留特殊卡片。 */
@@ -834,34 +700,13 @@ export const useAiStore = defineStore('ai', {
           appendPlainNote(assistant, `（已取消提问：${question}）`)
         }
       }
-      this.settleAsk(trimmed ? trimmed : '（用户取消了本次提问）')
+      this.pendingAsk = null
+      if (this.currentId) void dshAnswer(this.currentId, id, trimmed ? trimmed : '（用户取消了本次提问）')
       void this.persist()
     },
 
-    /** 危险操作确认通道：挂起 agent-loop 直到用户批准/拒绝（保持 running，会话不中断）。 */
-    makeWaitConfirm(signal?: AbortSignal): (req: { id: string; name: string; summary: string }) => Promise<string> {
-      return (req) =>
-        new Promise<string>((resolve) => {
-          pendingConfirmId = req.id
-          pendingConfirmResolve = (resultText) => {
-            pendingConfirmResolve = null
-            pendingConfirmId = null
-            resolve(resultText)
-          }
-          signal?.addEventListener(
-            'abort',
-            () => {
-              if (pendingConfirmId === req.id) {
-                pendingConfirmResolve?.('用户中止了本次生成，危险操作未执行。')
-              }
-            },
-            { once: true },
-          )
-        })
-    },
-
-    settleConfirm(resultText: string): void {
-      pendingConfirmResolve?.(resultText)
+    settleConfirm(_resultText: string): void {
+      /* 确认通道已迁到 insight-dsh；保留方法以免 stop/切会话调用处断裂 */
     },
 
     /** 压缩上下文：最近 2 个用户轮保留，更早历史折叠为一条摘要消息（随会话持久化）。 */
@@ -887,6 +732,7 @@ export const useAiStore = defineStore('ai', {
     stop() {
       const ac = this.abort
       ac?.abort()
+      if (this.currentId) void dshAbort(this.currentId)
       this.settleAsk('（用户中止了本次生成）')
       this.settleConfirm('用户中止了本次生成，危险操作未执行。')
       this.pendingAsk = null
@@ -1016,8 +862,21 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
       }
       pushArtifact(e.artifact)
     } else if (e.type === 'ask') {
-      const item = assistant.trace.find((t) => t.id === e.id)
-      if (item) item.ask = { question: e.question, options: e.options, allowOther: e.allowOther }
+      let item = assistant.trace.find((t) => t.id === e.id)
+      if (!item) {
+        assistant.trace = [
+          ...assistant.trace,
+          { id: e.id, name: 'ask_user', summary: '', ask: { question: e.question, options: e.options, allowOther: e.allowOther } },
+        ]
+        item = assistant.trace[assistant.trace.length - 1]
+      } else {
+        item.ask = { question: e.question, options: e.options, allowOther: e.allowOther }
+      }
+      const store = useAiStore()
+      store.pendingAsk = { id: e.id, question: e.question, options: e.options, allowOther: e.allowOther }
+    } else if (e.type === 'error') {
+      assistant.error = e.message
+      markErrorResumable(assistant)
     } else if (e.type === 'plan') {
       assistant.planSteps = e.steps
       assistant.planDone = []
@@ -1036,7 +895,7 @@ function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void)
         assistant.trace.find((t) => t.id === e.id)
       if (item) item.summary = e.summary
     } else if (e.type === 'done') {
-      const body = (e.content || '').trim()
+      const body = (e.content || assistant.content || '').trim()
       const notes = (assistant.interactionNotes ?? '').trim()
       assistant.content = [notes, body].filter(Boolean).join('\n\n')
       assistant.interactionNotes = undefined
@@ -1069,8 +928,4 @@ function appendPlainNote(msg: UiMessage, note: string): void {
   const n = note.trim()
   if (!n) return
   msg.interactionNotes = msg.interactionNotes?.trim() ? `${msg.interactionNotes.trim()}\n\n${n}` : n
-}
-
-function pushArtifactSafe(msg: UiMessage, a?: Artifact): void {
-  if (a && !msg.artifacts.some((x) => x.name === a.name && x.kind === a.kind)) msg.artifacts.push(a)
 }

@@ -1,8 +1,17 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+const root = path.dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      'node:async_hooks': path.resolve(root, 'src/shims/async-hooks.ts'),
+    },
+  },
   assetsInclude: ['**/*.wasm'],
   server: {
     port: 7100,
@@ -11,6 +20,10 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       // 更具体的路径必须写在 /api 之前，否则会被 insight-api 代理吞掉
+      '/api/ai/agent': {
+        target: process.env.INSIGHT_DSH_ORIGIN ?? 'http://127.0.0.1:3081',
+        changeOrigin: true,
+      },
       '/api/sql': {
         target: 'http://127.0.0.1:7120',
         changeOrigin: true,

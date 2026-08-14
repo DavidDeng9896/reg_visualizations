@@ -7,7 +7,7 @@
  * - 缺 x 等必填槽时按列类型启发式补全（避免模型只传 values 反复失败）
  */
 import type { ChartConfigure, ColumnMeta, DataType, FieldMapping } from '../../shared/types'
-import { getChartDef } from '../charts/registry'
+import { mappingSlotsFor } from '../charts/chartSlots'
 import type { MappingError } from '../charts/types'
 
 function asMapping(v: unknown): FieldMapping | undefined {
@@ -252,10 +252,10 @@ export function formatChartMappingFailHint(
   const more = columns.length > 24 ? `…共 ${columns.length} 列` : ''
   let example = ''
   try {
-    const def = getChartDef(chartType as never)
+    const slots = mappingSlotsFor(chartType)
     const draft: Record<string, unknown> = {}
     const used = usedFields(current)
-    for (const slot of def.mappingSlots) {
+    for (const slot of slots) {
       if (!slot.required) continue
       if (slot.multiple) {
         const existing = (current.values ?? []).filter((m) => m?.field)
