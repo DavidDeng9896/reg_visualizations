@@ -568,7 +568,7 @@ watch(sourceMode, (mode) => {
                 <tbody>
                   <tr v-for="(line, r) in previewRows" :key="r">
                     <td v-for="(h, i) in headers" :key="i">
-                      <span class="is-ellipsis">{{ line[i] ?? '' }}</span>
+                      <span class="is-ellipsis" :title="line[i] ?? ''">{{ line[i] ?? '' }}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -829,13 +829,19 @@ watch(sourceMode, (mode) => {
   border-right: 1px solid var(--is-border);
   padding: 6px 8px;
   text-align: left;
-  max-width: 160px;
+  overflow: hidden;
+  max-width: 220px;
+  vertical-align: top;
 }
 .sql__table-grid th {
   position: sticky;
   top: 0;
   background: var(--is-surface-muted, #f2f4f7);
   z-index: 1;
+}
+.sql__table-grid td .is-ellipsis {
+  display: block;
+  min-width: 0;
 }
 .sql__colhead {
   display: flex;
