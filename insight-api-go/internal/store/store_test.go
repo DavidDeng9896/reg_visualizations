@@ -1,20 +1,14 @@
 package store_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/store"
+	"github.com/DavidDeng9896/reg_visualizations/insight-api-go/internal/storetest"
 )
 
 func TestPutAnalysisPersistsSnapshot(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "t.sqlite")
-	st, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := storetest.Open(t)
 
 	saved, err := st.PutAnalysis(store.AnalysisDoc{
 		"id":        "a1",
@@ -58,5 +52,18 @@ func TestPutAnalysisPersistsSnapshot(t *testing.T) {
 	}
 	if snap.DataVersion != "r1" || snap.RowCount != 2 {
 		t.Fatalf("snap=%+v", snap)
+	}
+}
+
+func TestOpenUsesExplicitDSN(t *testing.T) {
+	base := store.ConfigFromEnv()
+	dsn := base.FormatDSN()
+	st, err := store.Open(store.Config{DSN: dsn, Host: "no-such-host", Port: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.DB.Ping(); err != nil {
+		t.Fatal(err)
 	}
 }

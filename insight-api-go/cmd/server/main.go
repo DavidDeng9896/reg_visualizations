@@ -16,16 +16,12 @@ func main() {
 	if port == "" {
 		port = "8787"
 	}
-	dbPath := os.Getenv("INSIGHT_DB_PATH")
-	if dbPath == "" {
-		dbPath = filepath.Join("data", "insight.sqlite")
-	}
-	dataDir := os.Getenv("INSIGHT_DATA_DIR")
-	if dataDir == "" {
-		dataDir = filepath.Dir(dbPath)
+	dataDir := store.DataDirFromEnv()
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		log.Fatalf("data dir: %v", err)
 	}
 
-	st, err := store.Open(dbPath)
+	st, err := store.OpenFromEnv()
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
@@ -42,7 +38,7 @@ func main() {
 	cfgPath := filepath.Join(dataDir, "ai-config.json")
 	srv := api.NewWithUserData(st, cfgPath, dataDir, officialSeed)
 	addr := "0.0.0.0:" + port
-	log.Printf("[insight-api-go] listening on http://127.0.0.1:%s (data=%s)", port, dataDir)
+	log.Printf("[insight-api-go] listening on http://127.0.0.1:%s storage=mariadb data=%s", port, dataDir)
 	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
 		log.Fatal(err)
 	}

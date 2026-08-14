@@ -1,7 +1,7 @@
 import { uuid } from '../../shared/id'
 
 /** 外部数据库连接配置（本地持久化；密码仅存浏览器）。 */
-export type SqlDialect = 'postgres' | 'mysql'
+export type SqlDialect = 'postgres' | 'mysql' | 'mariadb'
 
 export interface DbConnectionProfile {
   id: string
@@ -20,6 +20,7 @@ export interface DbConnectionProfile {
 export const DEFAULT_PORTS: Record<SqlDialect, number> = {
   postgres: 5432,
   mysql: 3306,
+  mariadb: 3306,
 }
 
 export function defaultProfile(partial?: Partial<DbConnectionProfile>): DbConnectionProfile {

@@ -3,7 +3,7 @@ import pg from 'pg'
 import mysql from 'mysql2/promise'
 import { assertReadOnlySelect, DEFAULT_ROW_LIMIT, HARD_ROW_CAP } from './sqlGuard.js'
 
-export type SqlDialect = 'postgres' | 'mysql'
+export type SqlDialect = 'postgres' | 'mysql' | 'mariadb'
 
 export interface DbConnectionConfig {
   dialect: SqlDialect
@@ -42,6 +42,10 @@ function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
     else out[k] = v
   }
   return out
+}
+
+function isMysqlFamily(dialect: SqlDialect): boolean {
+  return dialect === 'mysql' || dialect === 'mariadb'
 }
 
 async function withPostgres<T>(cfg: DbConnectionConfig, fn: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -93,10 +97,13 @@ export async function testConnection(cfg: DbConnectionConfig): Promise<{ ok: tru
       return { ok: true as const, version: String(r.rows[0]?.version ?? 'postgres') }
     })
   }
+  if (!isMysqlFamily(cfg.dialect)) {
+    throw new Error(`unsupported dialect: ${cfg.dialect}`)
+  }
   return withMysql(cfg, async (conn) => {
     const [rows] = await conn.query('SELECT VERSION() AS version')
     const row = (rows as { version?: string }[])[0]
-    return { ok: true as const, version: String(row?.version ?? 'mysql') }
+    return { ok: true as const, version: String(row?.version ?? cfg.dialect) }
   })
 }
 
