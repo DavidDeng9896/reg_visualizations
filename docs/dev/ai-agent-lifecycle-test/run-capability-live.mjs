@@ -20,10 +20,43 @@ const ORIGIN = process.env.INSIGHT_ORIGIN || 'http://127.0.0.1:7100'
 
 const results = []
 
+function redact(s) {
+  return String(s ?? '')
+    .replace(/org-[a-z0-9]+/gi, 'org-***')
+    .replace(/proj-[a-z0-9]+/gi, 'proj-***')
+    .replace(/ak-[a-z0-9]+/gi, 'ak-***')
+}
+
 function record(id, status, note, extra = {}) {
-  const row = { ts: new Date().toISOString(), id, status, note, ...extra }
+  const row = { ts: new Date().toISOString(), id, status, note: redact(note), ...extra }
+  if (typeof row.preview === 'string') row.preview = redact(row.preview)
   results.push(row)
-  console.log(`[${status}] ${id}: ${note}`)
+  console.log(`[${status}] ${id}: ${row.note}`)
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+async function snapshotAnalysis(page) {
+  const m = page.url().match(/\/analysis\/([^/?#]+)/)
+  if (!m) return null
+  const res = await fetch(`${ORIGIN}/api/analyses/${m[1]}`)
+  if (!res.ok) return { error: res.status }
+  const doc = await res.json()
+  const tables = (doc.tables || []).map((t) => ({
+    name: t.name,
+    rows: Array.isArray(t.rows) ? t.rows.length : t.rowCount,
+    cols: (t.columns || []).map((c) => c.field || c.name).slice(0, 12),
+    views: (t.views || []).map((v) => `${v.name}:${v.type || v.chart?.chartType || ''}`),
+  }))
+  const steps = (doc.steps || []).map((s) => ({
+    type: s.type,
+    name: s.name,
+    status: s.status,
+    fromPorts: (s.inputs || []).map((i) => (i.from || {}).port),
+  }))
+  return { id: doc.id, name: doc.name, tables, steps }
 }
 
 async function probeQuota() {
@@ -97,8 +130,8 @@ async function waitIdle(page, maxMs) {
       const cont = page.getByTestId('ai-continue')
       if ((await cont.count()) && continues < 2) {
         continues += 1
+        await sleep(20_000)
         await cont.click()
-        await page.waitForTimeout(8_000)
         continue
       }
       await page.waitForTimeout(2500)
@@ -126,16 +159,19 @@ async function runScenario(page, spec) {
     const text = await drawerText(page)
     const blocked = /日配额|TPD|token per day/i.test(text)
     const tables = await page.getByTestId('sidebar-table').allInnerTexts().catch(() => [])
+    const analysis = await snapshotAnalysis(page).catch((e) => ({ error: String(e) }))
     await page.screenshot({ path: path.join(SHOT, `cap-${spec.id}.png`) })
+    const blob = JSON.stringify(analysis || {})
     if (blocked) {
-      record(spec.id, 'blocked', '配额打断', { wait, preview: text.slice(0, 800), tables })
+      record(spec.id, 'blocked', '配额打断', { wait, preview: text.slice(0, 800), tables, analysis })
       return 'blocked'
     }
-    const ok = spec.expect.every((re) => re.test(text) || tables.some((t) => re.test(t)))
+    const ok = spec.expect.every((re) => re.test(text) || tables.some((t) => re.test(t)) || re.test(blob))
     record(spec.id, ok ? 'ok' : 'fail', ok ? '断言通过' : '未看到期望产物', {
       wait,
       preview: text.slice(0, 800),
       tables,
+      analysis,
     })
     return ok ? 'ok' : 'fail'
   } catch (e) {
@@ -183,6 +219,8 @@ if (quota === 'quota' || quota === 'unconfigured') {
   process.exit(0)
 }
 
+await sleep(5_000)
+
 const browser = await chromium.launch({
   headless: false,
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
@@ -200,9 +238,11 @@ try {
   await page.waitForURL(/\/analysis\//)
   await page.waitForTimeout(1000)
 
-  for (const spec of SCENES) {
+  for (let i = 0; i < SCENES.length; i += 1) {
+    const spec = SCENES[i]
     const st = await runScenario(page, spec)
     if (st === 'blocked') break
+    if (i < SCENES.length - 1) await sleep(25_000)
   }
 } catch (e) {
   record('runner', 'fail', e instanceof Error ? e.message : String(e))

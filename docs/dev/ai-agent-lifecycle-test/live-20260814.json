@@ -1,0 +1,37 @@
+{
+  "date": "2026-08-14",
+  "model": "kimi-k2.6",
+  "analysisId": "3f8f98c0-44a8-4397-bedf-2c723697e493",
+  "analysisName": "capability-live",
+  "probe": "ok",
+  "scenes": [
+    {
+      "id": "filter-chart",
+      "driver": "idle_timeout_180s",
+      "product": "ok",
+      "note": "计划 4/4 已勾完：demo_hits 3 行 → Filter 2 行（score>2 去掉 C=1）→ score_bar_chart bar。UI 仍「正在生成」，驱动超时。",
+      "tables": ["demo_hits:3", "Filter table:2+view score_bar_chart:bar"]
+    },
+    {
+      "id": "join",
+      "driver": "ok",
+      "product": "ok",
+      "note": "left 2 行 + right 2 行 → inner join on id → Join tables 2 行 id/v/label。模型调用 add_join_step。",
+      "elapsedMs": 151326
+    },
+    {
+      "id": "analysis-worker",
+      "driver": "ok",
+      "product": "ok",
+      "note": "主循环 import iris_tiny 后 delegate_analysis_worker；分析师建 bar「species_sepal_length_bar」（x=species, y=sepal_length mean）。",
+      "elapsedMs": 173282
+    },
+    {
+      "id": "skill-worker",
+      "driver": "ok",
+      "product": "ok",
+      "note": "delegate_skill_worker：规划师摘要 6 个已安装 Skill（抗体/细胞株/体外测定/体内/图表/通用实验室）。未改表。",
+      "elapsedMs": 72916
+    }
+  ]
+}

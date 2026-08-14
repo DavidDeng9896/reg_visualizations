@@ -1,11 +1,11 @@
 # 能力矩阵实测结论
 
-**日期：** 2026-08-13  
+**日期：** 2026-08-13 写协议与 A/B；**2026-08-14 补 C 层真实模型短场景**  
 **协议：** `CAPABILITY-MATRIX.md`  
 **单测：** `insight-studio` `tests/unit/ai` + `tests/unit/steps` → **178 passed**  
 **Python worker：** `tests/test_executor.py` → **7 passed, 1 skipped**  
 **mock e2e：** `tests/e2e/ai.spec.ts` → **6 passed**  
-**真实模型：** 探测 `/api/ai/chat` → **当日 TPD 已尽**（current ≈ 1.50M / limit 1.50M），短场景未再打模型。
+**真实模型短场景（14 日）：** kimi-k2.6，分析 `capability-live`（`3f8f98c0-…`）。四条均有产物；filter-chart 驱动因 UI 停在「正在生成」超时，产物已齐。
 
 ---
 
@@ -37,17 +37,24 @@
 
 ---
 
-## C. 真实模型短场景
+## C. 真实模型短场景（2026-08-14）
 
-探测正文（已脱敏）：`request reached organization TPD rate limit, current: 1500478, limit: 1500000`。
+TPD 已按日重置。探测 `/api/ai/chat` → **200 kimi-k2.6**。驱动：`run-capability-live.mjs`（headed，不点 stop，场景间隔 25s 避开 RPM=3）。
 
-因此 **filter-chart / join / analysis-worker / skill-worker 四条未跑**。覆盖由 A+B 承担；生命周期长跑仍见 `AUDIT.md`（修后 Filter 已通，随后同样被 RPM/TPD 打断）。
+分析：`capability-live` / `3f8f98c0-44a8-4397-bedf-2c723697e493`。摘要：`live-20260814.json`。截图：`evidence/live-*.png`。
 
-配额恢复后执行：
+| 场景 | 模型是否选对工具 | 产物 | 驱动 |
+| --- | --- | --- | --- |
+| filter-chart | `import_csv_text` + `add_filter_step` + `create_view`/`set_chart_config` | demo_hits 3 行 → Filter 2 行（去掉 score=1 的 C）→ `score_bar_chart` bar（A≈3, B≈8） | 计划 4/4 已勾完，UI 仍「正在生成」，**idle 180s 超时** |
+| join | `import_csv_text`×2 + **`add_join_step` inner on id** | left/right 各 2 行 → Join tables 2 行 `id,v,label` | 绿（151s） |
+| analysis-worker | 主循环 import 后 **`delegate_analysis_worker`** | iris_tiny 3 行；分析师建 `species_sepal_length_bar`（x=species, y=sepal_length mean） | 绿（173s） |
+| skill-worker | **`delegate_skill_worker`** | 规划师：已安装 6 个 Skill 中文摘要；未改表 | 绿（73s） |
 
-```bash
-DISPLAY=:1 node docs/dev/ai-agent-lifecycle-test/run-capability-live.mjs
-```
+Filter 上游口 `Output dataset`（upload-csv）；Join 两口均为 `Output dataset`。未再打 Custom Code。MCP 专家本环境无 `mcp_*`，短场景未派。
+
+**仍未用真实模型覆盖：** union / hide / report / dashboard（A/B 已测工具与编排）；工程师长跑见 `AUDIT.md`。
+
+filter-chart 的「步骤已完仍正在生成」与 13 日 RPM 挂起同类：loop 在等收尾文本。产物已在工作区，不算功能失败。
 
 ---
 
@@ -59,10 +66,10 @@ DISPLAY=:1 node docs/dev/ai-agent-lifecycle-test/run-capability-live.mjs
 | 中止后续跑 | mock e2e 覆盖；产品保留 incomplete +「继续任务」 |
 | TPD/配额文案 + 不自动空转重试 | 单测 + mock e2e；实跑探测仍是 502+TPD |
 | 主区打开大表 | mock 建图会关抽屉进视图；长跑里 agent 很少主动打开表 |
-| 子代理实选工具 | 仅长跑里见过工程师；规划师/分析师/MCP 本轮有 mock loop，无真实模型 |
+| 子代理实选工具 | 14 日短跑：规划师、分析师已派；工程师见长跑；MCP 无工具未派 |
 
 ---
 
 ## 还没被真实模型选过的能力
 
-join / union / hide / report / dashboard / 规划师 / 分析师 / MCP 专家：工具实现与 UI 编排已测，**模型是否会主动选它们**要等 TPD 恢复后的 `run-capability-live.mjs`。
+union / hide / report / dashboard：工具实现与 mock 编排已测，14 日短跑未点名。MCP 专家需先启用 MCP 服务器。

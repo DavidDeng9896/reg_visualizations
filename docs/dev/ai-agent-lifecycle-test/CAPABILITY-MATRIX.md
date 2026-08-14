@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | A 单测 | 否 | 每个 agent 工具的真实 `execTool`、端口连线、子代理白名单、loop 派工 | `npx vitest run tests/unit/ai tests/unit/steps` |
 | B mock e2e | 否（拦截 `/api/ai/chat`） | 对话 UI：计划/轨迹/产物/确认/提问/中止/配额失败后续跑；多节点落地到流程图 | `npx playwright test tests/e2e/ai.spec.ts` |
-| C 真实模型 | 是（短 prompt、小表） | 模型是否真会选对工具；四个子代理各一条；UX 走查 | `run-capability-live.mjs` |
+| C 真实模型 | 是（短 prompt、小表） | 模型是否真会选对工具；四个子代理各一条；UX 走查 | `run-capability-live.mjs`（14 日已跑，见 `live-20260814.json`） |
 
 生命周期长跑（r1/r2 + 过千行宽表）仍以 `AUDIT.md` 为准，本矩阵不重复造 4000 行。
 
