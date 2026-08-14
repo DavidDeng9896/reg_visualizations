@@ -50,9 +50,18 @@ TPD 已按日重置。探测 `/api/ai/chat` → **200 kimi-k2.6**。驱动：`ru
 | analysis-worker | 主循环 import 后 **`delegate_analysis_worker`** | iris_tiny 3 行；分析师建 `species_sepal_length_bar`（x=species, y=sepal_length mean） | 绿（173s） |
 | skill-worker | **`delegate_skill_worker`** | 规划师：已安装 6 个 Skill 中文摘要；未改表 | 绿（73s） |
 
-Filter 上游口 `Output dataset`（upload-csv）；Join 两口均为 `Output dataset`。未再打 Custom Code。MCP 专家本环境无 `mcp_*`，短场景未派。
+Filter 上游口 `Output dataset`（upload-csv）；Join 两口均为 `Output dataset`。未再打 Custom Code。
 
-**仍未用真实模型覆盖：** union / hide / report / dashboard（A/B 已测工具与编排）；工程师长跑见 `AUDIT.md`。
+**补跑（同日，分析 `capability-live-rest` / `1b7064af-…`）：** 点名 union / hide / report / dashboard，kimi-k2.6 均选对工具。摘要 `live-20260814-rest.json`，截图 `evidence/live-{union,hide,report,dashboard}.png`。
+
+| 场景 | 模型选的工具 | 产物 | 驱动 |
+| --- | --- | --- | --- |
+| union | **`add_union_step`** | u1+u2 → Union tables **4 行** id,v | 绿（129s） |
+| hide | **`add_hide_columns_step`** | wide 去掉 dropme → Hide columns 仅 id,keep | 绿（145s） |
+| report | **`create_report_step`** | 独立节点「短跑报告」 | 绿（94s） |
+| dashboard | **`create_dashboard` + `add_dashboard_widget`** | 看板「短跑看板」，放入 Union tables | 绿（89s） |
+
+MCP 专家本环境无 `mcp_*`，无法实派（派出会报无可用 MCP）。工程师见 13 日长跑 `AUDIT.md`。
 
 filter-chart 的「步骤已完仍正在生成」与 13 日 RPM 挂起同类：loop 在等收尾文本。产物已在工作区，不算功能失败。
 
@@ -64,12 +73,12 @@ filter-chart 的「步骤已完仍正在生成」与 13 日 RPM 挂起同类：l
 | --- | --- |
 | 计划/轨迹/产物/确认/提问 | mock e2e 覆盖；确认卡已挪到 `ai-pending-actions` |
 | 中止后续跑 | mock e2e 覆盖；产品保留 incomplete +「继续任务」 |
-| TPD/配额文案 + 不自动空转重试 | 单测 + mock e2e；实跑探测仍是 502+TPD |
+| TPD/配额文案 + 不自动空转重试 | 单测 + mock e2e；13 日实跑 TPD 尽；14 日短跑配额已恢复 |
 | 主区打开大表 | mock 建图会关抽屉进视图；长跑里 agent 很少主动打开表 |
 | 子代理实选工具 | 14 日短跑：规划师、分析师已派；工程师见长跑；MCP 无工具未派 |
 
 ---
 
-## 还没被真实模型选过的能力
+## 环境限制（不是漏测）
 
-union / hide / report / dashboard：工具实现与 mock 编排已测，14 日短跑未点名。MCP 专家需先启用 MCP 服务器。
+MCP 专家需先启用 MCP 服务器（当前无 `mcp_*`，派出会失败）。工程师已在 13 日长跑实派。

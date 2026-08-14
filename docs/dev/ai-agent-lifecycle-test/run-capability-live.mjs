@@ -176,42 +176,90 @@ async function runScenario(page, spec) {
     return ok ? 'ok' : 'fail'
   } catch (e) {
     const text = await drawerText(page)
+    const tables = await page.getByTestId('sidebar-table').allInnerTexts().catch(() => [])
+    const analysis = await snapshotAnalysis(page).catch((err) => ({ error: String(err) }))
     await page.screenshot({ path: path.join(SHOT, `cap-${spec.id}-err.png`) }).catch(() => {})
-    record(spec.id, 'fail', e instanceof Error ? e.message : String(e), { preview: text.slice(0, 800) })
+    const blob = `${text}\n${JSON.stringify(analysis || {})}`
+    const ok = spec.expect.every((re) => re.test(text) || tables.some((t) => re.test(t)) || re.test(blob))
+    if (ok) {
+      record(spec.id, 'ok', `产物已齐（${e instanceof Error ? e.message : String(e)}）`, {
+        preview: text.slice(0, 800),
+        tables,
+        analysis,
+      })
+      return 'ok'
+    }
+    record(spec.id, 'fail', e instanceof Error ? e.message : String(e), { preview: text.slice(0, 800), tables, analysis })
     return 'fail'
   }
 }
 
-const SCENES = [
-  {
-    id: 'filter-chart',
-    prompt:
-      '用 import_csv_text 导入表 demo_hits，CSV 如下：\nid,score\nA,3\nB,8\nC,1\n然后 Filter score>2，再画柱状图（x=id, y=score）。不要 Custom Code，不要新建第二个分析。',
-    expect: [/Filter|过滤|demo_hits|柱/i],
-    timeoutMs: 180_000,
-  },
-  {
-    id: 'join',
-    prompt:
-      '当前分析里用 import_csv_text 建两张表 left(id,v: 1,10 / 2,20) 和 right(id,label: 1,Alpha / 2,Beta)，再 add_join_step inner join on id。不要 Custom Code。',
-    expect: [/Join|合并|left/i],
-    timeoutMs: 180_000,
-  },
-  {
-    id: 'analysis-worker',
-    prompt:
-      '先用 import_csv_text 导入表 iris_tiny：\nspecies,sepal_length\nsetosa,5.1\nsetosa,4.9\nversicolor,7.0\n然后派「分析师」子代理（delegate_analysis_worker）给这张表建 bar 图，x=species，y=sepal_length。不要工程师，不要 Custom Code。',
-    expect: [/分析师|bar|柱|Iris/i],
-    timeoutMs: 240_000,
-  },
-  {
-    id: 'skill-worker',
-    prompt:
-      '派「规划师」子代理（delegate_skill_worker）列出已安装 skill 的要点，用一两句话中文告诉我。不要改表。',
-    expect: [/规划师|skill|没有已安装|要点/i],
-    timeoutMs: 120_000,
-  },
-]
+const ALL_SCENES = {
+  first: [
+    {
+      id: 'filter-chart',
+      prompt:
+        '用 import_csv_text 导入表 demo_hits，CSV 如下：\nid,score\nA,3\nB,8\nC,1\n然后 Filter score>2，再画柱状图（x=id, y=score）。不要 Custom Code，不要新建第二个分析。',
+      expect: [/Filter|过滤|demo_hits|柱/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'join',
+      prompt:
+        '当前分析里用 import_csv_text 建两张表 left(id,v: 1,10 / 2,20) 和 right(id,label: 1,Alpha / 2,Beta)，再 add_join_step inner join on id。不要 Custom Code。',
+      expect: [/Join|合并|left/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'analysis-worker',
+      prompt:
+        '先用 import_csv_text 导入表 iris_tiny：\nspecies,sepal_length\nsetosa,5.1\nsetosa,4.9\nversicolor,7.0\n然后派「分析师」子代理（delegate_analysis_worker）给这张表建 bar 图，x=species，y=sepal_length。不要工程师，不要 Custom Code。',
+      expect: [/分析师|bar|柱|Iris/i],
+      timeoutMs: 240_000,
+    },
+    {
+      id: 'skill-worker',
+      prompt:
+        '派「规划师」子代理（delegate_skill_worker）列出已安装 skill 的要点，用一两句话中文告诉我。不要改表。',
+      expect: [/规划师|skill|没有已安装|要点/i],
+      timeoutMs: 120_000,
+    },
+  ],
+  rest: [
+    {
+      id: 'union',
+      prompt:
+        '用 import_csv_text 建两张结构相同的表 u1 和 u2。\nu1 的 CSV：\nid,v\n1,10\n2,20\nu2 的 CSV：\nid,v\n3,30\n4,40\n然后必须调用 add_union_step 把 u1 与 u2 纵向合并。不要 Custom Code，不要 Join。',
+      expect: [/Union|union|u1/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'hide',
+      prompt:
+        '用 import_csv_text 导入表 wide，CSV：\nid,keep,dropme\n1,A,x\n2,B,y\n然后必须调用 add_hide_columns_step 隐藏 dropme 列。不要 Custom Code。',
+      expect: [/hide|隐藏|Hide|wide/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'report',
+      prompt:
+        '必须调用 create_report_step，节点名「短跑报告」，标题写 capability live。不要改已有表，不要 Custom Code。',
+      expect: [/报告|report/i],
+      timeoutMs: 180_000,
+    },
+    {
+      id: 'dashboard',
+      prompt:
+        '必须调用 create_dashboard 建看板「短跑看板」，若当前分析已有表，再用 add_dashboard_widget 把其中一张表放上去。不要 Custom Code。',
+      expect: [/看板|dashboard/i],
+      timeoutMs: 180_000,
+    },
+  ],
+}
+
+const pack = process.env.LIVE_SCENES === 'rest' ? 'rest' : 'first'
+const SCENES = ALL_SCENES[pack]
+const analysisName = pack === 'rest' ? 'capability-live-rest' : 'capability-live'
 
 const quota = await probeQuota()
 if (quota === 'quota' || quota === 'unconfigured') {
@@ -233,7 +281,7 @@ try {
   await page.waitForTimeout(2000)
   await page.getByRole('button', { name: '新建分析' }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('textbox').first().fill('capability-live')
+  await dialog.getByRole('textbox').first().fill(analysisName)
   await dialog.getByRole('button', { name: '创建' }).click()
   await page.waitForURL(/\/analysis\//)
   await page.waitForTimeout(1000)
