@@ -26,13 +26,16 @@ defineEmits<{
   (e: 'reject', t: TraceItem): void
 }>()
 
-const expanded = ref(false)
+const expanded = ref(!!props.streaming)
 /** 已展开明细的子项 id。 */
 const openDetail = ref<Set<string>>(new Set())
 
-const doneCount = computed(() => props.items.filter((t) => !t.running).length)
-/** 子操作仍在执行且整轮未结束 → 进行中（中止后 streaming/running 都会清掉）。 */
-const inProgress = computed(() => !!props.streaming && props.items.some((t) => t.running))
+const doneCount = computed(() => props.items.filter((t) => !t.running && t.ok !== undefined).length)
+const runningItem = computed(() => props.items.find((t) => t.running))
+/** 本轮仍有未完成操作（执行中或排队）且整轮未结束。 */
+const inProgress = computed(
+  () => !!props.streaming && props.items.some((t) => t.running || t.ok === undefined),
+)
 
 const pending = computed(() => {
   const seen = new Set<string>()
@@ -44,20 +47,13 @@ const pending = computed(() => {
   })
 })
 
-/** 有操作开始跑时自动展开，避免「全部做完才看见任务列表」。 */
+/** 有操作开始跑、或本轮仍在生成时自动展开，避免「全部做完才看见任务列表」。 */
 watch(
-  inProgress,
-  (busy) => {
-    if (busy) expanded.value = true
+  () => [!!props.streaming, props.items.length, inProgress.value] as const,
+  ([streaming, n, busy]) => {
+    if (streaming && (busy || n > 0)) expanded.value = true
   },
   { immediate: true },
-)
-
-watch(
-  () => props.items.length,
-  (n, prev) => {
-    if (props.streaming && n > (prev ?? 0)) expanded.value = true
-  },
 )
 
 function toggleDetail(id: string): void {
@@ -79,7 +75,11 @@ function pendingAction(t: TraceItem): string {
   return fullSummary(t)
 }
 
-const headLabel = computed(() => `已处理 ${props.items.length} 个操作（完成 ${doneCount.value}）`)
+const headLabel = computed(() => {
+  const base = `已处理 ${props.items.length} 个操作（完成 ${doneCount.value}）`
+  if (!runningItem.value) return base
+  return `${base} · ${briefOpLabel(runningItem.value)}`
+})
 </script>
 
 <template>
@@ -114,17 +114,18 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
           @click="hasDetail(t) && toggleDetail(t.id)"
         >
           <span class="trace__status">
-            <IIcon v-if="t.running && streaming" name="spinner" :size="11" class="trace__spin" />
+            <IIcon v-if="t.running" name="spinner" :size="11" class="trace__spin" />
             <IIcon
               v-else-if="t.needsConfirmation && !t.confirmed && !t.rejected"
               name="warning"
               :size="11"
               class="trace__warn"
             />
-            <IIcon v-else-if="t.ok" name="check" :size="11" class="trace__ok" />
-            <IIcon v-else name="close" :size="11" class="trace__fail" />
+            <IIcon v-else-if="t.ok === true" name="check" :size="11" class="trace__ok" />
+            <IIcon v-else-if="t.ok === false" name="close" :size="11" class="trace__fail" />
+            <IIcon v-else name="dot" :size="11" class="trace__queued" />
           </span>
-          <span class="trace__label" :class="{ 'trace__shimmer': t.running && streaming }">{{ briefOpLabel(t) }}</span>
+          <span class="trace__label" :class="{ 'trace__shimmer': t.running }">{{ briefOpLabel(t) }}</span>
           <IIcon
             v-if="hasDetail(t)"
             name="chevron-right"
@@ -296,6 +297,9 @@ const headLabel = computed(() => `已处理 ${props.items.length} 个操作（�
 }
 .trace__warn {
   color: var(--is-warning-text);
+}
+.trace__queued {
+  color: var(--is-text-tertiary);
 }
 .trace__label {
   flex: 1;
