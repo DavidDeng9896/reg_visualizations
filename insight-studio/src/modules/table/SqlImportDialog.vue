@@ -17,6 +17,7 @@ import {
   fetchRemoteSchema,
   remoteSchemaForEditor,
   runRemoteSqlQuery,
+  startSqlProxy,
   testRemoteConnection,
   type RemoteSchemaTable,
 } from './remoteSql'
@@ -48,6 +49,7 @@ const connections = ref<DbConnectionProfile[]>([])
 const activeId = ref<string>('')
 const draft = ref<DbConnectionProfile>(defaultProfile())
 const proxyOk = ref<boolean | null>(null)
+const startingProxy = ref(false)
 const testing = ref(false)
 const testMsg = ref('')
 /** 连接反馈语气：成功 / 失败 / 中性 */
@@ -188,6 +190,27 @@ async function refreshProxy() {
   proxyOk.value = await checkSqlProxyHealth()
 }
 
+async function startProxy() {
+  if (startingProxy.value) return
+  startingProxy.value = true
+  testMsg.value = ''
+  testMsgTone.value = 'neutral'
+  try {
+    await startSqlProxy()
+    await refreshProxy()
+    if (proxyOk.value) {
+      testMsg.value = 'SQL 代理已启动。'
+      testMsgTone.value = 'ok'
+    }
+  } catch (e) {
+    testMsg.value = e instanceof Error ? e.message : String(e)
+    testMsgTone.value = 'bad'
+    await refreshProxy()
+  } finally {
+    startingProxy.value = false
+  }
+}
+
 async function testConn() {
   testing.value = true
   testMsg.value = ''
@@ -200,7 +223,7 @@ async function testConn() {
     }
     await refreshProxy()
     if (!proxyOk.value) {
-      testMsg.value = 'SQL 代理未启动：请运行 npm run dev:api（或 npm run dev）'
+      testMsg.value = 'SQL 代理未启动。请点上方「启动」，或在 insight-studio 目录执行 npm run dev:api。'
       testMsgTone.value = 'bad'
       return
     }
@@ -245,7 +268,7 @@ async function run() {
     let result: { rows: Record<string, unknown>[]; columns: string[]; truncated?: boolean }
     if (sourceMode.value === 'remote') {
       await refreshProxy()
-      if (!proxyOk.value) throw new Error('SQL 代理未启动：请运行 npm run dev:api（或使用 npm run dev）')
+      if (!proxyOk.value) throw new Error('SQL 代理未启动。请点上方「启动」，或在 insight-studio 目录执行 npm run dev:api。')
       result = await runRemoteSqlQuery(draft.value, sql.value)
       truncated.value = !!result.truncated
     } else {
@@ -378,7 +401,24 @@ watch(sourceMode, (mode) => {
           连接你自己的 Postgres / MySQL，用 SQL 拉数导入。需本机 SQL 代理
           <code>npm run dev:api</code>
           （状态：
-          <span :class="proxyOk ? 'sql__ok' : 'sql__bad'">{{ proxyOk ? '已连接' : proxyOk === false ? '未启动' : '检测中…' }}</span>
+          <span class="sql__proxy-status">
+            <span :class="proxyOk ? 'sql__ok' : 'sql__bad'">{{
+              proxyOk ? '已连接' : proxyOk === false ? '未启动' : '检测中…'
+            }}</span>
+            <IButton
+              v-if="proxyOk === false"
+              size="sm"
+              variant="secondary"
+              icon="play"
+              class="sql__proxy-start"
+              data-testid="sql-proxy-start"
+              aria-label="启动 SQL 代理"
+              :loading="startingProxy"
+              @click="startProxy"
+            >
+              {{ startingProxy ? '启动中…' : '启动' }}
+            </IButton>
+          </span>
           ）。Host 填数据库地址（本机库用 <code>127.0.0.1</code>）；密码只保存在本机浏览器。
         </template>
         <template v-else>
@@ -597,6 +637,12 @@ watch(sourceMode, (mode) => {
   background: var(--is-surface-muted, #f2f4f7);
   border: 1px solid var(--is-border);
 }
+.sql__proxy-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
 .sql__ok {
   color: var(--is-success);
   font-weight: 600;
@@ -604,6 +650,10 @@ watch(sourceMode, (mode) => {
 .sql__bad {
   color: var(--is-danger);
   font-weight: 600;
+}
+.sql__proxy-start {
+  height: 22px;
+  padding: 0 8px;
 }
 .sql__conn {
   display: flex;

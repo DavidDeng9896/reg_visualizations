@@ -50,7 +50,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
       body: JSON.stringify(body),
     })
   } catch {
-    throw new Error('无法连接 SQL 代理。请先运行 npm run dev:api（或 npm run dev 会一并启动）')
+    throw new Error('无法连接 SQL 代理。请点「启动」，或在 insight-studio 目录运行 npm run dev:api')
   }
   const data = (await res.json().catch(() => ({}))) as T & { ok?: boolean; error?: string }
   if (!res.ok || (data as { ok?: boolean }).ok === false) {
@@ -68,6 +68,25 @@ export async function checkSqlProxyHealth(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** 请已运行的 Vite 开发服务器拉起本机 SQL 代理（:7120）。 */
+export async function startSqlProxy(): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch('/__insight/sql-proxy/start', { method: 'POST' })
+  } catch {
+    throw new Error('无法请求开发服务器启动 SQL 代理')
+  }
+  if (res.status === 404) {
+    throw new Error('当前环境不能一键启动代理，请在本机终端运行 npm run dev:api')
+  }
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.error || '启动 SQL 代理失败')
+  }
+  if (await checkSqlProxyHealth()) return
+  throw new Error('SQL 代理已请求启动，但尚未就绪，请稍后再试')
 }
 
 export async function testRemoteConnection(p: DbConnectionProfile): Promise<string> {
