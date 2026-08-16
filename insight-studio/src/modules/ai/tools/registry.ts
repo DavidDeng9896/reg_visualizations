@@ -158,14 +158,16 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'create_report_step',
     description:
-      '在当前分析流程图中创建独立「分析报告」节点（无需连线）。可选传入完整 report JSON（title/sections/conclusion）；缺省为科研主题空壳，用户可在节点内 AI 辅助填写。',
+      '在当前分析流程图中创建独立「分析报告」节点（无需连线，内容可很长）。可选 templateId（research|antibody|dashboard-review）按内置模板脚手架生成图+caption+解读；也可直接传入完整 report JSON。AI 应自动撰写各图 caption 与解读段落，勿只放空壳。',
     parameters: {
       type: 'object',
       properties: {
         name: str('节点名称（可选，默认「分析报告」）'),
+        templateId: str('内置模板：research（默认）| antibody | dashboard-review'),
         report: {
           type: 'object',
-          description: 'AnalysisReport：title, subtitle?, sections[], conclusion?, theme:"research"',
+          description:
+            'AnalysisReport：title, subtitle?, templateId?, sections[]（含 chart/table 的 caption 与紧随的 paragraph 解读）, conclusion?, theme:"research"。章节与结论允许长文。',
         },
       },
     },

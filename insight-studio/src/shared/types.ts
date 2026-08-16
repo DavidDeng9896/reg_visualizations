@@ -403,6 +403,9 @@ export interface StepNode {
 /** 报告章节：结构化存储，由科研主题模板渲染为 HTML。 */
 export type ReportSectionKind = 'heading' | 'paragraph' | 'bullets' | 'chart' | 'table' | 'divider'
 
+/** 内置报告模板 id（Skill 可后续覆盖扩展）。 */
+export type ReportTemplateId = 'research' | 'antibody' | 'dashboard-review'
+
 export interface ReportSection {
   id: string
   kind: ReportSectionKind
@@ -425,6 +428,8 @@ export interface AnalysisReport {
   generatedAt: string
   /** 目前仅 research；预留扩展 */
   theme: 'research'
+  /** 选用的内置模板 */
+  templateId?: ReportTemplateId
   sections: ReportSection[]
   conclusion?: string
 }

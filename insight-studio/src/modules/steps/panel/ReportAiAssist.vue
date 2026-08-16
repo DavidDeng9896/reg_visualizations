@@ -52,6 +52,7 @@ function systemPrompt(): string {
   "title": string,
   "subtitle": string,
   "theme": "research",
+  "templateId": "research"|"antibody"|"dashboard-review",
   "sections": [
     { "id": string, "kind": "heading"|"paragraph"|"bullets"|"chart"|"table"|"divider",
       "title"?: string, "body"?: string, "items"?: string[],
@@ -60,9 +61,18 @@ function systemPrompt(): string {
   "conclusion": string
 }
 
+## 结构（默认）
+1. 分析目标与数据范围
+2. 数据概况（bullets）
+3. 关键发现：每个 chart/table 后紧跟一段 **解读 paragraph**（自动写 caption + 解读，可写长）
+4. 结论（可较长）
+
+内置模板：research（通用）/ antibody（抗体筛选，含候选一览）/ dashboard-review（复盘与行动项）。
+
 ## 风格
 - 简洁、专业、权威；中文；避免空话与 emoji
-- 章节一节一事；可引用已有表/视图 id（chart/table 节）
+- **必须**为引用的图/表填写有信息量的 caption，并撰写解读（引用趋势、离群点、分组差异等）
+- 章节与结论允许较长正文；一节一事
 - 若用户要求改格式/语气/结构，在现有报告基础上修改
 
 ## 当前分析
@@ -124,7 +134,7 @@ function apply() {
       </button>
     </header>
     <div class="rai__body">
-      <p class="rai__hint">根据当前分析生成或改写科研风格报告；写入后可在预览中查看，并用「导出 PDF」打印。</p>
+      <p class="rai__hint">根据当前分析自动生成图注与解读（内容可较长）；写入后可在预览中交互看图，并用「导出 PDF」嵌入静态图。</p>
       <div class="rai__row">
         <ITextField
           v-model="prompt"

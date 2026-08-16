@@ -3,10 +3,11 @@
  * 分析报告可视化编辑器：章节增删改排序 + 实时预览。
  */
 import { computed, ref } from 'vue'
-import type { Analysis, AnalysisReport, ReportSection, ReportSectionKind } from '../../../shared/types'
+import type { Analysis, AnalysisReport, ReportSection, ReportSectionKind, ReportTemplateId } from '../../../shared/types'
 import { uuid } from '../../../shared/id'
 import { IButton, IIcon, ISelect, ITextField } from '../../../ui'
 import ReportPreview from './ReportPreview.vue'
+import { REPORT_TEMPLATES, scaffoldReportFromAnalysis } from '../report/reportTemplates'
 
 const props = withDefaults(
   defineProps<{
@@ -33,6 +34,8 @@ const sectionKindOptions = [
   { value: 'divider', label: '分割线' },
 ]
 
+const templateOptions = REPORT_TEMPLATES.map((t) => ({ value: t.id, label: t.label }))
+
 const tableOptions = computed(() => {
   if (!props.analysis) return []
   return props.analysis.tables.map((t) => ({ value: t.id, label: t.name }))
@@ -46,6 +49,12 @@ function viewOptions(tableId: string | undefined) {
 
 function update(patch: Partial<AnalysisReport>) {
   emit('update:report', { ...props.report, ...patch })
+}
+
+function applyTemplate(id: ReportTemplateId) {
+  if (props.readonly || !props.analysis) return
+  const next = scaffoldReportFromAnalysis(props.analysis, id, props.report.title)
+  emit('update:report', next)
 }
 
 function updateSection(id: string, patch: Partial<ReportSection>) {
@@ -123,6 +132,33 @@ function sectionItemsText(sec: ReportSection): string {
             @update:model-value="update({ subtitle: String($event ?? '') })"
           />
         </div>
+        <div class="red__field">
+          <label class="red__label">内置模板</label>
+          <div class="red__template-row">
+            <ISelect
+              :model-value="report.templateId ?? 'research'"
+              size="sm"
+              :options="templateOptions"
+              :disabled="readonly"
+              @update:model-value="update({ templateId: String($event) as ReportTemplateId })"
+            />
+            <IButton
+              v-if="!readonly && analysis"
+              size="sm"
+              variant="secondary"
+              title="按模板从当前分析重新生成章节骨架（会覆盖现有章节）"
+              @click="applyTemplate((report.templateId as ReportTemplateId) || 'research')"
+            >
+              应用脚手架
+            </IButton>
+          </div>
+          <p class="red__hint">
+            {{
+              REPORT_TEMPLATES.find((t) => t.id === (report.templateId || 'research'))?.description ??
+              ''
+            }}
+          </p>
+        </div>
 
         <div class="red__sections">
           <div v-for="(sec, i) in report.sections" :key="sec.id" class="red__sec">
@@ -164,8 +200,8 @@ function sectionItemsText(sec: ReportSection): string {
                 <textarea
                   class="red__textarea"
                   :value="sec.body ?? ''"
-                  rows="4"
-                  placeholder="段落内容…"
+                  rows="8"
+                  placeholder="段落内容（可较长）…"
                   :disabled="readonly"
                   @input="updateSection(sec.id, { body: ($event.target as HTMLTextAreaElement).value })"
                 />
@@ -238,8 +274,8 @@ function sectionItemsText(sec: ReportSection): string {
           <textarea
             class="red__textarea"
             :value="report.conclusion ?? ''"
-            rows="4"
-            placeholder="研究结论…"
+            rows="8"
+            placeholder="研究结论（可较长）…"
             :disabled="readonly"
             @input="update({ conclusion: ($event.target as HTMLTextAreaElement).value })"
           />
@@ -368,6 +404,7 @@ function sectionItemsText(sec: ReportSection): string {
 }
 .red__textarea {
   width: 100%;
+  min-height: 96px;
   padding: 8px 10px;
   border: 1px solid var(--is-border);
   border-radius: 6px;
@@ -382,6 +419,22 @@ function sectionItemsText(sec: ReportSection): string {
   outline: none;
   border-color: var(--is-accent);
   box-shadow: var(--is-ring-sm);
+}
+.red__template-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.red__template-row :deep(.i-select) {
+  flex: 1;
+  min-width: 140px;
+}
+.red__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+  line-height: 1.4;
 }
 .red__add {
   display: flex;

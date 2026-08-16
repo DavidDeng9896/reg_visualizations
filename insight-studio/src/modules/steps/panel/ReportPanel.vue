@@ -139,7 +139,7 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   <div ref="rpEl" class="rpt">
     <!-- 状态栏 -->
     <div class="rpt__status-bar">
-      <span class="rpt__meta">{{ reportDoc.sections.length }} 个章节</span>
+      <span class="rpt__meta">{{ reportDoc.sections.length }} 个章节 · 模板 {{ reportDoc.templateId || 'research' }}</span>
       <div class="rpt__status-actions">
         <IButton v-if="!readonly" size="sm" variant="ghost" icon="sparkle" @click="onAiToggle">
           AI 写报告
