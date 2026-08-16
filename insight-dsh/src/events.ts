@@ -74,7 +74,16 @@ export function sessionEventToAgentEvents(event: unknown): AgentEvent[] {
   }
 
   if (type === 'turn/end' || type === 'turn_end') {
-    /* 结束由 HTTP 桥统一发 done，避免空 content 覆盖已流式正文 */
+    const reason = data.reason
+    if (reason && typeof reason === 'object') {
+      const r = reason as Record<string, unknown>
+      if (String(r.kind ?? '') === 'error') {
+        const err = (r.error && typeof r.error === 'object' ? r.error : r.failure) as Record<string, unknown> | undefined
+        const msg = String(err?.message ?? 'LLM 请求失败')
+        return [{ type: 'error', message: msg }]
+      }
+    }
+    /* 正常结束由 HTTP 桥统一发 done，避免空 content 覆盖已流式正文 */
     return []
   }
 

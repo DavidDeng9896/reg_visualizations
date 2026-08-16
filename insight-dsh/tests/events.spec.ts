@@ -31,6 +31,15 @@ describe('sessionEventToAgentEvents extras', () => {
   it('does not emit done on turn/end', () => {
     expect(sessionEventToAgentEvents({ type: 'turn/end', content: 'hi' })).toEqual([])
   })
+
+  it('emits error on failed LLM turn', () => {
+    expect(
+      sessionEventToAgentEvents({
+        type: 'turn/end',
+        data: { reason: { kind: 'error', error: { message: 'DeepSeek API error (HTTP 400)', status: 400 } } },
+      }),
+    ).toEqual([{ type: 'error', message: 'DeepSeek API error (HTTP 400)' }])
+  })
 })
 
 describe('jsonSchemaToDshParams', () => {

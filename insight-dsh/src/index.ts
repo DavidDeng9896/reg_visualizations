@@ -44,6 +44,11 @@ function inferThinkingFromProvider() {
   if (shouldDisableThinking(process.env.DEEPSEEK_BASE_URL || '', process.env.DSH_THINKING)) {
     process.env.DSH_THINKING = 'disabled'
   }
+  const base = process.env.DEEPSEEK_BASE_URL || ''
+  if (/aliyuncs\.com|dashscope|maas\.aliyun|compatible-mode/i.test(base)) {
+    // 阿里云兼容端 max_tokens 上限 65536，DeepSeek 适配器默认 256000 会 400
+    process.env.DSH_MAX_TOKENS = process.env.DSH_MAX_TOKENS || '32768'
+  }
   if (process.env.DSH_THINKING === 'disabled') {
     process.env.DSH_REASONING_EFFORT = process.env.DSH_REASONING_EFFORT || 'off'
   } else {
@@ -63,7 +68,7 @@ if (mock) {
   try {
     dsh = await boot('insight-dsh', path.join(root, 'cordis.yml'))
     console.log(
-      `[insight-dsh] DeepSeek Harness booted model=${process.env.DSH_MODEL || '(provider default)'} thinking=${process.env.DSH_THINKING || 'enabled'} base=${process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'}`,
+      `[insight-dsh] DeepSeek Harness booted model=${process.env.DSH_MODEL || '(provider default)'} thinking=${process.env.DSH_THINKING || 'enabled'} maxTokens=${process.env.DSH_MAX_TOKENS || '256000'} base=${process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'}`,
     )
   } catch (err) {
     console.error('[insight-dsh] dsh boot failed, HTTP will report 503:', err)

@@ -8,6 +8,7 @@
     # thinking / effort 由 index.ts 根据网关写成 enabled|disabled 与 max|off。
     thinking: !!js process.env.DSH_THINKING || 'enabled'
     reasoningEffort: !!js process.env.DSH_REASONING_EFFORT || 'max'
+    maxTokens: !!js Number(process.env.DSH_MAX_TOKENS || 256000)
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
