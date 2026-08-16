@@ -59,6 +59,8 @@ const formHeaders = ref<McpHeaderKV[]>([{ key: '', value: '' }])
 const editingMcpId = ref<string | null>(null)
 const savingMcp = ref(false)
 const refreshingId = ref<string | null>(null)
+const skillDraft = ref('')
+const savingSkill = ref(false)
 
 const memories = ref<AiMemory[]>([])
 const loadingMemories = ref(false)
@@ -66,21 +68,6 @@ const memoryDraft = ref('')
 const savingMemory = ref(false)
 
 const title = computed(() => '能力')
-const mcpSubmitLabel = computed(() => (editingMcpId.value ? '保存修改' : '添加连接'))
-
-function resetMcpForm(): void {
-  editingMcpId.value = null
-  formName.value = ''
-  formUrl.value = ''
-  formHeaders.value = [{ key: '', value: '' }]
-}
-
-function startEditServer(s: McpServerView): void {
-  editingMcpId.value = s.id
-  formName.value = s.name
-  formUrl.value = s.url
-  formHeaders.value = [{ key: '', value: '' }]
-}
 
 async function loadSkills(): Promise<string | null> {
   loadingSkills.value = true
@@ -187,8 +174,79 @@ async function removeSkill(s: SkillInfo): Promise<void> {
 async function openPreview(s: SkillInfo): Promise<void> {
   try {
     preview.value = await aiSkillsApi.get(s.id)
+    skillDraft.value = preview.value.body
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : '预览失败')
+    toast.error(e instanceof Error ? e.message : '加载失败')
+  }
+}
+
+async function saveSkillBody(): Promise<void> {
+  if (!preview.value || preview.value.source === 'official') return
+  savingSkill.value = true
+  try {
+    const d = await aiSkillsApi.updateBody(preview.value.id, skillDraft.value)
+    preview.value = d
+    skillDraft.value = d.body
+    toast.success('已保存 Skill')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败')
+  } finally {
+    savingSkill.value = false
+  }
+}
+
+function startEditMcp(s: McpServerView): void {
+  editingMcpId.value = s.id
+  formName.value = s.name
+  formUrl.value = s.url
+  formHeaders.value = s.headerKeys.length
+    ? s.headerKeys.map((key) => ({ key, value: '' }))
+    : [{ key: '', value: '' }]
+}
+
+function cancelEditMcp(): void {
+  editingMcpId.value = null
+  formName.value = ''
+  formUrl.value = ''
+  formHeaders.value = [{ key: '', value: '' }]
+}
+
+async function saveMcp(): Promise<void> {
+  const name = formName.value.trim()
+  const url = formUrl.value.trim()
+  if (!name || !url) {
+    toast.error('请填写名称与 URL')
+    return
+  }
+  const headers = formHeaders.value.filter((h) => h.key.trim())
+  savingMcp.value = true
+  try {
+    if (editingMcpId.value) {
+      const id = editingMcpId.value
+      const patch: { name: string; url: string; headers?: McpHeaderKV[] } = { name, url }
+      if (headers.some((h) => h.value.trim())) patch.headers = headers
+      await aiMcpApi.patch(id, patch)
+      toast.success('已更新 MCP')
+      cancelEditMcp()
+      await loadMcp()
+      try {
+        await aiMcpApi.refresh(id)
+        await loadMcp()
+      } catch {
+        /* refresh optional */
+      }
+    } else {
+      await aiMcpApi.create({ name, url, headers })
+      formName.value = ''
+      formUrl.value = ''
+      formHeaders.value = [{ key: '', value: '' }]
+      toast.success('已添加 MCP')
+      await loadMcp()
+    }
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '保存失败')
+  } finally {
+    savingMcp.value = false
   }
 }
 
@@ -220,34 +278,6 @@ function addHeaderRow(): void {
 function removeHeaderRow(i: number): void {
   formHeaders.value.splice(i, 1)
   if (!formHeaders.value.length) formHeaders.value.push({ key: '', value: '' })
-}
-
-async function addServer(): Promise<void> {
-  const name = formName.value.trim()
-  const url = formUrl.value.trim()
-  if (!name || !url) {
-    toast.error('请填写名称与 URL')
-    return
-  }
-  const headers = formHeaders.value.filter((h) => h.key.trim())
-  savingMcp.value = true
-  try {
-    if (editingMcpId.value) {
-      const patch: { name: string; url: string; headers?: McpHeaderKV[] } = { name, url }
-      if (headers.length) patch.headers = headers
-      await aiMcpApi.patch(editingMcpId.value, patch)
-      toast.success('已更新 MCP')
-    } else {
-      await aiMcpApi.create({ name, url, headers })
-      toast.success('已添加 MCP')
-    }
-    resetMcpForm()
-    await loadMcp()
-  } catch (e) {
-    toast.error(e instanceof Error ? e.message : '保存失败')
-  } finally {
-    savingMcp.value = false
-  }
 }
 
 async function toggleServer(s: McpServerView, enabled: boolean): Promise<void> {
@@ -372,7 +402,17 @@ async function removeMemory(m: AiMemory): Promise<void> {
             <strong>{{ preview.name }}</strong>
             <button type="button" class="cap__link" @click="preview = null">关闭</button>
           </div>
-          <pre class="cap__preview-body">{{ preview.body }}</pre>
+          <textarea
+            v-if="preview.source !== 'official'"
+            v-model="skillDraft"
+            class="cap__preview-edit"
+            rows="12"
+            aria-label="编辑 SKILL.md"
+          />
+          <pre v-else class="cap__preview-body">{{ preview.body }}</pre>
+          <div v-if="preview.source !== 'official'" class="cap__preview-actions">
+            <IButton size="sm" variant="primary" :loading="savingSkill" @click="saveSkillBody">保存</IButton>
+          </div>
         </div>
       </div>
 
@@ -388,16 +428,19 @@ async function removeMemory(m: AiMemory): Promise<void> {
           </label>
           <div class="cap__field">
             <span>Headers</span>
+            <p v-if="editingMcpId" class="cap__hint">编辑时留空 Value 表示保留原 Header；填写 Value 则整体覆盖。</p>
             <div v-for="(h, i) in formHeaders" :key="i" class="cap__hdr">
               <ITextField v-model="h.key" placeholder="Key" />
-              <ITextField v-model="h.value" placeholder="Value" type="password" />
+              <ITextField v-model="h.value" :placeholder="editingMcpId ? '留空则保留' : 'Value'" type="password" />
               <button type="button" class="cap__link" @click="removeHeaderRow(i)">−</button>
             </div>
             <button type="button" class="cap__link" @click="addHeaderRow">+ 添加 Header</button>
           </div>
           <div class="cap__form-actions">
-            <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">{{ mcpSubmitLabel }}</IButton>
-            <button v-if="editingMcpId" type="button" class="cap__link" @click="resetMcpForm">取消编辑</button>
+            <IButton v-if="editingMcpId" size="sm" @click="cancelEditMcp">取消</IButton>
+            <IButton variant="primary" size="sm" :loading="savingMcp" @click="saveMcp">
+              {{ editingMcpId ? '保存修改' : '添加连接' }}
+            </IButton>
           </div>
         </div>
         <p v-if="loadingMcp" class="cap__empty">加载中…</p>
@@ -412,7 +455,7 @@ async function removeMemory(m: AiMemory): Promise<void> {
               <p class="cap__desc cap__desc--mono">{{ s.url }}</p>
               <p v-if="s.lastError" class="cap__err">{{ s.lastError }}</p>
               <div class="cap__actions">
-                <button type="button" class="cap__link" @click="startEditServer(s)">编辑</button>
+                <button type="button" class="cap__link" @click="startEditMcp(s)">编辑</button>
                 <button
                   type="button"
                   class="cap__link"
@@ -518,7 +561,17 @@ async function removeMemory(m: AiMemory): Promise<void> {
             <strong>{{ preview.name }}</strong>
             <button type="button" class="cap__link" @click="preview = null">关闭</button>
           </div>
-          <pre class="cap__preview-body">{{ preview.body }}</pre>
+          <textarea
+            v-if="preview.source !== 'official'"
+            v-model="skillDraft"
+            class="cap__preview-edit"
+            rows="12"
+            aria-label="编辑 SKILL.md"
+          />
+          <pre v-else class="cap__preview-body">{{ preview.body }}</pre>
+          <div v-if="preview.source !== 'official'" class="cap__preview-actions">
+            <IButton size="sm" variant="primary" :loading="savingSkill" @click="saveSkillBody">保存</IButton>
+          </div>
         </div>
       </div>
 
@@ -534,16 +587,19 @@ async function removeMemory(m: AiMemory): Promise<void> {
           </label>
           <div class="cap__field">
             <span>Headers</span>
+            <p v-if="editingMcpId" class="cap__hint">编辑时留空 Value 表示保留原 Header；填写 Value 则整体覆盖。</p>
             <div v-for="(h, i) in formHeaders" :key="i" class="cap__hdr">
               <ITextField v-model="h.key" placeholder="Key" />
-              <ITextField v-model="h.value" placeholder="Value" type="password" />
+              <ITextField v-model="h.value" :placeholder="editingMcpId ? '留空则保留' : 'Value'" type="password" />
               <button type="button" class="cap__link" @click="removeHeaderRow(i)">−</button>
             </div>
             <button type="button" class="cap__link" @click="addHeaderRow">+ 添加 Header</button>
           </div>
           <div class="cap__form-actions">
-            <IButton variant="primary" size="sm" :loading="savingMcp" @click="addServer">{{ mcpSubmitLabel }}</IButton>
-            <button v-if="editingMcpId" type="button" class="cap__link" @click="resetMcpForm">取消编辑</button>
+            <IButton v-if="editingMcpId" size="sm" @click="cancelEditMcp">取消</IButton>
+            <IButton variant="primary" size="sm" :loading="savingMcp" @click="saveMcp">
+              {{ editingMcpId ? '保存修改' : '添加连接' }}
+            </IButton>
           </div>
         </div>
         <p v-if="loadingMcp" class="cap__empty">加载中…</p>
@@ -558,7 +614,7 @@ async function removeMemory(m: AiMemory): Promise<void> {
               <p class="cap__desc cap__desc--mono">{{ s.url }}</p>
               <p v-if="s.lastError" class="cap__err">{{ s.lastError }}</p>
               <div class="cap__actions">
-                <button type="button" class="cap__link" @click="startEditServer(s)">编辑</button>
+                <button type="button" class="cap__link" @click="startEditMcp(s)">编辑</button>
                 <button
                   type="button"
                   class="cap__link"
@@ -715,6 +771,27 @@ async function removeMemory(m: AiMemory): Promise<void> {
   display: flex;
   justify-content: space-between;
   margin-bottom: 6px;
+}
+.cap__preview-edit {
+  width: 100%;
+  min-height: 220px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--is-border);
+  border-radius: var(--is-radius-sm);
+  background: var(--is-bg);
+  color: var(--is-text);
+  font-family: var(--is-font-mono, ui-monospace, monospace);
+  font-size: var(--is-text-xs);
+  line-height: 1.5;
+  resize: vertical;
+}
+.cap__preview-actions,
+.cap__form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
 }
 .cap__preview-body {
   margin: 0;

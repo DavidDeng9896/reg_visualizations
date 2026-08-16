@@ -6,7 +6,7 @@ import { useAnalysisStore } from '../../stores/analysisStore'
 import { useAiStore } from './aiStore'
 import { CONTEXT_TOKEN_LIMIT, formatTokens } from './tokens'
 import type { MentionTarget } from './context'
-import { attachmentKindIcon, mentionIcon, VIEW_ICON } from './mentionIcons'
+import { attachmentKindIcon, iconForMention, mentionIcon as resolveMentionIcon } from './mentionIcons'
 import type { IconName } from '../../ui'
 import type { ViewNode } from '../../shared/types'
 import { aiFilesApi } from './client'
@@ -98,29 +98,38 @@ const SLASH_COMMANDS = [
 
 /* ------------------------------- 引用（@） ------------------------------- */
 
-function appendViewMentions(
-  views: ViewNode[],
-  tableId: string,
-  items: { key: string; label: string; icon: IconName; target: MentionTarget }[],
-): void {
+type MentionItem = { key: string; label: string; target: MentionTarget; icon: IconName }
+
+function appendViewMentions(views: ViewNode[], tableId: string, items: MentionItem[]): void {
   for (const v of views) {
+    const target: MentionTarget = { kind: 'view', tableId, viewId: v.id }
     items.push({
       key: `v-${v.id}`,
       label: `视图：${v.name}`,
-      icon: VIEW_ICON[v.type],
-      target: { kind: 'view', tableId, viewId: v.id },
+      icon: iconForMention(target, v.type),
+      target,
     })
     appendViewMentions(v.children, tableId, items)
   }
 }
 
-const mentionables = computed(() => {
-  const items: { key: string; label: string; icon: IconName; target: MentionTarget }[] = []
+const mentionables = computed((): MentionItem[] => {
+  const items: MentionItem[] = []
   const a = current.value
   if (a) {
-    items.push({ key: 'analysis', label: `分析：${a.name}`, icon: 'database', target: { kind: 'analysis' } })
+    items.push({
+      key: 'analysis',
+      label: `分析：${a.name}`,
+      icon: iconForMention({ kind: 'analysis' }),
+      target: { kind: 'analysis' },
+    })
     for (const t of a.tables) {
-      items.push({ key: `t-${t.id}`, label: `表：${t.name}`, icon: 'table', target: { kind: 'table', tableId: t.id } })
+      items.push({
+        key: `t-${t.id}`,
+        label: `表：${t.name}`,
+        icon: iconForMention({ kind: 'table', tableId: t.id }),
+        target: { kind: 'table', tableId: t.id },
+      })
       appendViewMentions(t.views, t.id, items)
     }
   }
@@ -167,20 +176,19 @@ function mentionLabel(m: MentionTarget): string {
   const t = a?.tables.find((x) => x.id === m.tableId)
   return t?.views.find((v) => v.id === m.viewId)?.name ?? '视图'
 }
-
-function iconForMention(m: MentionTarget): IconName {
-  return mentionIcon(m, current.value)
+function mentionIcon(m: MentionTarget): IconName {
+  return resolveMentionIcon(m, current.value)
 }
 
 /** 从 + 菜单选引用：不加文本，直接成 chip。 */
-function pickMentionFromMenu(it: { label: string; target: MentionTarget }): void {
+function pickMentionFromMenu(it: MentionItem): void {
   addMention(it.target)
   menuMode.value = null
   void nextTick(() => inputEl.value?.focus())
 }
 
 /** 内联 @ 选引用：删掉正在输入的 @token 再成 chip。 */
-function pickMentionInline(it: { label: string; target: MentionTarget }): void {
+function pickMentionInline(it: MentionItem): void {
   const el = inputEl.value
   const caret = el?.selectionStart ?? text.value.length
   const before = text.value.slice(0, caret).replace(/@[^\s@]*$/, '')
@@ -446,7 +454,7 @@ watch(
         >
           <div v-if="mentions.length" class="bar__mentions">
             <span v-for="(m, i) in mentions" :key="i" class="bar__chip">
-              <IIcon :name="iconForMention(m)" :size="11" />
+              <IIcon :name="mentionIcon(m)" :size="11" />
               {{ mentionLabel(m) }}
               <button type="button" aria-label="移除引用" @click="removeMention(i)">×</button>
             </span>

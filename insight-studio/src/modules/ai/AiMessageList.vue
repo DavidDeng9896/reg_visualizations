@@ -9,6 +9,7 @@ import ReasoningCard from './ReasoningCard.vue'
 import AskCard from './AskCard.vue'
 import { useAiStore, type TraceItem, type UiMessage } from './aiStore'
 import { attachmentKindIcon } from './mentionIcons'
+import { renderMd } from './renderMd'
 
 /** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
 const props = defineProps<{
@@ -34,132 +35,6 @@ function fmtTime(at: number): string {
   } catch {
     return ''
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-/** 去除 emoji/装饰符号（保留 → × 及 ⚠ ✓ ✗ 等有语义符号），渲染层兜底。 */
-function stripEmoji(s: string): string {
-  return s
-    .replace(
-      /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{269F}\u{26A2}-\u{26FF}\u{2700}-\u{2712}\u{2714}-\u{2716}\u{2718}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,
-      '',
-    )
-    .replace(/[ \t]{2,}/g, ' ')
-}
-
-/** 长文按句号断段，避免一整坨挤在一起。 */
-function breakLongParagraphs(src: string): string {
-  return src
-    .split(/\n{2,}/)
-    .map((block) => {
-      const trimmed = block.trim()
-      if (!trimmed) return ''
-      if (/^```/m.test(trimmed) || /^\s*[-*] /m.test(trimmed) || /^\s*#{1,4}\s/m.test(trimmed) || /^\s*\|/m.test(trimmed)) {
-        return block
-      }
-      if (trimmed.includes('\n') && trimmed.length < 420) return block
-      const parts = trimmed
-        .replace(/([。！？；])(?!\n)/g, '$1\n')
-        .replace(/([.!?])\s+(?=[A-Z\u4e00-\u9fff])/g, '$1\n')
-        .split('\n')
-        .map((p) => p.trim())
-        .filter(Boolean)
-      if (parts.length <= 1) return block
-      const out: string[] = []
-      let cur = ''
-      for (const p of parts) {
-        if (!cur) cur = p
-        else if (cur.length < 56) {
-          const needSpace = /[a-zA-Z0-9]$/.test(cur) && /^[A-Za-z]/.test(p)
-          cur = `${cur}${needSpace ? ' ' : ''}${p}`
-        } else {
-          out.push(cur)
-          cur = p
-        }
-      }
-      if (cur) out.push(cur)
-      return out.join('\n\n')
-    })
-    .filter(Boolean)
-    .join('\n\n')
-}
-
-/** 轻量 markdown → html（先做 HTML 转义，再按模式替换）。 */
-function renderMd(src: string): string {
-  const lines = escapeHtml(breakLongParagraphs(src)).split('\n')
-  const out: string[] = []
-  let i = 0
-  let listOpen = false
-  const inline = (t: string): string =>
-    t
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-
-  while (i < lines.length) {
-    const raw = lines[i]
-    // 代码块（内容原样保留，不去 emoji）
-    if (raw.trimStart().startsWith('```')) {
-      const buf: string[] = []
-      i += 1
-      while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
-        buf.push(lines[i])
-        i += 1
-      }
-      i += 1
-      out.push(`<pre class="md-pre">${buf.join('\n')}</pre>`)
-      continue
-    }
-    const line = stripEmoji(raw)
-    if (!line.trim()) {
-      if (listOpen) {
-        out.push('</ul>')
-        listOpen = false
-      }
-      i += 1
-      continue
-    }
-    // 表格
-    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
-      const header = line.split('|').slice(1, -1).map((c) => c.trim())
-      const rows: string[][] = []
-      i += 2
-      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
-        rows.push(lines[i].split('|').slice(1, -1).map((c) => c.trim()))
-        i += 1
-      }
-      out.push(
-        `<table class="md-table"><thead><tr>${header.map((h) => `<th>${inline(h)}</th>`).join('')}</tr></thead><tbody>${rows
-          .map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`)
-          .join('')}</tbody></table>`,
-      )
-      continue
-    }
-    // 列表
-    if (/^\s*[-*] /.test(line)) {
-      if (!listOpen) {
-        out.push('<ul class="md-ul">')
-        listOpen = true
-      }
-      out.push(`<li>${inline(line.replace(/^\s*[-*] /, ''))}</li>`)
-      i += 1
-      continue
-    }
-    if (listOpen) {
-      out.push('</ul>')
-      listOpen = false
-    }
-    if (/^\s*#{1,4}\s+/.test(line)) {
-      out.push(`<div class="md-h">${inline(line.replace(/^\s*#{1,4}\s+/, ''))}</div>`)
-    } else {
-      out.push(`<p class="md-p">${inline(line)}</p>`)
-    }
-    i += 1
-  }
-  if (listOpen) out.push('</ul>')
-  return out.join('')
 }
 
 const rendered = computed(() =>
@@ -314,7 +189,7 @@ function displayContent(m: UiMessage): string {
 }
 .msg__ai {
   font-size: var(--is-text-sm);
-  line-height: 1.7;
+  line-height: 1.6;
   color: var(--is-text);
   word-break: break-word;
 }
@@ -356,7 +231,7 @@ function displayContent(m: UiMessage): string {
 }
 
 .md :deep(.md-p) {
-  margin: 0 0 10px;
+  margin: 0 0 0.65em;
   line-height: 1.65;
 }
 .md :deep(.md-p:last-child) {
@@ -364,41 +239,74 @@ function displayContent(m: UiMessage): string {
 }
 .md :deep(.md-h) {
   font-weight: 600;
-  margin: 10px 0 4px;
+  line-height: 1.4;
+  margin: 0.9em 0 0.4em;
+  color: var(--is-text);
+}
+.md :deep(.md-h1),
+.md :deep(.md-h2) {
+  font-size: 1.05em;
+}
+.md :deep(.md-h3),
+.md :deep(.md-h4) {
+  font-size: 1em;
+}
+.md :deep(.md-h:first-child) {
+  margin-top: 0;
+}
+.md :deep(.md-ul),
+.md :deep(.md-ol) {
+  margin: 0.35em 0 0.65em;
+  padding-left: 1.35em;
 }
 .md :deep(.md-ul) {
-  margin: 4px 0 4px 18px;
   list-style: disc;
 }
+.md :deep(.md-ol) {
+  list-style: decimal;
+}
+.md :deep(.md-ul li),
+.md :deep(.md-ol li) {
+  margin: 0.15em 0;
+}
 .md :deep(.md-pre) {
-  background: var(--is-surface-muted);
+  background: var(--is-surface-muted, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--is-border);
   border-radius: var(--is-radius-sm);
-  padding: 8px 10px;
+  padding: 10px 12px;
   font-family: var(--is-font-mono);
   font-size: var(--is-text-xs);
   overflow-x: auto;
   white-space: pre;
+  margin: 0.5em 0 0.75em;
+  line-height: 1.5;
 }
 .md :deep(code) {
-  background: var(--is-surface-muted);
+  background: var(--is-surface-muted, rgba(0, 0, 0, 0.05));
   border-radius: 4px;
-  padding: 0 4px;
+  padding: 0.1em 0.35em;
   font-family: var(--is-font-mono);
-  font-size: var(--is-text-xs);
+  font-size: 0.92em;
 }
 .md :deep(.md-pre code) {
   background: transparent;
   padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+.md :deep(strong) {
+  font-weight: 600;
 }
 .md :deep(.md-table) {
   border-collapse: collapse;
-  margin: 6px 0;
+  margin: 0.5em 0 0.75em;
   font-size: 12px;
+  width: 100%;
 }
 .md :deep(.md-table th),
 .md :deep(.md-table td) {
   border: 1px solid var(--is-border);
-  padding: 3px 8px;
+  padding: 4px 8px;
   text-align: left;
 }
 .md :deep(.md-table th) {

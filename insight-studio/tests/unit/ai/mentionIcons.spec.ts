@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mentionIcon } from '../../../src/modules/ai/mentionIcons'
+import { iconForMention, iconForViewType, mentionIcon } from '../../../src/modules/ai/mentionIcons'
 import type { Analysis } from '../../../src/shared/types'
 
 function analysis(partial: Partial<Analysis>): Analysis {
@@ -11,6 +11,20 @@ function analysis(partial: Partial<Analysis>): Analysis {
     ...partial,
   } as Analysis
 }
+
+describe('mentionIcons', () => {
+  it('maps analysis and table kinds', () => {
+    expect(iconForMention({ kind: 'analysis' })).toBe('database')
+    expect(iconForMention({ kind: 'table', tableId: 't1' })).toBe('table')
+  })
+
+  it('maps view by type with table fallback', () => {
+    expect(iconForMention({ kind: 'view', tableId: 't1', viewId: 'v1' }, 'bar')).toBe('bar')
+    expect(iconForMention({ kind: 'view', tableId: 't1', viewId: 'v1' }, 'heatmap')).toBe('heatmap')
+    expect(iconForMention({ kind: 'view', tableId: 't1', viewId: 'v1' })).toBe('table')
+    expect(iconForViewType('unknown')).toBe('table')
+  })
+})
 
 describe('mentionIcon', () => {
   it('分析用 database，表用 table，视图用类型图标', () => {

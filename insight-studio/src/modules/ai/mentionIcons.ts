@@ -1,19 +1,10 @@
-import type { Analysis, ViewNode, ViewType } from '../../shared/types'
+import type { Analysis, ViewNode } from '../../shared/types'
 import type { IconName } from '../../ui'
 import type { MentionTarget } from './context'
 import type { AttachmentKind } from './attachments'
+import { iconForViewType } from '../../shared/viewIcons'
 
-/** 与侧栏/看板源树一致的视图类型图标。 */
-export const VIEW_ICON: Record<ViewType, IconName> = {
-  table: 'table',
-  bar: 'bar',
-  line: 'line',
-  scatter: 'scatter',
-  box: 'box',
-  pie: 'pie',
-  heatmap: 'heatmap',
-  bignumber: 'bignumber',
-}
+export { VIEW_ICON, iconForViewType } from '../../shared/viewIcons'
 
 /** 附件 kind → 图标。 */
 export function attachmentKindIcon(kind: AttachmentKind | string): IconName {
@@ -40,14 +31,22 @@ function findView(views: ViewNode[], viewId: string): ViewNode | undefined {
   return undefined
 }
 
-/** @ 引用 chip / 菜单项图标。 */
-export function mentionIcon(target: MentionTarget, analysis: Analysis | null): IconName {
+/** @ 引用 chip / 菜单项图标（可传入已知 viewType，避免再查树）。 */
+export function iconForMention(target: MentionTarget, viewType?: string): IconName {
   if (target.kind === 'analysis') return 'database'
   if (target.kind === 'table') return 'table'
   if (target.kind === 'attachment') return attachmentKindIcon(target.fileKind ?? 'other')
+  return iconForViewType(viewType)
+}
+
+/** @ 引用 chip / 菜单项图标（从 analysis 解析视图类型）。 */
+export function mentionIcon(target: MentionTarget, analysis: Analysis | null): IconName {
+  if (target.kind === 'analysis' || target.kind === 'table' || target.kind === 'attachment') {
+    return iconForMention(target)
+  }
   const table = analysis?.tables.find((t) => t.id === target.tableId)
   const view = table ? findView(table.views, target.viewId) : undefined
-  return view ? VIEW_ICON[view.type] : 'table'
+  return iconForMention(target, view?.type)
 }
 
 /** @ 引用展示名。 */

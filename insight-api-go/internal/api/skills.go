@@ -132,24 +132,51 @@ func (s *Server) patchSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Enabled *bool `json:"enabled"`
+		Enabled *bool   `json:"enabled"`
+		Body    *string `json:"body"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Enabled == nil {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
-	err = st.SetEnabled(r.PathValue("id"), *body.Enabled)
-	if errors.Is(err, skills.ErrNotFound) {
-		writeErr(w, http.StatusNotFound, "not_found")
+	if body.Enabled == nil && body.Body == nil {
+		writeErr(w, http.StatusBadRequest, "invalid_body")
 		return
 	}
+	id := r.PathValue("id")
+	if body.Enabled != nil {
+		err = st.SetEnabled(id, *body.Enabled)
+		if errors.Is(err, skills.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "not_found")
+			return
+		}
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "internal")
+			return
+		}
+	}
+	if body.Body != nil {
+		err = st.UpdateBody(id, *body.Body)
+		if errors.Is(err, skills.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "not_found")
+			return
+		}
+		if errors.Is(err, skills.ErrForbidden) {
+			writeErr(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "internal")
+			return
+		}
+	}
+	d, err := st.Get(id)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
-	d, err := st.Get(r.PathValue("id"))
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal")
+	if body.Body != nil {
+		writeJSON(w, http.StatusOK, d)
 		return
 	}
 	writeJSON(w, http.StatusOK, d.Info)

@@ -533,6 +533,11 @@ export const aiSkillsApi = {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }, { withUser: true }),
+  updateBody: (id: string, body: string) =>
+    req<SkillDetail>(`/api/ai/skills/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ body }),
+    }, { withUser: true }),
   remove: (id: string) =>
     req<void>(`/api/ai/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }, { withUser: true }),
   importZip: async (file: File): Promise<SkillInfo> => {
