@@ -174,25 +174,28 @@ Line/Scatter 专属共用：拟合线型（实线/虚线，默认实线）；**�
 
 平台内置 agent：自然语言驱动平台工具完成「建表 → 加工 → 配图 → 看板」全流程。
 
-### 架构（前端 ReAct loop + 后端代理）
+### 架构（DeepSeek Harness + Go 数据面）
 
 ```
 浏览器（AiDrawer / aiStore）
-  │  POST /api/ai/chat（OpenAI chat/completions 负载，stream）
+  │  POST /api/ai/agent/prompt（SSE event: agent）
+  │  POST /api/ai/agent/answer | confirm | abort
   ▼
-insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照）
-  ├─ config：data/ai-config.json 服务端存储，GET 只回掩码 Key，PUT 局部更新
-  ├─ chat：SSE 原样代理到配置的 OpenAI 兼容端点（Key 不出服务端）；未配置 409 ai_not_configured
-  ├─ conversations：会话/消息 CRUD（store.db 的 ai_conversations 表）
-  ├─ skills：本机 Skill 包（official seed + 用户 zip），`/api/ai/skills*`
-  └─ mcp：SSE/HTTP MCP 连接与代调（headers 掩码），`/api/ai/mcp*`
+insight-dsh（默认 :3081，DeepSeek Harness）
+  ├─ agent loop / session / compaction / subagent
+  └─ 平台工具执行 → PUT 分析/看板文档
+  ▼
+insight-api-go /api/*（数据面；Node `insight-api` 为对照）
+  ├─ analyses / dashboards / python
+  ├─ config：data/ai-config.json，GET 只回掩码 Key
+  ├─ conversations：会话 UI 快照
+  ├─ skills / mcp / memories / files
+  └─ chat：仍代理 OpenAI 兼容端，生产抽屉不再调用
 ```
 
-- **ReAct loop 在前端**（`src/modules/ai/agentLoop.ts`）：模型返回 tool_calls → 本地执行 →
-  tool 结果回灌 → 再请求，直到纯文本或达到 maxIterations（默认 8）。
-  超轮不硬报错：自动追加一轮**无工具收尾请求**（system 提示「直接根据已有结果总结」），
-  实在拿不到文本才抛 MaxIterError。
-  好处：工具直接操作前端 store（analysisStore/dashboardStore），撤销/持久化/视图刷新全部走现有链路，零后端业务侵入。
+- **ReAct loop 在 DeepSeek Harness**（`insight-dsh`，默认 :3081）：浏览器 AiDrawer 只渲染 session 事件；
+  平台工具在后端执行并 PUT 分析文档，前端刷新 store。Go 仍是数据面（MariaDB / Python）。
+  详见 `docs/superpowers/specs/2026-08-14-dsh-agent-replacement-design.md`。
 - **工具集**（`tools/registry.ts` JSON Schema + `tools/impl.ts` 实现）四组平台工具 + Skills/MCP：
   数据（list/get schema/import_csv）、步骤（filter/join/union/computed/hide/run/rerun_stale）、
   图表（create_view/set_chart_config，写后跑 validateChartMapping 回执校验结果）、看板（建板/加组件）；
@@ -229,8 +232,8 @@ insight-api-go /api/ai/*（默认后端；Node `insight-api/src/ai.ts` 为对照
 
 - 单测 `tests/unit/ai/`：agentLoop（多轮循环/SSE 分片聚合/超轮收尾/执行异常）、impl（真实 store 上
   import/filter/computed/view+config/delete 确认流）、skillsMcp（MCP 工具名合并/resolve、Skill 目录提示、registry）。
-- e2e `tests/e2e/ai.spec.ts`：route 拦截 config（含备选模型）+ chat（按 tool 轮次回放编排 SSE，
-  与 `scripts/mock-ai.mjs` 同思路）：①全链路 发送 → 进展打勾 → 轨迹 → 思考块 → 模型切换 →
+- e2e `tests/e2e/ai.spec.ts`：route 拦截 config（含备选模型）；agent 走 insight-dsh mock
+  （`INSIGHT_DSH_MOCK=1`，真实执行平台工具）：①全链路 发送 → 进展打勾 → 轨迹 → 思考块 → 模型切换 →
   产物卡直达（URL 带 viewId + 侧栏出现新视图）；②危险确认流 删除需确认 → 按钮外露 → 确认后表真实删除。
 - 真实端点验收（qwen3.8-max，Aliyun 兼容模式）：建图+拟合注释 / 导入+过滤+派生列 / 建看板+加组件 /
   删除确认 / 中止重试 / 历史恢复 / @引用 / 模型切换 全通过。

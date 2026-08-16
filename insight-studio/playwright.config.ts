@@ -34,12 +34,24 @@ export default defineConfig({
       },
     },
     {
+      command: 'npm --prefix ../insight-dsh start',
+      url: 'http://127.0.0.1:3082/health',
+      reuseExistingServer: false,
+      timeout: 90_000,
+      env: {
+        INSIGHT_DSH_PORT: '3082',
+        INSIGHT_DSH_MOCK: '1',
+        INSIGHT_API_ORIGIN: 'http://127.0.0.1:8788',
+      },
+    },
+    {
       command: 'npm run dev:web -- --port 7101 --strictPort',
       url: 'http://localhost:7101',
       reuseExistingServer: false,
       timeout: 90_000,
       env: {
         INSIGHT_API_ORIGIN: 'http://127.0.0.1:8788',
+        INSIGHT_DSH_ORIGIN: 'http://127.0.0.1:3082',
       },
     },
   ],

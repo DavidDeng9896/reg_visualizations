@@ -1,5 +1,5 @@
 /** Agent 工具注册表：OpenAI function calling 的 tools 定义（JSON Schema）。
- * 实现见 impl.ts；协议级工具 submit_plan / mark_step_done / ask_user 与 delegate_*_worker 在 agentLoop 内置处理。
+ * 实现见 execCore.ts；协议级工具 submit_plan / mark_step_done / ask_user 与 delegate_*_worker 由 insight-dsh 处理。
  */
 
 type JsonSchema = Record<string, unknown>
