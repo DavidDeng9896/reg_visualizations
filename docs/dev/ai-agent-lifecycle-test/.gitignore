@@ -7,5 +7,7 @@ r1-drawer.txt
 r2-drawer.txt
 ui-test-log.jsonl
 capability-live.json
+live-qwen-results.json
 screenshots/cap-*.png
+screenshots/live-qwen-*.png
 

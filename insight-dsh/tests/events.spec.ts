@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { detectMockScenario } from '../src/mockAgent.ts'
 import { sessionEventToAgentEvents } from '../src/events.ts'
+import { shouldDisableThinking } from '../src/providerPolicy.ts'
 
 describe('detectMockScenario', () => {
   it('maps e2e prompts to scenarios', () => {
@@ -26,5 +27,13 @@ describe('sessionEventToAgentEvents extras', () => {
 
   it('does not emit done on turn/end', () => {
     expect(sessionEventToAgentEvents({ type: 'turn/end', content: 'hi' })).toEqual([])
+  })
+})
+
+describe('shouldDisableThinking', () => {
+  it('disables thinking on Aliyun compatible gateways', () => {
+    expect(shouldDisableThinking('https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')).toBe(true)
+    expect(shouldDisableThinking('https://api.deepseek.com')).toBe(false)
+    expect(shouldDisableThinking('https://dashscope.aliyuncs.com/compatible-mode/v1', 'enabled')).toBe(false)
   })
 })

@@ -168,12 +168,13 @@ async function getOrCreateAgent(
 ): Promise<AgentHandle> {
   const existing = agents.get(sessionId)
   if (existing) return existing
+  const resolvedModel = (model || process.env.DSH_MODEL || '').trim()
   const handle = (await dsh.agents.create({
     sessionId: SessionId(sessionId),
     meta: { cwd: process.cwd() },
     agentOptions: {
       provider: 'deepseek-official',
-      ...(model ? { model } : {}),
+      ...(resolvedModel ? { model: resolvedModel } : {}),
     },
   })) as AgentHandle
   agents.set(sessionId, handle)
