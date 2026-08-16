@@ -648,4 +648,23 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.summary).toContain('说明文档')
     expect(res.summary).toContain('不要 import_ai_file')
   })
+
+  it('list_skills：后端 404 时返回未启用话术，禁止再调', async () => {
+    await seedStore()
+    const { aiSkillsApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiSkillsApi, 'list').mockRejectedValue(new Error('AI 服务错误（404）：not_found'))
+    const res = await execTool('list_skills', {}, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('当前部署未启用 Skills')
+    expect(res.summary).not.toContain('AI 服务错误（404）')
+  })
+
+  it('save_memory：后端 404 时不要把 HTTP 原文喂给模型', async () => {
+    await seedStore()
+    const { aiMemoriesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiMemoriesApi, 'create').mockRejectedValue(new Error('AI 服务错误（404）：not_found'))
+    const res = await execTool('save_memory', { content: '下次先看表' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('当前部署未启用记忆')
+  })
 })

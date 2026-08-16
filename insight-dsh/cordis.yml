@@ -4,8 +4,11 @@
 - id: llm-deepseek
   name: '@deepseek-ai/dsh-llm-deepseek'
   config:
-    thinking: enabled
-    reasoningEffort: max
+    # 不要在 !!js 表达式里写冒号，YAML 会把它当成 mapping。
+    # thinking / effort 由 index.ts 根据网关写成 enabled|disabled 与 max|off。
+    thinking: !!js process.env.DSH_THINKING || 'enabled'
+    reasoningEffort: !!js process.env.DSH_REASONING_EFFORT || 'max'
+    maxTokens: !!js Number(process.env.DSH_MAX_TOKENS || 256000)
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
@@ -34,17 +37,20 @@
   config:
     providerName: spawn
 
-- id: tool-subagent
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: spawn
-    toolName: subagent
-    enableRunInBackground: false
-
-- id: tool-todo
-  name: '@deepseek-ai/dsh-tool-todo'
-  config:
-    allowParallelInProgress: true
+# 不挂 dsh 默认 subagent / todo_write 工具，避免模型乱派工。
+# 仍保留上面的 subagent + spawn-in-process，因为 delegate_*_worker 走 ctx.agents.create。
+# 升级官方 dsh 包后如需重新暴露，取消下面注释即可，不要改 node_modules。
+# - id: tool-subagent
+#   name: '@deepseek-ai/dsh-tool-subagent'
+#   config:
+#     provider: spawn
+#     toolName: subagent
+#     enableRunInBackground: false
+#
+# - id: tool-todo
+#   name: '@deepseek-ai/dsh-tool-todo'
+#   config:
+#     allowParallelInProgress: true
 
 - id: token-meter
   name: '@deepseek-ai/dsh-token-meter'

@@ -275,7 +275,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'clear_analysis',
     description:
-      '【危险】清空当前分析的全部表与步骤（保留分析本身）。用户要求「全部删掉/清空分析」时优先用此工具，勿逐张 delete_table。',
+      '【危险】清空当前分析的全部表与步骤（保留分析本身）。仅当用户明确要求「全部删掉/清空分析」时使用；用户拒绝单表删除后禁止改用此工具。',
     parameters: {
       type: 'object',
       properties: {
@@ -285,7 +285,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'list_skills',
-    description: '列出已安装的 AI Skills（id、名称、描述、是否启用）。需要细节时再 read_skill。',
+    description: '列出已安装的 AI Skills（id、名称、描述、是否启用）。需要细节时再 read_skill。若返回未启用，不要再调。',
     parameters: { type: 'object', properties: {} },
   },
   {

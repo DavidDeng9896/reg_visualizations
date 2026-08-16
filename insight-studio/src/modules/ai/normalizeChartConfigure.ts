@@ -170,11 +170,11 @@ export function autofillRequiredChartSlots(
   const used = usedFields(next)
   const type = String(chartType || 'bar')
 
-  const fillX = (preferTypes?: DataType[]) => {
+  const fillX = (preferTypes?: DataType[], useNameHint = true) => {
     if (next.x?.field) return
     const col = pickColumn(columns, used, {
       preferTypes: preferTypes ?? ['string', 'date', 'datetime', 'number'],
-      nameHint: X_NAME_HINT,
+      nameHint: useNameHint ? X_NAME_HINT : undefined,
     })
     if (!col) return
     next.x = { field: col.field }
@@ -202,9 +202,14 @@ export function autofillRequiredChartSlots(
   }
 
   if (type === 'scatter' || type === 'line') {
-    // scatter：x 优先数值（与 Y 成对）；line：x 可为类别/时间
     fillValues()
-    fillX(type === 'scatter' ? ['number', 'string', 'date', 'datetime'] : ['string', 'date', 'datetime', 'number'])
+    if (type === 'scatter') {
+      // 缺 x 时优先另一数值列；不要被 clone_id 这类 nameHint 抢走
+      fillX(['number'], false)
+      if (!next.x?.field) fillX(['string', 'date', 'datetime', 'number'], false)
+    } else {
+      fillX(['string', 'date', 'datetime', 'number'])
+    }
   } else if (type === 'bar') {
     fillX(['string', 'date', 'datetime', 'number'])
     // bar 的 y 可空（计数），不必强填

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { detectMockScenario } from '../src/mockAgent.ts'
-import { sessionEventToAgentEvents } from '../src/events.ts'
+import { createSessionEventMapper, sessionEventToAgentEvents } from '../src/events.ts'
+import { applyGatewayEnv, pickRecommendedModel, shouldDisableThinking } from '../src/providerPolicy.ts'
+import { jsonSchemaToDshParams, toLosslessJson } from '../src/dshParams.ts'
+import { REJECTED_NO_CHANGE, renderToolValue, sanitizeToolSummary } from '../src/toolReply.ts'
+import { TOOL_DEFS } from '../../insight-studio/src/modules/ai/tools/registry'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 
 describe('detectMockScenario', () => {
   it('maps e2e prompts to scenarios', () => {
@@ -26,5 +31,129 @@ describe('sessionEventToAgentEvents extras', () => {
 
   it('does not emit done on turn/end', () => {
     expect(sessionEventToAgentEvents({ type: 'turn/end', content: 'hi' })).toEqual([])
+  })
+
+  it('emits error on failed LLM turn', () => {
+    expect(
+      sessionEventToAgentEvents({
+        type: 'turn/end',
+        data: { reason: { kind: 'error', error: { message: 'DeepSeek API error (HTTP 400)', status: 400 } } },
+      }),
+    ).toEqual([{ type: 'error', message: 'DeepSeek API error (HTTP 400)' }])
+  })
+})
+
+describe('jsonSchemaToDshParams', () => {
+  it('omits undefined descriptions so dsh-tools accepts join keys', () => {
+    const join = TOOL_DEFS.find((t) => t.name === 'add_join_step')
+    expect(join).toBeTruthy()
+    const params = jsonSchemaToDshParams(join!.parameters as never)
+    expect(params.keys.type).toBe('array')
+    expect(params.keys.description).toBeUndefined()
+    expect(() =>
+      defineTool({
+        name: 'add_join_step',
+        description: join!.description,
+        parameters: params,
+        output: { schema: { type: 'json' }, render: () => [] },
+        async execute() {
+          return {}
+        },
+      }),
+    ).not.toThrow()
+  })
+
+  it('registers every platform tool schema', () => {
+    for (const def of TOOL_DEFS) {
+      if (def.name.startsWith('delegate_') || def.name === 'ask_user' || def.name === 'submit_plan' || def.name === 'mark_step_done') {
+        continue
+      }
+      expect(() =>
+        defineTool({
+          name: def.name,
+          description: def.description,
+          parameters: jsonSchemaToDshParams(def.parameters as never),
+          output: { schema: { type: 'json' }, render: () => [] },
+          async execute() {
+            return {}
+          },
+        }),
+      ).not.toThrow()
+    }
+  })
+
+  it('strips undefined so tool output is lossless JSON', () => {
+    expect(toLosslessJson({ ok: true, summary: 'hi', artifact: undefined })).toEqual({ ok: true, summary: 'hi' })
+  })
+})
+
+describe('shouldDisableThinking', () => {
+  it('disables thinking on Aliyun compatible gateways', () => {
+    expect(shouldDisableThinking('https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')).toBe(true)
+    expect(shouldDisableThinking('https://api.deepseek.com')).toBe(false)
+    expect(shouldDisableThinking('https://dashscope.aliyuncs.com/compatible-mode/v1', 'enabled')).toBe(false)
+  })
+})
+
+describe('applyGatewayEnv', () => {
+  it('caps max tokens and turns thinking off for compatible gateways', () => {
+    const env: NodeJS.ProcessEnv = {
+      DEEPSEEK_BASE_URL: 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+    }
+    applyGatewayEnv(env)
+    expect(env.DSH_THINKING).toBe('disabled')
+    expect(env.DSH_REASONING_EFFORT).toBe('off')
+    expect(env.DSH_MAX_TOKENS).toBe('32768')
+  })
+
+  it('keeps explicit thinking', () => {
+    const env: NodeJS.ProcessEnv = {
+      DEEPSEEK_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      DSH_THINKING: 'enabled',
+    }
+    applyGatewayEnv(env)
+    expect(env.DSH_THINKING).toBe('enabled')
+    expect(env.DSH_REASONING_EFFORT).toBe('max')
+  })
+})
+
+describe('pickRecommendedModel', () => {
+  it('keeps current when listed, else prefers flash', () => {
+    const ids = ['qwen3.7-plus', 'qwen3.6-flash', 'qwen3.7-max']
+    expect(pickRecommendedModel(ids, 'qwen3.7-plus')).toBe('qwen3.7-plus')
+    expect(pickRecommendedModel(ids, 'qwen3.7-flash')).toBe('qwen3.6-flash')
+  })
+})
+
+describe('createSessionEventMapper', () => {
+  it('drops assistant/message after streamed chunks', () => {
+    const map = createSessionEventMapper()
+    expect(map({ type: 'assistant/chunk', chunk: { type: 'text-delta', text: '你好' } })).toEqual([
+      { type: 'token', text: '你好' },
+    ])
+    expect(map({ type: 'assistant/message', message: { content: '你好世界' } })).toEqual([])
+  })
+
+  it('emits assistant/message when there was no stream', () => {
+    const map = createSessionEventMapper()
+    expect(map({ type: 'assistant/message', message: { content: '整段' } })).toEqual([{ type: 'token', text: '整段' }])
+  })
+
+  it('resets on turn/start so the next message can emit', () => {
+    const map = createSessionEventMapper()
+    map({ type: 'assistant/chunk', chunk: { type: 'text-delta', text: '旧' } })
+    map({ type: 'turn/end' })
+    map({ type: 'turn/start' })
+    expect(map({ type: 'assistant/message', message: { content: '新' } })).toEqual([{ type: 'token', text: '新' }])
+  })
+})
+
+describe('toolReply', () => {
+  it('rewrites missing-backend and lossless JSON errors', () => {
+    expect(sanitizeToolSummary('AI 服务错误（404）：not_found', 'list_skills')).toContain('当前部署未启用 Skills')
+    expect(sanitizeToolSummary('value is not lossless JSON')).toContain('不要因此清空分析')
+    expect(renderToolValue({ ok: true, summary: '已列出 2 张表', artifact: { kind: 'table' } })).toBe('已列出 2 张表')
+    expect(REJECTED_NO_CHANGE).toContain('未删除')
+    expect(REJECTED_NO_CHANGE).toContain('clear_analysis')
   })
 })

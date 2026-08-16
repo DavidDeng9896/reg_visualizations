@@ -6,6 +6,7 @@ import { boot } from '@deepseek-ai/dsh-app-boot'
 import { SYSTEM_PROMPT } from '../../insight-studio/src/modules/ai/prompts'
 import { installGoFetch } from './fetchPatch.ts'
 import { createAgentApp } from './server.ts'
+import { applyGatewayEnv } from './providerPolicy.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -20,6 +21,7 @@ process.env.DSH_SESSION_ROOT = process.env.DSH_SESSION_ROOT || path.join(root, '
 function applyAiConfigFromDisk() {
   const candidates = [
     process.env.INSIGHT_AI_CONFIG,
+    path.resolve(root, '../insight-api/data/ai-config.json'),
     path.resolve(root, '../insight-api-go/data/ai-config.json'),
     path.resolve(process.cwd(), 'data/ai-config.json'),
   ].filter(Boolean) as string[]
@@ -38,6 +40,7 @@ function applyAiConfigFromDisk() {
 }
 
 applyAiConfigFromDisk()
+applyGatewayEnv()
 
 const mock = process.env.INSIGHT_DSH_MOCK === '1'
 let dsh: Awaited<ReturnType<typeof boot>> | null = null
@@ -46,7 +49,9 @@ if (mock) {
 } else {
   try {
     dsh = await boot('insight-dsh', path.join(root, 'cordis.yml'))
-    console.log('[insight-dsh] DeepSeek Harness booted')
+    console.log(
+      `[insight-dsh] DeepSeek Harness booted model=${process.env.DSH_MODEL || '(provider default)'} thinking=${process.env.DSH_THINKING || 'enabled'} maxTokens=${process.env.DSH_MAX_TOKENS || '256000'} base=${process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'}`,
+    )
   } catch (err) {
     console.error('[insight-dsh] dsh boot failed, HTTP will report 503:', err)
   }

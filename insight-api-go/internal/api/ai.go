@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -155,6 +156,12 @@ func (s *Server) putAiConfig(w http.ResponseWriter, r *http.Request) {
 		next.ConfirmWrite = b
 	}
 
+	if len(next.Models) == 0 && strings.TrimSpace(next.APIKey) != "" {
+		if probed, errMsg := probeOpenAiModels(next.BaseURL, next.APIKey); errMsg == "" && len(probed) > 0 {
+			next.Models = probed
+		}
+	}
+
 	if err := s.writeAiConfig(next); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"error":   "write_failed",
@@ -166,6 +173,177 @@ func (s *Server) putAiConfig(w http.ResponseWriter, r *http.Request) {
 		"ok":           true,
 		"configured":   next.APIKey != "",
 		"apiKeyMasked": maskKey(next.APIKey),
+		"models":       next.Models,
+		"model":        next.Model,
+	})
+}
+
+func parseOpenAiModels(payload any) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0)
+	push := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, dup := seen[id]; dup {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	switch v := payload.(type) {
+	case []any:
+		for _, item := range v {
+			switch it := item.(type) {
+			case string:
+				push(it)
+			case map[string]any:
+				if id, ok := it["id"].(string); ok {
+					push(id)
+				}
+			}
+		}
+	case map[string]any:
+		if data, ok := v["data"]; ok {
+			return parseOpenAiModels(data)
+		}
+	}
+	return out
+}
+
+func pickRecommendedModel(models []string, current string) string {
+	if len(models) == 0 {
+		return strings.TrimSpace(current)
+	}
+	cur := strings.TrimSpace(current)
+	for _, id := range models {
+		if id == cur {
+			return cur
+		}
+	}
+	for _, id := range models {
+		low := strings.ToLower(id)
+		if strings.Contains(low, "flash") && !strings.Contains(low, "plus") && !strings.Contains(low, "max") {
+			return id
+		}
+	}
+	return models[0]
+}
+
+func probeOpenAiModels(baseURL, apiKey string) ([]string, string) {
+	root := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if root == "" {
+		return nil, "缺少 Base URL"
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, "缺少 API Key"
+	}
+	req, err := http.NewRequest(http.MethodGet, root+"/models", nil)
+	if err != nil {
+		return nil, "探测失败：" + err.Error()
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(apiKey))
+	req.Header.Set("Accept-Encoding", "identity")
+	client := &http.Client{Timeout: 12 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "探测失败：" + err.Error()
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(raw))
+		if msg == "" {
+			msg = resp.Status
+		}
+		if len([]rune(msg)) > 240 {
+			msg = string([]rune(msg)[:240])
+		}
+		return nil, fmt.Sprintf("探测失败（HTTP %d）：%s", resp.StatusCode, msg)
+	}
+	var payload any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, "探测失败：响应不是 JSON"
+	}
+	models := parseOpenAiModels(payload)
+	if len(models) == 0 {
+		return nil, "探测成功但目录为空"
+	}
+	return models, ""
+}
+
+func pingOK(url string) bool {
+	client := &http.Client{Timeout: 800 * time.Millisecond}
+	resp, err := client.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300
+}
+
+func (s *Server) postAiConfigModels(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	cur := s.readAiConfig()
+	baseURL := cur.BaseURL
+	apiKey := cur.APIKey
+	model := cur.Model
+	if body != nil {
+		if v, ok := body["baseUrl"].(string); ok && strings.TrimSpace(v) != "" {
+			baseURL = strings.TrimRight(strings.TrimSpace(v), "/")
+		}
+		if v, ok := body["apiKey"].(string); ok && strings.TrimSpace(v) != "" {
+			apiKey = strings.TrimSpace(v)
+		}
+		if v, ok := body["model"].(string); ok && strings.TrimSpace(v) != "" {
+			model = strings.TrimSpace(v)
+		}
+	}
+	models, errMsg := probeOpenAiModels(baseURL, apiKey)
+	if models == nil {
+		models = []string{}
+	}
+	recommended := pickRecommendedModel(models, model)
+	currentAvailable := false
+	for _, id := range models {
+		if id == model {
+			currentAvailable = true
+			break
+		}
+	}
+	var err any
+	if errMsg != "" {
+		err = errMsg
+	} else {
+		err = nil
+	}
+	var rec any
+	if recommended != "" {
+		rec = recommended
+	} else {
+		rec = nil
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"models":           models,
+		"recommended":      rec,
+		"currentAvailable": currentAvailable,
+		"error":            err,
+	})
+}
+
+func (s *Server) getAiCapabilities(w http.ResponseWriter, _ *http.Request) {
+	python := pingOK(pythonWorkerURL() + "/health")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"runtime":      "go",
+		"skills":       true,
+		"memories":     true,
+		"files":        true,
+		"mcp":          true,
+		"sql":          false,
+		"pythonWorker": python,
+		"note":         "Skills / 记忆 / 附件已由 insight-api-go 提供；Custom Code 需要 Python worker :8091。",
 	})
 }
 

@@ -24,6 +24,17 @@ export default defineConfig({
       '/api/ai/agent': {
         target: process.env.INSIGHT_DSH_ORIGIN ?? 'http://127.0.0.1:3081',
         changeOrigin: true,
+        timeout: 0,
+        proxyTimeout: 0,
+        configure(proxy) {
+          proxy.on('proxyRes', (proxyRes, _req, res) => {
+            proxyRes.headers['cache-control'] = 'no-cache, no-transform'
+            proxyRes.headers['x-accel-buffering'] = 'no'
+            delete proxyRes.headers['content-length']
+            res.setHeader('Cache-Control', 'no-cache, no-transform')
+            res.setHeader('X-Accel-Buffering', 'no')
+          })
+        },
       },
       '/api/sql': {
         target: 'http://127.0.0.1:7120',

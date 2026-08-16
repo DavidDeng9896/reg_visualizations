@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { Hono } from 'hono'
 import type { InsightStore } from './store.ts'
+import { pickRecommendedModel, probeOpenAiModels } from './aiModels.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CONFIG_PATH = path.resolve(__dirname, '../data/ai-config.json')
@@ -53,6 +54,15 @@ function maskKey(key: string): string {
   if (!key) return ''
   if (key.length <= 8) return '••••••••'
   return `${key.slice(0, 4)}…••••…${key.slice(-4)}`
+}
+
+async function pingOk(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(800) })
+    return r.ok
+  } catch {
+    return false
+  }
 }
 
 /** OpenAI chat 请求体（仅做必要校验后原样转发）。 */
@@ -143,11 +153,51 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
       confirmDestructive: typeof body.confirmDestructive === 'boolean' ? body.confirmDestructive : cur.confirmDestructive,
     }
     try {
+      if (!next.models.length && next.apiKey) {
+        const probed = await probeOpenAiModels(next.baseUrl, next.apiKey)
+        if (probed.models.length) next.models = probed.models
+      }
       writeConfig(next)
     } catch (e) {
       return c.json({ error: 'write_failed', message: e instanceof Error ? e.message : String(e) }, 500)
     }
-    return c.json({ ok: true, configured: !!next.apiKey, apiKeyMasked: maskKey(next.apiKey) })
+    return c.json({ ok: true, configured: !!next.apiKey, apiKeyMasked: maskKey(next.apiKey), models: next.models, model: next.model })
+  })
+
+  app.post('/api/ai/config/models', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { baseUrl?: string; apiKey?: string; model?: string }
+    const cur = readConfig()
+    const baseUrl =
+      typeof body.baseUrl === 'string' && body.baseUrl.trim() ? body.baseUrl.trim().replace(/\/$/, '') : cur.baseUrl
+    const apiKey = typeof body.apiKey === 'string' && body.apiKey.trim() ? body.apiKey.trim() : cur.apiKey
+    const current = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : cur.model
+    const probed = await probeOpenAiModels(baseUrl, apiKey)
+    const recommended = pickRecommendedModel(probed.models, current)
+    return c.json({
+      models: probed.models,
+      recommended: recommended ?? null,
+      currentAvailable: current ? probed.models.includes(current) : false,
+      error: probed.error ?? null,
+    })
+  })
+
+  app.get('/api/ai/capabilities', async (c) => {
+    const pythonBase = (process.env.PYTHON_WORKER_URL || 'http://127.0.0.1:8091').replace(/\/$/, '')
+    const sqlPort = process.env.SQL_PROXY_PORT || '7120'
+    const [sql, pythonWorker] = await Promise.all([
+      pingOk(`http://127.0.0.1:${sqlPort}/api/sql/health`),
+      pingOk(`${pythonBase}/health`),
+    ])
+    return c.json({
+      runtime: 'node',
+      skills: false,
+      memories: false,
+      files: false,
+      mcp: false,
+      sql,
+      pythonWorker,
+      note: 'Skills / 记忆 / 附件需要 insight-api-go；Custom Code 需要 Python worker :8091。',
+    })
   })
 
   /* ---- 聊天代理（SSE 原样透传） ---- */

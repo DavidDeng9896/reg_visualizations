@@ -1,8 +1,20 @@
 import type { AgentEvent } from '../../insight-studio/src/modules/ai/agentLoop'
 import type { Artifact } from '../../insight-studio/src/modules/ai/types'
 
+/**
+ * 有状态映射：同一回合里 assistant/chunk 已经流过 token 后，忽略完整 assistant/message，
+ * 避免 UI 把同一段正文显示两遍。turn/start|end 复位。
+ */
+export function createSessionEventMapper(): (event: unknown) => AgentEvent[] {
+  let streamedText = false
+  return (event: unknown) => sessionEventToAgentEvents(event, { streamedText, setStreamedText: (v) => { streamedText = v } })
+}
+
 /** 把 dsh SessionEvent 尽量映射到现有 AiDrawer AgentEvent。 */
-export function sessionEventToAgentEvents(event: unknown): AgentEvent[] {
+export function sessionEventToAgentEvents(
+  event: unknown,
+  state?: { streamedText: boolean; setStreamedText: (v: boolean) => void },
+): AgentEvent[] {
   if (!event || typeof event !== 'object') return []
   const e = event as Record<string, unknown>
   const type = String(e.type ?? e.kind ?? '')
@@ -12,6 +24,7 @@ export function sessionEventToAgentEvents(event: unknown): AgentEvent[] {
     const chunk = data.chunk && typeof data.chunk === 'object' ? (data.chunk as Record<string, unknown>) : data
     const chunkType = String(chunk.type ?? '')
     if (chunkType === 'text-delta' && typeof chunk.text === 'string' && chunk.text) {
+      state?.setStreamedText(true)
       return [{ type: 'token', text: chunk.text }]
     }
     if (chunkType === 'reasoning-delta' && typeof chunk.text === 'string' && chunk.text) {
@@ -21,11 +34,15 @@ export function sessionEventToAgentEvents(event: unknown): AgentEvent[] {
     const reasoning = extractReasoning(data)
     const out: AgentEvent[] = []
     if (reasoning) out.push({ type: 'reasoning', text: reasoning })
-    if (text) out.push({ type: 'token', text })
+    if (text) {
+      state?.setStreamedText(true)
+      out.push({ type: 'token', text })
+    }
     return out
   }
 
   if (type === 'assistant/message' || type === 'assistant_message') {
+    if (state?.streamedText) return []
     const msg = data.message && typeof data.message === 'object' ? (data.message as Record<string, unknown>) : data
     const text = extractText(msg)
     return text ? [{ type: 'token', text }] : []
@@ -73,8 +90,22 @@ export function sessionEventToAgentEvents(event: unknown): AgentEvent[] {
     ]
   }
 
-  if (type === 'turn/end' || type === 'turn_end') {
-    /* 结束由 HTTP 桥统一发 done，避免空 content 覆盖已流式正文 */
+  if (type === 'turn/start' || type === 'turn_start' || type === 'turn/end' || type === 'turn_end') {
+    if (type === 'turn/start' || type === 'turn_start') {
+      state?.setStreamedText(false)
+      return []
+    }
+    state?.setStreamedText(false)
+    const reason = data.reason
+    if (reason && typeof reason === 'object') {
+      const r = reason as Record<string, unknown>
+      if (String(r.kind ?? '') === 'error') {
+        const err = (r.error && typeof r.error === 'object' ? r.error : r.failure) as Record<string, unknown> | undefined
+        const msg = String(err?.message ?? 'LLM 请求失败')
+        return [{ type: 'error', message: msg }]
+      }
+    }
+    /* 正常结束由 HTTP 桥统一发 done，避免空 content 覆盖已流式正文 */
     return []
   }
 

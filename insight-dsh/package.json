@@ -6,7 +6,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:live": "node scripts/live-harness.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
@@ -31,6 +32,9 @@
     "papaparse": "^5.5.3",
     "tsx": "^4.23.1",
     "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=22.15.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

@@ -357,7 +357,25 @@ export const aiConfigApi = {
       confirmDestructive: boolean
       confirmWrite: boolean
     }>,
-  ) => req<{ ok: boolean; configured: boolean }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
+  ) => req<{ ok: boolean; configured: boolean; models?: string[]; model?: string }>('/api/ai/config', { method: 'PUT', body: JSON.stringify(patch) }),
+  probeModels: (patch?: { baseUrl?: string; apiKey?: string; model?: string }) =>
+    req<{
+      models: string[]
+      recommended: string | null
+      currentAvailable: boolean
+      error: string | null
+    }>('/api/ai/config/models', { method: 'POST', body: JSON.stringify(patch ?? {}) }),
+  capabilities: () =>
+    req<{
+      runtime: string
+      skills: boolean
+      memories: boolean
+      files: boolean
+      mcp: boolean
+      sql: boolean
+      pythonWorker: boolean
+      note?: string
+    }>('/api/ai/capabilities'),
 }
 
 /** 发送一轮对话（SSE）。缺配置时后端返回 409 → 抛错。对 429/可重试 502 做有限次退避。 */
