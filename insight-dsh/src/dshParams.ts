@@ -52,3 +52,13 @@ export function jsonSchemaToDshParams(schema: {
   }
   return out
 }
+
+/** dsh-tools 拒绝含 undefined/NaN 的返回值。 */
+export function toLosslessJson<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_k, v) => {
+      if (typeof v === 'number' && !Number.isFinite(v)) return null
+      return v
+    }),
+  ) as T
+}

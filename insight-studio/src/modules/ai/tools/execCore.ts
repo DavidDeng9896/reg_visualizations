@@ -54,7 +54,7 @@ const WRITE_TOOLS = new Set([
 ])
 
 function ok(summary: string, artifact?: Artifact): ToolExecResult {
-  return { ok: true, summary, artifact }
+  return artifact ? { ok: true, summary, artifact } : { ok: true, summary }
 }
 function fail(summary: string): ToolExecResult {
   return { ok: false, summary }

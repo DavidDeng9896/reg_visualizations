@@ -6,7 +6,7 @@ import { runWithWorkspaceAsync } from '../../../insight-studio/src/modules/ai/to
 import { goRequestContext } from '../fetchPatch.ts'
 import { readyHttpWorkspace } from '../httpWorkspace.ts'
 import { getSessionRuntime } from '../runtime.ts'
-import { jsonSchemaToDshParams } from '../dshParams.ts'
+import { jsonSchemaToDshParams, toLosslessJson } from '../dshParams.ts'
 
 export const name = 'insight-tools'
 export const inject = ['tools']
@@ -56,13 +56,16 @@ export function apply(ctx: Context) {
               if (decision === 'reject') {
                 return { ok: false, summary: '用户拒绝了该操作' }
               }
-              return runWithWorkspaceAsync(ws, () =>
+              const confirmed = await runWithWorkspaceAsync(ws, () =>
                 execTool(def.name, { ...(args as Record<string, unknown>), __confirmed: true }, toolCtx),
               )
+              if (confirmed.artifact?.analysisId && runtime) runtime.analysisId = confirmed.artifact.analysisId
+              else if (ws.current && runtime) runtime.analysisId = ws.current.id
+              return toLosslessJson(confirmed)
             }
             if (result.artifact?.analysisId && runtime) runtime.analysisId = result.artifact.analysisId
             else if (ws.current && runtime) runtime.analysisId = ws.current.id
-            return result
+            return toLosslessJson(result)
           })
         },
       }),

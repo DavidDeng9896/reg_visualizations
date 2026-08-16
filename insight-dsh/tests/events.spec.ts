@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { detectMockScenario } from '../src/mockAgent.ts'
 import { sessionEventToAgentEvents } from '../src/events.ts'
 import { shouldDisableThinking } from '../src/providerPolicy.ts'
-import { jsonSchemaToDshParams } from '../src/dshParams.ts'
+import { jsonSchemaToDshParams, toLosslessJson } from '../src/dshParams.ts'
 import { TOOL_DEFS } from '../../insight-studio/src/modules/ai/tools/registry'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
@@ -79,6 +79,10 @@ describe('jsonSchemaToDshParams', () => {
         }),
       ).not.toThrow()
     }
+  })
+
+  it('strips undefined so tool output is lossless JSON', () => {
+    expect(toLosslessJson({ ok: true, summary: 'hi', artifact: undefined })).toEqual({ ok: true, summary: 'hi' })
   })
 })
 
