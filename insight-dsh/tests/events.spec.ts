@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { detectMockScenario } from '../src/mockAgent.ts'
 import { sessionEventToAgentEvents } from '../src/events.ts'
 import { shouldDisableThinking } from '../src/providerPolicy.ts'
+import { jsonSchemaToDshParams } from '../src/dshParams.ts'
+import { TOOL_DEFS } from '../../insight-studio/src/modules/ai/tools/registry'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 
 describe('detectMockScenario', () => {
   it('maps e2e prompts to scenarios', () => {
@@ -27,6 +30,46 @@ describe('sessionEventToAgentEvents extras', () => {
 
   it('does not emit done on turn/end', () => {
     expect(sessionEventToAgentEvents({ type: 'turn/end', content: 'hi' })).toEqual([])
+  })
+})
+
+describe('jsonSchemaToDshParams', () => {
+  it('omits undefined descriptions so dsh-tools accepts join keys', () => {
+    const join = TOOL_DEFS.find((t) => t.name === 'add_join_step')
+    expect(join).toBeTruthy()
+    const params = jsonSchemaToDshParams(join!.parameters as never)
+    expect(params.keys.type).toBe('array')
+    expect(params.keys.description).toBeUndefined()
+    expect(() =>
+      defineTool({
+        name: 'add_join_step',
+        description: join!.description,
+        parameters: params,
+        output: { schema: { type: 'json' }, render: () => [] },
+        async execute() {
+          return {}
+        },
+      }),
+    ).not.toThrow()
+  })
+
+  it('registers every platform tool schema', () => {
+    for (const def of TOOL_DEFS) {
+      if (def.name.startsWith('delegate_') || def.name === 'ask_user' || def.name === 'submit_plan' || def.name === 'mark_step_done') {
+        continue
+      }
+      expect(() =>
+        defineTool({
+          name: def.name,
+          description: def.description,
+          parameters: jsonSchemaToDshParams(def.parameters as never),
+          output: { schema: { type: 'json' }, render: () => [] },
+          async execute() {
+            return {}
+          },
+        }),
+      ).not.toThrow()
+    }
   })
 })
 

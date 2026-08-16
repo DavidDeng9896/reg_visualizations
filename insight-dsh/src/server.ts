@@ -11,6 +11,7 @@ import { bindAgentRuntime, ensureSessionRuntime, getSessionRuntime } from './run
 import { goRequestContext } from './fetchPatch.ts'
 import { runMockTurn } from './mockAgent.ts'
 import type { AgentEvent } from '../../insight-studio/src/modules/ai/agentLoop'
+import { jsonSchemaToDshParams } from './dshParams.ts'
 
 const registeredMcp = new Set<string>()
 
@@ -211,30 +212,12 @@ function subscribeSession(
 }
 
 function mcpParamsFromSchema(schema: unknown): Record<string, { type: string; description?: string; required?: true; items?: { type: string } }> {
-  const s = schema as {
-    properties?: Record<string, { type?: string; description?: string; items?: { type?: string } }>
-    required?: string[]
-  }
-  const required = new Set(s?.required ?? [])
-  const out: Record<string, { type: string; description?: string; required?: true; items?: { type: string } }> = {}
-  for (const [key, prop] of Object.entries(s?.properties ?? {})) {
-    const t =
-      prop.type === 'array'
-        ? 'array'
-        : prop.type === 'number' || prop.type === 'integer'
-          ? 'number'
-          : prop.type === 'boolean'
-            ? 'boolean'
-            : prop.type === 'object'
-              ? 'json'
-              : 'string'
-    out[key] = {
-      type: t,
-      description: prop.description,
-      ...(required.has(key) ? { required: true as const } : {}),
-      ...(t === 'array' ? { items: { type: prop.items?.type === 'number' ? 'number' : 'string' } } : {}),
-    }
-  }
+  const out = jsonSchemaToDshParams(
+    (schema && typeof schema === 'object' ? schema : {}) as {
+      properties?: Record<string, { type?: string; description?: string; items?: { type?: string } }>
+      required?: string[]
+    },
+  )
   if (!Object.keys(out).length) {
     out.payload = { type: 'json', description: 'MCP 参数（原样转发）' }
   }

@@ -14,6 +14,7 @@ export DEEPSEEK_API_KEY=sk-...
 # 可选：覆盖默认模型。阿里云 Qwen 兼容端会自动 DSH_THINKING=disabled
 # （其不接受 DeepSeek 的 reasoning_effort=max）。
 export DSH_MODEL=qwen3.6-flash
+# 真实 boot 需要 Node ≥ 22.15（jsonl session 依赖 zlib zstd）
 npm start   # http://127.0.0.1:3081
 ```
 

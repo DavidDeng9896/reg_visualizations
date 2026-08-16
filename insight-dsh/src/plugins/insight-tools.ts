@@ -6,40 +6,10 @@ import { runWithWorkspaceAsync } from '../../../insight-studio/src/modules/ai/to
 import { goRequestContext } from '../fetchPatch.ts'
 import { readyHttpWorkspace } from '../httpWorkspace.ts'
 import { getSessionRuntime } from '../runtime.ts'
+import { jsonSchemaToDshParams } from '../dshParams.ts'
 
 export const name = 'insight-tools'
 export const inject = ['tools']
-
-function jsonParams(def: (typeof TOOL_DEFS)[number]): Record<string, { type: string; description?: string; required?: true; items?: { type: string } }> {
-  const schema = def.parameters as {
-    properties?: Record<string, { type?: string; description?: string; items?: { type?: string } }>
-    required?: string[]
-  }
-  const required = new Set(schema.required ?? [])
-  const out: Record<string, { type: string; description?: string; required?: true; items?: { type: string } }> = {}
-  for (const [key, prop] of Object.entries(schema.properties ?? {})) {
-    const itemType = prop.items?.type
-    const t =
-      prop.type === 'array'
-        ? 'array'
-        : prop.type === 'number' || prop.type === 'integer'
-          ? 'number'
-          : prop.type === 'boolean'
-            ? 'boolean'
-            : prop.type === 'object'
-              ? 'json'
-              : 'string'
-    out[key] = {
-      type: t,
-      description: prop.description,
-      ...(required.has(key) ? { required: true as const } : {}),
-      ...(t === 'array'
-        ? { items: { type: itemType === 'number' || itemType === 'integer' ? 'number' : itemType === 'object' ? 'json' : itemType === 'boolean' ? 'boolean' : 'string' } }
-        : {}),
-    }
-  }
-  return out
-}
 
 function lookupRuntime(exec: { agent?: { id: unknown; session?: { id?: unknown } }; callId?: unknown; token?: unknown }) {
   const agent = exec.agent
@@ -59,7 +29,7 @@ export function apply(ctx: Context) {
       defineTool({
         name: def.name,
         description: def.description,
-        parameters: jsonParams(def),
+        parameters: jsonSchemaToDshParams(def.parameters as never),
         output: {
           schema: { type: 'json' },
           render: (_args, value) => [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }],
