@@ -4,10 +4,10 @@
 - id: llm-deepseek
   name: '@deepseek-ai/dsh-llm-deepseek'
   config:
-    # DeepSeek 官方默认思考；阿里云 Qwen 兼容端不接受 reasoning_effort=max。
-    # index.ts 会在 Aliyun/DashScope baseURL 上自动设 DSH_THINKING=disabled。
-    thinking: !!js process.env.DSH_THINKING === 'disabled' ? 'disabled' : 'enabled'
-    reasoningEffort: !!js process.env.DSH_THINKING === 'disabled' ? 'off' : (process.env.DSH_REASONING_EFFORT || 'max')
+    # 不要在 !!js 表达式里写冒号，YAML 会把它当成 mapping。
+    # thinking / effort 由 index.ts 根据网关写成 enabled|disabled 与 max|off。
+    thinking: !!js process.env.DSH_THINKING || 'enabled'
+    reasoningEffort: !!js process.env.DSH_REASONING_EFFORT || 'max'
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'

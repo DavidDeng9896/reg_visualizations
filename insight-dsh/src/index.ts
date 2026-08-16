@@ -44,6 +44,12 @@ function inferThinkingFromProvider() {
   if (shouldDisableThinking(process.env.DEEPSEEK_BASE_URL || '', process.env.DSH_THINKING)) {
     process.env.DSH_THINKING = 'disabled'
   }
+  if (process.env.DSH_THINKING === 'disabled') {
+    process.env.DSH_REASONING_EFFORT = process.env.DSH_REASONING_EFFORT || 'off'
+  } else {
+    process.env.DSH_THINKING = process.env.DSH_THINKING || 'enabled'
+    process.env.DSH_REASONING_EFFORT = process.env.DSH_REASONING_EFFORT || 'max'
+  }
 }
 
 applyAiConfigFromDisk()
