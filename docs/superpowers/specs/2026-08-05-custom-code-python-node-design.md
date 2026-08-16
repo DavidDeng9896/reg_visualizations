@@ -52,7 +52,7 @@ def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]:
     ...
 ```
 
-- 即使单输出也必须 `return [IOData(...)]`。
+- 即使单输出也必须 `return [IOData(...)]`（也接受 `{"name","data"}` 字典或 `(name, data)` 元组）。
 - 多输入按**连线顺序**进入 `inputs`；可用下标或按 `name` 查找。
 - dataset ↔ `DataFrame`；file ↔ `BytesIO`；chart ↔ `go.Figure`。
 

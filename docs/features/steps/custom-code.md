@@ -15,6 +15,16 @@ def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]:
 
 - 多输入按**连线顺序**进入 `inputs`（dataset / file 可混连）
 - DataFrame → Output datasets；BytesIO → Output files；Figure → Output charts（独立 Plotly 产物，非 bar/line CONFIGURE）
+- 返回必须是 **list**；每项为 `IOData(name=..., data=...)`，也兼容 `{"name": ..., "data": ...}` 或 `(name, data)`
+
+**错误示例：** `return [df]` 或 `return df`  
+**正确示例：**
+
+```python
+return [IOData(name="标准化清洗数据", data=df_out)]
+# 或
+return [{"name": "标准化清洗数据", "data": df_out}]
+```
 
 ## 白名单包（v1）
 
