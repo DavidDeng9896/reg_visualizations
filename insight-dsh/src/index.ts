@@ -6,7 +6,7 @@ import { boot } from '@deepseek-ai/dsh-app-boot'
 import { SYSTEM_PROMPT } from '../../insight-studio/src/modules/ai/prompts'
 import { installGoFetch } from './fetchPatch.ts'
 import { createAgentApp } from './server.ts'
-import { shouldDisableThinking } from './providerPolicy.ts'
+import { applyGatewayEnv } from './providerPolicy.ts'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '..')
@@ -39,26 +39,8 @@ function applyAiConfigFromDisk() {
   }
 }
 
-/** 非 DeepSeek 官方兼容网关不接受 reasoning_effort=max；未显式配置时自动关思考。 */
-function inferThinkingFromProvider() {
-  if (shouldDisableThinking(process.env.DEEPSEEK_BASE_URL || '', process.env.DSH_THINKING)) {
-    process.env.DSH_THINKING = 'disabled'
-  }
-  const base = process.env.DEEPSEEK_BASE_URL || ''
-  if (/aliyuncs\.com|dashscope|maas\.aliyun|compatible-mode/i.test(base)) {
-    // 阿里云兼容端 max_tokens 上限 65536，DeepSeek 适配器默认 256000 会 400
-    process.env.DSH_MAX_TOKENS = process.env.DSH_MAX_TOKENS || '32768'
-  }
-  if (process.env.DSH_THINKING === 'disabled') {
-    process.env.DSH_REASONING_EFFORT = process.env.DSH_REASONING_EFFORT || 'off'
-  } else {
-    process.env.DSH_THINKING = process.env.DSH_THINKING || 'enabled'
-    process.env.DSH_REASONING_EFFORT = process.env.DSH_REASONING_EFFORT || 'max'
-  }
-}
-
 applyAiConfigFromDisk()
-inferThinkingFromProvider()
+applyGatewayEnv()
 
 const mock = process.env.INSIGHT_DSH_MOCK === '1'
 let dsh: Awaited<ReturnType<typeof boot>> | null = null

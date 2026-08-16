@@ -64,6 +64,8 @@ func (s *Server) routes() {
 
 	s.Mux.HandleFunc("GET /api/ai/config", s.getAiConfig)
 	s.Mux.HandleFunc("PUT /api/ai/config", s.putAiConfig)
+	s.Mux.HandleFunc("POST /api/ai/config/models", s.postAiConfigModels)
+	s.Mux.HandleFunc("GET /api/ai/capabilities", s.getAiCapabilities)
 	s.Mux.HandleFunc("POST /api/ai/chat", s.postAiChat)
 	s.Mux.HandleFunc("GET /api/ai/conversations", s.listAiConversations)
 	s.Mux.HandleFunc("POST /api/ai/conversations", s.createAiConversation)

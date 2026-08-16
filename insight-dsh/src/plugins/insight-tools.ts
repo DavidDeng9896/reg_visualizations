@@ -7,6 +7,7 @@ import { goRequestContext } from '../fetchPatch.ts'
 import { readyHttpWorkspace } from '../httpWorkspace.ts'
 import { getSessionRuntime } from '../runtime.ts'
 import { jsonSchemaToDshParams, toLosslessJson } from '../dshParams.ts'
+import { REJECTED_NO_CHANGE, renderToolValue, withSanitizedSummary } from '../toolReply.ts'
 
 export const name = 'insight-tools'
 export const inject = ['tools']
@@ -32,7 +33,7 @@ export function apply(ctx: Context) {
         parameters: jsonSchemaToDshParams(def.parameters as never),
         output: {
           schema: { type: 'json' },
-          render: (_args, value) => [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }],
+          render: (_args, value) => [{ type: 'text', text: renderToolValue(value, def.name) }],
         },
         async execute(args, exec) {
           const runtime = lookupRuntime(exec)
@@ -54,18 +55,18 @@ export function apply(ctx: Context) {
                 summary: result.summary,
               })
               if (decision === 'reject') {
-                return { ok: false, summary: '用户拒绝了该操作' }
+                return { ok: false, summary: REJECTED_NO_CHANGE }
               }
               const confirmed = await runWithWorkspaceAsync(ws, () =>
                 execTool(def.name, { ...(args as Record<string, unknown>), __confirmed: true }, toolCtx),
               )
               if (confirmed.artifact?.analysisId && runtime) runtime.analysisId = confirmed.artifact.analysisId
               else if (ws.current && runtime) runtime.analysisId = ws.current.id
-              return toLosslessJson(confirmed)
+              return withSanitizedSummary(toLosslessJson(confirmed), def.name)
             }
             if (result.artifact?.analysisId && runtime) runtime.analysisId = result.artifact.analysisId
             else if (ws.current && runtime) runtime.analysisId = ws.current.id
-            return toLosslessJson(result)
+            return withSanitizedSummary(toLosslessJson(result), def.name)
           })
         },
       }),

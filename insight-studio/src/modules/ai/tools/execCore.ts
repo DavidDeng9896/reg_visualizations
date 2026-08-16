@@ -23,6 +23,7 @@ import type { Artifact } from '../types'
 import { normalizeExpressionColumns } from '../../../shared/pipeline'
 import { coerceParsedToolArgs } from '../toolArgs'
 import { getWorkspace } from './workspace'
+import { failIfMissingBackend } from '../unavailableBackend'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -534,7 +535,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
         `共 ${list.length} 个附件：\n${lines.join('\n')}\nCSV/Excel 用 import_ai_file({ fileId }) 导入为分析表。`,
       )
     } catch (e) {
-      return fail(e instanceof Error ? e.message : '列出附件失败')
+      return fail(failIfMissingBackend(e, 'list_ai_files') ?? (e instanceof Error ? e.message : '列出附件失败'))
     }
   },
 
@@ -546,7 +547,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     try {
       meta = await getWorkspace().fileMeta(fileId)
     } catch (e) {
-      return fail(e instanceof Error ? e.message : '附件不存在或无法读取')
+      return fail(failIfMissingBackend(e, 'import_ai_file') ?? (e instanceof Error ? e.message : '附件不存在或无法读取'))
     }
     if (meta.kind !== 'csv' && meta.kind !== 'excel') {
       if (meta.kind === 'text' || /\.(md|txt|markdown)$/i.test(meta.name)) {
@@ -580,7 +581,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
           : undefined,
       )
     } catch (e) {
-      return fail(e instanceof Error ? e.message : '导入附件失败')
+      return fail(failIfMissingBackend(e, 'import_ai_file') ?? (e instanceof Error ? e.message : '导入附件失败'))
     }
   },
 
@@ -1005,27 +1006,39 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   async list_skills() {
-    const list = await getWorkspace().listSkills()
-    if (!list.length) return ok('暂无已安装 Skill')
-    const lines = list.map(
-      (s) =>
-        `- ${s.name}（id: ${s.id}，${s.enabled ? '启用' : '停用'}，${s.source}）：${s.description || '无描述'}`,
-    )
-    return ok(`已安装 ${list.length} 个 Skill：\n${lines.join('\n')}`)
+    try {
+      const list = await getWorkspace().listSkills()
+      if (!list.length) return ok('暂无已安装 Skill')
+      const lines = list.map(
+        (s) =>
+          `- ${s.name}（id: ${s.id}，${s.enabled ? '启用' : '停用'}，${s.source}）：${s.description || '无描述'}`,
+      )
+      return ok(`已安装 ${list.length} 个 Skill：\n${lines.join('\n')}`)
+    } catch (e) {
+      return fail(failIfMissingBackend(e, 'list_skills') ?? (e instanceof Error ? e.message : '列出 Skills 失败'))
+    }
   },
 
   async read_skill(args) {
     const id = String(args.skillId ?? '').trim()
     if (!id) return fail('缺少 skillId')
-    const d = await getWorkspace().getSkill(id)
-    return ok(`# ${d.name} (${d.id})\n\n${d.body}`)
+    try {
+      const d = await getWorkspace().getSkill(id)
+      return ok(`# ${d.name} (${d.id})\n\n${d.body}`)
+    } catch (e) {
+      return fail(failIfMissingBackend(e, 'read_skill') ?? (e instanceof Error ? e.message : '读取 Skill 失败'))
+    }
   },
 
   async save_memory(args) {
     const content = String(args.content ?? '').trim()
     if (!content) return fail('缺少 content（请写入简短可复用的分析教训）')
-    const rec = await getWorkspace().createMemory(content)
-    return ok(`已保存分析记忆（id: ${rec.id}）：${rec.content}`)
+    try {
+      const rec = await getWorkspace().createMemory(content)
+      return ok(`已保存分析记忆（id: ${rec.id}）：${rec.content}`)
+    } catch (e) {
+      return fail(failIfMissingBackend(e, 'save_memory') ?? (e instanceof Error ? e.message : '保存记忆失败'))
+    }
   },
 }
 
@@ -1047,6 +1060,6 @@ export async function execTool(name: string, args: Record<string, unknown>, ctx:
     } catch {
       /* 失败路径仍尽量落盘 */
     }
-    return fail(e instanceof Error ? e.message : String(e))
+    return fail(failIfMissingBackend(e, name) ?? (e instanceof Error ? e.message : String(e)))
   }
 }

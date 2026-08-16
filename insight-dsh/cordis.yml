@@ -37,17 +37,20 @@
   config:
     providerName: spawn
 
-- id: tool-subagent
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: spawn
-    toolName: subagent
-    enableRunInBackground: false
-
-- id: tool-todo
-  name: '@deepseek-ai/dsh-tool-todo'
-  config:
-    allowParallelInProgress: true
+# 不挂 dsh 默认 subagent / todo_write 工具，避免模型乱派工。
+# 仍保留上面的 subagent + spawn-in-process，因为 delegate_*_worker 走 ctx.agents.create。
+# 升级官方 dsh 包后如需重新暴露，取消下面注释即可，不要改 node_modules。
+# - id: tool-subagent
+#   name: '@deepseek-ai/dsh-tool-subagent'
+#   config:
+#     provider: spawn
+#     toolName: subagent
+#     enableRunInBackground: false
+#
+# - id: tool-todo
+#   name: '@deepseek-ai/dsh-tool-todo'
+#   config:
+#     allowParallelInProgress: true
 
 - id: token-meter
   name: '@deepseek-ai/dsh-token-meter'

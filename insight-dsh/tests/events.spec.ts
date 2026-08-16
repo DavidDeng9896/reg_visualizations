@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { detectMockScenario } from '../src/mockAgent.ts'
-import { sessionEventToAgentEvents } from '../src/events.ts'
-import { shouldDisableThinking } from '../src/providerPolicy.ts'
+import { createSessionEventMapper, sessionEventToAgentEvents } from '../src/events.ts'
+import { applyGatewayEnv, pickRecommendedModel, shouldDisableThinking } from '../src/providerPolicy.ts'
 import { jsonSchemaToDshParams, toLosslessJson } from '../src/dshParams.ts'
+import { REJECTED_NO_CHANGE, renderToolValue, sanitizeToolSummary } from '../src/toolReply.ts'
 import { TOOL_DEFS } from '../../insight-studio/src/modules/ai/tools/registry'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
@@ -91,5 +92,68 @@ describe('shouldDisableThinking', () => {
     expect(shouldDisableThinking('https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')).toBe(true)
     expect(shouldDisableThinking('https://api.deepseek.com')).toBe(false)
     expect(shouldDisableThinking('https://dashscope.aliyuncs.com/compatible-mode/v1', 'enabled')).toBe(false)
+  })
+})
+
+describe('applyGatewayEnv', () => {
+  it('caps max tokens and turns thinking off for compatible gateways', () => {
+    const env: NodeJS.ProcessEnv = {
+      DEEPSEEK_BASE_URL: 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+    }
+    applyGatewayEnv(env)
+    expect(env.DSH_THINKING).toBe('disabled')
+    expect(env.DSH_REASONING_EFFORT).toBe('off')
+    expect(env.DSH_MAX_TOKENS).toBe('32768')
+  })
+
+  it('keeps explicit thinking', () => {
+    const env: NodeJS.ProcessEnv = {
+      DEEPSEEK_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      DSH_THINKING: 'enabled',
+    }
+    applyGatewayEnv(env)
+    expect(env.DSH_THINKING).toBe('enabled')
+    expect(env.DSH_REASONING_EFFORT).toBe('max')
+  })
+})
+
+describe('pickRecommendedModel', () => {
+  it('keeps current when listed, else prefers flash', () => {
+    const ids = ['qwen3.7-plus', 'qwen3.6-flash', 'qwen3.7-max']
+    expect(pickRecommendedModel(ids, 'qwen3.7-plus')).toBe('qwen3.7-plus')
+    expect(pickRecommendedModel(ids, 'qwen3.7-flash')).toBe('qwen3.6-flash')
+  })
+})
+
+describe('createSessionEventMapper', () => {
+  it('drops assistant/message after streamed chunks', () => {
+    const map = createSessionEventMapper()
+    expect(map({ type: 'assistant/chunk', chunk: { type: 'text-delta', text: '你好' } })).toEqual([
+      { type: 'token', text: '你好' },
+    ])
+    expect(map({ type: 'assistant/message', message: { content: '你好世界' } })).toEqual([])
+  })
+
+  it('emits assistant/message when there was no stream', () => {
+    const map = createSessionEventMapper()
+    expect(map({ type: 'assistant/message', message: { content: '整段' } })).toEqual([{ type: 'token', text: '整段' }])
+  })
+
+  it('resets on turn/start so the next message can emit', () => {
+    const map = createSessionEventMapper()
+    map({ type: 'assistant/chunk', chunk: { type: 'text-delta', text: '旧' } })
+    map({ type: 'turn/end' })
+    map({ type: 'turn/start' })
+    expect(map({ type: 'assistant/message', message: { content: '新' } })).toEqual([{ type: 'token', text: '新' }])
+  })
+})
+
+describe('toolReply', () => {
+  it('rewrites missing-backend and lossless JSON errors', () => {
+    expect(sanitizeToolSummary('AI 服务错误（404）：not_found', 'list_skills')).toContain('当前部署未启用 Skills')
+    expect(sanitizeToolSummary('value is not lossless JSON')).toContain('不要因此清空分析')
+    expect(renderToolValue({ ok: true, summary: '已列出 2 张表', artifact: { kind: 'table' } })).toBe('已列出 2 张表')
+    expect(REJECTED_NO_CHANGE).toContain('未删除')
+    expect(REJECTED_NO_CHANGE).toContain('clear_analysis')
   })
 })

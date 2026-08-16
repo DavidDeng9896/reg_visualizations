@@ -61,9 +61,15 @@ describe('autofillRequiredChartSlots', () => {
       cols,
     )
     expect(configure.values?.[0]?.field).toBe('Expression_mg_L')
-    expect(configure.x?.field).toBeTruthy()
+    expect(configure.x?.field).toBe('KD_nM')
     expect(configure.x!.field).not.toBe('Expression_mg_L')
     expect(filled.some((f) => f.startsWith('x='))).toBe(true)
+  })
+
+  it('scatter 缺槽时 x/values 都走数值列，不用 clone_id', () => {
+    const { configure } = autofillRequiredChartSlots('scatter', {}, cols)
+    expect(configure.values?.[0]?.field).toBe('KD_nM')
+    expect(configure.x?.field).toBe('Expression_mg_L')
   })
 
   it('bar 缺 x 时优先选 clone/parent 类字符串列', () => {

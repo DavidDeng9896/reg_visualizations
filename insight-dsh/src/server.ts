@@ -6,12 +6,13 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { buildMcpToolsBundle } from '../../insight-studio/src/modules/ai/mcpTools'
 import { planIncomplete, pendingPlanSteps } from '../../insight-studio/src/modules/ai/taskState'
-import { sessionEventToAgentEvents } from './events.ts'
+import { createSessionEventMapper } from './events.ts'
 import { bindAgentRuntime, ensureSessionRuntime, getSessionRuntime } from './runtime.ts'
 import { goRequestContext } from './fetchPatch.ts'
 import { runMockTurn } from './mockAgent.ts'
 import type { AgentEvent } from '../../insight-studio/src/modules/ai/agentLoop'
 import { jsonSchemaToDshParams } from './dshParams.ts'
+import { renderToolValue } from './toolReply.ts'
 
 const registeredMcp = new Set<string>()
 
@@ -79,8 +80,9 @@ export function createAgentApp(dsh: CordisContext | null, opts?: { mock?: boolea
 
         const rec = await getOrCreateAgent(dsh!, agents, sessionId, body.model)
         bindAgentRuntime(sessionId, rec.agent.id)
+        const mapEvent = createSessionEventMapper()
         const unsub = subscribeSession(dsh!, rec.agent.session, (raw) => {
-          for (const ev of sessionEventToAgentEvents(raw)) void emit(ev)
+          for (const ev of mapEvent(raw)) void emit(ev)
         })
 
         try {
@@ -241,7 +243,7 @@ async function syncMcpTools(dsh: CordisContext, _userId: string) {
           parameters: mcpParamsFromSchema(rawParams),
           output: {
             schema: { type: 'json' },
-            render: (_a, v) => [{ type: 'text', text: JSON.stringify(v) }],
+            render: (_a, v) => [{ type: 'text', text: renderToolValue(v, fnName) }],
           },
           async execute(args) {
             if (!ref) return { ok: false, error: 'unknown mcp tool' }

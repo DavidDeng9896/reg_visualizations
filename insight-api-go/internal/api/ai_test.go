@@ -97,6 +97,63 @@ func TestAiConfigGetPut(t *testing.T) {
 	}
 }
 
+func TestAiConfigProbeModels(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/models" {
+			t.Fatalf("path=%s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer sk-probe-key-12345678" {
+			t.Fatalf("auth=%s", got)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []any{
+				map[string]any{"id": "qwen3.7-plus"},
+				map[string]any{"id": "qwen3.6-flash"},
+			},
+		})
+	}))
+	t.Cleanup(upstream.Close)
+
+	srv := newTestServer(t)
+	h := srv.Handler()
+	body, _ := json.Marshal(map[string]any{
+		"baseUrl": upstream.URL,
+		"apiKey":  "sk-probe-key-12345678",
+		"model":   "qwen3.7-flash",
+	})
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/config/models", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	models, _ := got["models"].([]any)
+	if len(models) != 2 {
+		t.Fatalf("models=%v", got)
+	}
+	if got["recommended"] != "qwen3.6-flash" {
+		t.Fatalf("recommended=%v", got["recommended"])
+	}
+	if got["currentAvailable"] != false {
+		t.Fatalf("currentAvailable=%v", got["currentAvailable"])
+	}
+
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/ai/capabilities", nil))
+	if rr.Code != 200 {
+		t.Fatalf("capabilities status=%d", rr.Code)
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["runtime"] != "go" || got["skills"] != true {
+		t.Fatalf("capabilities=%v", got)
+	}
+}
+
 func TestAiConversationsCRUD(t *testing.T) {
 	srv := newTestServer(t)
 	h := srv.Handler()
