@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLegendLayout, baseLayout, LEGEND_COLLAPSE_WIDTH } from '../../../src/modules/charts/runtime/shared'
+import { buildLegendLayout, baseLayout, buildTitleLayout, LEGEND_COLLAPSE_WIDTH } from '../../../src/modules/charts/runtime/shared'
 import {
   applyLegendClearanceMargin,
   overlapAmount,
@@ -121,5 +121,13 @@ describe('legendClearance', () => {
   it('applyLegendClearanceMargin 叠加且受 cap 限制', () => {
     const next = applyLegendClearanceMargin({ t: 32, r: 32, b: 48, l: 64 }, { side: 'r', delta: 40 }, { r: 50 })
     expect(next.r).toBe(50)
+  })
+})
+
+describe('buildTitleLayout', () => {
+  it('不渲染 subtitle：旧数据里的副标题也不上屏', () => {
+    const out = buildTitleLayout({ title: '主标题', subtitle: '副标题' }, '默认')
+    expect(out).toMatchObject({ text: '主标题' })
+    expect(String(out?.text ?? '')).not.toContain('副标题')
   })
 })

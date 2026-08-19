@@ -199,7 +199,7 @@ export function buildChartOption(
     result.columns ?? [],
   ) as ChartConfigure
   const style = { ...config.style }
-  // hideTitle 只抑制默认 viewName 标题，不剥掉用户在 STYLE 里写的 Title/Subtitle
+  // hideTitle 只抑制默认 viewName 标题，不剥掉用户在 STYLE 里写的 Title
   const displayName = opts?.hideTitle && !style.title ? '' : viewName
   const cfg: ChartConfig = { ...config, chartType: def.type, configure, style }
   return def.buildOption({ result, config: cfg, viewName: displayName, flags })

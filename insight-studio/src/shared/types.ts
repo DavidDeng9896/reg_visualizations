@@ -200,6 +200,7 @@ export interface AxisStyleSpec {
 /** STYLE Tab 骨架：通用样式（图种专属样式后续切片扩展）。 */
 export interface ChartStyle {
   title?: string
+  /** @deprecated 图表不再使用副标题；旧数据读取时忽略。 */
   subtitle?: string
   width?: number
   height?: number

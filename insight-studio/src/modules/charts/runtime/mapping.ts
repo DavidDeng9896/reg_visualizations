@@ -111,8 +111,8 @@ function isContinuous(id: string): boolean {
   return ['blues', 'viridis', 'warm', 'greenblue'].includes(id)
 }
 
-/** 样式迁移：保留通用项（title/subtitle/尺寸/边距/opacity/legend/系列色/轴设置），丢弃图种专属。 */
+/** 样式迁移：保留通用项（title/尺寸/边距/opacity/legend/系列色/轴设置），丢弃图种专属与已废弃的 subtitle。 */
 export function migrateStyle(from: ChartStyle): ChartStyle {
-  const { title, subtitle, width, height, margins, opacity, legend, seriesColors, xAxis, yAxis, yAxisRight } = from
-  return { title, subtitle, width, height, margins, opacity, legend, seriesColors, xAxis, yAxis, yAxisRight }
+  const { title, width, height, margins, opacity, legend, seriesColors, xAxis, yAxis, yAxisRight } = from
+  return { title, width, height, margins, opacity, legend, seriesColors, xAxis, yAxis, yAxisRight }
 }

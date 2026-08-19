@@ -114,11 +114,13 @@ describe('图种互切迁移（11A）', () => {
   it('样式迁移保留通用项、丢弃图种专属', () => {
     const from = createChartConfig('bar')
     from.style.title = 'T'
+    from.style.subtitle = 'S'
     from.style.opacity = 0.5
     from.style.bar = { direction: 'horizontal' }
     from.style.seriesColors = { g1: '#111111' }
     const style = migrateStyle(from.style)
     expect(style.title).toBe('T')
+    expect(style.subtitle).toBeUndefined()
     expect(style.opacity).toBe(0.5)
     expect(style.seriesColors?.g1).toBe('#111111')
     expect(style.bar).toBeUndefined()

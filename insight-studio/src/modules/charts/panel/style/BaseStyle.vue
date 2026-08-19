@@ -92,20 +92,8 @@ const chartTitle = computed({
     ctx.touch()
   },
 })
-const chartSubtitle = computed({
-  get: () => style.value.subtitle ?? '',
-  set: (v: string) => {
-    if (v === '') delete style.value.subtitle
-    else style.value.subtitle = v
-    ctx.touch()
-  },
-})
 function resetTitle() {
   delete style.value.title
-  ctx.touch()
-}
-function resetSubtitle() {
-  delete style.value.subtitle
   ctx.touch()
 }
 
@@ -156,13 +144,6 @@ function removeRefLine(i: number) {
         <div class="sty__inline">
           <ITextField v-model="chartTitle" size="sm" placeholder="默认（视图名）" aria-label="图表标题" />
           <button type="button" class="sty__reset" title="恢复默认标题" aria-label="恢复默认标题" @click="resetTitle">↻</button>
-        </div>
-      </div>
-      <div class="sty__row">
-        <span class="sty__label">Subtitle</span>
-        <div class="sty__inline">
-          <ITextField v-model="chartSubtitle" size="sm" placeholder="可选" aria-label="图表副标题" />
-          <button type="button" class="sty__reset" title="清除副标题" aria-label="清除副标题" @click="resetSubtitle">↻</button>
         </div>
       </div>
       <div class="sty__row">

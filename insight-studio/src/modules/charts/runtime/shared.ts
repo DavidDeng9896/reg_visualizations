@@ -60,10 +60,9 @@ export const TOOLTIP_DARK: Record<string, unknown> = {
 
 export function buildTitleLayout(style: ChartStyle, defaultTitle: string): Record<string, unknown> | undefined {
   const text = style.title ?? defaultTitle
-  const subtext = style.subtitle ?? ''
-  if (!text && !subtext) return undefined
+  if (!text) return undefined
   return {
-    text: subtext ? `${text}<br><span style="font-size:12px;color:#667085">${subtext}</span>` : text,
+    text,
     x: 0,
     xanchor: 'left',
     font: { size: 15, color: '#101828', weight: 600 },
