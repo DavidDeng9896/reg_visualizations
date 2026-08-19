@@ -169,6 +169,45 @@ export interface RunAgentOptions {
  */
 export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const { exec, maxIterations, signal, onEvent } = opts
+  const waitConfirm = opts.waitConfirm
+
+  const sweepFailedEmptyAiNodes = async () => {
+    const call: ToolCall = {
+      id: 'ai-sweep-empty',
+      type: 'function',
+      function: { name: 'cleanup_failed_ai_steps', arguments: '{}' },
+    }
+    try {
+      const result = await exec(call, {})
+      const summary = String(result.summary ?? '')
+      if (result.needsConfirmation && !summary.includes('失败的空节点')) return
+      if (!result.needsConfirmation && !summary.includes('已删除') && !summary.includes('空节点')) return
+      if (!result.needsConfirmation && /没有需要清理/.test(summary)) return
+      onEvent({ type: 'tool_call', call, running: false })
+      onEvent({
+        type: 'tool_result',
+        id: call.id,
+        name: 'cleanup_failed_ai_steps',
+        ok: result.ok,
+        summary: result.summary,
+        needsConfirmation: result.needsConfirmation,
+      })
+      if (!result.needsConfirmation) return
+      const resolved = waitConfirm
+        ? await waitConfirm({ id: call.id, name: 'cleanup_failed_ai_steps', summary: result.summary }, signal)
+        : '用户未确认该危险操作（前端未接入确认通道）。不要重试；请改用其他方案。'
+      onEvent({
+        type: 'tool_result',
+        id: call.id,
+        name: 'cleanup_failed_ai_steps',
+        ok: !resolved.includes('拒绝') && !resolved.includes('未确认'),
+        summary: resolved,
+        needsConfirmation: false,
+      })
+    } catch {
+      /* 测试 mock exec 或环境无分析时忽略 */
+    }
+  }
   const post = opts.postChatFn ?? postChat
   const messages = [...opts.messages]
   const planGate = opts.planGate !== false
@@ -327,6 +366,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       if (stallRounds >= MAX_STALL_ROUNDS && planGate && planIncomplete(planSteps, planDone)) {
         const scrubbed = scrubVisibleContent(text)
         emitIncompleteIfNeeded()
+        await sweepFailedEmptyAiNodes()
         onEvent({
           type: 'done',
           content: scrubbed
@@ -337,6 +377,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       }
 
       emitIncompleteIfNeeded()
+      await sweepFailedEmptyAiNodes()
       onEvent({ type: 'done', content: scrubVisibleContent(contentText(assistant.content)) })
       return messages
     }
@@ -507,6 +548,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     messages.push(finalMsg)
     if (finalMsg.content) {
       emitIncompleteIfNeeded()
+      await sweepFailedEmptyAiNodes()
       onEvent({ type: 'done', content: scrubVisibleContent(contentText(finalMsg.content)) })
       return messages
     }

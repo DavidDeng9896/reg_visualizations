@@ -5,6 +5,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import { contentText, postChat, readSseStream, type ChatMessage } from '../../ai/client'
+import { pythonPackagesPromptList } from '../pythonPackages'
 import { IButton, IIcon } from '../../../ui'
 
 interface ChatMsg {
@@ -53,7 +54,7 @@ function systemPrompt(): string {
 ${props.inputsSummary}
 
 ## 白名单包（仅可 import）
-pandas, numpy, scipy, scikit-learn, rdkit, plotly, openpyxl, pydantic
+${pythonPackagesPromptList()}
 
 ## 硬约束
 - 禁止 pip install / 网络请求 / 读写任意本地路径

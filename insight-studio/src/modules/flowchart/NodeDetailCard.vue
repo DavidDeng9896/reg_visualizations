@@ -10,6 +10,7 @@ import { IButton, IIcon, toast } from '../../ui'
 import type { IconName } from '../../ui'
 import type { FlowNodeData } from './graph'
 import { stepTypeLabel, viewTypeLabel } from './graph'
+import type { AnalysisChartArtifact } from '../../shared/types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { refreshSqlSourceStep } from '../table/refreshSqlSource'
 
@@ -47,6 +48,13 @@ const isChartNode = computed(
   () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
 )
 
+const isPythonChartNode = computed(() => props.node.kind === 'python-chart' && !!props.node.chartId)
+
+const pythonChart = computed<AnalysisChartArtifact | null>(() => {
+  if (!isPythonChartNode.value || !current.value) return null
+  return (current.value.charts ?? []).find((c) => c.id === props.node.chartId) ?? null
+})
+
 const stepCharts = computed(() => {
   if (props.node.kind !== 'step' || props.node.stepType !== 'custom-code' || !current.value) return []
   const step = current.value.steps.find((s) => s.id === props.node.stepId)
@@ -56,16 +64,20 @@ const stepCharts = computed(() => {
   return ids.map((id) => byId.get(id)).filter((c): c is NonNullable<typeof c> => !!c)
 })
 
-const showWidePreview = computed(() => isChartNode.value || stepCharts.value.length > 0)
+const showWidePreview = computed(
+  () => isChartNode.value || isPythonChartNode.value || stepCharts.value.length > 0,
+)
 
 const kindTitle = computed(() => {
   const n = props.node
+  if (n.kind === 'python-chart') return 'Python chart'
   if (n.kind === 'step') return stepTypeLabel(n.stepType!)
   return isChartNode.value ? viewTypeLabel(n.viewType ?? 'bar') : '视图'
 })
 
 const nodeIcon = computed<IconName>(() => {
   const n = props.node
+  if (n.kind === 'python-chart') return 'scatter'
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
   switch (n.stepType) {
     case 'upload-csv':
@@ -116,6 +128,12 @@ const metaRows = computed<MetaRow[]>(() => {
     }
     if (n.error) rows.push({ label: '错误', value: n.error })
     return rows
+  }
+  if (n.kind === 'python-chart') {
+    return [
+      { label: '类型', value: 'Python chart' },
+      { label: 'chartId', value: n.chartId ?? '—' },
+    ]
   }
   return [
     { label: '类型', value: viewTypeLabel(n.viewType ?? 'table') },
@@ -183,6 +201,7 @@ function toggleAutoRefresh(): void {
 }
 
 function refIcon(n: FlowNodeData): IconName {
+  if (n.kind === 'python-chart') return 'scatter'
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
   return nodeIcon.value
 }
@@ -199,7 +218,7 @@ function onDelete() {
     class="flow-detail flow-detail--docked"
     :class="{ 'flow-detail--chart': showWidePreview }"
     role="complementary"
-    :aria-label="isChartNode ? '图表预览' : '节点详情'"
+    :aria-label="isChartNode || isPythonChartNode ? '图表预览' : '节点详情'"
   >
     <header class="flow-detail__head">
       <span class="flow-detail__icon">
@@ -230,7 +249,18 @@ function onDelete() {
     </header>
 
     <div class="flow-detail__body">
-      <section v-if="isChartNode && node.viewId" class="flow-detail__preview">
+      <section v-if="isPythonChartNode" class="flow-detail__preview">
+        <h4 class="flow-detail__section-title">Python chart</h4>
+        <PlotlyArtifactPreview
+          v-if="pythonChart"
+          :name="pythonChart.name"
+          :plotly-json="pythonChart.plotlyJson"
+        />
+        <p v-else class="flow-detail__none">Python 图已不存在，请重跑 Custom Code</p>
+        <p class="flow-detail__none">只读。改图请编辑上游 Custom Code 后重新运行。</p>
+      </section>
+
+      <section v-else-if="isChartNode && node.viewId" class="flow-detail__preview">
         <h4 class="flow-detail__section-title">Output chart</h4>
         <FlowChartPreview :table-id="node.tableId ?? ''" :view-id="node.viewId" @open="emit('open')" />
       </section>
@@ -308,7 +338,7 @@ function onDelete() {
         <IButton variant="ghost" icon="edit" @click="emit('edit')">Edit</IButton>
         <IButton variant="ghost" icon="trash" @click="onDelete">Delete</IButton>
       </template>
-      <IButton variant="primary" icon="external" @click="emit('open')">在工作区打开</IButton>
+      <IButton v-if="!isPythonChartNode" variant="primary" icon="external" @click="emit('open')">在工作区打开</IButton>
     </footer>
   </aside>
 </template>

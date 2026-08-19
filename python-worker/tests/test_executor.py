@@ -240,3 +240,36 @@ def custom_code(inputs):
     assert result["ok"] is False
     assert "IOData" in result["error"]["message"]
 
+
+def test_missing_import_lists_available_packages():
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "a", "dataType": "number"}],
+            "rows": [{"a": 1}],
+        }
+    ]
+    code = """
+import definitely_not_a_real_package_xyz
+def custom_code(inputs):
+    return [inputs[0]]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is False
+    msg = result["error"]["message"]
+    assert "definitely_not_a_real_package_xyz" in msg
+    assert "当前可用包" in msg
+
+
+def test_health_payload_shape():
+    from app.packages import health_payload
+
+    payload = health_payload()
+    assert "ok" in payload
+    assert "packages" in payload
+    assert "missing" in payload
+    assert isinstance(payload["packages"], dict)
+    assert "pandas" in payload["packages"]
+
+

@@ -12,6 +12,7 @@ import type {
 } from '../../../shared/types'
 import { uuid } from '../../../shared/id'
 import { nowIso } from '../../../shared/datetime'
+import { pythonChartId } from '../pythonCharts'
 import { ensureRowIds, sealRows } from '../../../shared/factories'
 import { ROW_ID_FIELD } from '../../../shared/types'
 import { findTable } from '../../../shared/tree'
@@ -268,9 +269,10 @@ export async function execCustomCode(
         importedAt: nowIso(),
       })
     } else if (o.kind === 'figure' && o.plotlyJson) {
+      const name = o.name || 'chart'
       outputCharts.push({
-        id: uuid(),
-        name: o.name || 'chart',
+        id: pythonChartId(ctx.step.id, name),
+        name,
         stepId: ctx.step.id,
         plotlyJson: o.plotlyJson,
       })

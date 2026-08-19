@@ -6,8 +6,9 @@
 import type { Analysis, StepNode, StepType, ViewNode, ViewType } from '../../shared/types'
 import { countViews, findTable, findView } from '../../shared/tree'
 import { getStepDef } from '../steps/registry'
+import { pythonChartNodeId } from '../steps/pythonCharts'
 
-export type FlowNodeKind = 'step' | 'view'
+export type FlowNodeKind = 'step' | 'view' | 'python-chart'
 
 export interface FlowNodePort {
   name: string
@@ -37,6 +38,8 @@ export interface FlowNodeData {
   columnCount?: number
   viewCount?: number
   childCount?: number
+  /** python-chart 节点：analysis.charts id。 */
+  chartId?: string
   /** 节点是否完整有效（输入全部解析）。 */
   valid: boolean
 }
@@ -196,6 +199,33 @@ export function buildFlowGraph(analysis: Analysis): FlowGraph {
       getStepDef(parentStep.type).outputs[0]?.name ??
       'Output dataset'
     for (const view of table.views) pushViewNodes(view, tableMeta, parentId, nodes, edges, sourcePort)
+  }
+
+  // Custom Code Plotly Figure → 只读 python-chart 节点
+  const chartsById = new Map((analysis.charts ?? []).map((c) => [c.id, c]))
+  for (const step of analysis.steps) {
+    for (const cid of step.output.charts ?? []) {
+      const ch = chartsById.get(cid)
+      if (!ch) continue
+      const id = pythonChartNodeId(ch.id)
+      nodes.push({
+        id,
+        kind: 'python-chart',
+        label: ch.name,
+        stepId: step.id,
+        chartId: ch.id,
+        inputs: [{ name: 'in', type: 'chart' }],
+        outputs: [],
+        valid: true,
+      })
+      edges.push({
+        id: edgeId(stepNodeId(step.id), id, 'Output charts', 'in'),
+        source: stepNodeId(step.id),
+        target: id,
+        sourcePort: 'Output charts',
+        targetPort: 'in',
+      })
+    }
   }
 
   return { nodes, edges }

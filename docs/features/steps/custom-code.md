@@ -28,9 +28,13 @@ return [{"name": "标准化清洗数据", "data": df_out}]
 
 ## 白名单包（v1）
 
-pandas, numpy, scipy, scikit-learn, rdkit, plotly, openpyxl, pydantic
+pandas, numpy, scipy, scikit-learn, rdkit, statsmodels, biopython, lmfit, matplotlib, seaborn, kaleido, plotly, pyarrow, openpyxl, pydantic
 
-> 本地最小安装可不装 rdkit；Docker 镜像通过 `requirements-docker.txt` 安装。
+本地 `start.sh` 与 Docker 使用同一份 `python-worker/requirements.txt`。`GET /health` 返回已安装版本；缺核心包时 `ok: false`。
+
+`flowkit` / `pycorn` 暂不预装（有真实流式 / AKTA 数据再加）。
+
+return `plotly.graph_objects.Figure` 会在流程图上自动长出**只读 Python 图节点**（无 CONFIGURE），并可嵌入报告 / 看板。
 
 ## 使用
 

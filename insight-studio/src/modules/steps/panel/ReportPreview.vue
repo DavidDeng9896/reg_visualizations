@@ -24,6 +24,10 @@ function setChartRef(id: string, el: unknown) {
 
 function sectionLabel(sec: ReportSection): string {
   if (sec.kind === 'chart') {
+    if (sec.chartId) {
+      const ch = props.analysis?.charts?.find((c) => c.id === sec.chartId)
+      return `图 · ${ch?.name ?? sec.chartId}`
+    }
     const table = props.analysis?.tables.find((t) => t.id === sec.tableId)
     let name = sec.viewId
     if (table && sec.viewId) {
@@ -162,6 +166,7 @@ async function printPdf() {
                 :analysis="analysis"
                 :table-id="sec.tableId"
                 :view-id="sec.viewId"
+                :chart-id="sec.chartId"
               />
               <ReportEmbedTable
                 v-else

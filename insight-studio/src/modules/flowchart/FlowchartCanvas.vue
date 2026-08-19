@@ -341,6 +341,9 @@ function setActive(id: string | null): void {
   }
   if (n.kind === 'view' && n.viewId && n.tableId) {
     store.setSelected({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
+  } else if (n.kind === 'python-chart') {
+    // 只读图节点：保持画布选中，不写回 table/step，避免 selected watch 抢走焦点
+    return
   } else if (n.kind === 'step' && n.stepId) {
     const table = current.value?.tables.find((t) => t.stepId === n.stepId)
     if (table) store.setSelected({ kind: 'table', tableId: table.id })
@@ -351,11 +354,14 @@ function setActive(id: string | null): void {
 watch(selected, (sel) => {
   const flowId = selectionToFlowId(sel)
   if (flowId === activeId.value) return
+  if (!flowId && activeId.value && nodeById.value.get(activeId.value)?.kind === 'python-chart') return
   activeId.value = flowId
   if (flowId) void centerOn(flowId)
 })
 
 watch(selectedStepId, (stepId) => {
+  const currentNode = activeId.value ? nodeById.value.get(activeId.value) : null
+  if (currentNode?.kind === 'python-chart') return
   const flowId = stepSelectionToFlowId(stepId)
   if (flowId === activeId.value) return
   activeId.value = flowId
@@ -677,7 +683,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 function minimapNodeColor(node: { data?: unknown }): string {
   const d = node.data as FlowNodeData | undefined
-  if (d?.kind === 'view') return '#8fd7b5'
+  if (d?.kind === 'view' || d?.kind === 'python-chart') return '#8fd7b5'
   if (d?.status === 'pending' || d?.status === 'failed') return '#f3e3b3'
   return '#5cc795'
 }

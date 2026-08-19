@@ -30,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
   set_chart_config: '配置图表',
   create_dashboard: '创建看板',
   add_dashboard_widget: '添加看板组件',
+  cleanup_failed_ai_steps: '清理失败空节点',
   delete_table: '删除表',
   delete_view: '删除视图',
   delete_step: '删除步骤',

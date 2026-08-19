@@ -199,6 +199,55 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(evts.some((e) => e.type === 'done' && e.content.includes('完成'))).toBe(true)
   })
 
+  it('收束内部空节点清扫：无空壳时不抢 waitConfirm、不写入 messages', async () => {
+    const names: string[] = []
+    const post = async () => sseOf({ content: '直接回答' })
+    const exec: ToolExecutor = async (c) => {
+      names.push(c.function.name)
+      return { ok: true, summary: '没有需要清理的失败空节点' }
+    }
+    const evts = events()
+    const messages = await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 8,
+      waitConfirm: async () => {
+        throw new Error('should not waitConfirm')
+      },
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(names).toContain('cleanup_failed_ai_steps')
+    expect(messages.filter((m) => m.role === 'tool')).toHaveLength(0)
+    expect(evts.some((e) => e.type === 'tool_call' && e.call.function.name === 'cleanup_failed_ai_steps')).toBe(false)
+    expect(evts.some((e) => e.type === 'done')).toBe(true)
+  })
+
+  it('收束内部空节点清扫：有删除结果时发出 tool_result', async () => {
+    const post = async () => sseOf({ content: '完成' })
+    const exec: ToolExecutor = async (c) => {
+      if (c.function.name === 'cleanup_failed_ai_steps') {
+        return { ok: true, summary: '已删除 1 个失败的空节点：空壳' }
+      }
+      return { ok: true, summary: 'ok' }
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 8,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(
+      evts.some(
+        (e) => e.type === 'tool_result' && e.name === 'cleanup_failed_ai_steps' && e.summary.includes('已删除'),
+      ),
+    ).toBe(true)
+  })
+
   it('ask_user 无作答通道 → 兜底跳过不中断', async () => {
     const post = async (p: ChatPayload) => {
       const n = p.messages.filter((m) => m.role === 'tool').length

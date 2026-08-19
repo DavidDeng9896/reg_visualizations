@@ -14,6 +14,7 @@ const props = defineProps<{
   analysis: Analysis | null
   tableId?: string
   viewId?: string
+  chartId?: string
 }>()
 
 const panelRef = ref<InstanceType<typeof ChartPanel> | null>(null)
@@ -23,12 +24,36 @@ const error = ref('')
 
 const revision = computed(() => props.analysis?.revision ?? 0)
 
+function plotlyJsonToOption(raw: Record<string, unknown>): ChartOption {
+  const data = Array.isArray(raw.data) ? (raw.data as ChartOption['data']) : []
+  const layout =
+    raw.layout && typeof raw.layout === 'object'
+      ? ({ ...(raw.layout as Record<string, unknown>) } as ChartOption['layout'])
+      : {}
+  const config =
+    raw.config && typeof raw.config === 'object' ? (raw.config as ChartOption['config']) : undefined
+  return { data, layout, config }
+}
+
 function rebuild() {
   option.value = null
   error.value = ''
   rowCount.value = 0
   const a = props.analysis
-  if (!a || !props.tableId || !props.viewId) {
+  if (!a) {
+    error.value = '未指定图表视图'
+    return
+  }
+  if (props.chartId) {
+    const ch = (a.charts ?? []).find((c) => c.id === props.chartId)
+    if (!ch) {
+      error.value = 'Python 图已不存在，请重跑 Custom Code 或从报告移除'
+      return
+    }
+    option.value = plotlyJsonToOption(ch.plotlyJson)
+    return
+  }
+  if (!props.tableId || !props.viewId) {
     error.value = '未指定图表视图'
     return
   }
@@ -59,7 +84,7 @@ function rebuild() {
 }
 
 watch(
-  () => [props.tableId, props.viewId, revision.value] as const,
+  () => [props.tableId, props.viewId, props.chartId, revision.value] as const,
   () => rebuild(),
   { immediate: true },
 )

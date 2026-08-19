@@ -1,14 +1,8 @@
 /** Custom Code 预置 Python 模板（与 Worker 注入的 IOData 契约一致）。 */
+import { pythonPackagesTemplateComment } from './pythonPackages'
+
 export const CUSTOM_CODE_DEFAULT_TEMPLATE = `"""
-Supported packages:
-pandas
-numpy
-scipy
-scikit-learn
-rdkit
-plotly
-openpyxl
-pydantic
+${pythonPackagesTemplateComment()}
 """
 from io import BytesIO
 import pandas as pd

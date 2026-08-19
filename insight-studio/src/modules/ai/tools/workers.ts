@@ -33,7 +33,7 @@ export const WORKER_READ_ONLY_TOOLS = new Set([
 /** 分析师/工程师速查：补全冷启动缺失的平台知识。 */
 const WORKER_PLATFORM_BRIEF = `## 平台要点（速查）
 - 列名用原始 field（可含空格/特殊字符），title 仅展示名。
-- Custom Code 入口：def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]；return [IOData(name=..., data=df)] 或 [{"name":..., "data": df}]；stepId 必须是 UUID。写完后 run_step。
+- Custom Code 入口：def custom_code(inputs: list[IOData], **kwargs) -> list[IOData]；return [IOData(name=..., data=df)] 或 [{"name":..., "data": df}]；stepId 必须是 UUID。写完后 run_step。go.Figure 会生成只读 Python 图（chartId）。白名单含 rdkit/statsmodels/lmfit/biopython。
 - line：x + values[]；scatter：x + values，可用 color；分组用 series/color。
 - set_chart_config 必须给出完整可用映射，勿留空必填槽。`
 

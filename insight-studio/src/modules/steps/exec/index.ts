@@ -216,19 +216,15 @@ export function applyStepResult(
 
   if (!analysis.charts) analysis.charts = []
   const outputChartIds: string[] = []
-  newCharts.forEach((ch, i) => {
-    const oldId = oldChartIds[i]
-    const oldIdx = oldId ? analysis.charts!.findIndex((x) => x.id === oldId) : -1
+  newCharts.forEach((ch) => {
     ch.stepId = step.id
-    if (oldIdx >= 0) {
-      ch.id = oldId
-      analysis.charts![oldIdx] = ch
-    } else {
-      analysis.charts!.push(ch)
-    }
+    const oldIdx = analysis.charts!.findIndex((x) => x.id === ch.id)
+    if (oldIdx >= 0) analysis.charts![oldIdx] = ch
+    else analysis.charts!.push(ch)
     outputChartIds.push(ch.id)
   })
-  removeCharts(analysis, oldChartIds.slice(newCharts.length))
+  const keep = new Set(outputChartIds)
+  removeCharts(analysis, oldChartIds.filter((id) => !keep.has(id)))
 
   step.output = { tables: outputTableIds, files: outputFileIds, views: [], charts: outputChartIds }
 }

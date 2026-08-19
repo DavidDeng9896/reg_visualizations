@@ -115,6 +115,13 @@ function onRemoveWidgets(widgetIds: string[]) {
 function onAddWidget(payload: AddWidgetPayload) {
   let addedId: string | null = null
   store.mutate((d) => {
+    if (payload.kind === 'python-chart') {
+      const grid = findNextSlot(d.widgets, 6, 8)
+      const w = createDashboardWidget('python-chart', { analysisId: payload.analysisId, chartId: payload.chartId }, grid)
+      d.widgets.push(w)
+      addedId = w.id
+      return
+    }
     if (payload.kind === 'link') {
       const grid = findNextSlot(d.widgets, 6, 10)
       const w = createLinkWidget(payload.url, { title: payload.title, grid })

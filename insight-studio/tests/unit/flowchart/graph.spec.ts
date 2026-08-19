@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Analysis, AnalysisTable, StepNode, ViewNode } from '../../../src/shared/types'
 import { createTable } from '../../../src/shared/factories'
+import { pythonChartNodeId } from '../../../src/modules/steps/pythonCharts'
 import { buildFlowGraph, resolveStepSourceRef, stepNodeId, viewNodeId } from '../../../src/modules/flowchart/graph'
 
 function step(id: string, type: StepNode['type'], outputTableId: string, inputs: StepNode['inputs'] = []): StepNode {
@@ -94,6 +95,34 @@ describe('buildFlowGraph · steps', () => {
 
     const g = buildFlowGraph(a)
     expect(g.edges).toHaveLength(2)
+  })
+})
+
+describe('buildFlowGraph · python-chart', () => {
+  it('Custom Code Figure 产物自动长出只读节点', () => {
+    const t = createTable('T', [{ field: 'v', title: 'v', dataType: 'number' }], [{ v: 1 }], 'step')
+    t.stepId = 'cc1'
+    const s: StepNode = {
+      id: 'cc1',
+      type: 'custom-code',
+      name: 'ADME',
+      inputs: [],
+      config: {},
+      status: 'configured',
+      output: { tables: [t.id], files: [], views: [], charts: ['cc1::fig'] },
+    }
+    const a = analysis({ steps: [s], tables: [t] })
+    a.charts = [{ id: 'cc1::fig', name: 'MW vs logP', stepId: 'cc1', plotlyJson: { data: [], layout: {} } }]
+    const g = buildFlowGraph(a)
+    const pid = pythonChartNodeId('cc1::fig')
+    expect(g.nodes.map((n) => n.id)).toContain(pid)
+    const n = g.nodes.find((x) => x.id === pid)!
+    expect(n.kind).toBe('python-chart')
+    expect(n.chartId).toBe('cc1::fig')
+    const e = g.edges.find((x) => x.target === pid)
+    expect(e?.source).toBe(stepNodeId('cc1'))
+    expect(e?.sourcePort).toBe('Output charts')
+    expect(resolveStepSourceRef(a, n, 'in')).toBeNull()
   })
 })
 

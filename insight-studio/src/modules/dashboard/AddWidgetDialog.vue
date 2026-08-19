@@ -15,6 +15,11 @@ export type AddWidgetPayload =
       type: 'chart' | 'table'
     }
   | {
+      kind: 'python-chart'
+      analysisId: string
+      chartId: string
+    }
+  | {
       kind: 'link'
       url: string
       title?: string
@@ -93,6 +98,12 @@ function confirm() {
       analysisId: analysisId.value,
       tableId: p.tableId,
       type: 'table',
+    })
+  } else if (p.kind === 'python-chart') {
+    emit('confirm', {
+      kind: 'python-chart',
+      analysisId: analysisId.value,
+      chartId: p.chartId,
     })
   } else {
     emit('confirm', {

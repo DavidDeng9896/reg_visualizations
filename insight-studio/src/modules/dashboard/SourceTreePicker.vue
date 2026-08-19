@@ -5,12 +5,13 @@
 import { computed, reactive, watch } from 'vue'
 import type { Analysis, ViewNode, ViewType } from '../../shared/types'
 import { buildTableForest } from '../../shared/tree'
-import type { IconName } from '../../ui'
+import { IIcon, type IconName } from '../../ui'
 import SourceTreeNodes from './SourceTreeNodes.vue'
 
 export type TreePick =
   | { kind: 'table'; tableId: string }
   | { kind: 'view'; tableId: string; viewId: string; viewType: ViewType }
+  | { kind: 'python-chart'; chartId: string; name: string }
 
 const props = defineProps<{
   analysis: Analysis | null
@@ -89,8 +90,12 @@ function toggleView(id: string) {
 const selectedKey = computed(() => {
   const v = props.modelValue
   if (!v) return null
-  return v.kind === 'table' ? `t:${v.tableId}` : `v:${v.viewId}`
+  if (v.kind === 'table') return `t:${v.tableId}`
+  if (v.kind === 'python-chart') return `c:${v.chartId}`
+  return `v:${v.viewId}`
 })
+
+const pythonCharts = computed(() => props.analysis?.charts ?? [])
 
 function pickTable(tableId: string) {
   emit('update:modelValue', { kind: 'table', tableId })
@@ -98,26 +103,48 @@ function pickTable(tableId: string) {
 function pickView(tableId: string, view: ViewNode) {
   emit('update:modelValue', { kind: 'view', tableId, viewId: view.id, viewType: view.type })
 }
+function pickPythonChart(chartId: string, name: string) {
+  emit('update:modelValue', { kind: 'python-chart', chartId, name })
+}
 </script>
 
 <template>
   <div class="stp" role="tree" aria-label="选择表或视图">
     <p v-if="!analysis" class="stp__empty">请先选择 Insight</p>
-    <p v-else-if="!forest.length" class="stp__empty">该 Insight 还没有表</p>
-    <SourceTreeNodes
-      v-else
-      :nodes="forest"
-      :depth="0"
-      :expanded-tables="expandedTables"
-      :expanded-views="expandedViews"
-      :selected-key="selectedKey"
-      :view-icon="VIEW_ICON"
-      :view-kind="VIEW_KIND"
-      @toggle-table="toggleTable"
-      @toggle-view="toggleView"
-      @pick-table="pickTable"
-      @pick-view="pickView"
-    />
+    <p v-else-if="!forest.length && !pythonCharts.length" class="stp__empty">该 Insight 还没有表或 Python 图</p>
+    <template v-else>
+      <SourceTreeNodes
+        v-if="forest.length"
+        :nodes="forest"
+        :depth="0"
+        :expanded-tables="expandedTables"
+        :expanded-views="expandedViews"
+        :selected-key="selectedKey"
+        :view-icon="VIEW_ICON"
+        :view-kind="VIEW_KIND"
+        @toggle-table="toggleTable"
+        @toggle-view="toggleView"
+        @pick-table="pickTable"
+        @pick-view="pickView"
+      />
+      <div v-if="pythonCharts.length" class="stp__py">
+        <div class="stp__py-title">Python 图</div>
+        <div
+          v-for="ch in pythonCharts"
+          :key="ch.id"
+          class="stp__row"
+          :class="{ 'stp__row--on': selectedKey === `c:${ch.id}` }"
+          role="treeitem"
+          :aria-selected="selectedKey === `c:${ch.id}`"
+          tabindex="0"
+          @click="pickPythonChart(ch.id, ch.name)"
+          @keydown.enter.prevent="pickPythonChart(ch.id, ch.name)"
+        >
+          <IIcon name="scatter" :size="14" />
+          <span class="is-ellipsis">{{ ch.name }}</span>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -136,6 +163,19 @@ function pickView(tableId: string, view: ViewNode) {
   text-align: center;
   font-size: var(--is-text-sm);
   color: var(--is-text-tertiary);
+}
+.stp__py {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--is-border);
+}
+.stp__py-title {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--is-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .stp__row {
   display: flex;

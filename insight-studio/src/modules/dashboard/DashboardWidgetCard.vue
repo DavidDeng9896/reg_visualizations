@@ -3,10 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { DashboardWidget } from '../../shared/types'
 import { IButton, IIcon } from '../../ui'
-import { resolveWidgetSource, type WidgetResolveResult } from './widgetData'
+import { resolveWidgetSource, resolvePythonChartSource, type WidgetResolveResult, type PythonChartResolveResult } from './widgetData'
 import ChartWidget from './ChartWidget.vue'
 import TableWidget from './TableWidget.vue'
 import LinkWidget from './LinkWidget.vue'
+import PythonChartWidget from './PythonChartWidget.vue'
 
 const props = defineProps<{
   widget: DashboardWidget
@@ -21,11 +22,12 @@ const router = useRouter()
 const rootEl = ref<HTMLElement | null>(null)
 const inView = ref(false)
 const loading = ref(false)
-const resolved = ref<WidgetResolveResult | null>(null)
+const resolved = ref<WidgetResolveResult | PythonChartResolveResult | null>(null)
 let io: IntersectionObserver | null = null
 let gen = 0
 
 const isLink = computed(() => props.widget.type === 'link')
+const isPythonChart = computed(() => props.widget.type === 'python-chart')
 
 const title = computed(() => {
   if (props.widget.title) return props.widget.title
@@ -37,6 +39,7 @@ const title = computed(() => {
     }
   }
   if (resolved.value?.ok) return resolved.value.title
+  if (isPythonChart.value) return 'Python 图'
   return props.widget.type === 'chart' ? '图表' : '表格'
 })
 
@@ -44,7 +47,9 @@ async function load() {
   if (isLink.value || !inView.value || !props.widget.ref) return
   const token = ++gen
   loading.value = true
-  const r = await resolveWidgetSource(props.widget.ref)
+  const r = isPythonChart.value
+    ? await resolvePythonChartSource(props.widget.ref)
+    : await resolveWidgetSource(props.widget.ref)
   if (token !== gen) return
   resolved.value = r
   loading.value = false
@@ -57,6 +62,7 @@ watch(
       props.widget.ref?.analysisId,
       props.widget.ref?.tableId,
       props.widget.ref?.viewId,
+      props.widget.ref?.chartId,
       props.widget.url,
     ] as const,
   () => {
@@ -105,6 +111,12 @@ function openSource() {
   }
   const ref = props.widget.ref
   if (!ref) return
+  if (ref.chartId) {
+    const loc = router.resolve(`/analysis/${ref.analysisId}`)
+    window.open(loc.href, '_blank', 'noopener,noreferrer')
+    return
+  }
+  if (!ref.tableId) return
   const q = new URLSearchParams({ tableId: ref.tableId })
   if (ref.viewId) q.set('viewId', ref.viewId)
   const loc = router.resolve(`/analysis/${ref.analysisId}?${q.toString()}`)
@@ -134,8 +146,9 @@ function openSource() {
         <IIcon name="warning" :size="18" />
         <span>{{ resolved.message }}</span>
       </div>
+      <PythonChartWidget v-else-if="resolved?.ok && 'pythonChart' in resolved" :source="resolved" />
       <ChartWidget v-else-if="resolved?.ok && widget.type === 'chart'" :source="resolved" />
-      <TableWidget v-else-if="resolved?.ok" :source="resolved" />
+      <TableWidget v-else-if="resolved?.ok && !('pythonChart' in resolved)" :source="resolved" />
     </div>
   </article>
 </template>

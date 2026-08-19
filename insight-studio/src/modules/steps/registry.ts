@@ -247,7 +247,7 @@ const STEP_DEFS: StepDef[] = [
     type: 'custom-code',
     label: 'Custom code',
     category: 'code',
-    description: 'Run Python (pandas / rdkit / sklearn / plotly) with list[IOData] in and out.',
+    description: 'Run Python (pandas / rdkit / statsmodels / lmfit / plotly) with list[IOData] in and out.',
     inputs: [
       { name: 'Input datasets', type: 'table', multiple: true, optional: true },
       { name: 'Input files', type: 'file', multiple: true, optional: true },

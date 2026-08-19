@@ -85,9 +85,7 @@ export function createDashboardWidget(
   grid?: Partial<DashboardWidget['grid']>,
 ): DashboardWidget {
   const defaults =
-    type === 'chart'
-      ? { x: 0, y: 0, w: 6, h: 8 }
-      : { x: 0, y: 0, w: 12, h: 10 }
+    type === 'table' ? { x: 0, y: 0, w: 12, h: 10 } : { x: 0, y: 0, w: 6, h: 8 }
   return {
     id: uuid(),
     type,

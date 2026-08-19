@@ -22,6 +22,8 @@ const emit = defineEmits<{ (e: 'open', id: string): void }>()
 
 const isStep = computed(() => props.data.kind === 'step')
 const isView = computed(() => props.data.kind === 'view')
+const isPythonChart = computed(() => props.data.kind === 'python-chart')
+const isCompact = computed(() => isView.value || isPythonChart.value)
 
 const isDataStep = computed(() => {
   const t = props.data.stepType
@@ -38,6 +40,7 @@ const isReportStep = computed(() => props.data.stepType === 'report')
 
 const icon = computed<IconName>(() => {
   const d = props.data
+  if (d.kind === 'python-chart') return 'scatter'
   if (d.kind === 'view') return (d.viewType ?? 'table') as IconName
   switch (d.stepType) {
     case 'upload-csv':
@@ -69,6 +72,7 @@ const icon = computed<IconName>(() => {
 
 const subLabel = computed(() => {
   const d = props.data
+  if (d.kind === 'python-chart') return 'Python chart'
   if (d.kind === 'view') return viewTypeLabel(d.viewType ?? 'table')
   const parts: string[] = []
   if (d.stepType) parts.push(stepTypeLabel(d.stepType))
@@ -104,12 +108,13 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
 <template>
   <!-- —— 视图节点（紧凑） —— -->
   <div
-    v-if="isView"
+    v-if="isCompact"
     class="flow-node flow-node--view"
+    :class="{ 'flow-node--python-chart': isPythonChart }"
     :data-node-kind="data.kind"
   >
     <Handle type="target" :position="Position.Left" id="in" class="flow-node__handle flow-node__handle--view" />
-    <Handle type="source" :position="Position.Right" id="out" class="flow-node__handle flow-node__handle--view" />
+    <Handle v-if="isView" type="source" :position="Position.Right" id="out" class="flow-node__handle flow-node__handle--view" />
     <div class="flow-node__body">
       <div class="flow-node__head">
         <span class="flow-node__icon" aria-hidden="true">

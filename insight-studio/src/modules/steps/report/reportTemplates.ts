@@ -119,6 +119,24 @@ function collectFindings(analysis: Analysis, templateId: ReportTemplateId): Repo
       fig += 1
     }
   }
+  for (const ch of analysis.charts ?? []) {
+    out.push(
+      sec({
+        kind: 'chart',
+        title: `图 ${fig}. ${ch.name}`,
+        chartId: ch.id,
+        caption: `图「${ch.name}」：Custom Code 产出的 Python 图（只读）。`,
+      }),
+    )
+    out.push(
+      sec({
+        kind: 'paragraph',
+        title: `图 ${fig} 解读`,
+        body: `上图「${ch.name}」由 Python（plotly）绘制，用于原生图种无法表达的可视化。请结合 Custom Code 输出表解读图形。`,
+      }),
+    )
+    fig += 1
+  }
   // 无图时仍挂上主要表，保证报告不空
   if (!out.length) {
     for (const t of analysis.tables.slice(0, 4)) {

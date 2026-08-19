@@ -85,11 +85,11 @@ export function computeDepths(graph: FlowGraph): Map<string, number> {
   return depths
 }
 
-/** 子节点排序：视图(图)在前，步骤在后 —— 图形紧跟数据。 */
+/** 子节点排序：视图/Python 图在前，步骤在后。 */
 function sortChildren(ids: string[], byId: Map<string, FlowNodeData>): string[] {
   return [...ids].sort((a, b) => {
-    const ka = byId.get(a)?.kind === 'view' ? 0 : 1
-    const kb = byId.get(b)?.kind === 'view' ? 0 : 1
+    const ka = byId.get(a)?.kind === 'step' ? 1 : 0
+    const kb = byId.get(b)?.kind === 'step' ? 1 : 0
     if (ka !== kb) return ka - kb
     return 0
   })
@@ -191,8 +191,8 @@ export function resolvePositions(
     const da = depths.get(a.id) ?? 0
     const db = depths.get(b.id) ?? 0
     if (da !== db) return da - db
-    const ka = a.kind === 'view' ? 0 : 1
-    const kb = b.kind === 'view' ? 0 : 1
+    const ka = a.kind === 'step' ? 1 : 0
+    const kb = b.kind === 'step' ? 1 : 0
     return ka - kb
   })
 
@@ -212,10 +212,10 @@ export function resolvePositions(
       if (resolvedParents.length) {
         const parent = resolvedParents.reduce((m, p) => (p.x > m.x ? p : m))
         // 视图紧跟父节点右侧同起点；步骤稍向下错开，避免压住图
-        const isView = byId.get(node.id)?.kind === 'view'
+        const isChartish = byId.get(node.id)?.kind === 'view' || byId.get(node.id)?.kind === 'python-chart'
         pos = {
           x: parent.x + COLUMN_STEP,
-          y: isView ? parent.y : parent.y + ROW_STEP,
+          y: isChartish ? parent.y : parent.y + ROW_STEP,
         }
       } else {
         pos = { ...(auto[node.id] ?? { x: 0, y: 0 }) }

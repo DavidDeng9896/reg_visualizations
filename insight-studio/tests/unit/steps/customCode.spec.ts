@@ -123,6 +123,10 @@ describe('custom-code exec', () => {
     applyStepResult(analysis, step, result)
     expect(step.output.charts).toHaveLength(1)
     expect(analysis.charts?.[0].name).toBe('hist')
+    expect(analysis.charts?.[0].id).toBe(`${step.id}::hist`)
+    const firstId = analysis.charts?.[0].id
+    applyStepResult(analysis, step, result)
+    expect(analysis.charts?.[0].id).toBe(firstId)
     expect(analysis.files.some((f) => f.name === 'blob.txt')).toBe(true)
   })
 

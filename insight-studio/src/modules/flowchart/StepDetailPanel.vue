@@ -20,7 +20,8 @@ import { previewStep, runStepAsync, IMPLEMENTED_STEP_TYPES, type StepPreviewResu
 import StepConfigForm from '../steps/panel/StepConfigForm.vue'
 import CustomCodePanel from '../steps/panel/CustomCodePanel.vue'
 import ReportPanel from '../steps/panel/ReportPanel.vue'
-import type { StepNode } from '../../shared/types'
+import PlotlyArtifactPreview from '../steps/panel/PlotlyArtifactPreview.vue'
+import type { AnalysisChartArtifact, StepNode } from '../../shared/types'
 
 const FlowChartPreview = defineAsyncComponent(() => import('./FlowChartPreview.vue'))
 
@@ -59,6 +60,13 @@ const isChartNode = computed(
   () => props.node.kind === 'view' && !!props.node.viewType && props.node.viewType !== 'table' && !!props.node.viewId,
 )
 
+const isPythonChartNode = computed(() => props.node.kind === 'python-chart' && !!props.node.chartId)
+
+const pythonChart = computed<AnalysisChartArtifact | null>(() => {
+  if (!isPythonChartNode.value || !current.value) return null
+  return (current.value.charts ?? []).find((c) => c.id === props.node.chartId) ?? null
+})
+
 const stepCharts = computed(() => {
   if (!step.value || step.value.type !== 'custom-code' || !current.value) return []
   const ids = step.value.output.charts ?? []
@@ -96,12 +104,14 @@ const sqlStepMeta = computed(() => {
 
 const kindTitle = computed(() => {
   const n = props.node
+  if (n.kind === 'python-chart') return 'Python chart'
   if (n.kind === 'step') return stepTypeLabel(n.stepType!)
   return isChartNode.value ? viewTypeLabel(n.viewType ?? 'bar') : '视图'
 })
 
 const nodeIcon = computed<IconName>(() => {
   const n = props.node
+  if (n.kind === 'python-chart') return 'scatter'
   if (n.kind === 'view') return (n.viewType ?? 'table') as IconName
   switch (n.stepType) {
     case 'upload-csv':
@@ -355,8 +365,18 @@ function onDelete() {
         <span v-for="chip in metaChips" :key="chip" class="sdp__chip">{{ chip }}</span>
       </div>
 
+      <section v-if="isPythonChartNode" class="sdp__preview sdp__preview--cc">
+        <PlotlyArtifactPreview
+          v-if="pythonChart"
+          :name="pythonChart.name"
+          :plotly-json="pythonChart.plotlyJson"
+        />
+        <div v-else class="sdp__preview-empty">Python 图已不存在，请重跑 Custom Code</div>
+        <p class="sdp__readonly-hint">只读。改图请编辑上游 Custom Code 后重新运行。</p>
+      </section>
+
       <!-- 图表视图预览 -->
-      <section v-if="isChartNode && node.viewId" class="sdp__preview">
+      <section v-else-if="isChartNode && node.viewId" class="sdp__preview">
         <FlowChartPreview :table-id="node.tableId ?? ''" :view-id="node.viewId" @open="emit('open')" />
       </section>
 
@@ -460,7 +480,7 @@ function onDelete() {
           运行
         </IButton>
         <IButton v-if="step" variant="secondary" icon="edit" @click="startEdit">编辑</IButton>
-        <IButton variant="primary" icon="external" @click="emit('open')">在工作区打开</IButton>
+        <IButton v-if="!isPythonChartNode" variant="primary" icon="external" @click="emit('open')">在工作区打开</IButton>
       </template>
       <template v-else>
         <IButton variant="ghost" icon="trash" @click="onDelete">删除</IButton>
@@ -671,6 +691,11 @@ function onDelete() {
 }
 .sdp__preview-error {
   color: var(--is-danger);
+}
+.sdp__readonly-hint {
+  margin: 8px 0 0;
+  font-size: var(--is-text-xs);
+  color: var(--is-text-tertiary);
 }
 .sdp__preview-count {
   font-size: var(--is-text-xs);

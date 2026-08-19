@@ -246,6 +246,9 @@ function renderSection(
     }
     case 'chart':
     case 'table': {
+      const pyChart = sec.kind === 'chart' && sec.chartId
+        ? analysis?.charts?.find((c) => c.id === sec.chartId)
+        : undefined
       const table = analysis?.tables.find((t) => t.id === sec.tableId)
       const viewName = (() => {
         if (!table || !sec.viewId) return undefined
@@ -261,7 +264,7 @@ function renderSection(
       })()
       const label =
         sec.kind === 'chart'
-          ? `图 · ${viewName ?? sec.viewId ?? '未指定视图'}`
+          ? `图 · ${pyChart?.name ?? viewName ?? sec.chartId ?? sec.viewId ?? '未指定视图'}`
           : `表 · ${table?.name ?? sec.tableId ?? '未指定表'}`
       const img = images?.[sec.id]
       let embed: string
@@ -269,6 +272,10 @@ function renderSection(
         embed = `<img class="rp__embed-img" alt="${escapeHtml(label)}" src="${img}" />`
       } else if (sec.kind === 'table') {
         embed = renderTableHtmlSnippet(analysis, sec.tableId)
+      } else if (sec.chartId) {
+        embed = `<div data-report-embed="chart" data-chart-id="${escapeHtml(sec.chartId)}">
+          （预览中可交互展示；导出 PDF 时转为静态图）
+        </div>`
       } else {
         embed = `<div data-report-embed="chart" data-table-id="${escapeHtml(sec.tableId || '')}" data-view-id="${escapeHtml(sec.viewId || '')}">
           （预览中可交互展示；导出 PDF 时转为静态图）

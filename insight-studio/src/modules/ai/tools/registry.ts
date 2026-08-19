@@ -245,16 +245,18 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_dashboard_widget',
-    description: '往看板添加组件：某分析的表或图表视图（viewId 省略时为表格组件）。',
+    description:
+      '往看板添加组件：某分析的表/图表视图（tableId + 可选 viewId），或 Custom Code Python 图（chartId）。',
     parameters: {
       type: 'object',
       properties: {
         dashboardId: str('看板 id'),
         analysisId: str('分析 id'),
-        tableId: str('表 id'),
+        tableId: str('表 id（原生表/图时必填）'),
         viewId: str('视图 id（可选，给定时为图表组件）'),
+        chartId: str('Python 图 id（Custom Code Figure；与 tableId 二选一）'),
       },
-      required: ['dashboardId', 'analysisId', 'tableId'],
+      required: ['dashboardId', 'analysisId'],
     },
   },
   {

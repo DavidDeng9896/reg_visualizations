@@ -6,6 +6,9 @@ import { sealAnalysisRows } from '../../../src/shared/factories'
 import { useAnalysisStore } from '../../../src/stores/analysisStore'
 import { cloneAnalysisForDraft, execTool } from '../../../src/modules/ai/tools/impl'
 import { findTable, findView } from '../../../src/shared/tree'
+import { markStepCreatedByAi } from '../../../src/modules/ai/failedEmptySteps'
+import { CUSTOM_CODE_DEFAULT_TEMPLATE } from '../../../src/modules/steps/customCodeTemplate'
+import { OPENAI_TOOLS } from '../../../src/modules/ai/tools/registry'
 
 /** AI 工具实现：在真实 analysisStore 上执行（Dexie 由 fake-indexeddb 环境提供）。 */
 const ctx = { confirmDestructive: true, confirmWrite: false }
@@ -315,7 +318,9 @@ describe('AI 工具实现（execTool）', () => {
       )
       expect(res.ok).toBe(true)
       expect(res.summary).toContain('IC50清洗v2')
-      expect(analysis.steps.some((s) => s.type === 'custom-code' && s.name === 'IC50清洗v2')).toBe(true)
+      const created = analysis.steps.find((s) => s.type === 'custom-code' && s.name === 'IC50清洗v2')
+      expect(created).toBeTruthy()
+      expect(created!.config.__createdBy).toBe('ai')
       expect(fetchImpl).toHaveBeenCalled()
     } finally {
       globalThis.fetch = prev
@@ -647,5 +652,62 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.ok).toBe(false)
     expect(res.summary).toContain('说明文档')
     expect(res.summary).toContain('不要 import_ai_file')
+  })
+
+  it('cleanup_failed_ai_steps 不在模型工具表中', () => {
+    expect(OPENAI_TOOLS.some((t) => t.function.name === 'cleanup_failed_ai_steps')).toBe(false)
+  })
+
+  it('cleanup_failed_ai_steps：ask 模式先确认，只删 AI 失败空节点', async () => {
+    const { analysis, store } = await seedStore()
+    const keepId = analysis.steps[0]!.id
+    store.mutate((a) => {
+      a.steps.push({
+        id: '11111111-1111-4111-8111-111111111111',
+        type: 'custom-code',
+        name: '空壳',
+        inputs: [],
+        config: markStepCreatedByAi({ code: CUSTOM_CODE_DEFAULT_TEMPLATE }),
+        status: 'failed',
+        output: { tables: [], files: [], views: [], charts: [] },
+      })
+      a.steps.push({
+        id: '22222222-2222-4222-8222-222222222222',
+        type: 'custom-code',
+        name: '实质失败',
+        inputs: [],
+        config: markStepCreatedByAi({ code: 'def custom_code(inputs):\n    import statsmodels\n    return []\n' }),
+        status: 'failed',
+        output: { tables: [], files: [], views: [], charts: [] },
+      })
+    })
+    const need = await execTool('cleanup_failed_ai_steps', {}, ctx)
+    expect(need.needsConfirmation).toBe(true)
+    expect(need.summary).toContain('空壳')
+    expect(need.summary).not.toContain('实质失败')
+    const done = await execTool('cleanup_failed_ai_steps', { __confirmed: true }, ctx)
+    expect(done.ok).toBe(true)
+    expect(analysis.steps.some((s) => s.name === '空壳')).toBe(false)
+    expect(analysis.steps.some((s) => s.name === '实质失败')).toBe(true)
+    expect(analysis.steps.some((s) => s.id === keepId)).toBe(true)
+  })
+
+  it('cleanup_failed_ai_steps：allow 模式直接删除', async () => {
+    const { analysis, store } = await seedStore()
+    store.mutate((a) => {
+      a.steps.push({
+        id: '33333333-3333-4333-8333-333333333333',
+        type: 'filter',
+        name: 'AI空过滤',
+        inputs: [],
+        config: markStepCreatedByAi({}),
+        status: 'failed',
+        output: { tables: [], files: [], views: [], charts: [] },
+      })
+    })
+    const res = await execTool('cleanup_failed_ai_steps', {}, { confirmDestructive: false, confirmWrite: false })
+    expect(res.ok).toBe(true)
+    expect(res.needsConfirmation).toBeFalsy()
+    expect(analysis.steps.some((s) => s.name === 'AI空过滤')).toBe(false)
   })
 })

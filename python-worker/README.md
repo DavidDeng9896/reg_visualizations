@@ -13,7 +13,7 @@ def custom_code(inputs: list[IOData]) -> list[IOData]:
 
 ## API
 
-- `GET /health` → `{"ok": true}`
+- `GET /health` → `{ "ok": true, "packages": { "pandas": "...", ... }, "missing": [] }`
 - `POST /execute` → `{ code, inputs, limits? }` → execution result
 
 Default port: **8091**.
@@ -43,7 +43,7 @@ npm run install-deps
 npm start
 ```
 
-然后确认：`http://127.0.0.1:8091/health` → `{"ok":true}`。
+然后确认：`http://127.0.0.1:8091/health` → `ok: true` 且 `packages` 含 pandas / rdkit 等。
 
 Go / Node API 默认把 `/api/python/execute` 代理到该地址；可用环境变量覆盖：
 
@@ -58,7 +58,7 @@ cd python-worker
 docker compose up --build
 ```
 
-Image installs `requirements.txt` + `requirements-docker.txt` (includes **rdkit**).
+Image installs the same `requirements.txt` (includes rdkit, statsmodels, biopython, lmfit, etc.).
 
 ## Tests
 

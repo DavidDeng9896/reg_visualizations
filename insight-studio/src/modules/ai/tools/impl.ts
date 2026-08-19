@@ -29,6 +29,7 @@ import type { Artifact } from '../types'
 import { aiSkillsApi, aiMemoriesApi, aiFilesApi } from '../client'
 import { normalizeExpressionColumns } from '../../../shared/pipeline'
 import { attachmentFromMeta, importAiAttachment } from '../attachments'
+import { markStepCreatedByAi, listFailedEmptyAiSteps } from '../failedEmptySteps'
 import { coerceParsedToolArgs } from '../toolArgs'
 
 export interface ToolCtx {
@@ -298,7 +299,7 @@ function appendStep(opts: {
       type: opts.type,
       name: opts.name,
       inputs,
-      config: opts.config,
+      config: markStepCreatedByAi(opts.config),
       status: 'pending',
       output: { tables: [], files: [], views: [] },
     }
@@ -673,8 +674,8 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     const up = producingStep(draft, t.id)
     const step = createStepNode('custom-code', name)
+    step.config = markStepCreatedByAi({ ...step.config, code, language: 'python' })
     step.inputs = [{ port: 'Input datasets', from: { nodeId: up.id, port: tableOutputPortName(up.type) } }]
-    step.config.code = code
     draft.steps.push(step)
     const result = await runStepAsync(draft, step)
     if (result.status !== 'configured') {
@@ -687,17 +688,20 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       const real = createStepNode('custom-code', name)
       real.id = step.id
       real.inputs = [{ port: 'Input datasets', from: { nodeId: realUp.id, port: tableOutputPortName(realUp.type) } }]
-      real.config.code = code
+      real.config = markStepCreatedByAi({ ...real.config, code, language: 'python' })
       a.steps.push(real)
       // 复用自测产物（表/文件/图）
       applyDraftStepResult(a, real, draft, step)
       outTableId = real.output.tables[0] ?? ''
     })
 
-    const out = outTableId ? findTable(requireAnalysis(), outTableId) : undefined
+    const after = requireAnalysis()
+    const out = outTableId ? findTable(after, outTableId) : undefined
+    const chartIds = (after.charts ?? []).filter((c) => c.stepId === step.id).map((c) => `${c.name}(${c.id})`)
+    const chartNote = chartIds.length ? `，Python 图：${chartIds.join('、')}` : ''
     const resultSummary = out
-      ? `已创建 Custom Code「${name}」（step id: ${step.id}，产出表 id: ${out.id}，${out.rows.length} 行）`
-      : `已创建 Custom Code「${name}」（step id: ${step.id}）`
+      ? `已创建 Custom Code「${name}」（step id: ${step.id}，产出表 id: ${out.id}，${out.rows.length} 行${chartNote}）`
+      : `已创建 Custom Code「${name}」（step id: ${step.id}${chartNote}）`
     return ok(resultSummary, out ? artifactOf('table', out.name, { tableId: out.id, stepId: step.id }) : undefined)
   },
 
@@ -752,7 +756,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     let stepId = ''
     store().mutate((a) => {
       const step = createStepNode('report', name)
-      step.config.report = report
+      step.config = markStepCreatedByAi({ ...step.config, report })
       step.status = 'configured'
       a.steps.push(step)
       stepId = step.id
@@ -912,8 +916,21 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const d = await dashboardRepository.get(dashboardId)
     if (!d) return fail(`看板不存在：${dashboardId}`)
     const a = store().current
+    const chartId = typeof args.chartId === 'string' && args.chartId.trim() ? String(args.chartId).trim() : undefined
     const tableId = String(args.tableId ?? '')
     const viewId = typeof args.viewId === 'string' ? args.viewId : undefined
+    if (chartId) {
+      const widget: DashboardWidget = createDashboardWidget(
+        'python-chart',
+        { analysisId: String(args.analysisId ?? a?.id ?? ''), chartId },
+        { x: 0, y: d.widgets.reduce((m, w) => Math.max(m, w.grid.y + w.grid.h), 0), w: 6, h: 8 },
+      )
+      d.widgets.push(widget)
+      await dashboardRepository.put(d)
+      if (dashStore().currentId === dashboardId) await dashStore().loadOne(dashboardId)
+      return ok(`已把 Python 图添加到看板「${d.name}」`, { kind: 'dashboard', name: d.name, dashboardId })
+    }
+    if (!tableId) return fail('需要 tableId 或 chartId')
     const widget: DashboardWidget = createDashboardWidget(
       viewId ? 'chart' : 'table',
       { analysisId: String(args.analysisId ?? a?.id ?? ''), tableId, viewId },
@@ -923,6 +940,31 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     await dashboardRepository.put(d)
     if (dashStore().currentId === dashboardId) await dashStore().loadOne(dashboardId)
     return ok(`已把${viewId ? '图表' : '表'}添加到看板「${d.name}」`, { kind: 'dashboard', name: d.name, dashboardId })
+  },
+
+  cleanup_failed_ai_steps(_args, ctx) {
+    const a = requireAnalysis()
+    const doomed = listFailedEmptyAiSteps(a)
+    if (!doomed.length) return ok('没有需要清理的失败空节点')
+    const names = doomed.map((s) => s.name).join('、')
+    if (ctx.confirmDestructive && _args.__confirmed !== true) {
+      return needConfirm(`删除 ${doomed.length} 个失败的空节点：${names}`)
+    }
+    const ids = new Set(doomed.map((s) => s.id))
+    store().mutate((analysis) => {
+      for (const s of doomed) {
+        const outTables = new Set(s.output.tables)
+        const outFiles = new Set(s.output.files)
+        const outCharts = new Set(s.output.charts ?? [])
+        analysis.tables = analysis.tables.filter((t) => !outTables.has(t.id))
+        analysis.files = (analysis.files ?? []).filter((f) => !outFiles.has(f.id))
+        analysis.charts = (analysis.charts ?? []).filter((c) => !outCharts.has(c.id) && c.stepId !== s.id)
+        delete analysis.flowchartLayout[`step:${s.id}`]
+        for (const cid of outCharts) delete analysis.flowchartLayout[`pychart:${cid}`]
+      }
+      analysis.steps = analysis.steps.filter((s) => !ids.has(s.id))
+    })
+    return ok(`已删除 ${doomed.length} 个失败的空节点：${names}`)
   },
 
   delete_table(args, ctx) {

@@ -12,6 +12,8 @@ from typing import Any, NamedTuple
 
 import pandas as pd
 
+from app.packages import available_packages_hint
+
 try:
     import plotly.graph_objects as go
 except ImportError:  # pragma: no cover - optional for minimal test envs
@@ -147,6 +149,13 @@ def _extract_user_line(exc: BaseException, user_code: str) -> int | None:
     return None
 
 
+def _annotate_exc_message(exc: BaseException) -> str:
+    msg = str(exc)
+    if isinstance(exc, ModuleNotFoundError):
+        return f"{msg}。{available_packages_hint()}"
+    return msg
+
+
 def _error_result(
     message: str,
     *,
@@ -212,7 +221,7 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
                 exec(code, namespace)
             except Exception as exc:
                 return _error_result(
-                    str(exc),
+                    _annotate_exc_message(exc),
                     line=_extract_user_line(exc, code),
                     exc_type=type(exc).__name__,
                     stdout=stdout_buffer.getvalue(),
@@ -231,7 +240,7 @@ def run_user_code(code: str, inputs: list[dict], timeout_sec: int = 300) -> dict
                 outputs = custom_code(inputs_list)
             except Exception as exc:
                 return _error_result(
-                    str(exc),
+                    _annotate_exc_message(exc),
                     line=_extract_user_line(exc, code),
                     exc_type=type(exc).__name__,
                     stdout=stdout_buffer.getvalue(),

@@ -154,6 +154,22 @@ describe('reportTemplates', () => {
     expect(interp.body).toBeTruthy()
   })
 
+  it('scaffoldReportFromAnalysis includes Custom Code python charts by chartId', () => {
+    const a = miniAnalysis()
+    a.charts = [
+      {
+        id: 'cc1::volcano',
+        name: 'Volcano',
+        stepId: 'cc1',
+        plotlyJson: { data: [], layout: {} },
+      },
+    ]
+    const r = scaffoldReportFromAnalysis(a, 'research')
+    const py = r.sections.find((s) => s.kind === 'chart' && s.chartId === 'cc1::volcano')
+    expect(py).toBeTruthy()
+    expect(py?.caption).toContain('Python')
+  })
+
   it('antibody template adds candidate table block', () => {
     const r = scaffoldReportFromAnalysis(miniAnalysis(), 'antibody')
     expect(r.templateId).toBe('antibody')

@@ -75,7 +75,42 @@ function bindInvalidation(): void {
 }
 
 export function cacheKey(ref: DashboardWidgetRef, updatedAt: string): string {
-  return `${ref.analysisId}:${ref.tableId}:${ref.viewId ?? ''}:${updatedAt}`
+  return `${ref.analysisId}:${ref.tableId ?? ''}:${ref.viewId ?? ''}:${ref.chartId ?? ''}:${updatedAt}`
+}
+
+export type PythonChartResolveOk = {
+  ok: true
+  pythonChart: true
+  analysis: Analysis
+  chartId: string
+  plotlyJson: Record<string, unknown>
+  title: string
+}
+
+export type PythonChartResolveResult = PythonChartResolveOk | WidgetResolveFail
+
+export async function resolvePythonChartSource(ref: DashboardWidgetRef): Promise<PythonChartResolveResult> {
+  bindInvalidation()
+  const analysis = await getAnalysis(ref.analysisId)
+  if (!analysis) {
+    return { ok: false, reason: 'missing-analysis', message: '引用的 Insight 不存在或已删除' }
+  }
+  const chartId = ref.chartId
+  if (!chartId) {
+    return { ok: false, reason: 'missing-view', message: '未指定 Python 图' }
+  }
+  const ch = (analysis.charts ?? []).find((c) => c.id === chartId)
+  if (!ch) {
+    return { ok: false, reason: 'missing-view', message: 'Python 图已不存在，请重跑 Custom Code 或移除组件' }
+  }
+  return {
+    ok: true,
+    pythonChart: true,
+    analysis,
+    chartId,
+    plotlyJson: ch.plotlyJson,
+    title: ch.name,
+  }
 }
 
 /** 解析 widget 引用并跑 pipeline；同 key 短时复用。 */
@@ -89,7 +124,7 @@ export async function resolveWidgetSource(ref: DashboardWidgetRef): Promise<Widg
   const hit = cache.get(key)
   if (hit) return hit.value
 
-  const table = findTable(analysis, ref.tableId)
+  const table = findTable(analysis, ref.tableId ?? '')
   if (!table) {
     return { ok: false, reason: 'missing-table', message: '引用的表不存在' }
   }
@@ -103,7 +138,7 @@ export async function resolveWidgetSource(ref: DashboardWidgetRef): Promise<Widg
   }
 
   try {
-    const result = runPipeline(analysis, ref.tableId, ref.viewId)
+    const result = runPipeline(analysis, table.id, ref.viewId)
     const title = view?.name ?? table.name
     const value: WidgetResolveOk = { ok: true, analysis, table, view, result, title }
     cache.set(key, { key, value })

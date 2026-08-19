@@ -419,6 +419,8 @@ export interface ReportSection {
   /** chart / table 引用 */
   tableId?: string
   viewId?: string
+  /** Custom Code Plotly 产物（只读 Python 图）。与 tableId/viewId 互斥优先。 */
+  chartId?: string
   caption?: string
 }
 
@@ -497,7 +499,7 @@ export interface Analysis {
 
 /* ---------------------------------- 看板（与 Analysis 平级） ---------------------------------- */
 
-export type DashboardWidgetType = 'chart' | 'table' | 'link'
+export type DashboardWidgetType = 'chart' | 'table' | 'link' | 'python-chart'
 
 export interface DashboardLayout {
   /** 网格列数，固定 12。 */
@@ -509,9 +511,11 @@ export interface DashboardLayout {
 
 export interface DashboardWidgetRef {
   analysisId: string
-  tableId: string
+  tableId?: string
   /** 缺省 = 源表只读。 */
   viewId?: string
+  /** python-chart：Custom Code Figure 产物 id。 */
+  chartId?: string
 }
 
 export interface DashboardWidgetGrid {

@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from app.executor import run_user_code
+from app.packages import health_payload
 
 app = FastAPI(title="python-worker", version="0.1.0")
 
@@ -24,8 +25,8 @@ class ExecuteRequest(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict[str, bool]:
-    return {"ok": True}
+def health() -> dict:
+    return health_payload()
 
 
 @app.post("/execute")
