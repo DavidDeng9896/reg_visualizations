@@ -7,6 +7,26 @@ import type { Hono } from 'hono'
 export function registerPythonRoutes(app: Hono): void {
   const workerBase = () => (process.env.PYTHON_WORKER_URL || 'http://127.0.0.1:8091').replace(/\/$/, '')
 
+  app.get('/api/python/health', async (c) => {
+    try {
+      const res = await fetch(`${workerBase()}/health`, { signal: AbortSignal.timeout(4000) })
+      const text = await res.text()
+      c.header('Content-Type', res.headers.get('Content-Type') || 'application/json')
+      return c.body(text, res.status as 200)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return c.json(
+        {
+          ok: false,
+          packages: {},
+          missing: [],
+          error: `python worker unreachable: ${msg}`,
+        },
+        502,
+      )
+    }
+  })
+
   app.post('/api/python/execute', async (c) => {
     let body: unknown
     try {
@@ -45,8 +65,9 @@ export function registerPythonRoutes(app: Hono): void {
           error: {
             message:
               `python worker unreachable: ${msg}. ` +
-              `Start worker: cd python-worker && python -m uvicorn app.main:app --host 127.0.0.1 --port 8091 ` +
-              `(or start.cmd on Windows). Expected ${base}/execute; set PYTHON_WORKER_URL if different.`,
+              `Start worker: cd python-worker && ./start.sh (Windows: start.cmd) ` +
+              `to pip install requirements.txt (rdkit 等) then serve :8091. ` +
+              `Expected ${base}/execute; set PYTHON_WORKER_URL if different.`,
           },
         },
         502,

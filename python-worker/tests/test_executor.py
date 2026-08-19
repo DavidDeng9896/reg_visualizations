@@ -291,6 +291,17 @@ def test_health_payload_shape():
     )
 
 
+def test_available_packages_hint_install_when_missing(monkeypatch):
+    from app import packages as pkg
+
+    monkeypatch.setattr(pkg, "installed_packages", lambda names=None: {"pandas": "3.0.0"})
+    monkeypatch.setattr(pkg, "missing_packages", lambda names=None: ["rdkit"])
+    hint = pkg.available_packages_hint()
+    assert "pandas==3.0.0" in hint
+    assert "未安装：rdkit" in hint
+    assert "pip install -r requirements.txt" in hint
+
+
 def test_statsmodels_optional():
     pytest.importorskip("statsmodels")
     try:

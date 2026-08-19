@@ -39,11 +39,13 @@ chmod +x start.sh
 
 ```bash
 cd python-worker
-npm run install-deps
 npm start
 ```
 
+`npm start` 若检测到缺 rdkit 等科学包，会先 `pip install -r requirements.txt` 再启动。
+
 然后确认：`http://127.0.0.1:8091/health` → `ok: true` 且 `packages` 含 pandas / rdkit 等。
+不要只用 `python -m uvicorn ...` 跳过安装，否则 Custom Code 会报 `No module named 'rdkit'`。
 
 Go / Node API 默认把 `/api/python/execute` 代理到该地址；可用环境变量覆盖：
 
