@@ -79,7 +79,7 @@ const maxStr = computed({
 })
 
 const agg = computed({
-  get: () => uiAggregationValue(props.mapping),
+  get: () => uiAggregationValue(props.mapping, ctx.def.value.type),
   set: (v: string | number) => {
     props.mapping.aggregation = v as Aggregation
     ctx.touch()
@@ -96,7 +96,7 @@ const side = computed({
 })
 
 const aggLabelPreview = computed(() => {
-  const method = uiAggregationValue(props.mapping)
+  const method = uiAggregationValue(props.mapping, ctx.def.value.type)
   if (!method || method === 'none') return ''
   return `${aggregationLabel(method)} of ${props.mapping.field}`
 })

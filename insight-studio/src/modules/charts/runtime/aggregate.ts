@@ -140,21 +140,33 @@ export function aggregationLabel(method?: Aggregation): string {
 }
 
 /**
- * 运行时有效聚合：未写 aggregation 且已绑字段 → sum（与 bar/pie/bignumber 一致）。
- * 显式 none 表示不聚合。
+ * 运行时有效聚合：
+ * - 显式 aggregation 优先
+ * - bar/pie/bignumber/box 未写且已绑字段 → sum
+ * - line/scatter 未写 → none（逐点，不聚合）
  */
-export function effectiveAggregation(mapping?: FieldMapping | null): Aggregation {
+export function defaultAggregationFor(chartType = 'bar'): Aggregation {
+  if (chartType === 'bar' || chartType === 'pie' || chartType === 'bignumber' || chartType === 'box') return 'sum'
+  return 'none'
+}
+
+export function effectiveAggregation(mapping?: FieldMapping | null, chartType = 'bar'): Aggregation {
   if (mapping?.aggregation) return mapping.aggregation
-  return mapping?.field ? 'sum' : 'count'
+  if (!mapping?.field) return chartType === 'bar' || chartType === 'pie' ? 'count' : 'none'
+  return defaultAggregationFor(chartType)
 }
 
-/** 齿轮下拉当前值：未写时显示 Sum，而不是 None。 */
-export function uiAggregationValue(mapping?: FieldMapping | null): Aggregation {
-  return effectiveAggregation(mapping)
+/** 齿轮下拉当前值：与对应图种运行时默认一致。 */
+export function uiAggregationValue(mapping?: FieldMapping | null, chartType = 'bar'): Aggregation {
+  return effectiveAggregation(mapping, chartType)
 }
 
-/** 绑定可聚合槽时补默认 Sum，让 UI 与运行时一开始就一致。 */
-export function mappingWithDefaultAgg(mapping: FieldMapping, aggregatable: boolean): FieldMapping {
+/** 绑定可聚合槽时写入该图种默认聚合，让 UI 与运行时一开始就一致。 */
+export function mappingWithDefaultAgg(
+  mapping: FieldMapping,
+  aggregatable: boolean,
+  chartType = 'bar',
+): FieldMapping {
   if (!aggregatable || mapping.aggregation) return mapping
-  return { ...mapping, aggregation: mapping.field ? 'sum' : 'count' }
+  return { ...mapping, aggregation: mapping.field ? defaultAggregationFor(chartType) : 'count' }
 }

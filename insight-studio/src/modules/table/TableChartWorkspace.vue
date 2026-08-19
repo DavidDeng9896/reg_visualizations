@@ -390,7 +390,7 @@ provide(
     <div v-if="result && selected" class="tcw__body" data-mount="table-chart">
       <!-- 图表视图且已收起源表：全幅图表 -->
       <div v-if="hasChart && tableCollapsed" class="tcw__chart tcw__chart--solo" data-mount="chart-panel">
-        <ChartView />
+        <ChartView :key="selected.viewId" />
       </div>
 
       <ISplitPane
@@ -405,7 +405,7 @@ provide(
       >
         <template #first>
           <div class="tcw__chart" data-mount="chart-panel">
-            <ChartView />
+            <ChartView :key="selected.viewId" />
           </div>
         </template>
         <template #second>

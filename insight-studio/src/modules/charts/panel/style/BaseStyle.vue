@@ -87,18 +87,16 @@ const legendPos = computed({
 const chartTitle = computed({
   get: () => style.value.title ?? '',
   set: (v: string) => {
-    const t = v.trim()
-    if (t) style.value.title = t
-    else delete style.value.title
+    if (v === '') delete style.value.title
+    else style.value.title = v
     ctx.touch()
   },
 })
 const chartSubtitle = computed({
   get: () => style.value.subtitle ?? '',
   set: (v: string) => {
-    const t = v.trim()
-    if (t) style.value.subtitle = t
-    else delete style.value.subtitle
+    if (v === '') delete style.value.subtitle
+    else style.value.subtitle = v
     ctx.touch()
   },
 })

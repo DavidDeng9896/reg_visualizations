@@ -221,6 +221,7 @@ async function save(): Promise<boolean> {
     toast.error('未找到当前图表视图，配置未写入')
     return false
   }
+  identityBeforeTypeEdit = null
   saveAttempted.value = false
   chartSaving.value = true
   try {
@@ -235,8 +236,26 @@ async function save(): Promise<boolean> {
   }
 }
 
+let identityBeforeTypeEdit: { type: ChartType; name: string } | null = null
+
+function restoreTypeIdentity() {
+  const snap = identityBeforeTypeEdit
+  identityBeforeTypeEdit = null
+  if (!snap) return
+  const tableId = tc.selected.value?.tableId
+  const viewId = tc.selected.value?.viewId
+  store.mutate((a) => {
+    const tb = a.tables.find((x) => x.id === tableId)
+    const target = tb && viewId ? findView(tb.views, viewId) : null
+    if (!target) return
+    target.type = snap.type
+    target.name = snap.name
+  })
+}
+
 function cancel() {
   const was = cancelDraft(draftModel as ChartDraft)
+  restoreTypeIdentity()
   saveAttempted.value = false
   if (was) toast.info('已放弃修改')
   panelOpen.value = false
@@ -268,6 +287,7 @@ function changeType(t: ChartType) {
   const tableId = tc.selected.value?.tableId
   const viewId = tc.selected.value?.viewId
   if (v && viewId) {
+    if (!identityBeforeTypeEdit) identityBeforeTypeEdit = { type: fromType, name: v.name }
     const table = current.value?.tables.find((tb) => tb.id === tableId)
     const nextName = viewNameOnTypeChange(v.name, fromType, t, table?.views ?? [])
     store.mutate((a) => {
@@ -332,6 +352,7 @@ async function guardSave() {
 function guardDiscard() {
   guardOpen.value = false
   cancelDraft(draftModel as ChartDraft)
+  restoreTypeIdentity()
   if (pendingSelection) store.select(pendingSelection)
   pendingSelection = null
 }

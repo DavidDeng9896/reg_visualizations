@@ -29,6 +29,12 @@ describe('effectiveAggregation', () => {
     expect(mappingWithDefaultAgg({ field: 'val' }, true).aggregation).toBe('sum')
     expect(mappingWithDefaultAgg({ field: 'cat' }, false).aggregation).toBeUndefined()
   })
+
+  it('line/scatter 默认 none，不把逐点图写成 Sum', () => {
+    expect(effectiveAggregation({ field: 'val' }, 'scatter')).toBe('none')
+    expect(uiAggregationValue({ field: 'val' }, 'line')).toBe('none')
+    expect(mappingWithDefaultAgg({ field: 'val' }, true, 'scatter').aggregation).toBe('none')
+  })
 })
 
 describe('aggregate · 六种聚合', () => {

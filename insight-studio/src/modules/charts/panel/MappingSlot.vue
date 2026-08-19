@@ -53,7 +53,7 @@ const error = computed(() => {
 function setSingle(field: string | number) {
   const cfg = ctx.draft.configure
   const prev = (cfg as unknown as Record<string, FieldMapping | undefined>)[props.slot.key] ?? {}
-  const next = mappingWithDefaultAgg({ ...prev, field: String(field) }, !!props.slot.aggregatable)
+  const next = mappingWithDefaultAgg({ ...prev, field: String(field) }, !!props.slot.aggregatable, ctx.def.value.type)
   ;(cfg as unknown as Record<string, unknown>)[props.slot.key] = next
   ctx.touch()
 }
@@ -72,7 +72,7 @@ function addMapping(field: string | number) {
   const cfg = ctx.draft.configure
   if (!cfg.values) cfg.values = []
   if (cfg.values.some((m) => m.field === field)) return
-  cfg.values.push(mappingWithDefaultAgg({ field: String(field) }, !!props.slot.aggregatable))
+  cfg.values.push(mappingWithDefaultAgg({ field: String(field) }, !!props.slot.aggregatable, ctx.def.value.type))
   ctx.touch()
 }
 
@@ -82,7 +82,7 @@ const axisKeyOf = computed<'xAxis' | 'yAxis'>(() => (props.slot.key === 'x' ? 'x
 
 const capsuleAgg = (m: FieldMapping): string | undefined => {
   if (!props.slot.aggregatable) return undefined
-  const method = uiAggregationValue(m)
+  const method = uiAggregationValue(m, ctx.def.value.type)
   if (!method || method === 'none') return undefined
   return aggregationLabel(method)
 }

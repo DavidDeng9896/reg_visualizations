@@ -102,13 +102,14 @@ function onDblClick() {
 function onKeydown(e: KeyboardEvent) {
   const step = 0.02
   const horizontalKeys = props.direction === 'horizontal'
-  if ((horizontalKeys && e.key === 'ArrowLeft') || (!horizontalKeys && e.key === 'ArrowUp')) {
-    e.preventDefault()
-    setRatio(clampByMin(currentRatio.value - step))
-  } else if ((horizontalKeys && e.key === 'ArrowRight') || (!horizontalKeys && e.key === 'ArrowDown')) {
-    e.preventDefault()
-    setRatio(clampByMin(currentRatio.value + step))
-  }
+  const shrink =
+    (horizontalKeys && e.key === 'ArrowLeft') || (!horizontalKeys && e.key === 'ArrowUp')
+  const grow =
+    (horizontalKeys && e.key === 'ArrowRight') || (!horizontalKeys && e.key === 'ArrowDown')
+  if (!shrink && !grow) return
+  e.preventDefault()
+  const dir = (shrink ? -step : step) * (props.reverse ? -1 : 1)
+  setRatio(clampByMin(currentRatio.value + dir))
 }
 
 onBeforeUnmount(() => {
