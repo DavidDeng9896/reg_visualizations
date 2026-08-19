@@ -65,9 +65,10 @@ describe('isFailedEmptyAiStep', () => {
     const down = step({
       id: 's2',
       type: 'filter',
-      config: markStepCreatedByAi({}),
+      config: {},
       inputs: [{ port: 'Input dataset', from: { nodeId: 's1', port: 'Output datasets' } }],
-      status: 'pending',
+      status: 'configured',
+      output: { tables: ['t2'], files: [], views: [], charts: [] },
     })
     expect(listFailedEmptyAiSteps(analysis([empty, down])).map((x) => x.id)).toEqual([])
   })

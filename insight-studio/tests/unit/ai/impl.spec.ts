@@ -660,7 +660,7 @@ describe('AI 工具实现（execTool）', () => {
 
   it('cleanup_failed_ai_steps：ask 模式先确认，只删 AI 失败空节点', async () => {
     const { analysis, store } = await seedStore()
-    const keepId = analysis.steps[0]!.id
+    const keepIds = new Set(analysis.steps.map((s) => s.id))
     store.mutate((a) => {
       a.steps.push({
         id: '11111111-1111-4111-8111-111111111111',
@@ -689,7 +689,7 @@ describe('AI 工具实现（execTool）', () => {
     expect(done.ok).toBe(true)
     expect(analysis.steps.some((s) => s.name === '空壳')).toBe(false)
     expect(analysis.steps.some((s) => s.name === '实质失败')).toBe(true)
-    expect(analysis.steps.some((s) => s.id === keepId)).toBe(true)
+    expect(analysis.steps.filter((s) => keepIds.has(s.id))).toHaveLength(keepIds.size)
   })
 
   it('cleanup_failed_ai_steps：allow 模式直接删除', async () => {
