@@ -9,6 +9,7 @@ import { execJoin, previewJoin } from './join'
 import { execUnion, previewUnion } from './union'
 import { execCustomCode } from './customCode'
 import { execReport } from './report'
+import { removeChartsAndLayout } from '../pythonCharts'
 
 export * from './types'
 export { executeFilter, previewFilter } from './filter'
@@ -243,9 +244,7 @@ function removeFiles(analysis: Analysis, fileIds: string[]): void {
 }
 
 function removeCharts(analysis: Analysis, chartIds: string[]): void {
-  if (!chartIds.length || !analysis.charts?.length) return
-  const drop = new Set(chartIds)
-  analysis.charts = analysis.charts.filter((c) => !drop.has(c.id))
+  removeChartsAndLayout(analysis, chartIds)
 }
 
 /** 一键执行并应用单个步骤结果（同步步骤）。 */

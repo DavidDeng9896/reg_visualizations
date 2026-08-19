@@ -6,7 +6,7 @@ vi.mock('../../../src/shared/repository', () => ({
 }))
 
 import { createEmptyAnalysis, createTable, createViewNode } from '../../../src/shared/factories'
-import { clearWidgetDataCache, invalidateWidgetData, resolveWidgetSource } from '../../../src/modules/dashboard/widgetData'
+import { clearWidgetDataCache, invalidateWidgetData, resolveWidgetSource, resolvePythonChartSource } from '../../../src/modules/dashboard/widgetData'
 
 describe('resolveWidgetSource', () => {
   beforeEach(() => {
@@ -74,5 +74,31 @@ describe('resolveWidgetSource', () => {
     const r2 = await resolveWidgetSource({ analysisId: a.id, tableId: t.id })
     expect(r2.ok).toBe(true)
     expect(get).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('resolvePythonChartSource', () => {
+  beforeEach(() => {
+    clearWidgetDataCache()
+    get.mockReset()
+  })
+
+  it('按 chartId 解析 Plotly 产物', async () => {
+    const a = createEmptyAnalysis('A')
+    a.charts = [{ id: 's1::fig', name: 'Dose', stepId: 's1', plotlyJson: { data: [{ type: 'scatter' }], layout: {} } }]
+    get.mockResolvedValue(a)
+    const r = await resolvePythonChartSource({ analysisId: a.id, chartId: 's1::fig' })
+    expect(r.ok).toBe(true)
+    if (r.ok && 'pythonChart' in r) {
+      expect(r.title).toBe('Dose')
+      expect(r.plotlyJson).toMatchObject({ data: expect.any(Array) })
+    }
+  })
+
+  it('缺图时不抛错', async () => {
+    const a = createEmptyAnalysis('A')
+    get.mockResolvedValue(a)
+    const r = await resolvePythonChartSource({ analysisId: a.id, chartId: 'missing' })
+    expect(r.ok).toBe(false)
   })
 })

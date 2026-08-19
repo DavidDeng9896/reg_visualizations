@@ -248,6 +248,57 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     ).toBe(true)
   })
 
+  it('planGate=false（Worker 子 loop）不调用 cleanup_failed_ai_steps', async () => {
+    const names: string[] = []
+    const post = async () => sseOf({ content: '子代理完成' })
+    const exec: ToolExecutor = async (c) => {
+      names.push(c.function.name)
+      return { ok: true, summary: 'ok' }
+    }
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 8,
+      planGate: false,
+      sweepFailedEmpty: false,
+      onEvent: () => undefined,
+      postChatFn: post,
+    })
+    expect(names).not.toContain('cleanup_failed_ai_steps')
+  })
+
+  it('ask 模式清扫批准后带 __confirmed 再执行', async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const post = async () => sseOf({ content: '完成' })
+    const exec: ToolExecutor = async (c, args) => {
+      calls.push({ name: c.function.name, args })
+      if (c.function.name === 'cleanup_failed_ai_steps' && args.__confirmed !== true) {
+        return { ok: false, needsConfirmation: true, summary: 'NEEDS_CONFIRMATION: 删除 1 个失败的空节点：空壳' }
+      }
+      return { ok: true, summary: '已删除 1 个失败的空节点：空壳' }
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: 'q' }],
+      tools: [],
+      exec,
+      maxIterations: 8,
+      waitConfirm: async (req) => {
+        expect(req.id).toBe('ai-sweep-empty')
+        return '用户已批准并执行该操作，执行结果：已删除'
+      },
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    const sweep = calls.filter((c) => c.name === 'cleanup_failed_ai_steps')
+    expect(sweep).toHaveLength(2)
+    expect(sweep[1]?.args.__confirmed).toBe(true)
+    expect(
+      evts.some((e) => e.type === 'tool_result' && e.name === 'cleanup_failed_ai_steps' && e.summary.includes('已删除')),
+    ).toBe(true)
+  })
+
   it('ask_user 无作答通道 → 兜底跳过不中断', async () => {
     const post = async (p: ChatPayload) => {
       const n = p.messages.filter((m) => m.role === 'tool').length

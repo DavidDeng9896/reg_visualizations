@@ -28,6 +28,7 @@ import { debounce } from '../charts/draft'
 import { createStepNode } from '../steps/factory'
 import { runStepAsync, IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { hasStaleSteps, rerunStaleSteps } from '../steps/rerun'
+import { removeStepOwnedArtifacts } from '../steps/pythonCharts'
 
 /**
  * 流程图可编辑画布：
@@ -159,6 +160,7 @@ function sameNodeData(a: FlowNodeData | undefined, b: FlowNodeData): boolean {
     a.label === b.label &&
     a.stepId === b.stepId &&
     a.viewId === b.viewId &&
+    a.chartId === b.chartId &&
     a.tableId === b.tableId &&
     a.viewType === b.viewType &&
     a.stepType === b.stepType &&
@@ -191,7 +193,7 @@ function rebuild(): void {
       position: old ? { ...old.position } : (positions.value[n.id] ?? { x: 0, y: 0 }),
       data: n,
       draggable: true,
-      connectable: true,
+      connectable: n.kind !== 'python-chart',
       class: nodeClass(n.id),
     }
   })
@@ -342,7 +344,8 @@ function setActive(id: string | null): void {
   if (n.kind === 'view' && n.viewId && n.tableId) {
     store.setSelected({ kind: 'view', tableId: n.tableId, viewId: n.viewId })
   } else if (n.kind === 'python-chart') {
-    // 只读图节点：保持画布选中，不写回 table/step，避免 selected watch 抢走焦点
+    store.setSelected(null)
+    store.selectedStepId = null
     return
   } else if (n.kind === 'step' && n.stepId) {
     const table = current.value?.tables.find((t) => t.stepId === n.stepId)
@@ -494,6 +497,7 @@ function onConnect(conn: Connection): void {
   const sourceNode = nodeById.value.get(conn.source)
   const targetNode = nodeById.value.get(conn.target)
   if (!sourceNode || !targetNode) return
+  if (sourceNode.kind === 'python-chart' || targetNode.kind === 'python-chart') return
 
   const sourcePort = sourceNode.outputs.find((p) => p.name === conn.sourceHandle)
   const targetPort = targetNode.inputs.find((p) => p.name === conn.targetHandle)
@@ -638,9 +642,9 @@ const newStepEditingId = ref<string | null>(null)
 /** 删除步骤及其输出表（调用方需先确认无下游依赖）。 */
 function deleteStep(stepId: string): void {
   store.mutate((a) => {
+    const step = a.steps.find((s) => s.id === stepId)
+    if (step) removeStepOwnedArtifacts(a, step)
     a.steps = a.steps.filter((s) => s.id !== stepId)
-    a.tables = a.tables.filter((t) => t.stepId !== stepId)
-    delete a.flowchartLayout[stepNodeId(stepId)]
   })
   if (newStepEditingId.value === stepId) newStepEditingId.value = null
   if (activeId.value === stepNodeId(stepId)) activeId.value = null

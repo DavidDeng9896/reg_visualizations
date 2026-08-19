@@ -283,6 +283,7 @@ export async function runDelegateWorker(opts: RunWorkerOpts): Promise<ToolExecRe
       waitConfirm: opts.parent.waitConfirm,
       postChatFn: opts.parent.postChatFn,
       planGate: false,
+      sweepFailedEmpty: false,
       // 分析师/工程师禁止只读探路就收工；规划师/MCP 专家以读/调用本身为交付
       workerStrict: spec.kind === 'analysis' || spec.kind === 'code',
       onEvent: onWorkerEvent,

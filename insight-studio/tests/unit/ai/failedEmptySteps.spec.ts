@@ -56,6 +56,16 @@ describe('isFailedEmptyAiStep', () => {
     expect(isFailedEmptyAiStep(s)).toBe(false)
   })
 
+  it('AI pending 无产物节点为 true', () => {
+    const s = step({
+      id: 's1',
+      type: 'filter',
+      config: markStepCreatedByAi({}),
+      status: 'pending',
+    })
+    expect(isFailedEmptyAiStep(s)).toBe(true)
+  })
+
   it('有下游依赖的不列入清理', () => {
     const empty = step({
       id: 's1',

@@ -263,7 +263,7 @@ def custom_code(inputs):
 
 
 def test_health_payload_shape():
-    from app.packages import health_payload
+    from app.packages import health_payload, SCIENTIFIC_PACKAGES
 
     payload = health_payload()
     assert "ok" in payload
@@ -271,5 +271,50 @@ def test_health_payload_shape():
     assert "missing" in payload
     assert isinstance(payload["packages"], dict)
     assert "pandas" in payload["packages"]
+    assert payload["ok"] is (len(payload["missing"]) == 0)
+    assert SCIENTIFIC_PACKAGES == (
+        "pandas",
+        "numpy",
+        "scipy",
+        "scikit-learn",
+        "rdkit",
+        "statsmodels",
+        "biopython",
+        "lmfit",
+        "matplotlib",
+        "seaborn",
+        "kaleido",
+        "plotly",
+        "pyarrow",
+        "openpyxl",
+        "pydantic",
+    )
+
+
+def test_statsmodels_optional():
+    pytest.importorskip("statsmodels")
+    try:
+        import statsmodels.api as sm  # noqa: F401
+    except ImportError:
+        pytest.skip("statsmodels 与当前 scipy 不兼容")
+    inputs = [
+        {
+            "name": "t",
+            "kind": "dataframe",
+            "columns": [{"field": "x", "dataType": "number"}, {"field": "g", "dataType": "string"}],
+            "rows": [{"x": 1, "g": "a"}, {"x": 2, "g": "b"}],
+        }
+    ]
+    code = """
+import statsmodels.api as sm
+def custom_code(inputs):
+    df = inputs[0].data
+    assert sm is not None
+    return [IOData(name="out", data=df)]
+"""
+    result = run_user_code(code, inputs)
+    assert result["ok"] is True
+    assert result["outputs"][0]["name"] == "out"
+
 
 

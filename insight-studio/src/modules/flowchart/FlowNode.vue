@@ -113,7 +113,21 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
     :class="{ 'flow-node--python-chart': isPythonChart }"
     :data-node-kind="data.kind"
   >
-    <Handle type="target" :position="Position.Left" id="in" class="flow-node__handle flow-node__handle--view" />
+    <Handle
+      v-if="!isPythonChart"
+      type="target"
+      :position="Position.Left"
+      id="in"
+      class="flow-node__handle flow-node__handle--view"
+    />
+    <Handle
+      v-else
+      type="target"
+      :position="Position.Left"
+      id="in"
+      class="flow-node__handle flow-node__handle--view"
+      :connectable="false"
+    />
     <Handle v-if="isView" type="source" :position="Position.Right" id="out" class="flow-node__handle flow-node__handle--view" />
     <div class="flow-node__body">
       <div class="flow-node__head">
@@ -124,7 +138,15 @@ const pendingHint = computed(() => props.data.kind === 'step' && props.data.stat
       </div>
       <span v-if="subLabel" class="flow-node__sub is-ellipsis">{{ subLabel }}</span>
     </div>
-    <button type="button" class="flow-node__open" title="在工作区打开" aria-label="在工作区打开" @click.stop="emit('open', id)" @dblclick.stop>
+    <button
+      v-if="!isPythonChart"
+      type="button"
+      class="flow-node__open"
+      title="在工作区打开"
+      aria-label="在工作区打开"
+      @click.stop="emit('open', id)"
+      @dblclick.stop
+    >
       <IIcon name="external" :size="11" />
     </button>
   </div>

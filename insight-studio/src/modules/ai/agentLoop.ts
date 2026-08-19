@@ -161,6 +161,11 @@ export interface RunAgentOptions {
    * 与 planGate 独立；分析师/工程师子 loop 应开启。
    */
   workerStrict?: boolean
+  /**
+   * 收束时清理 AI 失败空节点。Worker 子 loop 必须关闭，以免抢父循环 waitConfirm。
+   * 默认：主循环开启（planGate 未关），子循环关闭。
+   */
+  sweepFailedEmpty?: boolean
 }
 
 /**
@@ -170,8 +175,10 @@ export interface RunAgentOptions {
 export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const { exec, maxIterations, signal, onEvent } = opts
   const waitConfirm = opts.waitConfirm
+  const shouldSweep = opts.sweepFailedEmpty ?? opts.planGate !== false
 
   const sweepFailedEmptyAiNodes = async () => {
+    if (!shouldSweep) return
     const call: ToolCall = {
       id: 'ai-sweep-empty',
       type: 'function',
@@ -196,11 +203,24 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       const resolved = waitConfirm
         ? await waitConfirm({ id: call.id, name: 'cleanup_failed_ai_steps', summary: result.summary }, signal)
         : '用户未确认该危险操作（前端未接入确认通道）。不要重试；请改用其他方案。'
+      const approved = !resolved.includes('拒绝') && !resolved.includes('未确认')
+      if (approved) {
+        const done = await exec(call, { __confirmed: true })
+        onEvent({
+          type: 'tool_result',
+          id: call.id,
+          name: 'cleanup_failed_ai_steps',
+          ok: done.ok,
+          summary: done.summary,
+          needsConfirmation: false,
+        })
+        return
+      }
       onEvent({
         type: 'tool_result',
         id: call.id,
         name: 'cleanup_failed_ai_steps',
-        ok: !resolved.includes('拒绝') && !resolved.includes('未确认'),
+        ok: false,
         summary: resolved,
         needsConfirmation: false,
       })

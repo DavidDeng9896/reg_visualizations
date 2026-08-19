@@ -535,6 +535,22 @@ describe('AI 工具实现（execTool）', () => {
     expect(widget.artifact?.kind).toBe('dashboard')
   })
 
+  it('add_dashboard_widget：chartId 添加 python-chart 组件', async () => {
+    const { analysis, store } = await seedStore()
+    store.mutate((a) => {
+      a.charts = [{ id: 'cc1::volcano', name: 'Volcano', stepId: 'cc1', plotlyJson: { data: [], layout: {} } }]
+    })
+    const dash = await execTool('create_dashboard', { name: 'Python 图看板' }, ctx)
+    const dashboardId = dash.artifact?.dashboardId
+    const widget = await execTool(
+      'add_dashboard_widget',
+      { dashboardId, analysisId: analysis.id, chartId: 'cc1::volcano' },
+      ctx,
+    )
+    expect(widget.ok, widget.summary).toBe(true)
+    expect(widget.summary).toContain('Python 图')
+  })
+
   it('delete_step：需确认，批准后去掉步骤与产出表', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]

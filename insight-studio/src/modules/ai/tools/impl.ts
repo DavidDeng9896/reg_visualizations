@@ -31,6 +31,7 @@ import { normalizeExpressionColumns } from '../../../shared/pipeline'
 import { attachmentFromMeta, importAiAttachment } from '../attachments'
 import { markStepCreatedByAi, listFailedEmptyAiSteps } from '../failedEmptySteps'
 import { coerceParsedToolArgs } from '../toolArgs'
+import { removeStepOwnedArtifacts } from '../../steps/pythonCharts'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -952,16 +953,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     const ids = new Set(doomed.map((s) => s.id))
     store().mutate((analysis) => {
-      for (const s of doomed) {
-        const outTables = new Set(s.output.tables)
-        const outFiles = new Set(s.output.files)
-        const outCharts = new Set(s.output.charts ?? [])
-        analysis.tables = analysis.tables.filter((t) => !outTables.has(t.id))
-        analysis.files = (analysis.files ?? []).filter((f) => !outFiles.has(f.id))
-        analysis.charts = (analysis.charts ?? []).filter((c) => !outCharts.has(c.id) && c.stepId !== s.id)
-        delete analysis.flowchartLayout[`step:${s.id}`]
-        for (const cid of outCharts) delete analysis.flowchartLayout[`pychart:${cid}`]
-      }
+      for (const s of doomed) removeStepOwnedArtifacts(analysis, s)
       analysis.steps = analysis.steps.filter((s) => !ids.has(s.id))
     })
     return ok(`已删除 ${doomed.length} 个失败的空节点：${names}`)
@@ -1012,11 +1004,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (ctx.confirmDestructive && args.__confirmed !== true) {
       return needConfirm(`删除步骤「${step.name}」及其产出表`)
     }
-    const outTables = new Set(step.output.tables)
     store().mutate((analysis) => {
+      const live = analysis.steps.find((s) => s.id === step.id)
+      if (live) removeStepOwnedArtifacts(analysis, live)
       analysis.steps = analysis.steps.filter((s) => s.id !== step.id)
-      analysis.tables = analysis.tables.filter((t) => !outTables.has(t.id))
-      delete analysis.flowchartLayout[`step:${step.id}`]
     })
     return ok(`已删除步骤「${step.name}」`)
   },
@@ -1035,6 +1026,8 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     store().mutate((analysis) => {
       analysis.tables = []
       analysis.steps = []
+      analysis.files = []
+      analysis.charts = []
       analysis.flowchartLayout = {}
     })
     return ok(`已清空分析「${target.name}」（删除 ${tableN} 张表、${stepN} 个步骤）`)

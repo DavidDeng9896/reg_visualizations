@@ -128,6 +128,29 @@ describe('custom-code exec', () => {
     applyStepResult(analysis, step, result)
     expect(analysis.charts?.[0].id).toBe(firstId)
     expect(analysis.files.some((f) => f.name === 'blob.txt')).toBe(true)
+    analysis.flowchartLayout[`pychart:${firstId}`] = { x: 1, y: 2 }
+
+    const fetchOnlyTable = vi.fn(async () => ({
+      json: async () => ({
+        ok: true,
+        outputs: [
+          {
+            name: 'out',
+            kind: 'dataframe',
+            columns: [{ field: 'n', dataType: 'number' }],
+            rows: [{ n: 1 }],
+          },
+        ],
+      }),
+    })) as unknown as typeof fetch
+    const next = await execCustomCode(
+      { analysis, step, inputs: { 'Input datasets': [table] } },
+      { fetchImpl: fetchOnlyTable },
+    )
+    applyStepResult(analysis, step, next)
+    expect(analysis.charts ?? []).toHaveLength(0)
+    expect(step.output.charts).toEqual([])
+    expect(analysis.flowchartLayout[`pychart:${firstId}`]).toBeUndefined()
   })
 
   it('按连线顺序混入 Input files', () => {
