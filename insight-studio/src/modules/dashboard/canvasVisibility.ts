@@ -15,6 +15,11 @@ export function dashboardEmptyStateVisible(opts: {
   return opts.hasCurrent && opts.widgetCount === 0 && !opts.loading
 }
 
-export function dashboardLoadingOverlayVisible(opts: { hasCurrent: boolean; loading: boolean }): boolean {
-  return opts.loading && !opts.hasCurrent
+export function dashboardLoadingOverlayVisible(opts: {
+  hasCurrent: boolean
+  loading: boolean
+  /** 首次进入带 id 的看板路由、current 尚未就绪。 */
+  booting?: boolean
+}): boolean {
+  return !opts.hasCurrent && (opts.loading || !!opts.booting)
 }

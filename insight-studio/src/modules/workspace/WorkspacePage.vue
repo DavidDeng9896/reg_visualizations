@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { analysisRepository } from '../../shared/repository'
-import { IButton, IIcon, IModal, IPopover, ITextField, ITooltip, toast } from '../../ui'
+import { IButton, IIcon, IModal, IPopover, ITextField, toast } from '../../ui'
 import WorkspaceMain from './WorkspaceMain.vue'
 import FlowchartChunkLoading from './FlowchartChunkLoading.vue'
 import { useAddData } from '../shell/useAddData'
@@ -169,9 +169,10 @@ async function confirmDelete() {
   }
 }
 
-/* Flowchart 切换 */
-async function toggleFlowchart() {
-  if (mode.value === 'flowchart') {
+/** 顶栏 Workspace / Flowchart 分段切换（非 toggle）。 */
+async function setWorkspaceMode(next: 'workspace' | 'flowchart') {
+  if (mode.value === next) return
+  if (next === 'workspace') {
     store.setMode('workspace')
     return
   }
@@ -203,19 +204,38 @@ const loadingText = computed(() => (flowchartSwitching.value && !loading.value ?
       </div>
 
       <div class="ws__header-actions">
-        <ITooltip :content="mode === 'flowchart' ? '返回工作区' : '查看流程图'">
-          <IButton
-            :variant="mode === 'flowchart' ? 'secondary' : 'ghost'"
-            icon="flowchart"
+        <div class="ws__mode-seg" role="tablist" aria-label="工作区与流程图">
+          <button
+            type="button"
+            role="tab"
+            class="ws__mode-seg-item"
+            :class="{ 'ws__mode-seg-item--on': mode === 'workspace' }"
+            :aria-selected="mode === 'workspace'"
+            :aria-pressed="mode === 'workspace'"
+            @mouseenter="void prefetchCharts()"
+            @focus="void prefetchCharts()"
+            @click="setWorkspaceMode('workspace')"
+          >
+            <IIcon name="table" :size="14" />
+            Workspace
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="ws__mode-seg-item"
+            :class="{ 'ws__mode-seg-item--on': mode === 'flowchart' }"
+            :aria-selected="mode === 'flowchart'"
             :aria-pressed="mode === 'flowchart'"
-            :loading="flowchartSwitching"
+            :aria-busy="flowchartSwitching || undefined"
+            :disabled="flowchartSwitching"
             @mouseenter="prefetchFlowchart(); void prefetchCharts()"
             @focus="prefetchFlowchart(); void prefetchCharts()"
-            @click="toggleFlowchart"
+            @click="setWorkspaceMode('flowchart')"
           >
+            <IIcon name="flowchart" :size="14" />
             Flowchart
-          </IButton>
-        </ITooltip>
+          </button>
+        </div>
 
         <IPopover :open="headerMenuOpen" placement="bottom-end" :arrow="false" @update:open="headerMenuOpen = $event">
           <template #anchor>
@@ -309,6 +329,44 @@ const loadingText = computed(() => (flowchartSwitching.value && !loading.value ?
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.ws__mode-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--is-radius);
+  background: var(--is-seg-bg);
+}
+.ws__mode-seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--is-radius-sm);
+  background: transparent;
+  color: var(--is-text-secondary);
+  font-size: var(--is-text-sm);
+  cursor: pointer;
+  transition:
+    background var(--is-dur-fast) var(--is-ease),
+    color var(--is-dur-fast) var(--is-ease),
+    box-shadow var(--is-dur-fast) var(--is-ease);
+}
+.ws__mode-seg-item:hover:not(:disabled) {
+  color: var(--is-text);
+}
+.ws__mode-seg-item:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+.ws__mode-seg-item--on {
+  background: var(--is-surface);
+  color: var(--is-text);
+  font-weight: 500;
+  box-shadow: var(--is-shadow-sm);
 }
 .ws__main {
   flex: 1;

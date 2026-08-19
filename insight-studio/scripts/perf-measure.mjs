@@ -80,7 +80,7 @@ await page.locator('.vue-flow__node').first().waitFor({ timeout: 30_000 })
 console.log('flowchart 切換首绘    :', Date.now() - tFlow, 'ms')
 
 console.log('== 图表 ==')
-await page.getByRole('button', { name: 'Flowchart' }).click()
+await page.getByRole('button', { name: 'Workspace' }).click()
 await page.locator('[data-testid=sidebar-table]', { hasText: 'Iris' }).first().click()
 await page.getByRole('button', { name: '创建图表' }).click()
 await page.getByRole('combobox', { name: 'X Axis' }).click()

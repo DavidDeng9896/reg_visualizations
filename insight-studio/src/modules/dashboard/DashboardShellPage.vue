@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { createDashboardWidget, createLinkWidget } from '../../shared/factories'
 import { useDashboardStore } from '../../stores/dashboardStore'
-import { IButton, IEmptyState, IIcon, toast } from '../../ui'
+import { IButton, IEmptyState, toast } from '../../ui'
 import DashboardCanvas from './DashboardCanvas.vue'
 import AddWidgetDialog, { type AddWidgetPayload } from './AddWidgetDialog.vue'
 import CategorySidebar from './CategorySidebar.vue'
@@ -21,6 +21,20 @@ const router = useRouter()
 const store = useDashboardStore()
 const { current, currentId, saving, dirty, loading } = storeToRefs(store)
 
+/** 首次挂载：list + 按路由 loadOne 完成前显示骨架，避免闪空白。 */
+const booting = ref(true)
+
+const editLayout = ref(false)
+const addOpen = ref(false)
+
+/** 分类样式侧栏开关（内嵌面板，非浮窗）。 */
+const categoryOpen = ref(false)
+
+const routeId = computed(() => {
+  const id = route.params.id
+  return typeof id === 'string' && id ? id : null
+})
+
 const showCanvas = computed(() =>
   dashboardCanvasVisible({
     hasCurrent: !!current.value,
@@ -36,23 +50,20 @@ const showEmpty = computed(() =>
   }),
 )
 const showLoadingOverlay = computed(() =>
-  dashboardLoadingOverlayVisible({ hasCurrent: !!current.value, loading: loading.value }),
+  dashboardLoadingOverlayVisible({
+    hasCurrent: !!current.value,
+    loading: loading.value,
+    booting: booting.value && !!routeId.value,
+  }),
 )
 
-const editLayout = ref(false)
-const addOpen = ref(false)
-
-/** 分类样式侧栏开关（内嵌面板，非浮窗）。 */
-const categoryOpen = ref(false)
-
-const routeId = computed(() => {
-  const id = route.params.id
-  return typeof id === 'string' && id ? id : null
-})
-
 onMounted(async () => {
-  await store.loadList()
-  await syncRoute()
+  try {
+    await store.loadList()
+    await syncRoute()
+  } finally {
+    booting.value = false
+  }
 })
 
 onBeforeUnmount(() => {
@@ -231,9 +242,13 @@ function onPickCategory(kind: 'table' | 'chart') {
 
     <AddWidgetDialog v-model:open="addOpen" @confirm="onAddWidget" />
 
-    <div v-if="showLoadingOverlay" class="dash__loading" role="status">
-      <span class="dash__loading-spin" aria-hidden="true" />
-      加载中…
+    <div v-if="showLoadingOverlay" class="dash__loading" role="status" aria-label="加载看板">
+      <div class="dash__skel" aria-hidden="true">
+        <div class="dash__skel-bar" />
+        <div class="dash__skel-grid">
+          <div v-for="n in 4" :key="n" class="dash__skel-card" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -360,26 +375,37 @@ function onPickCategory(kind: 'table' | 'chart') {
 .dash__loading {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: var(--is-bg);
-  color: var(--is-text-secondary);
   z-index: 5;
-  font-size: var(--is-text-sm);
+  background: var(--is-bg);
 }
-.dash__loading-spin {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--is-border-strong);
-  border-top-color: var(--is-accent);
-  border-radius: 50%;
-  animation: dash-spin 0.7s linear infinite;
+.dash__skel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-@keyframes dash-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.dash__skel-bar {
+  height: 52px;
+  flex-shrink: 0;
+  background: var(--is-surface);
+  border-bottom: 1px solid var(--is-border);
+}
+.dash__skel-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+  align-content: start;
+}
+.dash__skel-card {
+  height: 180px;
+  border-radius: var(--is-radius-md, 8px);
+  background: linear-gradient(90deg, var(--is-surface-hover) 25%, var(--is-border) 50%, var(--is-surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: dash-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes dash-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>

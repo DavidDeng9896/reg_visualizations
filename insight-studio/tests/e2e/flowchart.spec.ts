@@ -31,7 +31,7 @@ test.describe('g) 流程图', () => {
     expect(after).not.toBe(before)
 
     // 切回工作区再切回 → 位置保留（KeepAlive + flowchartLayout 持久化）
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await page.getByRole('button', { name: 'Workspace' }).click()
     await expect(page.getByTestId('grid-stats')).toBeVisible()
     await openFlowchart(page)
     await expect(node).toHaveAttribute('style', after ?? '')
@@ -64,7 +64,7 @@ test.describe('g) 流程图', () => {
     await banner.getByLabel('关闭提示').click()
     await expect(banner).toBeHidden()
     // 模式往返后仍保持关闭（localStorage 记忆）
-    await page.getByRole('button', { name: 'Flowchart' }).click()
+    await page.getByRole('button', { name: 'Workspace' }).click()
     await openFlowchart(page)
     await expect(page.locator('.flow-banner')).toHaveCount(0)
   })
@@ -96,5 +96,14 @@ test.describe('g) 流程图', () => {
     // 点空白关闭
     await page.locator('.vue-flow__pane').click({ position: { x: 20, y: 20 }, force: true })
     await expect(detail).toHaveCount(0)
+  })
+
+  test('工具栏添加步骤打开目录并可创建 Filter', async ({ page }) => {
+    await createDemoAndEnter(page)
+    await openFlowchart(page)
+    await page.getByRole('button', { name: '添加步骤' }).click()
+    await expect(page.locator('.add-step')).toBeVisible()
+    await page.getByRole('button', { name: 'Filter table' }).click()
+    await expect(page.locator('.vue-flow__node').filter({ hasText: 'Filter table' })).toBeVisible()
   })
 })

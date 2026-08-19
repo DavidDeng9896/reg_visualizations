@@ -35,6 +35,7 @@ import { removeStepOwnedArtifacts } from '../steps/pythonCharts'
  * - 基于 StepNode 自动拓扑 + 拖拽布局持久化
  * - 节点三态、类型化端口
  * - 拖线到空白处 → Add step 目录面板
+ * - 工具栏「添加步骤」→ 同一目录（无源端口时创建未连线步骤）
  * - 拖线到合法端口 → 自动连线
  * - 点击节点详情卡 / 双击打开工作区
  */
@@ -484,6 +485,22 @@ function closePanels(): void {
   skipNextPaneClick.value = false
 }
 
+function onAddStepOpen(open: boolean): void {
+  addStepOpen.value = open
+  if (!open) {
+    addStepSource.value = null
+    skipNextPaneClick.value = false
+  }
+}
+
+/** 工具栏入口：不要求先拖端口；若当前选中节点有兼容输出则自动作为源。 */
+function openAddStepFromToolbar(): void {
+  if (!current.value) return
+  addStepSource.value = null
+  addStepOpen.value = true
+  skipNextPaneClick.value = true
+}
+
 function onConnectStart({ nodeId, handleId }: { nodeId?: string; handleId?: string | null }): void {
   if (!nodeId || !handleId) return
   isConnecting.value = true
@@ -555,7 +572,7 @@ const addStepSourcePortType = computed(() => {
 /* --------------------------------- Add step 回调 -------------------------------- */
 
 function onStepSelected(type: StepType): void {
-  if (!addStepSource.value || !current.value) return
+  if (!current.value) return
   const def = getStepDef(type)
   const newStep: StepNode = {
     id: uuid(),
@@ -567,20 +584,31 @@ function onStepSelected(type: StepType): void {
     output: { tables: [], files: [], views: [] },
   }
 
-  // 自动连接源端口到第一个合法输入端口
-  const sourceNodeId = addStepSource.value.nodeId
-  const sourcePortName = addStepSource.value.port
-  const sourceNode = nodeById.value.get(sourceNodeId)
-  const sourcePort = sourceNode?.outputs.find((p) => p.name === sourcePortName)
-  const targetPort = def.inputs.find((p) => sourcePort && canConnectPorts(sourcePort, p))
+  let source = addStepSource.value
+  if (!source && activeId.value) {
+    const selected = nodeById.value.get(activeId.value)
+    const out = selected?.outputs.find((p) => def.inputs.some((inp) => canConnectPorts(p, inp)))
+    if (selected && out && selected.kind !== 'python-chart') {
+      source = { nodeId: selected.id, port: out.name }
+    }
+  }
 
-  if (targetPort && sourceNode && current.value) {
-    const sourceRef = resolveStepSourceRef(current.value, sourceNode, sourcePortName)
-    if (sourceRef) {
-      newStep.inputs.push({
-        port: targetPort.name,
-        from: { nodeId: sourceRef.nodeId, port: sourceRef.port },
-      })
+  // 自动连接源端口到第一个合法输入端口
+  if (source) {
+    const sourceNodeId = source.nodeId
+    const sourcePortName = source.port
+    const sourceNode = nodeById.value.get(sourceNodeId)
+    const sourcePort = sourceNode?.outputs.find((p) => p.name === sourcePortName)
+    const targetPort = def.inputs.find((p) => sourcePort && canConnectPorts(sourcePort, p))
+
+    if (targetPort && sourceNode && current.value) {
+      const sourceRef = resolveStepSourceRef(current.value, sourceNode, sourcePortName)
+      if (sourceRef) {
+        newStep.inputs.push({
+          port: targetPort.name,
+          from: { nodeId: sourceRef.nodeId, port: sourceRef.port },
+        })
+      }
     }
   }
 
@@ -666,7 +694,7 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
   if (e.key === 'Escape') {
     if (addStepOpen.value) {
-      addStepOpen.value = false
+      closePanels()
       return
     }
     if (activeId.value) setActive(null)
@@ -698,7 +726,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
     <Transition name="flow-banner">
       <div v-if="bannerVisible" class="flow-banner" role="status">
         <IIcon name="warning" :size="14" class="flow-banner__icon" />
-        <span class="flow-banner__text">流程图即编辑器：拖出端口连线添加步骤；视图节点双击打开工作区</span>
+        <span class="flow-banner__text">流程图即编辑器：拖出端口连线，或点工具栏「添加步骤」；视图节点双击打开工作区</span>
         <button type="button" class="flow-banner__close" aria-label="关闭提示" @click="dismissBanner">
           <IIcon name="close" :size="13" />
         </button>
@@ -792,6 +820,17 @@ function minimapNodeColor(node: { data?: unknown }): string {
             <IIcon name="arrange" :size="14" />
           </button>
         </ITooltip>
+        <ITooltip content="添加步骤">
+          <button
+            type="button"
+            class="flow-controls__btn"
+            aria-label="添加步骤"
+            :disabled="!current"
+            @click="openAddStepFromToolbar()"
+          >
+            <IIcon name="plus" :size="14" />
+          </button>
+        </ITooltip>
         <ITooltip content="添加分析报告">
           <button
             type="button"
@@ -867,7 +906,7 @@ function minimapNodeColor(node: { data?: unknown }): string {
       :open="addStepOpen"
       :source="addStepSource"
       :source-port-type="addStepSourcePortType"
-      @update:open="addStepOpen = $event"
+      @update:open="onAddStepOpen"
       @select="onStepSelected"
     />
   </div>

@@ -8,8 +8,8 @@ import { IMPLEMENTED_STEP_TYPES } from '../steps/exec'
 import { filterAddableStepDefs, groupAddableStepDefs } from './addStepCatalog'
 
 /**
- * Add step 目录面板：从输出端口拖线到空白处后滑出。
- * 仅展示「已实现执行逻辑且输入端口与源端口类型兼容」的步骤；
+ * Add step 目录面板：从输出端口拖线到空白处，或工具栏「添加步骤」后滑出。
+ * 仅展示「已实现执行逻辑且输入端口与源端口类型兼容」的步骤（无源端口时不过滤类型）；
  * 支持搜索、分类分组、description 开关。
  */
 const props = defineProps<{

@@ -27,8 +27,9 @@ test.describe('a) Analysis 列表页', () => {
     const cards = page.getByTestId('analysis-card')
     await expect(cards).toHaveCount(4)
     await expect(cards.filter({ hasText: '抗体纯化工艺分析' })).toHaveCount(1)
-    // 有数据时不展示主区缺省引导
+    // 有数据时不展示主区缺省引导，改为主区网格
     await expect(page.getByText('选择或新建分析')).toHaveCount(0)
+    await expect(page.getByTestId('analysis-home-card')).toHaveCount(4)
 
     // 侧栏新建空白 Analysis → 直达工作区（默认流程图）
     await page.getByRole('button', { name: '新建分析' }).click()
@@ -40,6 +41,7 @@ test.describe('a) Analysis 列表页', () => {
     // 回列表：4 示例 + 1 新建（显示默认项目/部门）
     await page.goto('/')
     await expect(cards).toHaveCount(5)
+    await expect(page.getByTestId('analysis-home-card')).toHaveCount(5)
     const blankCard = cards.filter({ hasText: 'E2E blank analysis' }).first()
     await expect(blankCard).toContainText('MD-AB023 · 抗体蛋白纯化')
     await expect(blankCard).toContainText('抗体发现部')
@@ -54,6 +56,7 @@ test.describe('a) Analysis 列表页', () => {
     // 回列表：6 张卡片，Demo 显示其项目/部门
     await page.goto('/')
     await expect(cards).toHaveCount(6)
+    await expect(page.getByTestId('analysis-home-card')).toHaveCount(6)
     const demoCard = cards.filter({ hasText: 'Demo analysis' })
     await expect(demoCard).toContainText('MD-BP310 · Bioprocess Media')
     await expect(demoCard).toContainText('生物分析部')

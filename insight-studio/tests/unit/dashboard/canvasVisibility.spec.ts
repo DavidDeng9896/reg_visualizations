@@ -21,4 +21,10 @@ describe('看板画布显隐', () => {
     expect(dashboardLoadingOverlayVisible({ hasCurrent: false, loading: true })).toBe(true)
     expect(dashboardLoadingOverlayVisible({ hasCurrent: true, loading: true })).toBe(false)
   })
+
+  it('首次进入看板路由、current 未就绪时显示骨架，避免闪空白/空态', () => {
+    expect(dashboardLoadingOverlayVisible({ hasCurrent: false, loading: false, booting: true })).toBe(true)
+    expect(dashboardLoadingOverlayVisible({ hasCurrent: true, loading: false, booting: true })).toBe(false)
+    expect(dashboardLoadingOverlayVisible({ hasCurrent: false, loading: false, booting: false })).toBe(false)
+  })
 })

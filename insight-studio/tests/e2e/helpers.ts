@@ -5,9 +5,9 @@ import { createDemoAnalysis } from '../../src/shared/seed'
 
 /** 确保处于工作区模式（无 query 进入默认 flowchart；flowchart 下树点击不切工作区）。 */
 export async function ensureWorkspace(page: Page): Promise<void> {
-  const btn = page.getByRole('button', { name: 'Flowchart' })
+  const btn = page.getByRole('button', { name: 'Workspace' })
   await expect(btn).toBeVisible()
-  if ((await btn.getAttribute('aria-pressed')) === 'true') await btn.click()
+  if ((await btn.getAttribute('aria-pressed')) !== 'true') await btn.click()
 }
 
 /** 写入 Iris Demo 并进入工作区（侧栏三张表就绪）。不依赖首页空态「一键 Demo」。 */

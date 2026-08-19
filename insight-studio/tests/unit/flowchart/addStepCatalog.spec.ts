@@ -28,4 +28,9 @@ describe('Add step 目录', () => {
     const output = groups.find((g) => g.key === 'output')
     expect(output?.defs.some((d) => d.type === 'report')).toBe(true)
   })
+
+  it('无源端口（工具栏添加步骤）仍列出 Filter / Join / Report', () => {
+    const defs = filterAddableStepDefs(listStepDefs(), { implemented: IMPLEMENTED_STEP_TYPES })
+    expect(defs.map((d) => d.type)).toEqual(expect.arrayContaining(['filter', 'join', 'report']))
+  })
 })
