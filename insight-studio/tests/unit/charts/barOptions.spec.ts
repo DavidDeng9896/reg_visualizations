@@ -62,4 +62,19 @@ describe('Plotly bar builder', () => {
   it('缺映射返回 EMPTY_FIGURE', () => {
     expect(buildBarOption({ result: vr(rows, catCols), config: createChartConfig('bar') }).option).toEqual(EMPTY_FIGURE)
   })
+
+  it('Y 未写 aggregation 时按 Sum 聚合，轴标签为 Sum of 字段', () => {
+    const c = cfg()
+    c.configure.y = { field: 'val' }
+    const out = buildBarOption({ result: vr(rows, catCols), config: c })
+    expect(out.option.data[0]).toMatchObject({ type: 'bar', y: [3, 7] })
+    expect((out.option.layout.yaxis as { title: { text: string } }).title.text).toBe('Sum of val')
+  })
+
+  it('显式 aggregation=none 时不求和', () => {
+    const c = cfg()
+    c.configure.y = { field: 'val', aggregation: 'none' }
+    const out = buildBarOption({ result: vr(rows, catCols), config: c })
+    expect((out.option.layout.yaxis as { title: { text: string } }).title.text).not.toMatch(/^Sum of/)
+  })
 })

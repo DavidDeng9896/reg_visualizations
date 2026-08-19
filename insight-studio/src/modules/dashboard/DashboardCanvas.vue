@@ -387,6 +387,7 @@ watch(anySelected, (on) => {
       v-for="w in dashboard.widgets"
       :key="w.id"
       class="dc__item"
+      :data-widget-id="w.id"
       :class="{
         'dc__item--edit': editLayout,
         'dc__item--dragging': drag?.id === w.id,

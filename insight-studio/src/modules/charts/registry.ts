@@ -2,9 +2,10 @@
  * 图种注册表：各图种各注册一个定义。
  * 新增图种 = 加一个定义 + 此处注册一行。
  */
-import type { ChartConfig, ChartType, ColumnMeta, RowFlag } from '../../shared/types'
+import type { ChartConfig, ChartConfigure, ChartType, ColumnMeta, RowFlag } from '../../shared/types'
 import { createChartConfig } from '../../shared/factories'
 import type { ViewResult } from '../../shared/pipeline'
+import { normalizeAiChartConfigure, resolveConfigureFields } from '../ai/normalizeChartConfigure'
 import { buildBarOption } from './runtime/bar'
 import { buildLineOption } from './runtime/line'
 import { buildScatterOption } from './runtime/scatter'
@@ -193,12 +194,15 @@ export function buildChartOption(
   opts?: { hideTitle?: boolean },
 ): BuildOutput {
   const def = getChartDef(config.chartType)
-  let cfg: ChartConfig = { ...config, chartType: def.type }
-  if (opts?.hideTitle) {
-    // 嵌入卡片场景：卡头已展示名称，隐藏图内标题并收紧顶部留白
-    cfg = { ...cfg, style: { ...cfg.style, title: undefined, subtitle: undefined } }
-  }
-  return def.buildOption({ result, config: cfg, viewName, flags })
+  const configure = resolveConfigureFields(
+    normalizeAiChartConfigure(def.type, config.configure ?? {}),
+    result.columns ?? [],
+  ) as ChartConfigure
+  const style = { ...config.style }
+  // hideTitle 只抑制默认 viewName 标题，不剥掉用户在 STYLE 里写的 Title/Subtitle
+  const displayName = opts?.hideTitle && !style.title && !style.subtitle ? '' : viewName
+  const cfg: ChartConfig = { ...config, chartType: def.type, configure, style }
+  return def.buildOption({ result, config: cfg, viewName: displayName, flags })
 }
 
 export function validateChartMapping(config: ChartConfig, columns: ColumnMeta[]): MappingError[] {

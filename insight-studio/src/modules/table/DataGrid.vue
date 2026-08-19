@@ -6,7 +6,7 @@ import 'vxe-table/es/style.css'
 import type { Analysis, AnalysisTable, CellValue, ColumnMeta, DataType, Filter, Row, Transform, TransformType } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { uuid } from '../../shared/id'
-import { compareValues, isIdentityOrSortOnly, rowIdOf, type ViewResult } from '../../shared/pipeline'
+import { isIdentityOrSortOnly, nextSortDirection, rowIdOf, sortRows, type ViewResult } from '../../shared/pipeline'
 import { findTable, findView, findViewPath } from '../../shared/tree'
 import { createTransform, createViewNode, defaultViewName, sealRows } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -261,16 +261,16 @@ function setSort(field: string, direction: 'asc' | 'desc' | null) {
 
 const displayedRows = computed<Row[]>(() => {
   const rows = props.result.rows
-  if (!view.value && localSort.value) {
-    const { field, direction } = localSort.value
-    const dt = props.result.columns.find((c) => c.field === field)?.dataType
-    return rows.slice().sort((a, b) => {
-      const cmp = compareValues(a[field] ?? null, b[field] ?? null, dt)
-      return direction === 'asc' ? cmp : -cmp
-    })
-  }
-  return rows
+  const s = sortInfo.value
+  if (!s) return rows
+  const dt = props.result.columns.find((c) => c.field === s.field)?.dataType
+  return sortRows(rows, s.field, s.direction, dt)
 })
+
+function cycleHeaderSort(field: string) {
+  const next = nextSortDirection(sortInfo.value, field)
+  setSort(field, next?.direction ?? null)
+}
 
 const rowIndexMap = computed(() => {
   const m = new WeakMap<Row, number>()
@@ -764,6 +764,10 @@ function markEdited() {
 /* ------------------------------ 单元格编辑 ------------------------------ */
 
 const gridRef = ref()
+watch(displayedRows, (rows) => {
+  const grid = gridRef.value as { reloadData?: (data: Row[]) => void } | undefined
+  grid?.reloadData?.(rows)
+})
 const editDraft = ref('')
 const editCancelled = ref(false)
 const editActive = ref(false)
@@ -1189,7 +1193,7 @@ function promote() {
           :edit-render="sessionActive ? {} : undefined"
         >
           <template #header>
-            <div class="dg__th" @contextmenu.prevent="openColumnMenu(col.field, $event)">
+            <div class="dg__th" @click="cycleHeaderSort(col.field)" @contextmenu.prevent="openColumnMenu(col.field, $event)">
               <IIcon
                 :name="columnTypeIcon(col.dataType)"
                 :size="13"
@@ -1574,6 +1578,7 @@ function promote() {
   gap: 5px;
   width: 100%;
   min-width: 0;
+  cursor: pointer;
 }
 .dg__typeicon {
   color: var(--is-text-tertiary);

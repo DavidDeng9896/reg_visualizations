@@ -53,6 +53,24 @@ function toNumber(v: CellValue): number | null {
   return null
 }
 
+export type SortDirection = 'asc' | 'desc'
+export type SortInfo = { field: string; direction: SortDirection }
+
+/** 列头点击：无排序 → 升序 → 降序 → 清除。 */
+export function nextSortDirection(current: SortInfo | null, field: string): SortInfo | null {
+  if (!current || current.field !== field) return { field, direction: 'asc' }
+  if (current.direction === 'asc') return { field, direction: 'desc' }
+  return null
+}
+
+/** 按单列排序（表格展示用；不修改入参）。 */
+export function sortRows(rows: Row[], field: string, direction: SortDirection, dataType?: DataType): Row[] {
+  return rows.slice().sort((a, b) => {
+    const cmp = compareValues(a[field] ?? null, b[field] ?? null, dataType)
+    return direction === 'asc' ? cmp : -cmp
+  })
+}
+
 /** 类型感知的比较：数值列按数值，date/datetime 按时间戳，其余按字符串。 */
 export function compareValues(a: CellValue, b: CellValue, dataType?: DataType): number {
   if (isBlank(a) && isBlank(b)) return 0

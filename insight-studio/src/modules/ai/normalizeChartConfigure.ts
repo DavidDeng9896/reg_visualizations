@@ -83,6 +83,12 @@ export function normalizeAiChartConfigure(
     if (!next.y?.field && next.values?.[0]?.field) {
       next.y = next.values[0]
     }
+    if (!next.x?.field && next.categories?.field) {
+      next.x = next.categories
+    }
+    if (!next.y?.field && next.measure?.field) {
+      next.y = next.measure
+    }
   }
 
   return next

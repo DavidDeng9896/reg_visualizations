@@ -9,6 +9,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 const props = withDefaults(
   defineProps<{
     direction?: 'horizontal' | 'vertical'
+    /** 反转视觉顺序（图在下/右），不更换 slot 以免卸载子组件。 */
+    reverse?: boolean
     ratio?: number
     defaultRatio?: number
     /** 第一栏最小尺寸 px。 */
@@ -18,7 +20,7 @@ const props = withDefaults(
     storageKey?: string
     disabled?: boolean
   }>(),
-  { direction: 'horizontal', defaultRatio: 0.5, minFirst: 120, minSecond: 120 },
+  { direction: 'horizontal', reverse: false, defaultRatio: 0.5, minFirst: 120, minSecond: 120 },
 )
 
 const emit = defineEmits<{ (e: 'update:ratio', v: number): void }>()
@@ -86,7 +88,7 @@ function onPointerMove(e: PointerEvent) {
     props.direction === 'horizontal'
       ? (e.clientX - rect.left) / rect.width
       : (e.clientY - rect.top) / rect.height
-  setRatio(clampByMin(ratio))
+  setRatio(clampByMin(props.reverse ? 1 - ratio : ratio))
 }
 
 function onPointerUp() {
@@ -118,7 +120,7 @@ onBeforeUnmount(() => {
   <div
     ref="containerEl"
     class="is-split"
-    :class="[`is-split--${direction}`, { 'is-split--dragging': dragging }]"
+    :class="[`is-split--${direction}`, { 'is-split--dragging': dragging, 'is-split--reverse': reverse }]"
   >
     <div class="is-split__pane is-split__first" :style="{ flexBasis: `${currentRatio * 100}%` }">
       <slot name="first" />
@@ -158,6 +160,12 @@ onBeforeUnmount(() => {
 }
 .is-split--vertical {
   flex-direction: column;
+}
+.is-split--reverse.is-split--horizontal {
+  flex-direction: row-reverse;
+}
+.is-split--reverse.is-split--vertical {
+  flex-direction: column-reverse;
 }
 .is-split__pane {
   min-width: 0;

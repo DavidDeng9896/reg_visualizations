@@ -2,7 +2,7 @@
  * 聚合与误差棒统计（纯函数）。
  * 约定：空值/非数值一律剔除；SD 为样本标准差（n-1）；SEM = SD / √n。
  */
-import type { Aggregation, CellValue, ErrorBarType, Row } from '../../../shared/types'
+import type { Aggregation, CellValue, ErrorBarType, FieldMapping, Row } from '../../../shared/types'
 import { isBlank } from '../../../shared/pipeline'
 
 export function toFiniteNumber(v: CellValue | undefined): number | null {
@@ -137,4 +137,24 @@ export const AGGREGATION_LABELS: Record<Aggregation, string> = {
 /** 聚合显示名（胶囊 / 轴默认标签用，如 `Average of Concentration`）。 */
 export function aggregationLabel(method?: Aggregation): string {
   return AGGREGATION_LABELS[method ?? 'count'] ?? 'Count'
+}
+
+/**
+ * 运行时有效聚合：未写 aggregation 且已绑字段 → sum（与 bar/pie/bignumber 一致）。
+ * 显式 none 表示不聚合。
+ */
+export function effectiveAggregation(mapping?: FieldMapping | null): Aggregation {
+  if (mapping?.aggregation) return mapping.aggregation
+  return mapping?.field ? 'sum' : 'count'
+}
+
+/** 齿轮下拉当前值：未写时显示 Sum，而不是 None。 */
+export function uiAggregationValue(mapping?: FieldMapping | null): Aggregation {
+  return effectiveAggregation(mapping)
+}
+
+/** 绑定可聚合槽时补默认 Sum，让 UI 与运行时一开始就一致。 */
+export function mappingWithDefaultAgg(mapping: FieldMapping, aggregatable: boolean): FieldMapping {
+  if (!aggregatable || mapping.aggregation) return mapping
+  return { ...mapping, aggregation: mapping.field ? 'sum' : 'count' }
 }

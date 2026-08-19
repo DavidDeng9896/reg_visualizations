@@ -2,7 +2,7 @@
 import { computed, inject } from 'vue'
 import type { Aggregation, FieldMapping } from '../../../shared/types'
 import { IPopover, ISelect, ITextField, IToggle } from '../../../ui'
-import { aggregationLabel } from '../runtime/aggregate'
+import { aggregationLabel, uiAggregationValue } from '../runtime/aggregate'
 import { CHART_DRAFT_CONTEXT } from './context'
 import type { SlotDef } from '../types'
 
@@ -79,10 +79,9 @@ const maxStr = computed({
 })
 
 const agg = computed({
-  get: () => props.mapping.aggregation ?? 'none',
+  get: () => uiAggregationValue(props.mapping),
   set: (v: string | number) => {
-    if (v === 'none') delete props.mapping.aggregation
-    else props.mapping.aggregation = v as Aggregation
+    props.mapping.aggregation = v as Aggregation
     ctx.touch()
   },
 })
@@ -97,7 +96,7 @@ const side = computed({
 })
 
 const aggLabelPreview = computed(() => {
-  const method = props.mapping.aggregation
+  const method = uiAggregationValue(props.mapping)
   if (!method || method === 'none') return ''
   return `${aggregationLabel(method)} of ${props.mapping.field}`
 })

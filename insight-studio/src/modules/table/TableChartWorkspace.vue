@@ -13,6 +13,7 @@ import { TABLE_CHART_CONTEXT, type TableChartContext } from './context'
 import { promoteViewToTable } from './promote'
 import { downloadCsv, toCsv } from './csv'
 import { resolveTableCollapsedOnEnter } from './tableSourceVisibility'
+import { chartSplitDirection, chartSplitReverse, chartSplitStorageKey } from './chartLayout'
 
 const ChartView = defineAsyncComponent(() => import('../charts/ChartView.vue'))
 const StepConfigPanel = defineAsyncComponent(() => import('../steps/panel/StepConfigPanel.vue'))
@@ -123,13 +124,11 @@ onBeforeUnmount(() => ro?.disconnect())
 const degraded = computed(() => narrow.value && (chartPosition.value === 'left' || chartPosition.value === 'right'))
 const effectivePosition = computed<ChartPosition>(() => (degraded.value ? (chartPosition.value === 'left' ? 'top' : 'bottom') : chartPosition.value))
 
-const splitDirection = computed<'horizontal' | 'vertical'>(() =>
-  effectivePosition.value === 'left' || effectivePosition.value === 'right' ? 'horizontal' : 'vertical',
+const splitDirection = computed<'horizontal' | 'vertical'>(() => chartSplitDirection(effectivePosition.value))
+const splitReverse = computed(() => chartSplitReverse(effectivePosition.value))
+const splitKey = computed(() =>
+  chartSplitStorageKey(current.value?.id ?? '', selected.value?.viewId ?? ''),
 )
-/** 图表区在 first 还是 second */
-const chartFirst = computed(() => effectivePosition.value === 'top' || effectivePosition.value === 'left')
-
-const splitKey = computed(() => `chart-split:${current.value?.id ?? ''}:${selected.value?.viewId ?? ''}:${effectivePosition.value}`)
 
 /* 标题栏 ⋯ 菜单 */
 const menuOpen = ref(false)
@@ -398,22 +397,19 @@ provide(
         v-else-if="hasChart"
         :key="splitKey"
         :direction="splitDirection"
+        :reverse="splitReverse"
         :default-ratio="0.55"
         :min-first="200"
         :min-second="200"
         :storage-key="splitKey"
       >
         <template #first>
-          <div v-if="chartFirst" class="tcw__chart" data-mount="chart-panel">
+          <div class="tcw__chart" data-mount="chart-panel">
             <ChartView />
           </div>
-          <DataGrid v-else :table-id="selected.tableId" :view-id="selected.viewId" :result="result" />
         </template>
         <template #second>
-          <DataGrid v-if="chartFirst" :table-id="selected.tableId" :view-id="selected.viewId" :result="result" />
-          <div v-else class="tcw__chart" data-mount="chart-panel">
-            <ChartView />
-          </div>
+          <DataGrid :table-id="selected.tableId" :view-id="selected.viewId" :result="result" />
         </template>
       </ISplitPane>
 

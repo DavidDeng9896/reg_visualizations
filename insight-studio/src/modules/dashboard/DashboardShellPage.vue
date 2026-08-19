@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { createDashboardWidget, createLinkWidget } from '../../shared/factories'
@@ -9,12 +9,35 @@ import DashboardCanvas from './DashboardCanvas.vue'
 import AddWidgetDialog, { type AddWidgetPayload } from './AddWidgetDialog.vue'
 import CategorySidebar from './CategorySidebar.vue'
 import { findNextSlot, type LayoutItem } from './grid'
+import {
+  dashboardCanvasVisible,
+  dashboardEmptyStateVisible,
+  dashboardLoadingOverlayVisible,
+} from './canvasVisibility'
 import type { DashboardWidget } from '../../shared/types'
 
 const route = useRoute()
 const router = useRouter()
 const store = useDashboardStore()
 const { current, currentId, saving, dirty, loading } = storeToRefs(store)
+
+const showCanvas = computed(() =>
+  dashboardCanvasVisible({
+    hasCurrent: !!current.value,
+    widgetCount: current.value?.widgets.length ?? 0,
+    loading: loading.value,
+  }),
+)
+const showEmpty = computed(() =>
+  dashboardEmptyStateVisible({
+    hasCurrent: !!current.value,
+    widgetCount: current.value?.widgets.length ?? 0,
+    loading: loading.value,
+  }),
+)
+const showLoadingOverlay = computed(() =>
+  dashboardLoadingOverlayVisible({ hasCurrent: !!current.value, loading: loading.value }),
+)
 
 const editLayout = ref(false)
 const addOpen = ref(false)
@@ -90,11 +113,13 @@ function onRemoveWidgets(widgetIds: string[]) {
 }
 
 function onAddWidget(payload: AddWidgetPayload) {
+  let addedId: string | null = null
   store.mutate((d) => {
     if (payload.kind === 'link') {
       const grid = findNextSlot(d.widgets, 6, 10)
       const w = createLinkWidget(payload.url, { title: payload.title, grid })
       d.widgets.push(w)
+      addedId = w.id
       return
     }
     const defaults = payload.type === 'chart' ? { w: 6, h: 8 } : { w: 12, h: 10 }
@@ -109,8 +134,16 @@ function onAddWidget(payload: AddWidgetPayload) {
       grid,
     )
     d.widgets.push(w)
+    addedId = w.id
   })
+  if (!addedId) {
+    toast.error('未选中看板，无法添加组件')
+    return
+  }
   toast.success('已添加组件')
+  void nextTick(() => {
+    document.querySelector(`[data-widget-id="${addedId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
 }
 
 /** 分类侧栏选择：打开添加组件对话框（图表/表） */
@@ -154,7 +187,7 @@ function onPickCategory(kind: 'table' | 'chart') {
         </div>
         <div class="dash__canvas-wrap">
           <IEmptyState
-            v-if="!loading && !current.widgets.length"
+            v-if="showEmpty"
             icon="plus"
             title="还没有组件"
             description="从多个 Insight 中选择已配置好的表或图表，拖到画布上组成总览。"
@@ -162,7 +195,7 @@ function onPickCategory(kind: 'table' | 'chart') {
             <IButton variant="primary" icon="plus" @click="addOpen = true">添加组件</IButton>
           </IEmptyState>
           <DashboardCanvas
-            v-else-if="current.widgets.length"
+            v-else-if="showCanvas"
             :dashboard="current"
             :edit-layout="editLayout"
             @update-widget="onUpdateWidget"
@@ -191,7 +224,7 @@ function onPickCategory(kind: 'table' | 'chart') {
 
     <AddWidgetDialog v-model:open="addOpen" @confirm="onAddWidget" />
 
-    <div v-if="loading" class="dash__loading" role="status">
+    <div v-if="showLoadingOverlay" class="dash__loading" role="status">
       <span class="dash__loading-spin" aria-hidden="true" />
       加载中…
     </div>

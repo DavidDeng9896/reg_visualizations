@@ -43,6 +43,23 @@ describe('normalizeAiChartConfigure', () => {
     expect(out.y?.aggregation).toBe('sum')
   })
 
+  it('bignumber：y 提升为 values', () => {
+    const out = normalizeAiChartConfigure('bignumber', {
+      y: { field: 'val', aggregation: 'sum' },
+    })
+    expect(out.values?.[0]?.field).toBe('val')
+    expect(out.y).toBeUndefined()
+  })
+
+  it('bar：categories 回填 x，measure 回填 y', () => {
+    const out = normalizeAiChartConfigure('bar', {
+      categories: { field: 'formula' },
+      measure: { field: 'n', aggregation: 'count' },
+    })
+    expect(out.x?.field).toBe('formula')
+    expect(out.y?.field).toBe('n')
+  })
+
   it('字符串字段简写转为 mapping', () => {
     const out = normalizeAiChartConfigure('scatter', {
       x: 'weight' as unknown as { field: string },

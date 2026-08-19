@@ -5,6 +5,7 @@ import type { ChartConfig, ChartType, RowFlag } from '../../shared/types'
 import { ROW_ID_FIELD } from '../../shared/types'
 import { runPipeline } from '../../shared/pipeline'
 import { findView } from '../../shared/tree'
+import { viewNameOnTypeChange } from '../../shared/factories'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { IButton, IEmptyState, IIcon, IModal, IPopover, toast } from '../../ui'
 import { TABLE_CHART_CONTEXT } from '../table/context'
@@ -43,6 +44,7 @@ const draftModel = reactive<ChartDraft>({
   saved: cloneConfig(savedConfig.value ?? fallbackConfig()),
   draft: cloneConfig(savedConfig.value ?? fallbackConfig()),
 })
+let lastSyncedViewId = view.value?.id ?? ''
 
 function fallbackConfig(): ChartConfig {
   const t = (view.value?.type && view.value.type !== 'table' ? view.value.type : 'bar') as ChartType
@@ -68,13 +70,25 @@ function syncDraftFromView(): void {
     draftModel.draft = cloneConfig(snap)
   }
   saveAttempted.value = false
+  lastSyncedViewId = view.value?.id ?? ''
 }
 
-// 视图切换 / 外部保存后重建草稿（含首次）
+// 仅在切换视图，或外部写入 chart 且本地无未保存草稿时重建。图种/方位变更不得冲掉 draft。
 watch(
-  () => [view.value?.id, view.value?.type, view.value?.chart] as const,
-  () => syncDraftFromView(),
+  () => [view.value?.id, savedConfig.value] as const,
+  ([id]) => {
+    if (id && id === lastSyncedViewId && isDirty(draftModel as ChartDraft)) return
+    syncDraftFromView()
+  },
   { immediate: true },
+)
+watch(
+  () => view.value?.chart?.position,
+  (p) => {
+    if (!p) return
+    if (draftModel.draft.position !== p) draftModel.draft.position = p
+    if (draftModel.saved.position !== p) draftModel.saved.position = p
+  },
 )
 
 const dirty = computed(() => isDirty(draftModel as ChartDraft))
@@ -240,6 +254,7 @@ function rename(name: string) {
 
 function changeType(t: ChartType) {
   if (t === draftModel.draft.chartType) return
+  const fromType = draftModel.draft.chartType
   const to = getChartDef(t)
   const { configure, carried } = migrateConfigure(draftModel.draft, to, columns.value)
   const base = { chartType: t, position: draftModel.draft.position }
@@ -249,6 +264,20 @@ function changeType(t: ChartType) {
     style: { ...to.createDefaultStyle(), ...migrateStyle(draftModel.draft.style) },
   }
   saveAttempted.value = false
+  const v = view.value
+  const tableId = tc.selected.value?.tableId
+  const viewId = tc.selected.value?.viewId
+  if (v && viewId) {
+    const table = current.value?.tables.find((tb) => tb.id === tableId)
+    const nextName = viewNameOnTypeChange(v.name, fromType, t, table?.views ?? [])
+    store.mutate((a) => {
+      const tb = a.tables.find((x) => x.id === tableId)
+      const target = tb ? findView(tb.views, viewId) : null
+      if (!target) return
+      target.type = t
+      if (nextName !== target.name) target.name = nextName
+    })
+  }
   if (carried) toast.info('已切换图种，可复用映射已保留')
   touch()
 }

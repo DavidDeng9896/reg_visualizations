@@ -2,14 +2,34 @@ import { describe, expect, it } from 'vitest'
 import {
   aggregateRows,
   aggregateValues,
+  effectiveAggregation,
   errorValue,
   fiveNumber,
+  mappingWithDefaultAgg,
   numericValues,
   quantile,
   standardDeviation,
   standardError,
+  uiAggregationValue,
 } from '../../../src/modules/charts/runtime/aggregate'
 import type { Row } from '../../../src/shared/types'
+
+describe('effectiveAggregation', () => {
+  it('有字段但未写 aggregation 时视为 sum，与柱状图运行时一致', () => {
+    expect(effectiveAggregation({ field: 'sepal_length' })).toBe('sum')
+    expect(uiAggregationValue({ field: 'sepal_length' })).toBe('sum')
+  })
+
+  it('显式 none 不再被当成 sum', () => {
+    expect(effectiveAggregation({ field: 'sepal_length', aggregation: 'none' })).toBe('none')
+    expect(uiAggregationValue({ field: 'sepal_length', aggregation: 'none' })).toBe('none')
+  })
+
+  it('绑定可聚合槽时补上默认 sum', () => {
+    expect(mappingWithDefaultAgg({ field: 'val' }, true).aggregation).toBe('sum')
+    expect(mappingWithDefaultAgg({ field: 'cat' }, false).aggregation).toBeUndefined()
+  })
+})
 
 describe('aggregate · 六种聚合', () => {
   const vals = [4, 1, 3, 2]

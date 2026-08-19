@@ -2,7 +2,7 @@
 import { computed, inject, ref } from 'vue'
 import type { ChartConfigure, FieldMapping } from '../../../shared/types'
 import { IFieldCapsule, ISelect, type SelectOption } from '../../../ui'
-import { aggregationLabel } from '../runtime/aggregate'
+import { aggregationLabel, mappingWithDefaultAgg, uiAggregationValue } from '../runtime/aggregate'
 import AxisSettingsPopover from './AxisSettingsPopover.vue'
 import { CHART_DRAFT_CONTEXT } from './context'
 import type { SlotDef } from '../types'
@@ -53,7 +53,8 @@ const error = computed(() => {
 function setSingle(field: string | number) {
   const cfg = ctx.draft.configure
   const prev = (cfg as unknown as Record<string, FieldMapping | undefined>)[props.slot.key] ?? {}
-  ;(cfg as unknown as Record<string, unknown>)[props.slot.key] = { ...prev, field: String(field) }
+  const next = mappingWithDefaultAgg({ ...prev, field: String(field) }, !!props.slot.aggregatable)
+  ;(cfg as unknown as Record<string, unknown>)[props.slot.key] = next
   ctx.touch()
 }
 
@@ -71,7 +72,7 @@ function addMapping(field: string | number) {
   const cfg = ctx.draft.configure
   if (!cfg.values) cfg.values = []
   if (cfg.values.some((m) => m.field === field)) return
-  cfg.values.push({ field: String(field) })
+  cfg.values.push(mappingWithDefaultAgg({ field: String(field) }, !!props.slot.aggregatable))
   ctx.touch()
 }
 
@@ -81,7 +82,7 @@ const axisKeyOf = computed<'xAxis' | 'yAxis'>(() => (props.slot.key === 'x' ? 'x
 
 const capsuleAgg = (m: FieldMapping): string | undefined => {
   if (!props.slot.aggregatable) return undefined
-  const method = m.aggregation
+  const method = uiAggregationValue(m)
   if (!method || method === 'none') return undefined
   return aggregationLabel(method)
 }

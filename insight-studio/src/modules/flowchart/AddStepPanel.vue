@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { PortType, StepType } from '../../shared/types'
-import { IButton, IIcon, ITextField } from '../../ui'
+import { IIcon, ITextField } from '../../ui'
 import type { IconName } from '../../ui'
-import { listStepDefs, portTypeIcon, type StepDef } from '../steps/registry'
+import { listStepDefs, portTypeIcon } from '../steps/registry'
 import { IMPLEMENTED_STEP_TYPES } from '../steps/exec'
+import { filterAddableStepDefs, groupAddableStepDefs } from './addStepCatalog'
 
 /**
  * Add step 目录面板：从输出端口拖线到空白处后滑出。
@@ -23,31 +24,16 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'select', t
 const query = ref('')
 const showDescriptions = ref(true)
 
-/** 可添加的步骤：已实现 + 有输入端口 + 与源端口类型兼容。 */
-const availableDefs = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  return listStepDefs().filter((d) => {
-    if (!IMPLEMENTED_STEP_TYPES.has(d.type)) return false
-    if (d.inputs.length === 0) return false
-    if (props.sourcePortType && !d.inputs.some((p) => p.type === props.sourcePortType)) return false
-    if (q && !d.label.toLowerCase().includes(q) && !d.description.toLowerCase().includes(q)) return false
-    return true
-  })
-})
+/** 可添加的步骤：已实现 +（兼容输入端口 或 独立 Report）。 */
+const availableDefs = computed(() =>
+  filterAddableStepDefs(listStepDefs(), {
+    implemented: IMPLEMENTED_STEP_TYPES,
+    sourcePortType: props.sourcePortType,
+    query: query.value,
+  }),
+)
 
-const groups = computed(() => {
-  const out: { key: string; title: string; defs: StepDef[] }[] = [
-    { key: 'code', title: 'Code', defs: [] },
-    { key: 'combine', title: 'Combine tables', defs: [] },
-    { key: 'transform', title: 'Transform', defs: [] },
-    { key: 'statistics', title: 'Statistics', defs: [] },
-  ]
-  for (const def of availableDefs.value) {
-    const g = out.find((o) => o.key === def.category)
-    if (g) g.defs.push(def)
-  }
-  return out.filter((g) => g.defs.length > 0)
-})
+const groups = computed(() => groupAddableStepDefs(availableDefs.value))
 
 function close() {
   emit('update:open', false)
@@ -83,7 +69,7 @@ function select(type: StepType) {
             @click="select(def.type)"
           >
             <span class="add-step__icon">
-              <IIcon :name="(portTypeIcon(def.outputs[0]?.type ?? 'table') as IconName)" :size="14" />
+              <IIcon :name="(def.type === 'report' ? 'file-text' : portTypeIcon(def.outputs[0]?.type ?? 'table')) as IconName" :size="14" />
             </span>
             <span class="add-step__item-body">
               <span class="add-step__item-name">{{ def.label }}</span>

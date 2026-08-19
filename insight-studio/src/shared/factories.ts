@@ -167,6 +167,26 @@ export function defaultViewName(type: ViewType, existing: ViewNode[] = []): stri
   return `${base} ${i}`
 }
 
+/** 是否仍是创建时的工厂名（含 "Bar chart 2" 这种序号）。 */
+export function isFactoryViewName(name: string, type: ViewType): boolean {
+  const base = VIEW_TYPE_LABELS[type]
+  if (!base) return false
+  if (name === base) return true
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped} \\d+$`).test(name)
+}
+
+/** 图种切换：默认名跟随新图种；用户自定义名保留。 */
+export function viewNameOnTypeChange(
+  currentName: string,
+  fromType: ViewType,
+  toType: ViewType,
+  existing: ViewNode[] = [],
+): string {
+  if (!isFactoryViewName(currentName, fromType)) return currentName
+  return defaultViewName(toType, existing)
+}
+
 export function createViewNode(type: ViewType, name?: string): ViewNode {
   const node: ViewNode = {
     id: uuid(),

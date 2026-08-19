@@ -84,6 +84,33 @@ const legendPos = computed({
   },
 })
 
+const chartTitle = computed({
+  get: () => style.value.title ?? '',
+  set: (v: string) => {
+    const t = v.trim()
+    if (t) style.value.title = t
+    else delete style.value.title
+    ctx.touch()
+  },
+})
+const chartSubtitle = computed({
+  get: () => style.value.subtitle ?? '',
+  set: (v: string) => {
+    const t = v.trim()
+    if (t) style.value.subtitle = t
+    else delete style.value.subtitle
+    ctx.touch()
+  },
+})
+function resetTitle() {
+  delete style.value.title
+  ctx.touch()
+}
+function resetSubtitle() {
+  delete style.value.subtitle
+  ctx.touch()
+}
+
 /* 轴区可见性 */
 const xScaleTypes = ['line', 'scatter']
 const yScaleTypes = ['bar', 'line', 'scatter', 'box']
@@ -126,6 +153,20 @@ function removeRefLine(i: number) {
     <!-- General -->
     <section class="sty__sec">
       <h4 class="sty__sec-title">General</h4>
+      <div class="sty__row">
+        <span class="sty__label">Title</span>
+        <div class="sty__inline">
+          <ITextField v-model="chartTitle" size="sm" placeholder="默认（视图名）" aria-label="图表标题" />
+          <button type="button" class="sty__reset" title="恢复默认标题" aria-label="恢复默认标题" @click="resetTitle">↻</button>
+        </div>
+      </div>
+      <div class="sty__row">
+        <span class="sty__label">Subtitle</span>
+        <div class="sty__inline">
+          <ITextField v-model="chartSubtitle" size="sm" placeholder="可选" aria-label="图表副标题" />
+          <button type="button" class="sty__reset" title="清除副标题" aria-label="清除副标题" @click="resetSubtitle">↻</button>
+        </div>
+      </div>
       <div class="sty__row">
         <span class="sty__label">Width (px)</span>
         <ITextField v-model="width" size="sm" placeholder="自适应" />
@@ -440,7 +481,7 @@ function removeRefLine(i: number) {
     <section class="sty__sec">
       <h4 class="sty__sec-title">Legend</h4>
       <div class="sty__row sty__row--switch">
-        <span class="sty__label">显示图例</span>
+        <span class="sty__label">Visible</span>
         <IToggle v-model="legendShow" aria-label="显示图例" />
       </div>
       <div v-if="legendShow" class="sty__row">
@@ -523,6 +564,19 @@ function removeRefLine(i: number) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.sty__reset {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--is-radius-sm);
+  color: var(--is-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+}
+.sty__reset:hover {
+  background: var(--is-surface-hover);
+  color: var(--is-text);
 }
 .sty__row--switch {
   flex-direction: row;
