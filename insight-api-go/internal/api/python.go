@@ -138,3 +138,36 @@ func (s *Server) getPythonHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 	_, _ = w.Write(respBody)
 }
+
+func (s *Server) postPythonInstallPackages(w http.ResponseWriter, r *http.Request) {
+	url := pythonWorkerURL() + "/install-packages"
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, nil)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"ok": false, "packages": map[string]any{}, "missing": []any{},
+			"error": pythonWorkerUnreachableMessage(err),
+		})
+		return
+	}
+	client := &http.Client{Timeout: 10 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"ok": false, "packages": map[string]any{}, "missing": []any{},
+			"error": pythonWorkerUnreachableMessage(err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"ok": false, "packages": map[string]any{}, "missing": []any{},
+			"error": pythonWorkerUnreachableMessage(err),
+		})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(respBody)
+}

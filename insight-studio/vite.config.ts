@@ -17,7 +17,13 @@ export default defineConfig({
         changeOrigin: true,
       },
       // 同源代理 insight-api，公网隧道只需暴露前端端口；e2e 用 INSIGHT_API_ORIGIN 指向独立测试库
-      '/api': { target: process.env.INSIGHT_API_ORIGIN ?? 'http://127.0.0.1:8787', changeOrigin: true },
+      '/api': {
+        target: process.env.INSIGHT_API_ORIGIN ?? 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        // pip install rdkit 等可达数分钟；execute 上限 900s
+        timeout: 600_000,
+        proxyTimeout: 600_000,
+      },
       '/health': { target: process.env.INSIGHT_API_ORIGIN ?? 'http://127.0.0.1:8787', changeOrigin: true },
     },
   },

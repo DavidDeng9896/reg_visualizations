@@ -76,4 +76,27 @@ export function registerPythonRoutes(app: Hono): void {
       clearTimeout(timer)
     }
   })
+
+  app.post('/api/python/install-packages', async (c) => {
+    try {
+      const res = await fetch(`${workerBase()}/install-packages`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(600_000),
+      })
+      const text = await res.text()
+      c.header('Content-Type', res.headers.get('Content-Type') || 'application/json')
+      return c.body(text, res.status as 200)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return c.json(
+        {
+          ok: false,
+          packages: {},
+          missing: [],
+          error: `python worker unreachable: ${msg}`,
+        },
+        502,
+      )
+    }
+  })
 }

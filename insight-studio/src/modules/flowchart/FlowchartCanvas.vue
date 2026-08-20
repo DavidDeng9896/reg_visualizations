@@ -932,6 +932,12 @@ function minimapNodeColor(node: { data?: unknown }): string {
   min-width: 0;
   min-height: 0;
 }
+/* 详情栏自己管滚动；overflow:auto 会让内部 height:100% 的图表只撑到内容高度 */
+.flow-canvas__split:not(.flow-canvas__split--solo) :deep(.is-split__second) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .flow-canvas__split--solo :deep(.is-split__divider),
 .flow-canvas__split--solo :deep(.is-split__second) {
   display: none;

@@ -248,7 +248,7 @@ function onDelete() {
       </button>
     </header>
 
-    <div class="flow-detail__body">
+    <div class="flow-detail__body" :class="{ 'flow-detail__body--fill': showWidePreview }">
       <section v-if="isPythonChartNode" class="flow-detail__preview">
         <h4 class="flow-detail__section-title">Python chart</h4>
         <PlotlyArtifactPreview
@@ -451,16 +451,29 @@ function onDelete() {
   flex-direction: column;
   gap: 16px;
 }
+.flow-detail__body--fill {
+  overflow: hidden;
+}
 .flow-detail__preview {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.flow-detail__body--fill .flow-detail__preview :deep(.pap),
+.flow-detail__body--fill .flow-detail__preview :deep(.flow-chart-preview) {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 .flow-detail__meta {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 8px 16px;
   margin: 0;
+  flex-shrink: 0;
 }
 .flow-detail__meta--compact {
   padding-top: 2px;

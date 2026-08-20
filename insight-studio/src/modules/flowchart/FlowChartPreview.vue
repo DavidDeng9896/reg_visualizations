@@ -109,21 +109,32 @@ watch(
 
 <style scoped>
 .flow-chart-preview {
-  min-height: 240px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
 .flow-chart-preview__stage {
-  height: 320px;
-  min-height: 260px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius-sm);
   background: #fff;
   overflow: hidden;
 }
 .flow-chart-preview__chart {
+  flex: 1;
   width: 100%;
   height: 100%;
+  min-height: 0;
+}
+.flow-chart-preview__chart :deep(.chart-panel-wrap) {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 .flow-chart-preview__state {
   display: flex;

@@ -49,6 +49,8 @@ const option = computed<ChartOption | null>(() => {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  flex: 1;
+  min-height: 0;
 }
 .pap__name {
   font-size: var(--is-text-xs);
@@ -57,14 +59,24 @@ const option = computed<ChartOption | null>(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 .pap__chart {
-  height: 220px;
-  min-height: 160px;
+  flex: 1;
+  min-height: 220px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--is-border);
   border-radius: var(--is-radius-sm);
   overflow: hidden;
   background: #fff;
+}
+.pap__chart :deep(.chart-panel-wrap),
+.pap__chart :deep(.chart-panel) {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 .pap__empty {
   display: flex;

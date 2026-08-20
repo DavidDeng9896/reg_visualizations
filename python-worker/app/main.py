@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from app.executor import run_user_code
+from app.install import install_whitelist_packages
 from app.packages import health_payload, missing_packages
 
 
@@ -50,6 +51,12 @@ def execute(request: ExecuteRequest) -> dict[str, Any]:
     if request.limits is not None:
         timeout_sec = request.limits.timeoutSec
     return run_user_code(request.code, request.inputs, timeout_sec=timeout_sec)
+
+
+@app.post("/install-packages")
+def install_packages() -> dict:
+    """Only installs python-worker/requirements.txt. No extra package names."""
+    return install_whitelist_packages()
 
 
 if __name__ == "__main__":
