@@ -96,6 +96,8 @@ func (s *Server) routes() {
 	s.Mux.HandleFunc("DELETE /api/ai/memories/{id}", s.deleteMemory)
 
 	s.Mux.HandleFunc("POST /api/python/execute", s.postPythonExecute)
+	s.Mux.HandleFunc("GET /api/python/health", s.getPythonHealth)
+	s.Mux.HandleFunc("POST /api/python/install-packages", s.postPythonInstallPackages)
 }
 
 func withCORS(next http.Handler) http.Handler {

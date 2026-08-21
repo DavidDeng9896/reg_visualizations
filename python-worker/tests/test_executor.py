@@ -291,6 +291,56 @@ def test_health_payload_shape():
     )
 
 
+def test_available_packages_hint_install_when_missing(monkeypatch):
+    from app import packages as pkg
+
+    monkeypatch.setattr(pkg, "installed_packages", lambda names=None: {"pandas": "3.0.0"})
+    monkeypatch.setattr(pkg, "missing_packages", lambda names=None: ["rdkit"])
+    hint = pkg.available_packages_hint()
+    assert "pandas==3.0.0" in hint
+    assert "未安装：rdkit" in hint
+    assert "pip install -r requirements.txt" in hint
+
+
+def test_install_whitelist_skips_when_complete(monkeypatch):
+    from app import install as inst
+
+    monkeypatch.setattr(inst, "missing_packages", lambda: [])
+    monkeypatch.setattr(inst, "health_payload", lambda: {"ok": True, "packages": {"rdkit": "1"}, "missing": []})
+    out = inst.install_whitelist_packages()
+    assert out["installed"] is False
+    assert "无需安装" in out["message"]
+
+
+def test_install_whitelist_runs_pip(monkeypatch, tmp_path):
+    from app import install as inst
+    from types import SimpleNamespace
+
+    req = tmp_path / "requirements.txt"
+    req.write_text("rdkit==2024.9.6\n")
+    monkeypatch.setattr(inst, "REQUIREMENTS_FILE", req)
+    monkeypatch.setattr(inst, "missing_packages", lambda: ["rdkit"])
+    monkeypatch.setattr(
+        inst,
+        "health_payload",
+        lambda: {"ok": True, "packages": {"rdkit": "2024.9.6"}, "missing": []},
+    )
+
+    def fake_run(args, **_k):
+        assert "-r" in args
+        assert str(req) in args
+        # 只允许 pip install -r <requirements>，禁止把包名写进命令行
+        assert "rdkit" not in args
+        assert "evilpkg" not in args
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(inst.subprocess, "run", fake_run)
+    out = inst.install_whitelist_packages()
+    assert out["installed"] is True
+    assert out["pipOk"] is True
+    assert out["missingBefore"] == ["rdkit"]
+
+
 def test_statsmodels_optional():
     pytest.importorskip("statsmodels")
     try:

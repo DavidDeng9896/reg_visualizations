@@ -94,3 +94,53 @@ func TestPostPythonExecuteWorkerUnreachable(t *testing.T) {
 		t.Fatalf("expected start hint in message=%q", msg)
 	}
 }
+
+func TestGetPythonHealthProxiesToWorker(t *testing.T) {
+	worker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/health" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"packages":{"rdkit":"2024.9.6"},"missing":[]}`))
+	}))
+	t.Cleanup(worker.Close)
+	t.Setenv("PYTHON_WORKER_URL", worker.URL)
+
+	srv := newTestServer(t)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/python/health", nil)
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), `"rdkit"`) {
+		t.Fatalf("body=%s", rr.Body.String())
+	}
+}
+
+func TestPostPythonInstallPackagesProxiesToWorker(t *testing.T) {
+	var gotMethod, gotPath string
+	worker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"installed":true,"missing":[],"message":"白名单包已安装。"}`))
+	}))
+	t.Cleanup(worker.Close)
+	t.Setenv("PYTHON_WORKER_URL", worker.URL)
+
+	srv := newTestServer(t)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/python/install-packages", nil)
+	srv.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if gotMethod != http.MethodPost || gotPath != "/install-packages" {
+		t.Fatalf("worker %s %s", gotMethod, gotPath)
+	}
+	if !strings.Contains(rr.Body.String(), `"installed":true`) {
+		t.Fatalf("body=%s", rr.Body.String())
+	}
+}

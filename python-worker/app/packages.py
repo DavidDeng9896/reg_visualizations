@@ -49,9 +49,16 @@ def health_payload() -> dict:
     }
 
 
+INSTALL_HINT = "请在 python-worker 目录执行：python -m pip install -r requirements.txt 后重启 Worker。"
+
+
 def available_packages_hint() -> str:
     packages = installed_packages()
+    missing = missing_packages()
     if not packages:
-        return "当前 Worker 未探测到科学包。"
+        return f"当前 Worker 未探测到科学包。{INSTALL_HINT}"
     listing = ", ".join(f"{k}=={v}" for k, v in packages.items())
-    return f"当前可用包：{listing}"
+    parts = [f"当前可用包：{listing}"]
+    if missing:
+        parts.append(f"未安装：{', '.join(missing)}。{INSTALL_HINT}")
+    return " ".join(parts)

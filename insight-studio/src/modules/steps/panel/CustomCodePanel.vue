@@ -3,11 +3,11 @@
  * Custom Code 节点专用配置面板：代码编辑 + 输入预览 + 输出/日志 + AI 辅助。
  * 编辑态与预览态共用本组件，预览态传入 readonly 只读展示。
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AnalysisTable, StepNode } from '../../../shared/types'
 import { useAnalysisStore } from '../../../stores/analysisStore'
 import { storeToRefs } from 'pinia'
-import { IButton, IIcon, ISelect, type IconName, type SelectOption } from '../../../ui'
+import { IButton, IIcon, ISelect, toast, type IconName, type SelectOption } from '../../../ui'
 import { resolveStepInputs } from '../exec'
 import PythonEditor, { type PythonCompletionSource } from './PythonEditor.vue'
 import CustomCodeAiChat from './CustomCodeAiChat.vue'
@@ -313,6 +313,49 @@ watch(
     if (s === 'failed') activeTab.value = 'code'
   },
 )
+
+type WorkerHealth = { ok: boolean; missing: string[]; unreachable: boolean }
+const workerHealth = ref<WorkerHealth | null>(null)
+const installingPkgs = ref(false)
+
+async function refreshWorkerHealth() {
+  try {
+    const res = await fetch('/api/python/health')
+    const j = (await res.json()) as { ok?: boolean; missing?: unknown }
+    const missing = Array.isArray(j.missing) ? j.missing.filter((x): x is string => typeof x === 'string') : []
+    workerHealth.value = {
+      ok: res.ok && j.ok === true,
+      missing,
+      unreachable: !res.ok,
+    }
+  } catch {
+    workerHealth.value = { ok: false, missing: [], unreachable: true }
+  }
+}
+
+async function installWhitelistPackages() {
+  if (installingPkgs.value) return
+  installingPkgs.value = true
+  try {
+    const res = await fetch('/api/python/install-packages', { method: 'POST' })
+    const j = (await res.json()) as { ok?: boolean; error?: string; message?: string; missing?: string[] }
+    await refreshWorkerHealth()
+    if (res.ok && j.ok) {
+      toast.success(j.message || '白名单包已安装')
+    } else {
+      toast.error(j.error || j.message || '安装失败')
+    }
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : '安装失败')
+    await refreshWorkerHealth()
+  } finally {
+    installingPkgs.value = false
+  }
+}
+
+onMounted(() => {
+  void refreshWorkerHealth()
+})
 </script>
 
 <template>
@@ -322,6 +365,22 @@ watch(
       <span v-if="customCodeInputs.length" class="ccp__input-count">
         {{ customCodeInputs.length }} 个输入
       </span>
+      <p v-if="workerHealth && !workerHealth.ok" class="ccp__pkg-warn" role="status">
+        <template v-if="workerHealth.unreachable">Python Worker 未连接。请先启动 python-worker（./start.sh 会安装 rdkit）。</template>
+        <template v-else>
+          <template v-if="installingPkgs">正在安装白名单包，可能需要几分钟…</template>
+          <template v-else>Worker 未安装：{{ workerHealth.missing.join('、') || '科学包' }}。</template>
+          <IButton
+            size="sm"
+            variant="primary"
+            :loading="installingPkgs"
+            :disabled="installingPkgs"
+            @click="installWhitelistPackages"
+          >
+            {{ installingPkgs ? '安装中…' : '一键安装白名单包' }}
+          </IButton>
+        </template>
+      </p>
       <div class="ccp__status-actions">
         <IButton v-if="!readonly" size="sm" variant="ghost" @click="formatCode">格式化</IButton>
       </div>
@@ -559,6 +618,18 @@ watch(
 .ccp__input-count {
   font-size: 11px;
   color: var(--is-text-tertiary);
+}
+.ccp__pkg-warn {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--is-warning-text, #92400e);
 }
 .ccp__status-actions {
   margin-left: auto;

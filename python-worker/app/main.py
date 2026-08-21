@@ -2,15 +2,31 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from app.executor import run_user_code
-from app.packages import health_payload
+from app.install import install_whitelist_packages
+from app.packages import health_payload, missing_packages
 
-app = FastAPI(title="python-worker", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    missing = missing_packages()
+    if missing:
+        print(
+            "[python-worker] missing packages: "
+            + ", ".join(missing)
+            + ". Run: python -m pip install -r requirements.txt",
+            flush=True,
+        )
+    yield
+
+
+app = FastAPI(title="python-worker", version="0.1.0", lifespan=lifespan)
 
 
 class ExecuteLimits(BaseModel):
@@ -35,6 +51,12 @@ def execute(request: ExecuteRequest) -> dict[str, Any]:
     if request.limits is not None:
         timeout_sec = request.limits.timeoutSec
     return run_user_code(request.code, request.inputs, timeout_sec=timeout_sec)
+
+
+@app.post("/install-packages")
+def install_packages() -> dict:
+    """Only installs python-worker/requirements.txt. No extra package names."""
+    return install_whitelist_packages()
 
 
 if __name__ == "__main__":

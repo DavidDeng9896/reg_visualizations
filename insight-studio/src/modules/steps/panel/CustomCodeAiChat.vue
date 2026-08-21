@@ -5,12 +5,16 @@
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import { contentText, postChat, readSseStream, type ChatMessage } from '../../ai/client'
+import { capReasoningText } from '../../ai/contentScrub'
+import ReasoningCard from '../../ai/ReasoningCard.vue'
 import { pythonPackagesPromptList } from '../pythonPackages'
 import { IButton, IIcon } from '../../../ui'
 
 interface ChatMsg {
   role: 'user' | 'assistant'
   content: string
+  reasoning?: string
+  streaming?: boolean
 }
 
 interface MsgPart {
@@ -62,7 +66,7 @@ ${pythonPackagesPromptList()}
 
 ## 输出要求
 - 当用户要求修改代码时，用 \`\`\`python 代码块给出完整代码
-- 纯问答时简明回答
+- 纯问答时简明回答。不要在正文里输出「思考过程」标签；模型自带的 reasoning 会显示在思考卡中。
 ${props.lastError ? `\n## 最近一次执行错误\n${props.lastError}\n` : ''}
 ## 用户当前代码
 ${props.code || '（空）'}`
@@ -96,7 +100,7 @@ async function send(text: string) {
   if (!content || loading.value) return
   errorMsg.value = ''
   messages.value.push({ role: 'user', content })
-  messages.value.push({ role: 'assistant', content: '' })
+  messages.value.push({ role: 'assistant', content: '', reasoning: '', streaming: true })
   input.value = ''
   loading.value = true
   abort = new AbortController()
@@ -107,20 +111,30 @@ async function send(text: string) {
     ]
     const last = messages.value[messages.value.length - 1]
     const res = await postChat({ messages: history }, abort.signal)
-    const msg = await readSseStream(res, (t) => {
-      last.content += t
-      scrollBottom()
-    })
+    const msg = await readSseStream(
+      res,
+      (t) => {
+        last.content += t
+        scrollBottom()
+      },
+      (t) => {
+        last.reasoning = capReasoningText((last.reasoning ?? '') + t)
+        scrollBottom()
+      },
+    )
     const finalText = contentText(msg.content)
     if (finalText) last.content = finalText
-    if (!last.content.trim()) last.content = '（无返回内容）'
+    if (msg.reasoning) last.reasoning = capReasoningText(msg.reasoning)
+    if (!last.content.trim() && !last.reasoning?.trim()) last.content = '（无返回内容）'
+    last.streaming = false
   } catch (e) {
     const last = messages.value[messages.value.length - 1]
+    if (last) last.streaming = false
     if (e instanceof Error && e.name === 'AbortError') {
-      if (!last.content.trim()) last.content = '（已停止）'
+      if (!last?.content.trim() && !last?.reasoning?.trim() && last) last.content = '（已停止）'
     } else {
       errorMsg.value = e instanceof Error ? e.message : String(e)
-      if (last.role === 'assistant' && !last.content.trim()) messages.value.pop()
+      if (last?.role === 'assistant' && !last.content.trim() && !last.reasoning?.trim()) messages.value.pop()
     }
   } finally {
     loading.value = false
@@ -172,6 +186,11 @@ defineExpose({ ingestError })
         描述你要做的处理，AI 会基于当前代码与上游输入生成 Custom Code；生成后可「应用」整段替换或「插入到光标」。
       </div>
       <div v-for="(m, i) in messages" :key="i" class="ccc__msg" :class="`ccc__msg--${m.role}`">
+        <ReasoningCard
+          v-if="m.role === 'assistant' && m.reasoning"
+          :reasoning="m.reasoning"
+          :streaming="!!m.streaming && loading && i === messages.length - 1"
+        />
         <template v-for="(part, pi) in splitParts(m.content)" :key="pi">
           <div v-if="part.kind === 'text' && part.text.trim()" class="ccc__text">{{ part.text }}</div>
           <div v-else-if="part.kind === 'code'" class="ccc__codebox">
@@ -183,7 +202,7 @@ defineExpose({ ingestError })
           </div>
         </template>
       </div>
-      <div v-if="loading && lastMsg && !lastMsg.content" class="ccc__typing">正在生成…</div>
+      <div v-if="loading && lastMsg && !lastMsg.content && !lastMsg.reasoning" class="ccc__typing">思考中…</div>
     </div>
 
     <p v-if="errorMsg" class="ccc__err">{{ errorMsg }}</p>

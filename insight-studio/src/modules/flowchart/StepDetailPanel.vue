@@ -360,12 +360,12 @@ function onDelete() {
     </header>
 
     <!-- 预览态 -->
-    <div v-if="!editing" class="sdp__body">
+    <div v-if="!editing" class="sdp__body" :class="{ 'sdp__body--fill': isPythonChartNode || isChartNode }">
       <div v-if="metaChips.length" class="sdp__meta">
         <span v-for="chip in metaChips" :key="chip" class="sdp__chip">{{ chip }}</span>
       </div>
 
-      <section v-if="isPythonChartNode" class="sdp__preview sdp__preview--cc">
+      <section v-if="isPythonChartNode" class="sdp__preview sdp__preview--chart">
         <PlotlyArtifactPreview
           v-if="pythonChart"
           :name="pythonChart.name"
@@ -376,7 +376,7 @@ function onDelete() {
       </section>
 
       <!-- 图表视图预览 -->
-      <section v-else-if="isChartNode && node.viewId" class="sdp__preview">
+      <section v-else-if="isChartNode && node.viewId" class="sdp__preview sdp__preview--chart">
         <FlowChartPreview :table-id="node.tableId ?? ''" :view-id="node.viewId" @open="emit('open')" />
       </section>
 
@@ -590,6 +590,9 @@ function onDelete() {
   flex-direction: column;
   gap: 16px;
 }
+.sdp__body--fill {
+  overflow: hidden;
+}
 .sdp__body--editing {
   padding: 0;
 }
@@ -680,6 +683,22 @@ function onDelete() {
 .sdp__preview--cc {
   flex: 1;
   min-height: 420px;
+}
+.sdp__preview--chart {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sdp__preview--chart :deep(.pap),
+.sdp__preview--chart :deep(.flow-chart-preview) {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.sdp__preview--chart .sdp__readonly-hint {
+  flex-shrink: 0;
 }
 .sdp__preview-loading,
 .sdp__preview-error,
