@@ -51,15 +51,14 @@ Custom Code AI（`CustomCodeAiChat.vue`）目前是**单轮直调**：一次 `po
 
 ## 4. 架构
 
-### 4.1 Store 拆分
+### 4.1 Store 拆分（实现期修订：改为并行场景，不拆 aiStore）
 
-现 `aiStore.ts` 是「主会话场景 + 循环内核」的混合体。拆为：
+调研发现循环内核 `runAgent` 本就是 `agentLoop.ts` 里的独立纯函数（可注入 `postChatFn`/`exec`/`onEvent`），`aiStore` 只是「主会话场景」包装。拆分 `aiStore`（1076 行、与主会话 UI 深耦合）风险大于收益，故实施期改为：
 
-- **`agentCore`**（新文件 `ai/agentCore.ts`）：从 `aiStore` 抽出与「场景无关」的状态机：会话消息、`runAgent` 调度、续跑（`continueTask` / `maybeAutoContinue`）、`persist`、中止。参数化：`scope`（场景标识）、`systemComposer`（每轮 system 消息组装）、`toolset`（工具子集）、`conversationMeta`。
-- **`useAiStore`**：主会话保持原行为，改为基于 `agentCore` 的场景实例（迁移，不改行为）。
-- **`useCodeAiStore`**（新）：Custom Code 场景，`scope: { kind: 'custom-code', analysisId, stepId }`。
-
-> 若拆分成本过高（`aiStore` 与 UI 耦合深），退路：`aiStore` 内加 `scene` 参数双实例，Pinia 用 `defineStore(id, ...)` 动态 id 区分。评审时二选一。
+- **`useAiStore`**：完全不动，零回归。
+- **`useCodeAiStore`**（新文件 `ai/codeAiStore.ts`）：直接驱动 `runAgent` 的 Custom Code 场景。复用 `agentLoop` 全部既有机制（截断续写、stall/空转检测、`postChat` 退避重试、`AgentRunError` 检查点）；复用 `makeOnEvent`（从 aiStore 导出）聚合事件到 `UiMessage`。
+- 场景差异点集中在三处：`buildSystemPrompt`（代码契约 + 白名单 + 当前代码每轮重建）、工具集 `CODE_TOOLS`（仅 `run_python_code` + skill/记忆 4 个）、会话按 `stepId` 挂接。
+- `planGate: false`、`sweepFailedEmpty: false`：写代码场景无计划门禁，也不触发失败空节点清扫。
 
 ### 4.2 会话持久化扩展
 
@@ -113,7 +112,7 @@ Custom Code AI（`CustomCodeAiChat.vue`）目前是**单轮直调**：一次 `po
 | 阶段 | 内容 | 验收 |
 |------|------|------|
 | P1 止血 | `finish_reason` 修复 + 自动续写；现单轮实现先受益 | 长代码生成不再静默半截 |
-| P2 循环接入 | `agentCore` 拆分 + `useCodeAiStore`；`run_python_code` 工具 | AI 能写码→执行→自修，断了能续跑 |
+| P2 循环接入 | 新增 `useCodeAiStore` 并行场景（不动 aiStore）；`run_python_code` 工具 | AI 能写码→执行→自修，断了能续跑 |
 | P3 能力接入 | skill/记忆注入与工具；`stepId` 持久化 | 关面板重开对话还在；能用 skill |
 | P4 打磨 | 工具轨迹渲染、频控参数调优、提示微调 | 主观体验验收 |
 
@@ -125,11 +124,11 @@ Custom Code AI（`CustomCodeAiChat.vue`）目前是**单轮直调**：一次 `po
 - `run_python_code`：正常输出回传摘要；报错回传 `error`；超时；DataFrame 只回 shape。
 - `useCodeAiStore`：按 `(analysisId, stepId)` 复用/新建会话；续跑；停止（abort）。
 - 会话 API：`stepId` 过滤；无 `stepId` 的旧会话不受影响。
-- 回归：主会话行为不变（agentCore 拆分后原有用例全绿）。
+- 回归：主会话行为不变（aiStore 未动，原有用例全绿）。
 
 ## 8. 风险
 
-- **agentCore 拆分风险**：`aiStore` 与主会话 UI 耦合较深，拆分可能引入回归。缓解：迁移型重构 + 全量回归；备选双实例方案见 §4.1。
+- **场景间不一致**：两个 store 各维护一份会话/续跑逻辑，长期可能漂移。缓解：事件聚合（makeOnEvent）已共享；循环内核只在 `agentLoop` 一处。若后续主会话大改，再评估抽公共基座。
 - **上下文膨胀**：代码 + 执行日志多轮累积。缓解：沿用 `compressContext`；执行产物只回摘要。
 - **执行安全**：`run_python_code` 跑的是模型生成的代码。缓解：科研运行时已是沙箱（白名单、无网络、限时）；验证阶段 `draft` 不落图节点。
 - **模型能力**：小模型可能不会主动调 `run_python_code`。缓解：提示显式要求 + stall 检测兜底。
