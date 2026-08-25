@@ -110,21 +110,34 @@ async function send(text: string) {
       ...messages.value.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
     ]
     const last = messages.value[messages.value.length - 1]
-    const res = await postChat({ messages: history }, abort.signal)
-    const msg = await readSseStream(
-      res,
-      (t) => {
-        last.content += t
-        scrollBottom()
-      },
-      (t) => {
-        last.reasoning = capReasoningText((last.reasoning ?? '') + t)
-        scrollBottom()
-      },
-    )
-    const finalText = contentText(msg.content)
-    if (finalText) last.content = finalText
-    if (msg.reasoning) last.reasoning = capReasoningText(msg.reasoning)
+    // 输出被 max_tokens 截断（长代码写一半）时自动续写，上限 2 次。
+    const MAX_LENGTH_CONTINUES = 2
+    let acc = ''
+    let accReasoning = ''
+    for (let attempt = 0; ; attempt += 1) {
+      const res = await postChat({ messages: history }, abort.signal)
+      const msg = await readSseStream(
+        res,
+        (t) => {
+          last.content += t
+          scrollBottom()
+        },
+        (t) => {
+          last.reasoning = capReasoningText((last.reasoning ?? '') + t)
+          scrollBottom()
+        },
+      )
+      acc += contentText(msg.content)
+      last.content = acc
+      if (msg.reasoning) accReasoning += (accReasoning ? '\n' : '') + msg.reasoning
+      if (msg.finishReason !== 'length' || attempt >= MAX_LENGTH_CONTINUES) break
+      history.push({ role: 'assistant', content: acc })
+      history.push({
+        role: 'system',
+        content: '（上一条输出因长度限制被截断。请从截断处继续输出剩余内容，不要重复已输出的部分，不要加任何说明。）',
+      })
+    }
+    if (accReasoning) last.reasoning = capReasoningText(accReasoning)
     if (!last.content.trim() && !last.reasoning?.trim()) last.content = '（无返回内容）'
     last.streaming = false
   } catch (e) {

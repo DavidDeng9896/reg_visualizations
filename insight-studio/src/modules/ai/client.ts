@@ -215,25 +215,31 @@ export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
   return out
 }
 
+/** SSE 流结束原因：'length' 表示被 max_tokens 截断（需要续写）。 */
+export type SseFinishReason = 'stop' | 'length' | 'tool_calls' | string
+
 /**
  * 解析 OpenAI SSE 流：逐 chunk 回调 delta 文本与 tool_calls 增量，
- * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文）。
+ * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文与 finishReason）。
  */
 export async function readSseStream(
   res: Response,
   onToken?: (text: string) => void,
   onReasoningToken?: (text: string) => void,
-): Promise<ChatMessage & { reasoning?: string }> {
+): Promise<ChatMessage & { reasoning?: string; finishReason?: SseFinishReason }> {
   if (!res.body) throw new Error('响应无流式内容')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let content = ''
   let reasoning = ''
+  let finishReason: SseFinishReason | undefined
   const calls = new Map<number, ToolCall>()
 
   function applyChunk(chunk: SseChunk): void {
-    const delta = chunk.choices?.[0]?.delta
+    const choice = chunk.choices?.[0]
+    if (choice?.finish_reason) finishReason = choice.finish_reason
+    const delta = choice?.delta
     if (!delta) return
     if (delta.content) {
       content += delta.content
@@ -299,6 +305,7 @@ export async function readSseStream(
     content: content || null,
     ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
     ...(reasoning ? { reasoning } : {}),
+    ...(finishReason ? { finishReason } : {}),
   }
 }
 
