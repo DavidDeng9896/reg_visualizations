@@ -496,6 +496,8 @@ export function sanitizeModelError(raw: string): string {
 export interface ConversationMeta {
   id: string
   analysisId: string | null
+  /** Custom Code 步骤会话：挂到步骤上。 */
+  stepId?: string | null
   title: string
   createdAt: string
   updatedAt: string
@@ -506,9 +508,14 @@ export interface ConversationDoc extends ConversationMeta {
 }
 
 export const aiConvApi = {
-  list: () => req<ConversationMeta[]>('/api/ai/conversations', undefined, { withUser: true }),
+  list: (stepId?: string) =>
+    req<ConversationMeta[]>(
+      stepId ? `/api/ai/conversations?stepId=${encodeURIComponent(stepId)}` : '/api/ai/conversations',
+      undefined,
+      { withUser: true },
+    ),
   get: (id: string) => req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, undefined, { withUser: true }),
-  create: (body: { analysisId?: string | null; title?: string; messages?: unknown[] }) =>
+  create: (body: { analysisId?: string | null; stepId?: string | null; title?: string; messages?: unknown[] }) =>
     req<ConversationDoc>('/api/ai/conversations', { method: 'POST', body: JSON.stringify(body) }, { withUser: true }),
   update: (id: string, body: { title?: string; messages?: unknown[]; analysisId?: string | null }) =>
     req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, { withUser: true }),

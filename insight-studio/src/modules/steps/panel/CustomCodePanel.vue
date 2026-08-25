@@ -584,6 +584,7 @@ onMounted(() => {
       >
         <CustomCodeAiChat
           ref="aiChatRef"
+          :step-id="step.id"
           :code="customCodeCfg.code"
           :inputs-summary="customCodeInputsSummary"
           :last-error="step.error"

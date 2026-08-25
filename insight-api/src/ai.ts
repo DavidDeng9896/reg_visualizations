@@ -67,6 +67,7 @@ interface ChatPayload {
 interface ConversationRow {
   id: string
   analysis_id: string | null
+  step_id: string | null
   title: string
   created_at: string
   updated_at: string
@@ -76,6 +77,7 @@ interface ConversationRow {
 export interface ConversationDoc {
   id: string
   analysisId: string | null
+  stepId: string | null
   title: string
   createdAt: string
   updatedAt: string
@@ -86,6 +88,7 @@ function rowToDoc(r: ConversationRow): ConversationDoc {
   return {
     id: r.id,
     analysisId: r.analysis_id,
+    stepId: r.step_id ?? null,
     title: r.title,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -100,6 +103,7 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
     CREATE TABLE IF NOT EXISTS ai_conversations (
       id TEXT PRIMARY KEY,
       analysis_id TEXT,
+      step_id TEXT,
       title TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -107,6 +111,13 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
     );
     CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations(updated_at DESC);
   `)
+  // 旧库迁移：补 step_id 列与索引（幂等）
+  try {
+    store.db.prepare('SELECT step_id FROM ai_conversations LIMIT 1').get()
+  } catch {
+    store.db.exec('ALTER TABLE ai_conversations ADD COLUMN step_id TEXT')
+  }
+  store.db.exec('CREATE INDEX IF NOT EXISTS ai_conv_step ON ai_conversations(step_id)')
 
   /* ---- 配置 ---- */
   app.get('/api/ai/config', (c) => {
@@ -187,26 +198,32 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
 
   /* ---- 会话 CRUD ---- */
   app.get('/api/ai/conversations', (c) => {
-    const rows = store.db
-      .prepare('SELECT id, analysis_id, title, created_at, updated_at FROM ai_conversations ORDER BY updated_at DESC LIMIT 100')
-      .all() as Omit<ConversationRow, 'messages'>[]
-    return c.json(rows.map((r) => ({ id: r.id, analysisId: r.analysis_id, title: r.title, createdAt: r.created_at, updatedAt: r.updated_at })))
+    const stepId = c.req.query('stepId')
+    const rows = stepId
+      ? (store.db
+          .prepare('SELECT id, analysis_id, step_id, title, created_at, updated_at FROM ai_conversations WHERE step_id = ? ORDER BY updated_at DESC')
+          .all(stepId) as Omit<ConversationRow, 'messages'>[])
+      : (store.db
+          .prepare('SELECT id, analysis_id, step_id, title, created_at, updated_at FROM ai_conversations ORDER BY updated_at DESC LIMIT 100')
+          .all() as Omit<ConversationRow, 'messages'>[])
+    return c.json(rows.map((r) => ({ id: r.id, analysisId: r.analysis_id, stepId: r.step_id ?? null, title: r.title, createdAt: r.created_at, updatedAt: r.updated_at })))
   })
 
   app.post('/api/ai/conversations', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { analysisId?: string; title?: string; messages?: unknown[] }
+    const body = (await c.req.json().catch(() => ({}))) as { analysisId?: string; stepId?: string; title?: string; messages?: unknown[] }
     const now = new Date().toISOString()
     const doc: ConversationDoc = {
       id: randomUUID(),
       analysisId: typeof body.analysisId === 'string' ? body.analysisId : null,
+      stepId: typeof body.stepId === 'string' ? body.stepId : null,
       title: typeof body.title === 'string' ? body.title : '新会话',
       createdAt: now,
       updatedAt: now,
       messages: Array.isArray(body.messages) ? body.messages : [],
     }
     store.db
-      .prepare('INSERT INTO ai_conversations (id, analysis_id, title, created_at, updated_at, messages) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(doc.id, doc.analysisId, doc.title, doc.createdAt, doc.updatedAt, JSON.stringify(doc.messages))
+      .prepare('INSERT INTO ai_conversations (id, analysis_id, step_id, title, created_at, updated_at, messages) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(doc.id, doc.analysisId, doc.stepId, doc.title, doc.createdAt, doc.updatedAt, JSON.stringify(doc.messages))
     return c.json(doc, 201)
   })
 
