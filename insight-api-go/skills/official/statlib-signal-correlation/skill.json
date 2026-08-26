@@ -1,0 +1,7 @@
+{
+  "id": "statlib-signal-correlation",
+  "name": "statlib 信号处理与相关",
+  "version": "1.0.0",
+  "description": "样条/LOWESS平滑·求导积分·曲线下面积·相关分析·复孔行统计：按意图与数据形状选方法、设参数、写 Custom Code 调 statlib",
+  "tags": ["statlib", "statistics", "custom-code", "signal", "correlation", "auc"]
+}

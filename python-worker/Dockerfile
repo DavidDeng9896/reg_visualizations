@@ -14,6 +14,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+# statlib: AI 统计分析算法库（20 个纯计算方法），custom_code 可 `import statlib`
+COPY statlib ./statlib
 
 EXPOSE 8091
 

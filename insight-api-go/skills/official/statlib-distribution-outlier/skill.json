@@ -1,0 +1,7 @@
+{
+  "id": "statlib-distribution-outlier",
+  "name": "statlib 分布形态与离群诊断",
+  "version": "1.0.0",
+  "description": "描述统计/正态性/频数分布/离群点检测：按意图与数据形状选方法、设参数、写 Custom Code 调 statlib",
+  "tags": ["statlib", "statistics", "custom-code", "distribution", "normality", "outlier"]
+}

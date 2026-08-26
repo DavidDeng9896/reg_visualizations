@@ -1,0 +1,7 @@
+{
+  "id": "statlib-classifier-agreement",
+  "name": "statlib 分类器与一致性",
+  "version": "1.0.0",
+  "description": "ROC曲线判别能力评估 / Bland-Altman 两种方法一致性：按意图与数据形状选方法、写 Custom Code 调 statlib",
+  "tags": ["statlib", "statistics", "custom-code", "roc", "bland-altman", "agreement"]
+}

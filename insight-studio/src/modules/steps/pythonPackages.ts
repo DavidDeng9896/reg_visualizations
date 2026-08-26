@@ -15,6 +15,9 @@ export const PYTHON_SCIENTIFIC_PACKAGES = [
   'pyarrow',
   'openpyxl',
   'pydantic',
+  // statlib 依赖（组间比较非参 / 事后检验）
+  'pingouin',
+  'scikit-posthocs',
 ] as const
 
 export type PythonScientificPackage = (typeof PYTHON_SCIENTIFIC_PACKAGES)[number]

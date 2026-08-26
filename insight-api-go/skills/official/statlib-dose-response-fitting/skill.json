@@ -1,0 +1,7 @@
+{
+  "id": "statlib-dose-response-fitting",
+  "name": "statlib 剂量反应与曲线拟合",
+  "version": "1.0.0",
+  "description": "S形剂量反应/线性/逻辑/Deming/标准曲线反算：按意图与数据形状选模型、设权重稳健项、写 Custom Code 调 statlib",
+  "tags": ["statlib", "statistics", "custom-code", "curve-fitting", "ic50"]
+}
