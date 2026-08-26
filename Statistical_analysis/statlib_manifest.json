@@ -1,0 +1,737 @@
+{
+  "name": "statlib",
+  "version": "1.0.0",
+  "description": "AI 统计分析算法库：20 个方法，纯计算、JSON 可序列化、固定种子可复现",
+  "integration": {
+    "entry": "import statlib; result = statlib.run(method, params, data)",
+    "result_schema": "{\"method\", \"stats\": {..., \"interpretation\": str}, \"params\", \"data\"}",
+    "available_methods": "statlib.available()"
+  },
+  "methods": [
+    {
+      "method": "nonlinear_regression",
+      "module": "statlib.xy_nonlinear",
+      "doc": "曲线拟合（4PL/5PL/MM/指数衰减），提取 IC50/Vmax/Km",
+      "skill": "stat-nonlinear-regression",
+      "dependencies": [
+        "lmfit",
+        "scipy",
+        "statsmodels"
+      ],
+      "params": {
+        "model": {
+          "default": "four_pl",
+          "description": "模型: four_pl/three_pl/five_pl/mm/exp_decay",
+          "regenerates_data": false
+        },
+        "weighting": {
+          "default": "equal",
+          "description": "权重: equal/1/y/1/y2/y/y2",
+          "regenerates_data": false
+        },
+        "robust": {
+          "default": false,
+          "description": "稳健回归 soft_l1",
+          "regenerates_data": false
+        },
+        "compare": {
+          "default": false,
+          "description": "是否输出 AICc 模型比较表",
+          "regenerates_data": false
+        },
+        "data:n_points": {
+          "default": 9,
+          "description": "浓度点数",
+          "regenerates_data": true
+        },
+        "data:reps": {
+          "default": 3,
+          "description": "复孔数",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_nonlinear.py",
+      "call_example": "import statlib; result = statlib.run(\"nonlinear_regression\", params, data)"
+    },
+    {
+      "method": "linear_regression",
+      "module": "statlib.xy_linear",
+      "doc": "简单线性回归 Y=a+bX",
+      "skill": "stat-linear-regression",
+      "dependencies": [
+        "statsmodels",
+        "numpy"
+      ],
+      "params": {
+        "force_zero": {
+          "default": false,
+          "description": "强制过原点",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 20,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:slope": {
+          "default": 1.2,
+          "description": "真实斜率",
+          "regenerates_data": true
+        },
+        "data:noise": {
+          "default": 1.5,
+          "description": "噪声SD",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_linear.py",
+      "call_example": "import statlib; result = statlib.run(\"linear_regression\", params, data)"
+    },
+    {
+      "method": "logistic_regression",
+      "module": "statlib.xy_logistic",
+      "doc": "S 形剂量-反应 4PL/5PL + 二分类概率",
+      "skill": "stat-logistic-regression",
+      "dependencies": [
+        "lmfit",
+        "numpy"
+      ],
+      "params": {
+        "five_pl": {
+          "default": false,
+          "description": "是否用5PL",
+          "regenerates_data": false
+        },
+        "data:n_points": {
+          "default": 9,
+          "description": "浓度点数",
+          "regenerates_data": true
+        },
+        "data:reps": {
+          "default": 4,
+          "description": "复孔数",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_logistic.py",
+      "call_example": "import statlib; result = statlib.run(\"logistic_regression\", params, data)"
+    },
+    {
+      "method": "spline_lowess",
+      "module": "statlib.xy_spline",
+      "doc": "样条/LOWESS 平滑拟合",
+      "skill": "stat-spline-lowess",
+      "dependencies": [
+        "scipy",
+        "statsmodels"
+      ],
+      "params": {
+        "k": {
+          "default": 3,
+          "description": "样条阶数",
+          "regenerates_data": false
+        },
+        "smooth": {
+          "default": 3.0,
+          "description": "样条平滑度",
+          "regenerates_data": false
+        },
+        "frac": {
+          "default": 0.25,
+          "description": "LOWESS窗口比例",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 40,
+          "description": "点数",
+          "regenerates_data": true
+        },
+        "data:shape": {
+          "default": "sin",
+          "description": "数据形状",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_spline.py",
+      "call_example": "import statlib; result = statlib.run(\"spline_lowess\", params, data)"
+    },
+    {
+      "method": "smooth_deriv_integrate",
+      "module": "statlib.xy_smooth",
+      "doc": "Savitzky-Golay 平滑/求导/积分",
+      "skill": "stat-smooth-deriv-integrate",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "window": {
+          "default": 21,
+          "description": "S-G窗口(奇数)",
+          "regenerates_data": false
+        },
+        "polyorder": {
+          "default": 3,
+          "description": "多项式阶",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 200,
+          "description": "采样点数",
+          "regenerates_data": true
+        },
+        "data:shape": {
+          "default": "peaks",
+          "description": "信号形状",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_smooth.py",
+      "call_example": "import statlib; result = statlib.run(\"smooth_deriv_integrate\", params, data)"
+    },
+    {
+      "method": "auc",
+      "module": "statlib.xy_auc",
+      "doc": "曲线下面积（梯形法则+基线扣除）",
+      "skill": "stat-auc",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "baseline": {
+          "default": "zero",
+          "description": "基线: zero/first/last",
+          "regenerates_data": false
+        },
+        "logx": {
+          "default": false,
+          "description": "X对数化",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 20,
+          "description": "点数",
+          "regenerates_data": true
+        },
+        "data:shape": {
+          "default": "pk",
+          "description": "曲线类型",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_auc.py",
+      "call_example": "import statlib; result = statlib.run(\"auc\", params, data)"
+    },
+    {
+      "method": "deming_regression",
+      "module": "statlib.xy_deming",
+      "doc": "Deming 回归（X/Y 均有误差）",
+      "skill": "stat-deming-regression",
+      "dependencies": [
+        "numpy",
+        "scipy"
+      ],
+      "params": {
+        "lambda_source": {
+          "default": "true",
+          "description": "λ来源: true(数据)/manual",
+          "regenerates_data": false
+        },
+        "lam_manual": {
+          "default": 1.0,
+          "description": "手动λ",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 25,
+          "description": "样本量",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_deming.py",
+      "call_example": "import statlib; result = statlib.run(\"deming_regression\", params, data)"
+    },
+    {
+      "method": "row_statistics",
+      "module": "statlib.xy_rowstats",
+      "doc": "行统计（复孔均值/SD/SEM/CV）",
+      "skill": "stat-row-statistics",
+      "dependencies": [
+        "numpy"
+      ],
+      "params": {
+        "data:n_rows": {
+          "default": 12,
+          "description": "行数",
+          "regenerates_data": true
+        },
+        "data:n_reps": {
+          "default": 3,
+          "description": "复孔数",
+          "regenerates_data": true
+        },
+        "data:trend": {
+          "default": 0.8,
+          "description": "行间趋势",
+          "regenerates_data": true
+        },
+        "data:noise": {
+          "default": 0.8,
+          "description": "噪声SD",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_rowstats.py",
+      "call_example": "import statlib; result = statlib.run(\"row_statistics\", params, data)"
+    },
+    {
+      "method": "correlation",
+      "module": "statlib.xy_correlation",
+      "doc": "相关分析 Pearson/Spearman/Kendall",
+      "skill": "stat-correlation",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "method": {
+          "default": "pearson",
+          "description": "方法: pearson/spearman/kendall",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 60,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:rho": {
+          "default": 0.7,
+          "description": "真实相关",
+          "regenerates_data": true
+        },
+        "data:monotone": {
+          "default": false,
+          "description": "单调非线性",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_correlation.py",
+      "call_example": "import statlib; result = statlib.run(\"correlation\", params, data)"
+    },
+    {
+      "method": "standard_curve_interpolation",
+      "module": "statlib.xy_interpolate",
+      "doc": "标准曲线反算浓度",
+      "skill": "stat-standard-curve-interpolation",
+      "dependencies": [
+        "lmfit",
+        "numpy"
+      ],
+      "params": {
+        "fit_model": {
+          "default": "4pl",
+          "description": "标准曲线模型: 4pl/linear",
+          "regenerates_data": false
+        },
+        "data:n_std": {
+          "default": 8,
+          "description": "标准品点数",
+          "regenerates_data": true
+        },
+        "data:noise": {
+          "default": 2.0,
+          "description": "噪声SD",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/xy_interpolate.py",
+      "call_example": "import statlib; result = statlib.run(\"standard_curve_interpolation\", params, data)"
+    },
+    {
+      "method": "t_test",
+      "module": "statlib.col_ttests",
+      "doc": "t 检验（含 Shapiro 预检决策）",
+      "skill": "stat-t-test",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "design": {
+          "default": "unpaired",
+          "description": "设计: unpaired/paired/onesample",
+          "regenerates_data": false
+        },
+        "gauss": {
+          "default": "auto",
+          "description": "正态假设: auto/yes/no",
+          "regenerates_data": false
+        },
+        "equal_var": {
+          "default": "welch",
+          "description": "非配对方差: welch/equal",
+          "regenerates_data": false
+        },
+        "tail": {
+          "default": 2,
+          "description": "尾: 2双尾/1单尾",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 12,
+          "description": "每组样本量",
+          "regenerates_data": true
+        },
+        "data:mu_ctrl": {
+          "default": 20,
+          "description": "对照均值",
+          "regenerates_data": true
+        },
+        "data:mu_trt": {
+          "default": 28,
+          "description": "处理均值",
+          "regenerates_data": true
+        },
+        "data:sd": {
+          "default": 5,
+          "description": "SD",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_ttests.py",
+      "call_example": "import statlib; result = statlib.run(\"t_test\", params, data)"
+    },
+    {
+      "method": "anova",
+      "module": "statlib.col_anova",
+      "doc": "单因素 ANOVA + 事后检验",
+      "skill": "stat-anova",
+      "dependencies": [
+        "scipy",
+        "statsmodels",
+        "pingouin",
+        "scikit-posthocs",
+        "pandas"
+      ],
+      "params": {
+        "approach": {
+          "default": "auto",
+          "description": "路径: auto/param/nonparam",
+          "regenerates_data": false
+        },
+        "posthoc": {
+          "default": "tukey",
+          "description": "事后: tukey/dunnett/bonf",
+          "regenerates_data": false
+        },
+        "data:k": {
+          "default": 4,
+          "description": "组数",
+          "regenerates_data": true
+        },
+        "data:n": {
+          "default": 8,
+          "description": "每组样本量",
+          "regenerates_data": true
+        },
+        "data:effect": {
+          "default": 4.0,
+          "description": "组间效应",
+          "regenerates_data": true
+        },
+        "data:hetero": {
+          "default": false,
+          "description": "方差不齐",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_anova.py",
+      "call_example": "import statlib; result = statlib.run(\"anova\", params, data)"
+    },
+    {
+      "method": "one_sample_test",
+      "module": "statlib.col_onesample",
+      "doc": "单样本检验 vs 理论值",
+      "skill": "stat-one-sample-test",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "approach": {
+          "default": "auto",
+          "description": "auto/t/w",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 18,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:mu_true": {
+          "default": 12,
+          "description": "真实均值",
+          "regenerates_data": true
+        },
+        "data:mu0": {
+          "default": 10,
+          "description": "理论值",
+          "regenerates_data": true
+        },
+        "data:skewed": {
+          "default": false,
+          "description": "偏态数据",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_onesample.py",
+      "call_example": "import statlib; result = statlib.run(\"one_sample_test\", params, data)"
+    },
+    {
+      "method": "descriptive_statistics",
+      "module": "statlib.col_descriptive",
+      "doc": "描述统计",
+      "skill": "stat-descriptive-statistics",
+      "dependencies": [
+        "numpy",
+        "scipy"
+      ],
+      "params": {
+        "data:n": {
+          "default": 80,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:sd": {
+          "default": 3.0,
+          "description": "SD",
+          "regenerates_data": true
+        },
+        "data:shape": {
+          "default": "normal",
+          "description": "分布: normal/lognorm/bimodal/uniform",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_descriptive.py",
+      "call_example": "import statlib; result = statlib.run(\"descriptive_statistics\", params, data)"
+    },
+    {
+      "method": "normality_test",
+      "module": "statlib.col_normality",
+      "doc": "正态性检验",
+      "skill": "stat-normality-test",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "shapiro": {
+          "default": true,
+          "description": "启用Shapiro",
+          "regenerates_data": false
+        },
+        "dagostino": {
+          "default": true,
+          "description": "启用D'Agostino",
+          "regenerates_data": false
+        },
+        "ks": {
+          "default": true,
+          "description": "启用KS",
+          "regenerates_data": false
+        },
+        "test_lognorm": {
+          "default": false,
+          "description": "对数正态检验",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 40,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:dist": {
+          "default": "normal",
+          "description": "真实分布",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_normality.py",
+      "call_example": "import statlib; result = statlib.run(\"normality_test\", params, data)"
+    },
+    {
+      "method": "frequency_distribution",
+      "module": "statlib.col_frequency",
+      "doc": "频数分布",
+      "skill": "stat-frequency-distribution",
+      "dependencies": [
+        "numpy"
+      ],
+      "params": {
+        "bin_method": {
+          "default": "sqrt",
+          "description": "分箱: sqrt/rice/manual",
+          "regenerates_data": false
+        },
+        "n_bins": {
+          "default": 15,
+          "description": "手动箱数",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 120,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:shape": {
+          "default": "normal",
+          "description": "分布形状",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_frequency.py",
+      "call_example": "import statlib; result = statlib.run(\"frequency_distribution\", params, data)"
+    },
+    {
+      "method": "roc_curve",
+      "module": "statlib.col_roc",
+      "doc": "ROC 曲线 + Youden 阈值",
+      "skill": "stat-roc-curve",
+      "dependencies": [
+        "scikit-learn",
+        "numpy"
+      ],
+      "params": {
+        "data:n_case": {
+          "default": 60,
+          "description": "病例数",
+          "regenerates_data": true
+        },
+        "data:n_ctrl": {
+          "default": 60,
+          "description": "对照数",
+          "regenerates_data": true
+        },
+        "data:dprime": {
+          "default": 1.5,
+          "description": "分离度",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_roc.py",
+      "call_example": "import statlib; result = statlib.run(\"roc_curve\", params, data)"
+    },
+    {
+      "method": "bland_altman",
+      "module": "statlib.col_blandaltman",
+      "doc": "Bland-Altman 一致性",
+      "skill": "stat-bland-altman",
+      "dependencies": [
+        "scipy"
+      ],
+      "params": {
+        "data:n": {
+          "default": 50,
+          "description": "样本数",
+          "regenerates_data": true
+        },
+        "data:bias": {
+          "default": 1.2,
+          "description": "系统偏倚",
+          "regenerates_data": true
+        },
+        "data:ratio": {
+          "default": 1.05,
+          "description": "比例因子",
+          "regenerates_data": true
+        },
+        "data:noise": {
+          "default": 1.5,
+          "description": "随机误差SD",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_blandaltman.py",
+      "call_example": "import statlib; result = statlib.run(\"bland_altman\", params, data)"
+    },
+    {
+      "method": "outlier_detection",
+      "module": "statlib.col_outliers",
+      "doc": "离群点检测 IQR/Grubbs/ROUT",
+      "skill": "stat-outlier-detection",
+      "dependencies": [
+        "scipy",
+        "statsmodels"
+      ],
+      "params": {
+        "method": {
+          "default": "grubbs",
+          "description": "方法: iqr/grubbs/rout",
+          "regenerates_data": false
+        },
+        "alpha": {
+          "default": 0.05,
+          "description": "α/Q值",
+          "regenerates_data": false
+        },
+        "data:n": {
+          "default": 30,
+          "description": "样本量",
+          "regenerates_data": true
+        },
+        "data:n_out": {
+          "default": 2,
+          "description": "注入离群点数",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_outliers.py",
+      "call_example": "import statlib; result = statlib.run(\"outlier_detection\", params, data)"
+    },
+    {
+      "method": "p_value_stack",
+      "module": "statlib.col_stackpvals",
+      "doc": "P 值堆栈 + 多重比较校正",
+      "skill": "stat-p-value-stack",
+      "dependencies": [
+        "scipy",
+        "statsmodels"
+      ],
+      "params": {
+        "test": {
+          "default": "t",
+          "description": "检验: t/mw",
+          "regenerates_data": false
+        },
+        "correction": {
+          "default": "fdr_bh",
+          "description": "校正: fdr_bh/holm/bonferroni/none",
+          "regenerates_data": false
+        },
+        "fdr": {
+          "default": 0.05,
+          "description": "显著阈值",
+          "regenerates_data": false
+        },
+        "data:n_genes": {
+          "default": 100,
+          "description": "基因数",
+          "regenerates_data": true
+        },
+        "data:n": {
+          "default": 8,
+          "description": "每组样本量",
+          "regenerates_data": true
+        },
+        "data:prop_de": {
+          "default": 0.15,
+          "description": "真差异比例",
+          "regenerates_data": true
+        },
+        "data:effect": {
+          "default": 2.2,
+          "description": "效应量",
+          "regenerates_data": true
+        }
+      },
+      "reference_page": "pages/col_stackpvals.py",
+      "call_example": "import statlib; result = statlib.run(\"p_value_stack\", params, data)"
+    }
+  ]
+}

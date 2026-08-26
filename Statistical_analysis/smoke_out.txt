@@ -1,0 +1,32 @@
+FAIL xy_nonlinear case#3: OverflowError(34, 'Result too large')
+Traceback (most recent call last):
+  File "D:\david\git\statistical_analysis\smoke_test.py", line 69, in check_module
+    fig, stats = m.analyze(data, p)
+                 ^^^^^^^^^^^^^^^^^^
+  File "D:\david\git\statistical_analysis\pages\xy_nonlinear.py", line 421, in analyze
+    interp_txt.append(f"IC₅₀ = {ic50:.3g}" + (f"（95% CI {10 ** hi:.3g} ~ {10 ** lo:.3g}）" if lo is not None else ""))
+                                                          ~~~^^~~~
+OverflowError: (34, 'Result too large')
+
+OK   xy_linear (2 cases)
+OK   xy_logistic (1 cases)
+OK   xy_spline (1 cases)
+OK   xy_smooth (1 cases)
+OK   xy_auc (1 cases)
+OK   xy_deming (1 cases)
+OK   xy_rowstats (1 cases)
+OK   xy_correlation (1 cases)
+OK   xy_interpolate (1 cases)
+OK   col_ttests (5 cases)
+OK   col_anova (5 cases)
+OK   col_onesample (1 cases)
+OK   col_descriptive (1 cases)
+OK   col_normality (2 cases)
+OK   col_frequency (2 cases)
+OK   col_roc (2 cases)
+OK   col_blandaltman (2 cases)
+OK   col_outliers (3 cases)
+OK   col_stackpvals (3 cases)
+--------------------------------------------------
+总计 20 个页面 / 41 个用例
+❌ 1 个用例失败
