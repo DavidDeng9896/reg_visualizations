@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "ts": "2026-09-02T06:24:30.529Z",
+      "id": "worker-disconnected",
+      "status": "ok",
+      "note": "未连接文案正确",
+      "preview": "Python Worker 未连接。请先启动 python-worker（./start.sh 会安装 rdkit）。"
+    },
+    {
+      "ts": "2026-09-02T06:24:32.387Z",
+      "id": "worker-connected",
+      "status": "ok",
+      "note": "Worker 恢复后警告消失",
+      "analysisUrl": "http://127.0.0.1:7100/analysis/1ccf285d-abf4-4e73-9967-3d62932d2f88"
+    },
+    {
+      "ts": "2026-09-02T06:24:47.157Z",
+      "id": "ccp-ai-generate",
+      "status": "fail",
+      "note": "生成/应用/输出未全部满足",
+      "elapsed": 3916,
+      "thinkingLeak": true,
+      "preview": "AI 助手\n读取 inputs[0] 的表，新增列 v2 = v*2，输出表名 doubled。只返回 Python 代码，用 \n包裹完整 custom_code 函数。\n应用\n插入到光标\n<think>\n用户想要我编写一个 custom_code 函数，读取 inputs[0] 的表，新增列 v2 = v*2，输出表名 doubled。\n</think>\n\n\nfrom io import BytesIO\nimport pandas as pd\nfrom typing import NamedTuple\nimport plotly.graph_objects as go\n\nclass IOData(NamedTuple):\n    name: str\n    data: BytesIO | pd.DataFrame | go.Figure\n\ndef custom_code(inputs: list[IOData], **kwargs) -> list[IOData]:\n    df = inputs[0].data.copy()\n    df['v2'] = df['v'] * 2\n    return [IOData(name=\"doubled\", data=df)]\n应用\n插入到光标\n发送"
+    },
+    {
+      "ts": "2026-09-02T06:24:47.157Z",
+      "id": "ux-thinking-leak-ccp",
+      "status": "info",
+      "note": "Custom Code AI 正文中出现 thinking 标签"
+    },
+    {
+      "ts": "2026-09-02T06:24:58.330Z",
+      "id": "ccp-ai-fix-error",
+      "status": "partial",
+      "note": "AI 给出修复但步骤仍有错误",
+      "preview": "AI 助手\n读取 inputs[0] 的表，新增列 v2 = v*2，输出表名 doubled。只返回 Python 代码，用 \n包裹完整 custom_code 函数。\n应用\n插入到光标\n<think>\n用户想要我编写一个 custom_code 函数，读取 inputs[0] 的表，新增列 v2 = v*2，输出表名 doubled。\n</think>\n\n\nfrom io import BytesIO\nimport pandas as pd\nfrom typing import NamedTuple\nimport plotly.graph_objects as go\n\nclass IOData(NamedTuple):\n    name: str\n    data: BytesIO | pd.DataFrame | go.Figure\n\ndef custom_code(inputs: list[IOData], **kwargs) -> list[IOData]:\n    df = inputs[0].data.copy()\n    df['v2'] = df['v'] * 2\n    return [IOData(name=\"doubled\", data=df)]\n应用\n插入到光标\n发送"
+    }
+  ]
+}
