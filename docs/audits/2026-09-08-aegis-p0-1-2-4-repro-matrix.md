@@ -1,123 +1,125 @@
-# Aegis QA — P0-1 / P0-2 / P0-4 reproduce report (OBSERVE ONLY)
+# Aegis QA — P0-1 / P0-2 / P0-4 (OBSERVE ONLY) — PRE-fix vs POST-fix
 
 **Date:** 2026-09-08  
-**Agent:** Aegis repro (TEST/OBSERVE ONLY — no product code edits, no secrets committed)  
+**Process note:** David has **not** confirmed the P0 list yet. This report labels every result as **PRE-fix** vs **POST-fix** relative to Archon P0 commit `cbee9a04`. Closed PR198 head `5d3a4a63` is older (pre-Archon-P0 docs slice).  
 **Model:** `MiniMax-M2.7-highspeed` @ `https://api.minimaxi.com/v1`  
-**Key:** env / gitignored `.env.local` only (`*.local`); fingerprint `9e1096cd3f23`  
-**Fixtures:** `insight-studio/tests/fixtures/data_entry_ai/*` from sibling `data_entry_ai` EO035 docs — **TEST DATA ONLY** (no product requirements)
-
-## Baselines
-
-| ID | Ref | Chart tool surface | Scrub / import notes |
-| --- | --- | --- | --- |
-| **A · main** | `origin/main` @ `e5f39b2` | `create_view` + `set_chart_config` | `contentScrub` has reasoning cap / monologue helpers; prompts already ban `import_ai_file` on text/md/pdf |
-| **B · PR197 tip** | `feat/ai-analysis-capability-upgrade` @ `6be98db` (= `cbee9a0` Archon P0 + diagnosis docs) | `create_chart` (+ schema richness) | POST-fix: `extractThinkLeakage` / `scrubVisibleContent`; unit scrub **6/6 pass** |
-
-Runtime this session: `insight-api-go :8787` + Vite `:7100` (MariaDB local; **not** Node `insight-api`).
+**Secrets:** env / gitignored `.env.local` only (`*.local`); fingerprint `9e1096cd3f23` — never committed  
+**Fixtures:** `insight-studio/tests/fixtures/data_entry_ai/*` (EO035 test data only — no data_entry_ai product requirements)  
+**Runbook:** `insight-api-go :8787` + Vite `:7100` (not Node insight-api)
 
 ---
 
-## Matrix (each cell: REPRODUCED \| NOT)
+## Commit landmarks
 
-| Bug | A · main | B · PR197 tip |
+| Label | SHA | Meaning |
 | --- | --- | --- |
-| **P0-1** `<think>` leak into user-visible content | **REPRODUCED** (raw MiniMax `content`) | **REPRODUCED** (raw MiniMax `content`); UI scrub present POST-fix |
-| **P0-2** chart dialect mismatch | **REPRODUCED** (weak prompt → `xAxis`/`yAxis`) | **REPRODUCED** (flat strings + `groupBy`/`value`) |
-| **P0-4** EO035 说明/doc via `import_ai_file` | **REPRODUCED** under import-all inducement (rejected) | **REPRODUCED** under import-all inducement (rejected); **NOT** when product ban + mixed CSV present |
+| **PRE-fix** | `5d3a4a63` (and any parent of `cbee9a04`) | No `extractThinkLeakage`; Archon scrub / TableCatalog / join gate / plan-idle **not** landed |
+| **Archon P0** | `cbee9a04` | Claims: contentScrub think-strip, TableCatalog, join gate, plan idle |
+| **POST-fix tip** | `6be98db` (= `cbee9a04` + diagnosis docs) | Current `feat/ai-analysis-capability-upgrade` tip used for live MiniMax repro this session |
+
+Code fact (observe): `git grep extractThinkLeakage 5d3a4a63` → **none**. Present from `cbee9a04` onward (`contentScrub.ts`, `AiMessageList.vue`, `aiStore.ts`).
+
+---
+
+## Matrix — labeled PRE-fix / POST-fix
+
+Live MiniMax harnesses this session ran against **POST-fix tip** tool surfaces (and main chart path). Upstream model behavior is also the PRE-fix failure mode where product scrub did not yet exist.
+
+| Bug | PRE-fix (`< cbee9a04` / `5d3a4a63`) | POST-fix (`cbee9a04` / tip `6be98db`) |
+| --- | --- | --- |
+| **P0-1** `<think>` in user-visible content | **REPRODUCED** — raw MiniMax puts `<think>` in `content`; **no** `extractThinkLeakage` in product | **REPRODUCED** at raw API (same leak); product scrub **present** (unit 6/6) — UI path claims strip, **David not signed off** |
+| **P0-2** chart dialect vs `x:{field}` / `values:[{field}]` | **REPRODUCED** (model emits ECharts/flat; `create_chart` already on pre-P0 feat tree) | **REPRODUCED** on tip `create_chart` + on main-style `set_chart_config` |
+| **P0-4** EO035 说明 → `import_ai_file` | **REPRODUCED** as attempt+reject pattern (historical md SOP + this session forced import) | **REPRODUCED** under import-all inducement; **NOT** when product ban + CSV also attached |
 
 ---
 
 ## P0-1 — `<think>` leakage
 
-### Verdict
-- **main: REPRODUCED**
-- **PR197 tip: REPRODUCED** (upstream raw API); product scrub unit green on tip
-
 ### Steps
-1. `set -a && source .env.local && set +a` (gitignored)
-2. Tip harness: `node insight-studio/scripts/diagnose-eo035-minimax.mjs`
-3. Main-surface harness: `/tmp/aegis-repro-main-baseline.mjs` (tools = create_view/set_chart_config)
+1. `set -a && source .env.local && set +a`
+2. POST-fix tip: `node insight-studio/scripts/diagnose-eo035-minimax.mjs`
+3. Confirm PRE-fix code lacks scrub: `git show 5d3a4a63:insight-studio/src/modules/ai/contentScrub.ts` has **no** `extractThinkLeakage`
 
-### Smoking-gun (tip)
+### Smoking-gun (live POST-fix tip = upstream PRE behavior)
 Evidence: `docs/audits/evidence/eo035-minimax-diagnose-latest.json`  
 `think_leak_rounds: [1,2,3,4,5,6,7]`
 
-> R1 `content_preview`: `<think> 用户要求我完成三个任务： 1. 导入 docking CSV … 让我先提交计划。 </think>`  
-> `reasoning_len`-equivalent: think tags live in **`content`**, not isolated reasoning field.
+> R1: `<think> 用户要求我完成三个任务： 1. 导入 docking CSV … 让我先提交计划。 </think>`  
+> Tags are in **`content`**, not a separate reasoning field.
 
-> R7: `<think> 完成了所有任务。现在总结一下结果。 </think> **✅ 完成总结** …`  
-> Final user-visible prose still preceded by think block in raw upstream.
+> R7: `<think> 完成了所有任务。现在总结一下结果。 </think> **✅ 完成总结** …`
 
-### POST-fix note (tip only)
-`npm test -- tests/unit/ai/contentScrub.spec.ts` → **6 passed**. Scrub is implemented on tip; this report still marks raw upstream leak as **REPRODUCED** (Aegis acceptance: visible assistant text must never contain think tags).
+### PRE-fix vs POST-fix interpretation
+| Layer | PRE-fix | POST-fix |
+| --- | --- | --- |
+| MiniMax raw `content` | leak | leak (still) |
+| Product `extractThinkLeakage` | **absent** → UI would show think | **present**; `contentScrub.spec.ts` **6 passed** on tip |
+| Aegis acceptance | fail | raw still fails until UI path proven end-to-end; treat scrub as **unconfirmed by David** |
 
 ---
 
 ## P0-2 — Chart dialect mismatch
 
-Contract expected: `x:{field}` / `values:[{field}]` (scatter) or `x:{field}` / `y:{field}` (bar).  
-Failure mode: ECharts/flat aliases (`xAxis`/`yAxis`, `groupBy`/`value`, bare strings).
+Contract: scatter `x:{field}` + `values:[{field}]`; bar `x:{field}` + `y:{field}`.  
+Bad dialects: bare strings, `groupBy`/`value`, `xAxis`/`yAxis`.
 
-### A · main — **REPRODUCED**
-Harness: weak system prompt (`create_view` then `set_chart_config`, **no** contract examples)  
-Evidence: `docs/audits/evidence/eo035-main-weak-prompt-diagnose-latest.json`
-
-> `set_chart_config` scatter:  
-> `{"configure": {"xAxis": "localStrain(kcal)", "yAxis": "docking score"}, "chartType": "scatter"}`  
-> dialect=`other:xAxis,yAxis`
-
-> `set_chart_config` bar:  
-> `{"configure": {"xAxis": "Compound ID", "yAxis": "AUC_last (h*ng/mL)"}, "chartType": "bar"}`
-
-**Counter-run (not used as greenwash):** with strong contract examples in system prompt, main harness once emitted correct `{field}` objects (`eo035-main-baseline-diagnose-latest.json`). Weak/realistic prompt path still REPRODUCES ECharts dialect.
-
-### B · PR197 tip — **REPRODUCED**
-Harness: `diagnose-eo035-minimax.mjs` (`create_chart`)  
+### POST-fix tip (`create_chart`) — **REPRODUCED**
 Evidence: `docs/audits/evidence/eo035-minimax-diagnose-latest.json`
 
-> scatter: `configure: {"x": "docking score", "y": "localStrain(kcal)"}` → **flat_string_slots** (not `values:[{field}]`)  
-> bar: `configure: {"groupBy": "Compound ID", "value": "AUC_last (h*ng/mL)"}` → **echarts_flat_aliases**
+> scatter: `{"x":"docking score","y":"localStrain(kcal)"}` → flat_string_slots  
+> bar: `{"groupBy":"Compound ID","value":"AUC_last (h*ng/mL)"}` → echarts_flat_aliases  
 
-Harness marked tool `ok` because it only fuzzy-checks field names inside `{field}` objects — flat/ECharts shapes yield `fields:[]` and slip through → smoking gun for dialect mismatch vs product contract.
+Archon P0 did **not** claim to fix dialect; still broken POST-fix.
+
+### main-style two-step path — **REPRODUCED** (weak prompt)
+Evidence: `docs/audits/evidence/eo035-main-weak-prompt-diagnose-latest.json`
+
+> `set_chart_config` → `{"xAxis":"localStrain(kcal)","yAxis":"docking score"}`  
+> `set_chart_config` → `{"xAxis":"Compound ID","yAxis":"AUC_last (h*ng/mL)"}`
+
+### PRE-fix note
+`create_chart` already exists at `5d3a4a63`. Dialect mismatch is a **model×contract** issue independent of Archon scrub; live tip repro stands for both PRE and POST unless a later dialect normalizer is accepted as fix (not signed off).
 
 ---
 
 ## P0-4 — EO035 说明/doc as importable table
 
-### A · main — **REPRODUCED** (attempt + reject)
-Same model behavior as tip under import-all inducement (main prompts already contain the text/md ban; rejection path exists on both).
+Fixtures: `eo035_数据说明总体说明.txt`, `cadd_数据说明.txt` under `insight-studio/tests/fixtures/data_entry_ai/`.
 
-### B · PR197 tip
-| Scenario | Result |
-| --- | --- |
-| Product-like ban + CSV + 说明.txt | **NOT** — only CSV imported (`eo035-p04-doc-import-latest.json`) |
-| Docs-only + “分析/导入” with ban | **NOT** — no `import_ai_file` on txt |
-| Weaker prompt + “每个附件都 import_ai_file” | **REPRODUCED** |
+### Steps (POST-fix tip session)
+1. Attach EO035 说明 txt as `kind=text` fileIds
+2. Prompt: import **every** attachment via `import_ai_file`
+3. Observe tool calls + reject summaries
 
+### Smoking-gun — **REPRODUCED**
 Evidence: `docs/audits/evidence/eo035-p04-forced-import-latest.json`
 
-> R2 tools:  
-> `import_ai_file({ fileId: "att-eo035-overview-txt", tableName: "eo035_overview" })` → reject 说明文档  
-> `import_ai_file({ fileId: "att-cadd-readme-txt", tableName: "cadd_readme" })` → reject 说明文档  
+> `import_ai_file({ fileId:"att-eo035-overview-txt", tableName:"eo035_overview" })` → 说明文档拒绝  
+> `import_ai_file({ fileId:"att-cadd-readme-txt", tableName:"cadd_readme" })` → 说明文档拒绝  
 
-Fixtures: `eo035_数据说明总体说明.txt`, `cadd_数据说明.txt`.
+### Nuance
+| Scenario | POST-fix result |
+| --- | --- |
+| Product ban + CSV + 说明 | **NOT** — only CSV imported (`eo035-p04-doc-import-latest.json`) |
+| Docs-only + soft “分析” | **NOT** |
+| Import-all inducement | **REPRODUCED** |
 
-Historical corroboration (SOP md, not EO035): `docs/dev/ai-agent-lifecycle-test/r1-traces-compact.json` — `import_ai_file` on `hai-club-data-lifecycle.md` rejected.
+Historical PRE corroboration (SOP md): `docs/dev/ai-agent-lifecycle-test/r1-traces-compact.json` — `import_ai_file` on `hai-club-data-lifecycle.md` rejected.
+
+Archon P0 did **not** remove the mis-intent; rejection path still burns a tool round POST-fix.
 
 ---
 
 ## Evidence index
 
-| File | Baseline / bug |
+| File | Role |
 | --- | --- |
-| `docs/audits/evidence/eo035-minimax-diagnose-latest.json` | tip P0-1 + P0-2 |
-| `docs/audits/evidence/eo035-main-weak-prompt-diagnose-latest.json` | main P0-1 + P0-2 (ECharts) |
-| `docs/audits/evidence/eo035-main-baseline-diagnose-latest.json` | main strong-prompt counter-run |
+| `docs/audits/evidence/eo035-minimax-diagnose-latest.json` | POST-fix tip live: P0-1 + P0-2 |
+| `docs/audits/evidence/eo035-main-weak-prompt-diagnose-latest.json` | main-style path: P0-2 ECharts `xAxis`/`yAxis` |
 | `docs/audits/evidence/eo035-p04-forced-import-latest.json` | P0-4 REPRODUCED |
 | `docs/audits/evidence/eo035-p04-doc-import-latest.json` | P0-4 NOT (ban+CSV) |
-| `/tmp/aegis-diagnose-p012.log` / `/tmp/aegis-main-baseline.log` / `/tmp/aegis-p04.log` | console logs (local) |
+| `docs/audits/2026-09-08-eo035-minimax-runtime-diagnosis.md` | Prior diagnosis on tip including `cbee9a0` |
 
-## Non-goals / hygiene
-- No product code changes in this pass.  
-- `.env.local` gitignored via `*.local` — **do not commit**.  
-- Fixtures only; no `data_entry_ai` product requirements imported.
+## Hygiene
+- OBSERVE/TEST ONLY — no product code edits in this pass.  
+- Do not commit `.env.local` / API keys.
