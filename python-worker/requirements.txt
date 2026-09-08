@@ -15,3 +15,6 @@ matplotlib==3.10.3
 seaborn==0.13.2
 kaleido==0.2.1
 pyarrow==19.0.1
+# statlib 依赖：组间比较（ANOVA 非参路径 / 事后检验）需要
+pingouin==0.5.5
+scikit-posthocs==0.8.1

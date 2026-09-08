@@ -1,0 +1,7 @@
+{
+  "id": "statlib-group-comparison",
+  "name": "statlib 组间比较检验",
+  "version": "1.0.0",
+  "description": "两组/多组差异显著性检验（t检验/ANOVA/单样本/批量P值堆栈）：按意图与数据形状选方法、设参数、写 Custom Code 调 statlib",
+  "tags": ["statlib", "statistics", "custom-code", "hypothesis-testing"]
+}

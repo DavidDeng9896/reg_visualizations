@@ -1,0 +1,11 @@
+# Prism Lab — AI 驱动 GraphPad Prism 复刻交互实验室
+dash>=2.16
+plotly>=5.18
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+lmfit>=1.2
+pingouin>=0.5
+statsmodels>=0.14
+scikit-posthocs>=0.8
+scikit-learn>=1.3

@@ -4,11 +4,13 @@ import type { ChatMessage, ChatPayload, ToolCall } from '../../../src/modules/ai
 import { OPENAI_TOOLS } from '../../../src/modules/ai/tools/registry'
 
 /** 造一个 SSE Response：单 chunk 内含完整 tool_calls 或纯文本。 */
-function sseOf(payload: { toolCalls?: ToolCall[]; content?: string }): Response {
+function sseOf(payload: { toolCalls?: ToolCall[]; content?: string; finishReason?: string }): Response {
   const delta: Record<string, unknown> = { role: 'assistant' }
   if (payload.toolCalls) delta.tool_calls = payload.toolCalls.map((c, i) => ({ index: i, ...c }))
   if (payload.content) delta.content = payload.content
-  const body = `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\ndata: [DONE]\n\n`
+  const choice: Record<string, unknown> = { index: 0, delta }
+  if (payload.finishReason) choice.finish_reason = payload.finishReason
+  const body = `data: ${JSON.stringify({ choices: [choice] })}\n\ndata: [DONE]\n\n`
   return new Response(new ReadableStream({ start: (c) => { c.enqueue(new TextEncoder().encode(body)); c.close() } }))
 }
 function call(name: string, args: Record<string, unknown>, id = `call_${name}`): ToolCall {
@@ -442,6 +444,35 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(workerResult?.content).toContain('要点')
     expect(evts.some((e) => e.type === 'done' && e.content === '主循环完成')).toBe(true)
   })
+  it('finish_reason=length 截断 → 注入续写指令再来一轮，上限 2 次', async () => {
+    const rounds: ChatPayload[] = []
+    let n = 0
+    const post = async (p: ChatPayload) => {
+      rounds.push(p)
+      n += 1
+      // 前两轮均被截断，第三轮正常结束
+      if (n <= 2) return sseOf({ content: `代码片段${n}`, finishReason: 'length' })
+      return sseOf({ content: '代码片段3（完）' })
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: '写代码' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'x' }),
+      maxIterations: 8,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(n).toBe(3)
+    // 续写指令注入了 2 次
+    const nudges = rounds[2].messages.filter(
+      (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('被截断'),
+    )
+    expect(nudges).toHaveLength(2)
+    const done = evts.find((e) => e.type === 'done')
+    expect(done && done.type === 'done' ? done.content : '').toBe('代码片段3（完）')
+  })
+
   it('工具轮：过程独白不写入回灌上下文', async () => {
     const post = async (p: ChatPayload) => {
       const n = p.messages.filter((m) => m.role === 'tool').length
@@ -754,6 +785,18 @@ describe('readSseStream（OpenAI SSE 聚合）', () => {
     expect(msg.tool_calls).toHaveLength(1)
     expect(msg.tool_calls![0].function.name).toBe('add_custom_code_step')
     expect(msg.tool_calls![0].function.arguments).toBe('{"a":1}')
+  })
+
+  it('finish_reason=length 被捕获到 finishReason', async () => {
+    const body = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: 'def f():' }, finish_reason: 'length' }] })}\n\ndata: [DONE]\n\n`
+    const res = new Response(new ReadableStream({ start: (c) => { c.enqueue(new TextEncoder().encode(body)); c.close() } }))
+    const msg = await readSseStream(res)
+    expect(msg.finishReason).toBe('length')
+  })
+
+  it('正常结束无 finishReason 字段', async () => {
+    const msg = await readSseStream(sseOf({ content: 'hi' }))
+    expect(msg.finishReason).toBeUndefined()
   })
 
   it('每帧重发完整 arguments 时不翻倍损坏 JSON', async () => {

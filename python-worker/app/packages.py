@@ -21,6 +21,9 @@ SCIENTIFIC_PACKAGES: tuple[str, ...] = (
     "pyarrow",
     "openpyxl",
     "pydantic",
+    # statlib 依赖（组间比较非参/事后检验）
+    "pingouin",
+    "scikit-posthocs",
 )
 
 

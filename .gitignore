@@ -11,3 +11,12 @@ src/auto-imports.d.ts
 src/components.d.ts
 test-results
 .playwright-mcp
+
+# 运行时产物
+insight-dsh/
+.workbuddy/
+
+# Python 字节码
+__pycache__/
+*.pyc
+*.pyo
