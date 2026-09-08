@@ -451,39 +451,50 @@ func (s *Server) postAiChat(w http.ResponseWriter, r *http.Request) {
 type conversationDoc struct {
 	ID         string `json:"id"`
 	AnalysisID any    `json:"analysisId"` // string | null
+	StepID     any    `json:"stepId"`     // string | null；Custom Code 节点会话
 	Title      string `json:"title"`
 	CreatedAt  string `json:"createdAt"`
 	UpdatedAt  string `json:"updatedAt"`
 	Messages   []any  `json:"messages,omitempty"`
 }
 
+func nullableStr(p *string) any {
+	if p == nil || *p == "" {
+		return nil
+	}
+	return *p
+}
+
 func (s *Server) listAiConversations(w http.ResponseWriter, r *http.Request) {
 	uid := userid.FromRequest(r)
-	rows, err := s.Store.DB.Query(
-		`SELECT id, analysis_id, title, created_at, updated_at
-		 FROM ai_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100`, uid)
+	stepID := strings.TrimSpace(r.URL.Query().Get("stepId"))
+	query := `SELECT id, analysis_id, step_id, title, created_at, updated_at
+		 FROM ai_conversations WHERE user_id = ? AND (step_id IS NULL OR step_id = '')
+		 ORDER BY updated_at DESC LIMIT 100`
+	args := []any{uid}
+	if stepID != "" {
+		query = `SELECT id, analysis_id, step_id, title, created_at, updated_at
+			 FROM ai_conversations WHERE user_id = ? AND step_id = ?
+			 ORDER BY updated_at DESC LIMIT 100`
+		args = []any{uid, stepID}
+	}
+	sqlRows, err := s.Store.DB.Query(query, args...)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
-	defer rows.Close()
+	defer sqlRows.Close()
 	out := make([]map[string]any, 0)
-	for rows.Next() {
+	for sqlRows.Next() {
 		var id, title, createdAt, updatedAt string
-		var analysisID *string
-		if err := rows.Scan(&id, &analysisID, &title, &createdAt, &updatedAt); err != nil {
+		var analysisID, convStepID *string
+		if err := sqlRows.Scan(&id, &analysisID, &convStepID, &title, &createdAt, &updatedAt); err != nil {
 			writeErr(w, http.StatusInternalServerError, "internal")
 			return
 		}
-		var aid any
-		if analysisID != nil {
-			aid = *analysisID
-		} else {
-			aid = nil
-		}
 		out = append(out, map[string]any{
-			"id": id, "analysisId": aid, "title": title,
-			"createdAt": createdAt, "updatedAt": updatedAt,
+			"id": id, "analysisId": nullableStr(analysisID), "stepId": nullableStr(convStepID),
+			"title": title, "createdAt": createdAt, "updatedAt": updatedAt,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -493,6 +504,7 @@ func (s *Server) createAiConversation(w http.ResponseWriter, r *http.Request) {
 	uid := userid.FromRequest(r)
 	var body struct {
 		AnalysisID *string `json:"analysisId"`
+		StepID     *string `json:"stepId"`
 		Title      string  `json:"title"`
 		Messages   []any   `json:"messages"`
 	}
@@ -506,21 +518,19 @@ func (s *Server) createAiConversation(w http.ResponseWriter, r *http.Request) {
 	}
 	msgRaw, _ := json.Marshal(body.Messages)
 	id := uuid.NewString()
-	var aid any
-	if body.AnalysisID != nil {
-		aid = *body.AnalysisID
-	}
+	aid := nullableStr(body.AnalysisID)
+	sid := nullableStr(body.StepID)
 	_, err := s.Store.DB.Exec(
-		`INSERT INTO ai_conversations (id, analysis_id, title, created_at, updated_at, messages, user_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, aid, body.Title, now, now, string(msgRaw), uid,
+		`INSERT INTO ai_conversations (id, analysis_id, step_id, title, created_at, updated_at, messages, user_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, aid, sid, body.Title, now, now, string(msgRaw), uid,
 	)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
 	writeJSON(w, http.StatusCreated, conversationDoc{
-		ID: id, AnalysisID: aid, Title: body.Title,
+		ID: id, AnalysisID: aid, StepID: sid, Title: body.Title,
 		CreatedAt: now, UpdatedAt: now, Messages: body.Messages,
 	})
 }
@@ -529,11 +539,11 @@ func (s *Server) getAiConversation(w http.ResponseWriter, r *http.Request) {
 	uid := userid.FromRequest(r)
 	id := r.PathValue("id")
 	var title, createdAt, updatedAt, messages string
-	var analysisID *string
+	var analysisID, stepID *string
 	err := s.Store.DB.QueryRow(
-		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
+		`SELECT analysis_id, step_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
 		id, uid,
-	).Scan(&analysisID, &title, &createdAt, &updatedAt, &messages)
+	).Scan(&analysisID, &stepID, &title, &createdAt, &updatedAt, &messages)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -543,12 +553,8 @@ func (s *Server) getAiConversation(w http.ResponseWriter, r *http.Request) {
 	if msgs == nil {
 		msgs = []any{}
 	}
-	var aid any
-	if analysisID != nil {
-		aid = *analysisID
-	}
 	writeJSON(w, http.StatusOK, conversationDoc{
-		ID: id, AnalysisID: aid, Title: title,
+		ID: id, AnalysisID: nullableStr(analysisID), StepID: nullableStr(stepID), Title: title,
 		CreatedAt: createdAt, UpdatedAt: updatedAt, Messages: msgs,
 	})
 }
@@ -557,11 +563,11 @@ func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
 	uid := userid.FromRequest(r)
 	id := r.PathValue("id")
 	var title, createdAt, updatedAt, messages string
-	var analysisID *string
+	var analysisID, stepID *string
 	err := s.Store.DB.QueryRow(
-		`SELECT analysis_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
+		`SELECT analysis_id, step_id, title, created_at, updated_at, messages FROM ai_conversations WHERE id = ? AND user_id = ?`,
 		id, uid,
-	).Scan(&analysisID, &title, &createdAt, &updatedAt, &messages)
+	).Scan(&analysisID, &stepID, &title, &createdAt, &updatedAt, &messages)
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found")
 		return
@@ -585,10 +591,8 @@ func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
 	if msgs == nil {
 		msgs = []any{}
 	}
-	aid := any(nil)
-	if analysisID != nil {
-		aid = *analysisID
-	}
+	aid := nullableStr(analysisID)
+	sid := nullableStr(stepID)
 
 	if body != nil {
 		if t, ok := body["title"].(string); ok {
@@ -598,22 +602,33 @@ func (s *Server) putAiConversation(w http.ResponseWriter, r *http.Request) {
 			msgs = m
 		}
 		if _, ok := body["analysisId"]; ok {
-			aid = body["analysisId"]
+			if v, ok := body["analysisId"].(string); ok {
+				aid = v
+			} else {
+				aid = nil
+			}
+		}
+		if _, ok := body["stepId"]; ok {
+			if v, ok := body["stepId"].(string); ok {
+				sid = v
+			} else {
+				sid = nil
+			}
 		}
 	}
 
 	updatedAt = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	msgRaw, _ := json.Marshal(msgs)
 	_, err = s.Store.DB.Exec(
-		`UPDATE ai_conversations SET title = ?, analysis_id = ?, updated_at = ?, messages = ? WHERE id = ? AND user_id = ?`,
-		title, aid, updatedAt, string(msgRaw), id, uid,
+		`UPDATE ai_conversations SET title = ?, analysis_id = ?, step_id = ?, updated_at = ?, messages = ? WHERE id = ? AND user_id = ?`,
+		title, aid, sid, updatedAt, string(msgRaw), id, uid,
 	)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal")
 		return
 	}
 	writeJSON(w, http.StatusOK, conversationDoc{
-		ID: id, AnalysisID: aid, Title: title,
+		ID: id, AnalysisID: aid, StepID: sid, Title: title,
 		CreatedAt: createdAt, UpdatedAt: updatedAt, Messages: msgs,
 	})
 }

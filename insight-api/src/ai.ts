@@ -204,7 +204,10 @@ export function registerAiRoutes(app: Hono, store: InsightStore): void {
           .prepare('SELECT id, analysis_id, step_id, title, created_at, updated_at FROM ai_conversations WHERE step_id = ? ORDER BY updated_at DESC')
           .all(stepId) as Omit<ConversationRow, 'messages'>[])
       : (store.db
-          .prepare('SELECT id, analysis_id, step_id, title, created_at, updated_at FROM ai_conversations ORDER BY updated_at DESC LIMIT 100')
+          .prepare(
+            `SELECT id, analysis_id, step_id, title, created_at, updated_at FROM ai_conversations
+             WHERE step_id IS NULL OR step_id = '' ORDER BY updated_at DESC LIMIT 100`,
+          )
           .all() as Omit<ConversationRow, 'messages'>[])
     return c.json(rows.map((r) => ({ id: r.id, analysisId: r.analysis_id, stepId: r.step_id ?? null, title: r.title, createdAt: r.created_at, updatedAt: r.updated_at })))
   })

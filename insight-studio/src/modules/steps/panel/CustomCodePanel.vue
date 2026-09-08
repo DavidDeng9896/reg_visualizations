@@ -3,7 +3,7 @@
  * Custom Code 节点专用配置面板：代码编辑 + 输入预览 + 输出/日志 + AI 辅助。
  * 编辑态与预览态共用本组件，预览态传入 readonly 只读展示。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import type { AnalysisTable, StepNode } from '../../../shared/types'
 import { useAnalysisStore } from '../../../stores/analysisStore'
 import { storeToRefs } from 'pinia'
@@ -102,6 +102,11 @@ if (typeof window !== 'undefined') {
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') window.removeEventListener('resize', positionAiFloat)
   stopAiPositioning()
+})
+
+onDeactivated(() => {
+  aiOpen.value = false
+  aiMinimized.value = false
 })
 
 /* ------------------------------ 配置 ------------------------------ */
@@ -583,6 +588,7 @@ onMounted(() => {
         aria-label="AI 助手"
       >
         <CustomCodeAiChat
+          :key="step.id"
           ref="aiChatRef"
           :step-id="step.id"
           :code="customCodeCfg.code"

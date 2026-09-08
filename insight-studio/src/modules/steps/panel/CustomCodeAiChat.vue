@@ -3,7 +3,7 @@
  * Custom Code 嵌入式 AI 对话（悬浮窗）：底层走 codeAiStore（主会话 agent-loop 内核）。
  * 能力：多轮工具调用（run_python_code 草稿验证 / skill / 记忆）、截断续写、检查点续跑、按步骤持久化。
  */
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCodeAiStore } from '../../ai/codeAiStore'
 import ReasoningCard from '../../ai/ReasoningCard.vue'
 import { IButton, IIcon } from '../../../ui'
@@ -44,6 +44,9 @@ onMounted(() => {
   void store.open(props.stepId)
 })
 onUnmounted(() => {
+  store.close()
+})
+onDeactivated(() => {
   store.close()
 })
 watch(
@@ -108,7 +111,7 @@ defineExpose({ ingestError })
   <div class="ccc">
     <header class="ccc__head">
       <IIcon name="sparkle" :size="14" />
-      <span class="ccc__title">AI 助手</span>
+      <span class="ccc__title">AI 助手 <span class="ccc__scope">本节点</span></span>
       <button type="button" class="ccc__head-btn" title="清除对话" :disabled="loading" @click="clear">
         <IIcon name="trash" :size="13" />
       </button>
@@ -123,7 +126,7 @@ defineExpose({ ingestError })
     <div ref="listRef" class="ccc__list">
       <div v-if="store.loading && !messages.length" class="ccc__empty">加载对话中…</div>
       <div v-else-if="!messages.length" class="ccc__empty">
-        描述你要做的处理，AI 会基于当前代码与上游输入生成 Custom Code，自动运行验证；生成后可「应用」整段替换或「插入到光标」。
+        会话只属于当前 Custom Code 节点，不会带入其他分析或步骤的历史。描述你要做的处理，AI 会基于当前代码与上游输入生成代码并自动验证；生成后可「应用」整段替换或「插入到光标」。
       </div>
       <template v-for="m in messages" :key="m.id">
         <div class="ccc__msg" :class="`ccc__msg--${m.role}`">
@@ -207,6 +210,12 @@ defineExpose({ ingestError })
   font-size: 12px;
   font-weight: 600;
   color: var(--is-text);
+}
+.ccc__scope {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--is-text-tertiary);
 }
 .ccc__head-btn {
   display: inline-flex;

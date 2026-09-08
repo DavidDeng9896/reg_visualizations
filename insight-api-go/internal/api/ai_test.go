@@ -161,3 +161,97 @@ func TestAiConversationsCRUD(t *testing.T) {
 		t.Fatalf("GET deleted status=%d", rr.Code)
 	}
 }
+
+func TestAiConversationsScopedByStep(t *testing.T) {
+	srv := newTestServer(t)
+	h := srv.Handler()
+
+	post := func(body map[string]any) map[string]any {
+		t.Helper()
+		raw, _ := json.Marshal(body)
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/ai/conversations", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		h.ServeHTTP(rr, req)
+		if rr.Code != 201 {
+			t.Fatalf("POST status=%d body=%s", rr.Code, rr.Body.String())
+		}
+		var doc map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &doc)
+		return doc
+	}
+
+	global := post(map[string]any{
+		"analysisId": "analysis-other",
+		"title":      "其他分析主会话",
+		"messages":   []any{map[string]any{"role": "user", "content": "global hello"}},
+	})
+	stepA := post(map[string]any{
+		"analysisId": "analysis-a",
+		"stepId":     "step-a",
+		"title":      "Custom Code AI",
+		"messages":   []any{map[string]any{"role": "user", "content": "node a"}},
+	})
+	_ = post(map[string]any{
+		"analysisId": "analysis-b",
+		"stepId":     "step-b",
+		"title":      "Custom Code AI",
+		"messages":   []any{map[string]any{"role": "user", "content": "node b"}},
+	})
+
+	if stepA["stepId"] != "step-a" {
+		t.Fatalf("create should persist stepId, got %v", stepA["stepId"])
+	}
+
+	list := func(qs string) []map[string]any {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/ai/conversations"+qs, nil))
+		if rr.Code != 200 {
+			t.Fatalf("LIST %s status=%d body=%s", qs, rr.Code, rr.Body.String())
+		}
+		var out []map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &out)
+		return out
+	}
+
+	ids := func(rows []map[string]any) []string {
+		var out []string
+		for _, r := range rows {
+			id, _ := r["id"].(string)
+			out = append(out, id)
+		}
+		return out
+	}
+
+	globalList := list("")
+	gids := ids(globalList)
+	if !containsStr(gids, global["id"].(string)) {
+		t.Fatalf("global list missing main conversation: %v", gids)
+	}
+	if containsStr(gids, stepA["id"].(string)) {
+		t.Fatalf("global list must not include Custom Code conversations: %v", gids)
+	}
+
+	stepList := list("?stepId=step-a")
+	if len(stepList) != 1 || stepList[0]["id"] != stepA["id"] {
+		t.Fatalf("step-a list=%v want only %v", stepList, stepA["id"])
+	}
+	if stepList[0]["stepId"] != "step-a" {
+		t.Fatalf("step list item stepId=%v", stepList[0]["stepId"])
+	}
+
+	empty := list("?stepId=step-missing")
+	if len(empty) != 0 {
+		t.Fatalf("unknown step should be empty, got %v", empty)
+	}
+}
+
+func containsStr(xs []string, want string) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
+}
