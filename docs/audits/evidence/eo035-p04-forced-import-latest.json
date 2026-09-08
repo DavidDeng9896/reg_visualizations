@@ -1,0 +1,114 @@
+{
+  "when": "2026-09-08T11:03:28.565807+00:00",
+  "model": "MiniMax-M2.7-highspeed",
+  "scenario": "PRE-prompt-style explicit import-all docs",
+  "reproduced": true,
+  "doc_import_attempts": [
+    {
+      "fileId": "att-eo035-overview-txt",
+      "tableName": "eo035_overview",
+      "meta": {
+        "name": "eo035_数据说明总体说明.txt",
+        "kind": "text"
+      }
+    },
+    {
+      "fileId": "att-cadd-readme-txt",
+      "tableName": "cadd_readme",
+      "meta": {
+        "name": "cadd_数据说明.txt",
+        "kind": "text"
+      }
+    }
+  ],
+  "import_ai_file_attempts": [
+    {
+      "fileId": "att-eo035-overview-txt",
+      "tableName": "eo035_overview",
+      "meta": {
+        "name": "eo035_数据说明总体说明.txt",
+        "kind": "text"
+      }
+    },
+    {
+      "fileId": "att-cadd-readme-txt",
+      "tableName": "cadd_readme",
+      "meta": {
+        "name": "cadd_数据说明.txt",
+        "kind": "text"
+      }
+    }
+  ],
+  "tool_sequence": [
+    "list_ai_files",
+    "import_ai_file",
+    "import_ai_file",
+    "list_tables"
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "content_preview": "<think>\n用户要求我先列出附件，然后导入所有附件为表。让我先列出附件，然后依次导入每个文件。\n</think>\n\n\n",
+      "think_tag_in_content": true,
+      "tool_calls": [
+        {
+          "name": "list_ai_files",
+          "args_preview": "{}",
+          "result": {
+            "ok": true,
+            "summary": "共 2 个附件：\n- eo035_数据说明总体说明.txt（id: att-eo035-overview-txt，kind=text）\n- cadd_数据说明.txt（id: att-cadd-readme-txt，kind=text）\n请用 import_ai_file({{ fileId }}) 导入。",
+            "rejected_doc": false
+          }
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "content_preview": "<think>\n用户要求我把所有附件都用 import_ai_file 导入成表。我需要导入这两个文件：\n1. eo035_数据说明总体说明.txt (id: att-eo035-overview-txt)\n2. cadd_数据说明.txt (id: att-cadd-readme-txt)\n\n让我依次导入这两个文件。\n</think>\n\n\n",
+      "think_tag_in_content": true,
+      "tool_calls": [
+        {
+          "name": "import_ai_file",
+          "args_preview": "{\"fileId\": \"att-eo035-overview-txt\", \"tableName\": \"eo035_overview\"}",
+          "result": {
+            "ok": false,
+            "summary": "附件「eo035_数据说明总体说明.txt」是说明文档（kind=text），内容已在对话上下文中，不要 import_ai_file。",
+            "rejected_doc": true
+          }
+        },
+        {
+          "name": "import_ai_file",
+          "args_preview": "{\"fileId\": \"att-cadd-readme-txt\", \"tableName\": \"cadd_readme\"}",
+          "result": {
+            "ok": false,
+            "summary": "附件「cadd_数据说明.txt」是说明文档（kind=text），内容已在对话上下文中，不要 import_ai_file。",
+            "rejected_doc": true
+          }
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "content_preview": "<think>\n这两个文件都是说明文档（kind=text），系统提示不需要用 import_ai_file 导入。让我用 list_tables 看看当前有哪些表。\n</think>\n\n\n",
+      "think_tag_in_content": true,
+      "tool_calls": [
+        {
+          "name": "list_tables",
+          "args_preview": "{}",
+          "result": {
+            "ok": true,
+            "summary": "当前分析还没有表。",
+            "rejected_doc": false
+          }
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "content_preview": "<think>\n这两个文件都是纯文本说明文档（kind=text），系统提示它们的内容已经在对话上下文中，不需要用 import_ai_file 导入。list_tables 显示当前没有表。\n\n我需要向用户解释这个情况。\n</think>\n\n根据系统提示，这两个附件都是 **说明文档（kind=text）**，内容已在对话上下文中提供，不需要再导入为数据表。\n\n**当前没有数据表**，附件内容如下：\n\n---\n\n### eo035_数据说明总体说明.txt\n总体输入数据包括设计环节 CADD/AIDD计算环节 合成与库存环节 测试环节\n\n设计环节需要上",
+      "think_tag_in_content": true,
+      "tool_calls": []
+    }
+  ],
+  "key_fingerprint": "9e1096cd3f23"
+}
