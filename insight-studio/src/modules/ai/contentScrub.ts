@@ -10,6 +10,32 @@ export function capReasoningText(text: string, cap = REASONING_DISPLAY_CAP): str
 }
 
 /**
+ * MiniMax 等模型常把推理塞进 content 的 `<think>…</think>`（而非 reasoning_content）。
+ * 同步剥离未闭合尾部（流式半截块），避免泄漏到用户可见正文。
+ */
+const THINK_BLOCK_RE =
+  /<\s*(?:think|thinking|reason|reasoning)\s*>[\s\S]*?<\s*\/\s*(?:think|thinking|reason|reasoning)\s*>/gi
+const THINK_OPEN_TAIL_RE = /<\s*(?:think|thinking|reason|reasoning)\s*>[\s\S]*$/i
+const THINK_TAG_STRIP_RE = /<\/?\s*(?:think|thinking|reason|reasoning)\s*>/gi
+
+/** 剥离 think 泄漏；thinking 可映射到 ReasoningCard。 */
+export function extractThinkLeakage(text: string): { visible: string; thinking: string } {
+  const chunks: string[] = []
+  let visible = String(text ?? '').replace(THINK_BLOCK_RE, (block) => {
+    const inner = block.replace(THINK_TAG_STRIP_RE, '').trim()
+    if (inner) chunks.push(inner)
+    return '\n'
+  })
+  visible = visible.replace(THINK_OPEN_TAIL_RE, (block) => {
+    const inner = block.replace(/<\s*(?:think|thinking|reason|reasoning)\s*>/i, '').trim()
+    if (inner) chunks.push(inner)
+    return ''
+  })
+  visible = visible.replace(/\n{3,}/g, '\n\n').trim()
+  return { visible, thinking: chunks.join('\n\n').trim() }
+}
+
+/**
  * 可见回复去重：折叠连续高度相似的短句/段落，抑制 agent 复读墙。
  */
 const FILLER_LINE =
@@ -41,7 +67,8 @@ export function normalizeLine(s: string): string {
  * 保留首个出现；若全文几乎全是同一句循环，压成一句并加省略说明。
  */
 export function scrubVisibleContent(text: string, opts?: { maxLines?: number }): string {
-  const raw = String(text ?? '').trim()
+  const { visible } = extractThinkLeakage(text)
+  const raw = visible.trim()
   if (!raw) return ''
   const maxLines = opts?.maxLines ?? 40
   const parts = raw.split(/\n+/).map((p) => p.trim()).filter(Boolean)

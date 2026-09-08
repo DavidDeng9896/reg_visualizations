@@ -16,12 +16,26 @@ import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } fr
 import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
 import { isNearDuplicate, isProcessMonologue, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
+import { TABLE_CATALOG_MARK } from './tableSchema'
 
 /** 让出到下一个宏任务，使 Vue 能绘制 tool_call 的进行中态后再执行工具。 */
 export function yieldToUi(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, 0)
   })
+}
+
+/** 替换消息列表中旧的 TableCatalog 系统块，再追加最新目录（每轮刷新、不堆叠）。 */
+export function replaceTableCatalogMessage(messages: ChatMessage[], catalog: string): void {
+  const text = catalog.trim()
+  if (!text) return
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i]
+    if (m?.role === 'system' && typeof m.content === 'string' && m.content.startsWith(TABLE_CATALOG_MARK)) {
+      messages.splice(i, 1)
+    }
+  }
+  messages.push({ role: 'system', content: text.startsWith(TABLE_CATALOG_MARK) ? text : `${TABLE_CATALOG_MARK}\n${text}` })
 }
 
 /** 工具执行结果。 */
@@ -156,6 +170,11 @@ export interface RunAgentOptions {
   initialPlan?: { steps: string[]; done: number[] }
   /** 计划催促最大次数；默认 3。 */
   maxPlanNudges?: number
+  /**
+   * 每轮注入最新 TableCatalog（列类型 + 样例行）。返回空则跳过。
+   * agentLoop 会替换旧的【TableCatalog】系统块，避免上下文堆叠。
+   */
+  getTableCatalog?: () => string | null | undefined
   /**
    * Worker 严格模式：无 tool_calls / 仅探路就收工时催促继续。
    * 与 planGate 独立；分析师/工程师子 loop 应开启。
@@ -306,6 +325,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   for (let round = 1; round <= maxIterations; round += 1) {
     throwIfAborted()
     onEvent({ type: 'round', n: round })
+
+    // P0：每轮注入最新 TableCatalog（列类型 + 样例），替换旧块
+    try {
+      const catalog = opts.getTableCatalog?.()
+      if (catalog?.trim()) replaceTableCatalogMessage(messages, catalog.trim())
+    } catch {
+      /* catalog 构建失败不阻断分析 */
+    }
 
     let streamed: Awaited<ReturnType<typeof readSseStream>>
     try {
@@ -556,6 +583,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
       pushToolContent(call, name, result.summary, result)
       noteToolSpin(name, args, result)
+    }
+
+    // P0：计划全部 mark_step_done 后强制收束，避免再等一轮模型收尾卡在「正在生成」
+    if (planGate && planSteps.length > 0 && !planIncomplete(planSteps, planDone)) {
+      await sweepFailedEmptyAiNodes()
+      onEvent({ type: 'done', content: scrubVisibleContent('计划已全部完成。') })
+      return messages
     }
   }
 

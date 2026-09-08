@@ -596,8 +596,15 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   add_join_step(args) {
-    const left = requireTable(String(args.leftTableId ?? ''))
-    const right = requireTable(String(args.rightTableId ?? ''))
+    const leftId = String(args.leftTableId ?? '').trim()
+    const rightId = String(args.rightTableId ?? '').trim()
+    if (!leftId || !rightId) {
+      return fail(
+        'Join 必须显式提供 leftTableId 与 rightTableId（不可省略、不可依赖默认表）；请先 list_tables 确认两表 id',
+      )
+    }
+    const left = requireTable(leftId)
+    const right = requireTable(rightId)
     const joinType = String(args.joinType ?? 'left')
     const keys = (Array.isArray(args.keys) ? args.keys : []) as { left: string; right: string }[]
     if (!keys.length) return fail('keys 不能为空')

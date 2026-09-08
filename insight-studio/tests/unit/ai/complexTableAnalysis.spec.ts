@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import Papa from 'papaparse'
 import { inferColumnTypes } from '../../../src/modules/table/csv'
-import { formatTableSchema, extractUnitHint } from '../../../src/modules/ai/tableSchema'
+import { formatTableSchema, extractUnitHint, buildTableCatalog, TABLE_CATALOG_MARK } from '../../../src/modules/ai/tableSchema'
 import { inferAnalysisIntent } from '../../../src/modules/ai/intentHint'
 import {
   resolveColumnField,
@@ -112,5 +112,23 @@ describe('analysis intent hint', () => {
   it('只要清洗不要图 → transform_only', () => {
     const h = inferAnalysisIntent('过滤掉空值，只要表，不要图')
     expect(h.kind).toBe('transform_only')
+  })
+})
+
+describe('TableCatalog', () => {
+  it('buildTableCatalog 含 field 类型与样例行', () => {
+    const t = loadCsvFixture('docking_scores_20241105.csv')
+    const a = {
+      id: 'a1',
+      name: 'EO035 fixture',
+      tables: [t],
+      steps: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    } as import('../../../src/shared/types').Analysis
+    const cat = buildTableCatalog(a)
+    expect(cat.startsWith(TABLE_CATALOG_MARK)).toBe(true)
+    expect(cat).toContain('field=`docking score`')
+    expect(cat).toMatch(/row1:/)
   })
 })

@@ -2,7 +2,9 @@
 import type { Analysis, AnalysisTable } from '../../shared/types'
 import { CONTEXT_HEADER } from './prompts'
 import type { AttachmentKind } from './attachments'
-import { formatTableBrief } from './tableSchema'
+import { buildTableCatalog, formatTableBrief } from './tableSchema'
+
+export { buildTableCatalog } from './tableSchema'
 
 function tableBrief(t: AnalysisTable, withSample = true): string {
   return formatTableBrief(t, withSample)

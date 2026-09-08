@@ -16,7 +16,7 @@ import {
 import type { ChatMessage, ChatPayload, ToolCall } from './client'
 import { OPENAI_TOOLS } from './tools/registry'
 import { execTool } from './tools/impl'
-import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
+import { buildAnalysisContext, buildMentionContext, buildTableCatalog, type MentionTarget } from './context'
 import {
   blobToDataUrl,
   buildAttachmentCatalog,
@@ -32,7 +32,7 @@ import { inferAnalysisIntent } from './intentHint'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
-import { capReasoningText } from './contentScrub'
+import { capReasoningText, extractThinkLeakage, scrubVisibleContent } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -453,6 +453,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -569,6 +570,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           ...(planSteps ? { initialPlan: { steps: planSteps, done: doneSnapshot } } : {}),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
@@ -744,6 +746,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -1041,10 +1044,16 @@ export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) =
         assistant.trace.find((t) => t.id === e.id)
       if (item) item.summary = e.summary
     } else if (e.type === 'done') {
-      const body = (e.content || '').trim()
       const notes = (assistant.interactionNotes ?? '').trim()
-      assistant.content = [notes, body].filter(Boolean).join('\n\n')
+      const rawBody = (e.content || '').trim()
+      const { visible, thinking } = extractThinkLeakage([notes, rawBody].filter(Boolean).join('\n\n'))
+      assistant.content = scrubVisibleContent(visible)
       assistant.interactionNotes = undefined
+      if (thinking) {
+        assistant.reasoning = capReasoningText(
+          [assistant.reasoning, thinking].filter(Boolean).join('\n\n'),
+        )
+      }
     }
   }
 }

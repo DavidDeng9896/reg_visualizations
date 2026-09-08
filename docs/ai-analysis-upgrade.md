@@ -35,6 +35,15 @@
       → ArtifactCard / AiChartCard 渲染非空 Plotly figure
 ```
 
+## Archon P0（已落地）
+
+| 项 | 实现 |
+| --- | --- |
+| contentScrub | `extractThinkLeakage` 剥离 MiniMax `<think>…</think>`（含未闭合流式尾部）；`scrubVisibleContent` / 消息展示 / done 事件共用 |
+| TableCatalog | `buildTableCatalog`；`runAgent` 每轮经 `getTableCatalog` 注入并替换旧块 |
+| Join 显式 tableId | `add_join_step` 缺 `leftTableId`/`rightTableId` 直接失败，不回退默认表 |
+| 计划完成强制 idle | 全部 `mark_step_done` 后立即 `done` + 结束 loop，避免卡在「正在生成」 |
+
 ## Fixtures（来自 data_entry_ai）
 
 路径：`insight-studio/tests/fixtures/data_entry_ai/`

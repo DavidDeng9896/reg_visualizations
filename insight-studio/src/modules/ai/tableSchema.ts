@@ -116,3 +116,38 @@ export function partitionColumnsByType(columns: ColumnMeta[]): Record<DataType |
   }
   return out as Record<DataType | 'other', string[]>
 }
+
+/** TableCatalog 系统消息前缀：agentLoop 每轮替换同前缀旧块，避免堆叠。 */
+export const TABLE_CATALOG_MARK = '【TableCatalog】'
+
+/**
+ * 每轮注入的表目录：列类型 + 样例行（Join/Filter 须用精确 tableId / field）。
+ */
+export function buildTableCatalog(
+  analysis: import('../../shared/types').Analysis | null,
+  opts?: { maxTables?: number; sampleRows?: number },
+): string {
+  const maxTables = opts?.maxTables ?? 12
+  const sampleRows = opts?.sampleRows ?? 3
+  if (!analysis) {
+    return `${TABLE_CATALOG_MARK}\n当前没有打开的分析。可用 list_analyses / create_analysis。`
+  }
+  if (!analysis.tables.length) {
+    return `${TABLE_CATALOG_MARK}\n当前分析「${analysis.name}」(id: ${analysis.id}) 尚无表。可用 import_csv_text / import_ai_file 导入。`
+  }
+  const shown = analysis.tables.slice(0, maxTables)
+  const blocks = shown.map((t) => formatTableSchema(t, { sampleRows }))
+  const more =
+    analysis.tables.length > maxTables
+      ? `\n…另有 ${analysis.tables.length - maxTables} 张表未列出，请用 list_tables / get_table_schema。`
+      : ''
+  return [
+    `${TABLE_CATALOG_MARK} 每轮刷新；配图/过滤必须使用 field 精确值；Join 必须显式 leftTableId 与 rightTableId。`,
+    `分析：「${analysis.name}」(id: ${analysis.id})`,
+    '',
+    ...blocks,
+    more,
+  ]
+    .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
+    .join('\n')
+}

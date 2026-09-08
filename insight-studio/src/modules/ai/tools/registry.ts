@@ -109,12 +109,13 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_join_step',
-    description: '以 key 连接两表（joinType: left/inner/right/full），产出合并表。',
+    description:
+      '以 key 连接两表（joinType: left/inner/right/full），产出合并表。必须显式传入 leftTableId 与 rightTableId（禁止省略；多表时勿猜测默认表）。',
     parameters: {
       type: 'object',
       properties: {
-        leftTableId: str('左表 id'),
-        rightTableId: str('右表 id'),
+        leftTableId: str('左表 id（必填，不可省略）'),
+        rightTableId: str('右表 id（必填，不可省略）'),
         joinType: { type: 'string', enum: ['left', 'inner', 'right', 'full'], description: '连接类型' },
         keys: { type: 'array', items: { type: 'object', properties: { left: str('左表列'), right: str('右表列') }, required: ['left', 'right'] } },
       },

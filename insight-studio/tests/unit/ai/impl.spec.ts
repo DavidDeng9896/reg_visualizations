@@ -541,6 +541,27 @@ describe('AI 工具实现（execTool）', () => {
     expect(out!.rows[0].label).toBe('Alpha')
   })
 
+  it('add_join_step：缺少 leftTableId/rightTableId 时拒绝（不回退默认表）', async () => {
+    const { analysis, store } = await seedStore()
+    const iris = analysis.tables[0]!
+    store.select({ kind: 'table', tableId: iris.id })
+    expect(analysis.tables.length).toBeGreaterThan(0)
+    const missingBoth = await execTool(
+      'add_join_step',
+      { joinType: 'left', keys: [{ left: 'id', right: 'id' }] },
+      ctx,
+    )
+    expect(missingBoth.ok).toBe(false)
+    expect(missingBoth.summary).toMatch(/必须显式|leftTableId|rightTableId/)
+    const missingRight = await execTool(
+      'add_join_step',
+      { leftTableId: iris.id, joinType: 'left', keys: [{ left: 'species', right: 'species' }] },
+      ctx,
+    )
+    expect(missingRight.ok).toBe(false)
+    expect(missingRight.summary).toMatch(/必须显式|rightTableId/)
+  })
+
   it('add_union_step：纵向合并结构兼容表', async () => {
     await seedStore()
     const a = await execTool('import_csv_text', { tableName: 'u1', csv: 'id,v\na,1' }, ctx)
