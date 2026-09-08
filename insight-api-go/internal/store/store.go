@@ -108,6 +108,28 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("migrate %s: %w", stmt, err)
 		}
 	}
+	return s.ensureAiConversationStepID()
+}
+
+// ensureAiConversationStepID 给已有库补 Custom Code 会话归属列（CREATE TABLE IF NOT EXISTS 不会改旧表）。
+func (s *Store) ensureAiConversationStepID() error {
+	var n int
+	err := s.DB.QueryRow(`
+		SELECT COUNT(*) FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = 'ai_conversations'
+		   AND COLUMN_NAME = 'step_id'`).Scan(&n)
+	if err != nil {
+		return fmt.Errorf("check ai_conversations.step_id: %w", err)
+	}
+	if n == 0 {
+		if _, err := s.DB.Exec(`ALTER TABLE ai_conversations ADD COLUMN step_id VARCHAR(128) NULL`); err != nil {
+			return fmt.Errorf("add ai_conversations.step_id: %w", err)
+		}
+	}
+	if _, err := s.DB.Exec(`CREATE INDEX IF NOT EXISTS ai_conv_step ON ai_conversations (step_id)`); err != nil {
+		return fmt.Errorf("index ai_conversations.step_id: %w", err)
+	}
 	return nil
 }
 

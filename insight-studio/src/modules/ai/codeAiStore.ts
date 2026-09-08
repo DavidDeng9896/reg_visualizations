@@ -16,6 +16,7 @@ import {
 } from './client'
 import type { ChatMessage, ToolCall } from './client'
 import { makeOnEvent, type UiMessage } from './aiStore'
+import { pickStepConversation } from './conversationScope'
 import { buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
 import { execRunPythonCode, type RunPythonCodeCtx } from './tools/pythonExec'
 import { clearTransientProgress, applyUserAbortToMessages } from './userAbort'
@@ -121,10 +122,11 @@ export const useCodeAiStore = defineStore('codeAi', {
   actions: {
     /** 打开某步骤的 AI 面板：加载其专属会话（无则待首次发送时创建）。 */
     async open(stepId: string): Promise<void> {
-      if (this.stepId === stepId && !this.loading) return
+      const analysisId = useAnalysisStore().current?.id ?? null
+      if (this.stepId === stepId && this.analysisId === analysisId && !this.loading) return
       this.stop()
       this.stepId = stepId
-      this.analysisId = useAnalysisStore().current?.id ?? null
+      this.analysisId = analysisId
       this.conversationId = null
       this.messages = []
       this.error = ''
@@ -138,8 +140,9 @@ export const useCodeAiStore = defineStore('codeAi', {
           }
         }
         const list = await aiConvApi.list(stepId)
-        if (list.length) {
-          const doc = await aiConvApi.get(list[0].id)
+        const mine = pickStepConversation(list, stepId)
+        if (mine) {
+          const doc = await aiConvApi.get(mine.id)
           this.conversationId = doc.id
           this.messages = Array.isArray(doc.messages) ? (doc.messages as UiMessage[]) : []
           for (const m of this.messages) {

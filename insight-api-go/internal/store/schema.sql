@@ -86,6 +86,7 @@ CREATE INDEX IF NOT EXISTS event_outbox_created ON event_outbox (created_at);
 CREATE TABLE IF NOT EXISTS ai_conversations (
   id            VARCHAR(64) NOT NULL,
   analysis_id   VARCHAR(64) NULL,
+  step_id       VARCHAR(128) NULL,
   title         VARCHAR(512) NOT NULL DEFAULT '',
   created_at    VARCHAR(32) NOT NULL,
   updated_at    VARCHAR(32) NOT NULL,
@@ -96,3 +97,4 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
 
 CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations (updated_at);
 CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations (user_id, updated_at);
+CREATE INDEX IF NOT EXISTS ai_conv_step ON ai_conversations (step_id);
