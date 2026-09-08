@@ -13,6 +13,7 @@ import { findTable, findView, findViewParent, findCombineDependents } from '../.
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
 import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
+import { formatTableSchema } from '../tableSchema'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { tableOutputPortName } from '../../steps/registry'
@@ -56,6 +57,7 @@ const WRITE_TOOLS = new Set([
   'rerun_stale_steps',
   'refresh_sql_source',
   'create_view',
+  'create_chart',
   'set_chart_config',
   'create_dashboard',
   'add_dashboard_widget',
@@ -448,9 +450,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   get_table_schema(args) {
     const t = requireTable(tableRefFromArgs(args))
-    const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
-    const sample = t.rows.slice(0, 5).map((r) => t.columns.map((c) => String(r[c.field] ?? '')).join(' | '))
-    return ok(`表「${t.name}」（id: ${t.id}，${t.rows.length} 行）：\n列：${cols}\n样例：\n${sample.join('\n')}`)
+    return ok(formatTableSchema(t, { sampleRows: 5 }))
   },
 
   async create_analysis(args) {
@@ -855,6 +855,48 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已在表「${t.name}」上创建视图「${name}」（view id: ${view.id}，${type}）`, artifactOf('view', name, { tableId: t.id, viewId: view.id, viewType: type }))
   },
 
+  /**
+   * 原子建图：先在内存中组装完整 ChartConfig 并校验，通过后再写入。
+   * 避免 create_view 留下未映射空图、或 set_chart_config 校验失败却已污染 configure。
+   */
+  create_chart(args) {
+    const coerced = coerceParsedToolArgs('create_chart', args)
+    const t = requireTable(tableRefFromArgs(coerced))
+    const chartType = String(coerced.chartType ?? coerced.type ?? '').trim()
+    if (!chartType || chartType === 'table') {
+      return fail('create_chart 需要 chartType（bar/line/scatter/box/pie/heatmap/bignumber）')
+    }
+    const name =
+      typeof coerced.name === 'string' && coerced.name.trim()
+        ? coerced.name.trim()
+        : defaultViewName(chartType as Parameters<typeof createViewNode>[0], t.views)
+    let configure = extractChartConfigure(coerced, chartType)
+    configure = resolveConfigureFields(configure, t.columns)
+    const autofilled = autofillRequiredChartSlots(chartType, configure, t.columns)
+    configure = autofilled.configure
+    const stylePatch = { ...((coerced.style ?? {}) as Partial<ChartConfig['style']>) }
+    const draft = createViewNode(chartType as Parameters<typeof createViewNode>[0], name)
+    if (!draft.chart) return fail('无法创建图表视图')
+    Object.assign(draft.chart.configure, configure)
+    Object.assign(draft.chart.style, stylePatch)
+    const regModel = (configure.regression as { model?: string } | undefined)?.model
+    if (regModel && regModel !== 'none' && draft.chart.style.fitAnnotation === undefined) {
+      draft.chart.style.fitAnnotation = true
+    }
+    const errors = validateChartMapping(draft.chart, t.columns)
+    if (errors.length) {
+      return fail(formatChartMappingFailHint(chartType, t.columns, errors, configure))
+    }
+    store().mutate((a) => {
+      findTable(a, t.id)?.views.push(draft)
+    })
+    const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
+    return ok(
+      `已创建并配置图表「${name}」（view id: ${draft.id}，${chartType}）${fillNote}`,
+      artifactOf('view', name, { tableId: t.id, viewId: draft.id, viewType: chartType }),
+    )
+  },
+
   set_chart_config(args) {
     const coerced = coerceParsedToolArgs('set_chart_config', args)
     const { table, view } = resolveChartView(tableRefFromArgs(coerced), viewRefFromArgs(coerced))
@@ -876,6 +918,17 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (regModel && regModel !== 'none' && style.fitAnnotation === undefined) {
       style.fitAnnotation = true
     }
+    // 先在副本上校验，通过后再写入 — 避免半成品配置导致 UI 空图
+    const draftChart: ChartConfig = {
+      ...v.chart,
+      chartType: (chartType || v.chart.chartType) as ChartConfig['chartType'],
+      configure: { ...v.chart.configure, ...configure },
+      style: { ...v.chart.style, ...style },
+    }
+    const errors = validateChartMapping(draftChart, t.columns)
+    if (errors.length) {
+      return fail(formatChartMappingFailHint(effectiveType, t.columns, errors, configure))
+    }
     store().mutate((a) => {
       const table = findTable(a, t.id)
       const view = table ? findView(table.views, v.id) : null
@@ -884,18 +937,10 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       Object.assign(view.chart.configure, configure)
       Object.assign(view.chart.style, style)
     })
-    // 校验映射完整性：失败返回 ok:false，并给出可用列 + 完整示例，避免同参空转
-    const updated = findView(requireTable(t.id).views, v.id)
-    const errors = validateChartMapping(updated!.chart!, requireTable(t.id).columns)
-    if (errors.length) {
-      return fail(
-        formatChartMappingFailHint(effectiveType, requireTable(t.id).columns, errors, configure),
-      )
-    }
     const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
     return ok(
       `图表「${v.name}」配置完成${fillNote}`,
-      artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }),
+      artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: draftChart.chartType }),
     )
   },
 

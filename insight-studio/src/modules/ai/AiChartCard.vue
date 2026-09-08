@@ -4,7 +4,8 @@ import { storeToRefs } from 'pinia'
 import { runPipeline } from '../../shared/pipeline'
 import { findTable, findView } from '../../shared/tree'
 import { analysisRepository } from '../../shared/repository'
-import { buildChartOption } from '../charts/registry'
+import { buildChartOption, validateChartMapping } from '../charts/registry'
+import { EMPTY_FIGURE } from '../charts/types'
 import ChartPanel from '../charts/ChartPanel.vue'
 import type { ChartOption } from '../charts/types'
 import { useAnalysisStore } from '../../stores/analysisStore'
@@ -21,11 +22,13 @@ const { current } = storeToRefs(store)
 
 const option = ref<ChartOption | null>(null)
 const failed = ref(false)
+const failReason = ref('')
 let gen = 0
 
 async function rebuild(): Promise<void> {
   const token = ++gen
   failed.value = false
+  failReason.value = ''
   option.value = null
   const art = props.artifact
   if (art.kind !== 'view' || !art.analysisId || !art.tableId || !art.viewId) return
@@ -34,19 +37,36 @@ async function rebuild(): Promise<void> {
   if (token !== gen) return
   if (!a) {
     failed.value = true
+    failReason.value = '分析不存在'
     return
   }
   const table = findTable(a, art.tableId)
   const view = table ? findView(table.views, art.viewId) : null
   if (!view?.chart) {
     failed.value = true
+    failReason.value = '视图无图表配置'
     return
   }
   try {
+    const mappingErrors = validateChartMapping(view.chart, table!.columns)
+    if (mappingErrors.length) {
+      failed.value = true
+      failReason.value = mappingErrors.map((e) => e.message).join('；')
+      return
+    }
     const result = runPipeline(a, art.tableId, art.viewId)
-    option.value = buildChartOption(result, view.chart, view.name, view.flags ?? [], { hideTitle: true }).option
-  } catch {
+    const built = buildChartOption(result, view.chart, view.name, view.flags ?? [], { hideTitle: true })
+    if (token !== gen) return
+    // 缺映射时 build 返回 EMPTY_FIGURE（data=[]），视为失败而非空白「成功」
+    if (!built.option?.data?.length || built.option === EMPTY_FIGURE) {
+      failed.value = true
+      failReason.value = built.warnings?.length ? built.warnings.join('；') : '图表数据为空'
+      return
+    }
+    option.value = built.option
+  } catch (e) {
     failed.value = true
+    failReason.value = e instanceof Error ? e.message : '图表构建失败'
   }
 }
 
@@ -62,7 +82,9 @@ const chartType = computed(() => props.artifact.viewType ?? 'chart')
 <template>
   <div class="acc" data-testid="ai-chart-card">
     <ChartPanel v-if="option" :option="option" class="acc__chart" />
-    <div v-else-if="failed" class="acc__fail">图表构建失败</div>
+    <div v-else-if="failed" class="acc__fail" :title="failReason">
+      {{ failReason || '图表构建失败' }}
+    </div>
     <div v-else class="acc__loading">{{ chartType }} 加载中…</div>
   </div>
 </template>
@@ -87,6 +109,8 @@ const chartType = computed(() => props.artifact.viewType ?? 'chart')
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 12px;
+  text-align: center;
   font-size: var(--is-text-xs);
   color: var(--is-text-tertiary);
 }

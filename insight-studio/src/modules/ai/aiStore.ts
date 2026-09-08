@@ -28,6 +28,7 @@ import {
   type ChatAttachmentSnapshot,
 } from './attachments'
 import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
+import { inferAnalysisIntent } from './intentHint'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
@@ -348,6 +349,10 @@ export const useAiStore = defineStore('ai', {
           .filter((m) => m.id !== assistant.id)
           .map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
       ]
+      const intent = inferAnalysisIntent(input)
+      if (intent.prompt) {
+        chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: intent.prompt })
+      }
       const mentionCtx = buildMentionContext(analysis, mentions)
       if (mentionCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: mentionCtx })
 

@@ -29,7 +29,7 @@ export function coerceParsedToolArgs(
   args: Record<string, unknown>,
 ): Record<string, unknown> {
   const next = { ...args }
-  if (toolName === 'set_chart_config') {
+  if (toolName === 'set_chart_config' || toolName === 'create_chart') {
     if (!next.configure && Array.isArray(next.values)) {
       next.configure = { values: next.values }
       delete next.values
@@ -41,6 +41,9 @@ export function coerceParsedToolArgs(
     if (typeof next.field === 'string' && next.field.trim() && !next.configure) {
       next.configure = { values: [{ field: next.field.trim() }] }
       delete next.field
+    }
+    if (toolName === 'create_chart' && !next.chartType && typeof next.type === 'string') {
+      next.chartType = next.type
     }
   }
   return next

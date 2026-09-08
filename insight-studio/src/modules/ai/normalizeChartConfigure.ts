@@ -50,7 +50,7 @@ const VALUES_TYPES = new Set(['line', 'scatter', 'bignumber'])
 const Y_TYPES = new Set(['bar', 'box'])
 
 const X_NAME_HINT =
-  /^(clone|parent|sample|name|id|label|category|group|series|species|campaign|batch|well|antibody|pur)/i
+  /^(clone|parent|sample|name|id|label|category|group|series|species|campaign|batch|well|antibody|pur|title|compound|route)/i
 
 /** 返回浅拷贝后的 configure，不修改入参。 */
 export function normalizeAiChartConfigure(
@@ -94,7 +94,18 @@ export function normalizeAiChartConfigure(
   return next
 }
 
-/** 按 field / title 不区分大小写解析真实列名。 */
+/** 归一化列名：去单位括号、空白/下划线/连字符与其它标点，便于模糊匹配。 */
+export function normalizeFieldKey(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, '')
+    .replace(/（[^）]*）/g, '')
+    .replace(/[_\s\-./]+/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '')
+}
+
+/** 按 field / title 不区分大小写解析真实列名；支持去单位括号与空格差异。 */
 export function resolveColumnField(raw: string, columns: ColumnMeta[]): string | undefined {
   const key = raw.trim()
   if (!key) return undefined
@@ -107,7 +118,17 @@ export function resolveColumnField(raw: string, columns: ColumnMeta[]): string |
   if (byTitle) return byTitle.field
   // 去下划线/空格后再比
   const compact = lower.replace(/[_\s-]+/g, '')
-  return columns.find((c) => c.field.toLowerCase().replace(/[_\s-]+/g, '') === compact)?.field
+  const byCompact = columns.find((c) => c.field.toLowerCase().replace(/[_\s-]+/g, '') === compact)
+  if (byCompact) return byCompact.field
+  const byTitleCompact = columns.find((c) => c.title.toLowerCase().replace(/[_\s-]+/g, '') === compact)
+  if (byTitleCompact) return byTitleCompact.field
+  // 去单位括号：localStrain ↔ localStrain(kcal)；Dose ↔ Dose (mg/kg)
+  const norm = normalizeFieldKey(key)
+  if (!norm) return undefined
+  return (
+    columns.find((c) => normalizeFieldKey(c.field) === norm)?.field ??
+    columns.find((c) => normalizeFieldKey(c.title) === norm)?.field
+  )
 }
 
 function remapField(m: FieldMapping | undefined, columns: ColumnMeta[]): FieldMapping | undefined {

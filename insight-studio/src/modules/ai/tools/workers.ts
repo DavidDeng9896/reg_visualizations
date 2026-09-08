@@ -80,6 +80,7 @@ export const WORKER_SPECS: Record<string, WorkerSpec> = {
       'rerun_stale_steps',
       'refresh_sql_source',
       'create_view',
+      'create_chart',
       'set_chart_config',
       'create_dashboard',
       'add_dashboard_widget',

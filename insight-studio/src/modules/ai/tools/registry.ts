@@ -215,13 +215,33 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'create_view',
-    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。',
+    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。出图请优先用 create_chart（原子配置，避免空图）。',
     parameters: { type: 'object', properties: { tableId: str('表 id'), type: str('视图类型'), name: str('视图名（可选）') }, required: ['tableId', 'type'] },
+  },
+  {
+    name: 'create_chart',
+    description:
+      '原子建图：创建图表视图并一次写全 configure；校验失败不留下空图。优先于 create_view+set_chart_config。field 必须来自 get_table_schema。bar: {x,y}；scatter/line: {x,values[]}。',
+    parameters: {
+      type: 'object',
+      properties: {
+        tableId: str('表 id（可省略：当前/唯一表）'),
+        chartType: str('图种：bar/line/scatter/box/pie/heatmap/bignumber'),
+        name: str('视图名（可选）'),
+        configure: {
+          type: 'object',
+          description:
+            '映射。bar: {x:{field}, y:{field, aggregation?}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}',
+        },
+        style: { type: 'object', description: '样式（部分更新）' },
+      },
+      required: ['chartType'],
+    },
   },
   {
     name: 'set_chart_config',
     description:
-      '配置图表。务必一次给出完整 configure。示例 bar: {x:{field}, y:{field, aggregation:"sum"}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}。y 是对象不是数组；聚合用 aggregation 不是 aggregate。缺槽会尽量自动补齐。tableId/viewId 可省略。已「配置完成」勿重复调用。勿为配图去 read_skill。',
+      '配置已有图表。务必一次给出完整 configure。示例 bar: {x:{field}, y:{field, aggregation:"sum"}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}。y 是对象不是数组；聚合用 aggregation 不是 aggregate。缺槽会尽量自动补齐。校验失败不会写入半成品配置。tableId/viewId 可省略。已「配置完成」勿重复调用。新建图优先 create_chart。',
     parameters: {
       type: 'object',
       properties: {

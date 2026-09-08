@@ -126,6 +126,9 @@ describe('AI 工具实现（execTool）', () => {
     const bad = await execTool('set_chart_config', { tableId: iris.id, viewId, configure: { x: { field: 'nope' } } }, ctx)
     expect(bad.ok).toBe(false)
     expect(bad.summary).toContain('校验未通过')
+    // 校验失败不得写入半成品（空图根因）
+    const afterBad = findView(findTable(analysis, iris.id)!.views, viewId!)
+    expect(afterBad!.chart!.configure.x?.field).not.toBe('nope')
 
     const viaY = await execTool(
       'set_chart_config',
@@ -145,6 +148,69 @@ describe('AI 工具实现（execTool）', () => {
     const view = findView(findTable(analysis, iris.id)!.views, viewId!)
     expect(view!.chart!.style.fitAnnotation).toBe(true)
     expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
+  })
+
+  it('create_chart：原子建图；失败不留空视图', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.views.length
+    const bad = await execTool(
+      'create_chart',
+      { tableId: iris.id, chartType: 'scatter', configure: { x: { field: 'nope' } } },
+      ctx,
+    )
+    expect(bad.ok).toBe(false)
+    expect(iris.views.length).toBe(before)
+
+    const good = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '物种柱',
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length', aggregation: 'mean' } },
+      },
+      ctx,
+    )
+    expect(good.ok).toBe(true)
+    expect(good.artifact?.viewType).toBe('bar')
+    expect(iris.views.length).toBe(before + 1)
+    const view = iris.views.find((v) => v.name === '物种柱')
+    expect(view?.chart?.configure.x?.field).toBe('species')
+    expect(view?.chart?.configure.y?.field).toBe('sepal_length')
+  })
+
+  it('create_chart + 复杂表头（docking fixture）：模糊字段可配散点', async () => {
+    const { analysis } = await seedStore()
+    const csv = [
+      '"Stars","Title","State Penalty","docking score","localStrain(kcal)","globalStrain(kcal)","glide gscore"',
+      '2,"20241105_D1_T1",0.0216,-8.121,3.249,10.450,',
+      '2,"20241105_D2_T1",0.0000,-6.465,3.008,6.630,',
+    ].join('\n')
+    const imported = await execTool('import_csv_text', { tableName: 'docking', csv }, ctx)
+    expect(imported.ok).toBe(true)
+    const table = analysis.tables.find((t) => t.name === 'docking')!
+    const schema = await execTool('get_table_schema', { tableId: table.id }, ctx)
+    expect(schema.summary).toContain('field=`docking score`')
+    expect(schema.summary).toContain('field=`localStrain(kcal)`')
+
+    const res = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'scatter',
+        name: 'docking vs strain',
+        configure: {
+          x: { field: 'docking score' },
+          values: [{ field: 'localStrain' }],
+        },
+      },
+      ctx,
+    )
+    expect(res.ok, res.summary).toBe(true)
+    const view = table.views.find((v) => v.name === 'docking vs strain')
+    expect(view?.chart?.configure.x?.field).toBe('docking score')
+    expect(view?.chart?.configure.values?.[0]?.field).toBe('localStrain(kcal)')
   })
 
   it('add_filter_step：缺 tableId 时回退分析内唯一/最近表', async () => {

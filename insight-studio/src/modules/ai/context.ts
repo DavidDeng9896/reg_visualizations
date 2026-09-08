@@ -2,18 +2,10 @@
 import type { Analysis, AnalysisTable } from '../../shared/types'
 import { CONTEXT_HEADER } from './prompts'
 import type { AttachmentKind } from './attachments'
+import { formatTableBrief } from './tableSchema'
 
 function tableBrief(t: AnalysisTable, withSample = true): string {
-  const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
-  const lines = [`- 「${t.name}」(id: ${t.id}) ${t.rows.length} 行 × ${t.columns.length} 列：${cols}`]
-  if (withSample && t.rows.length) {
-    const sample = t.rows.slice(0, 3).map((r) => `  ${t.columns.map((c) => String(r[c.field] ?? '')).join(' | ')}`)
-    lines.push(...sample)
-  }
-  if (t.views.length) {
-    lines.push(`  视图：${t.views.map((v) => `「${v.name}」(${v.type}, id: ${v.id})`).join('、')}`)
-  }
-  return lines.join('\n')
+  return formatTableBrief(t, withSample)
 }
 
 /** 当前分析的简要上下文（注入第一轮）。 */
@@ -26,7 +18,7 @@ export function buildAnalysisContext(analysis: Analysis | null): string {
     CONTEXT_HEADER,
     `当前分析：「${analysis.name}」(id: ${analysis.id}${analysis.project ? `，项目 ${analysis.project}` : ''})`,
     steps,
-    '表：',
+    '表（列以 field= 机器名为准；含空格/括号单位时必须原样使用）：',
     ...analysis.tables.slice(0, 6).map((t) => tableBrief(t)),
   ].join('\n')
 }
