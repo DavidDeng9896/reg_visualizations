@@ -23,14 +23,15 @@ export interface AnalysisIntentHint {
   reasons: string[]
 }
 
-const CHART_WORDS = /图|图表|可视化|出图|画|plot|chart|visuali[sz]/i
+const CHART_WORDS = /(?<!不|别|勿|无需|不用)(图|图表|可视化|出图|画图|plot|chart|visuali[sz])/i
 const COMPARE = /对比|比较|高低|排名|top\s*\d+|柱状|条形|bar\b/i
 const TREND = /趋势|随时间|随剂量|折线|line\b|time\s*series|随.*变化/i
 const CORRELATE = /相关|散点|scatter|vs\.?|versus|相关性|回归/i
 const DIST = /分布|箱线|box\b|histogram|直方|离散/i
 const SHARE = /占比|比例|pie|饼图|构成/i
 const STAT = /p\s*值|显著性|anova|t\s*-?\s*test|ic50|ec50|auc\b|拟合|statlib|组间|剂量.?反应/i
-const TRANSFORM = /清洗|过滤|派生|join|合并|只要表|不要图|别出图/i
+const TRANSFORM = /清洗|过滤|派生|join|合并|只要表|不要图|别出图|无需出图|不用画图/i
+const NO_CHART = /不要图|别出图|无需出图|不用画图|不要可视化|先不出图/i
 const EXPLORE = /看看|概览|探索|分析一下|帮我分析|快速分析|总结数据/i
 
 function uniq(xs: string[]): string[] {
@@ -48,7 +49,9 @@ export function inferAnalysisIntent(userText: string): AnalysisIntentHint {
   const chartTypes: string[] = []
   let kind: AnalysisIntentKind = 'unknown'
 
-  if (TRANSFORM.test(text) && !CHART_WORDS.test(text)) {
+  const wantsChart = CHART_WORDS.test(text) && !NO_CHART.test(text)
+
+  if ((TRANSFORM.test(text) && NO_CHART.test(text)) || (TRANSFORM.test(text) && !wantsChart && !COMPARE.test(text) && !CORRELATE.test(text))) {
     kind = 'transform_only'
     reasons.push('transform')
   } else if (STAT.test(text)) {
@@ -72,7 +75,7 @@ export function inferAnalysisIntent(userText: string): AnalysisIntentHint {
     kind = 'chart_distribution'
     chartTypes.push('box')
     reasons.push('distribution')
-  } else if (COMPARE.test(text) || CHART_WORDS.test(text)) {
+  } else if (COMPARE.test(text) || wantsChart) {
     kind = 'chart_compare'
     chartTypes.push('bar')
     reasons.push(COMPARE.test(text) ? 'compare' : 'chart')

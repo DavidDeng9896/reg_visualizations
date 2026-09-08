@@ -2,9 +2,11 @@
 
 **日期：** 2026-09-08  
 **分支：** `feat/ai-analysis-capability-upgrade`  
-**范围：** 只读调查 + 架构级升级计划（本文件）。**本轮无产品代码改动。**  
+**范围：** 调查 + **已落地首批代码修复**（见同目录 `ai-analysis-upgrade.md` 与 PR）。  
 **仓库：** `DavidDeng9896/reg_visualizations`（Insight Studio）  
 **对照样例源：** 兄弟仓 `DavidDeng9896/data_entry_ai` + 本仓已有 `docs/dev/ai-agent-lifecycle-test/`
+
+> **实现状态（2026-09-08）：** Intent 启发式注入、`tableSchema` 富字段摘要、原子 `create_chart`、校验后写入 `set_chart_config`、`AiChartCard` 空 figure 失败提示、data_entry_ai fixtures + 单测 + MiniMax live smoke 已合入本分支。更细运行说明见 `docs/ai-analysis-upgrade.md`。
 
 ---
 

@@ -94,6 +94,16 @@ describe('autofillRequiredChartSlots', () => {
     expect(resolved.values?.[0]?.field).toBe('KD_nM')
   })
 
+  it('去单位括号匹配 localStrain ↔ localStrain(kcal)', () => {
+    const withUnit: ColumnMeta[] = [
+      { field: 'Title', title: 'Title', dataType: 'string' },
+      { field: 'localStrain(kcal)', title: 'localStrain(kcal)', dataType: 'number' },
+      { field: 'docking score', title: 'docking score', dataType: 'number' },
+    ]
+    expect(resolveColumnField('localStrain', withUnit)).toBe('localStrain(kcal)')
+    expect(resolveColumnField('docking_score', withUnit)).toBe('docking score')
+  })
+
   it('失败提示包含可用列与示例 configure', () => {
     const hint = formatChartMappingFailHint(
       'scatter',
