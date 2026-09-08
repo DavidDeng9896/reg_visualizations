@@ -215,25 +215,31 @@ export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
   return out
 }
 
+/** SSE 流结束原因：'length' 表示被 max_tokens 截断（需要续写）。 */
+export type SseFinishReason = 'stop' | 'length' | 'tool_calls' | string
+
 /**
  * 解析 OpenAI SSE 流：逐 chunk 回调 delta 文本与 tool_calls 增量，
- * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文）。
+ * 返回聚合后的 assistant 消息（content + tool_calls，附 reasoning 思考全文与 finishReason）。
  */
 export async function readSseStream(
   res: Response,
   onToken?: (text: string) => void,
   onReasoningToken?: (text: string) => void,
-): Promise<ChatMessage & { reasoning?: string }> {
+): Promise<ChatMessage & { reasoning?: string; finishReason?: SseFinishReason }> {
   if (!res.body) throw new Error('响应无流式内容')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let content = ''
   let reasoning = ''
+  let finishReason: SseFinishReason | undefined
   const calls = new Map<number, ToolCall>()
 
   function applyChunk(chunk: SseChunk): void {
-    const delta = chunk.choices?.[0]?.delta
+    const choice = chunk.choices?.[0]
+    if (choice?.finish_reason) finishReason = choice.finish_reason
+    const delta = choice?.delta
     if (!delta) return
     if (delta.content) {
       content += delta.content
@@ -299,6 +305,7 @@ export async function readSseStream(
     content: content || null,
     ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
     ...(reasoning ? { reasoning } : {}),
+    ...(finishReason ? { finishReason } : {}),
   }
 }
 
@@ -489,6 +496,8 @@ export function sanitizeModelError(raw: string): string {
 export interface ConversationMeta {
   id: string
   analysisId: string | null
+  /** Custom Code 步骤会话：挂到步骤上。 */
+  stepId?: string | null
   title: string
   createdAt: string
   updatedAt: string
@@ -499,9 +508,14 @@ export interface ConversationDoc extends ConversationMeta {
 }
 
 export const aiConvApi = {
-  list: () => req<ConversationMeta[]>('/api/ai/conversations', undefined, { withUser: true }),
+  list: (stepId?: string) =>
+    req<ConversationMeta[]>(
+      stepId ? `/api/ai/conversations?stepId=${encodeURIComponent(stepId)}` : '/api/ai/conversations',
+      undefined,
+      { withUser: true },
+    ),
   get: (id: string) => req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, undefined, { withUser: true }),
-  create: (body: { analysisId?: string | null; title?: string; messages?: unknown[] }) =>
+  create: (body: { analysisId?: string | null; stepId?: string | null; title?: string; messages?: unknown[] }) =>
     req<ConversationDoc>('/api/ai/conversations', { method: 'POST', body: JSON.stringify(body) }, { withUser: true }),
   update: (id: string, body: { title?: string; messages?: unknown[]; analysisId?: string | null }) =>
     req<ConversationDoc>(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, { withUser: true }),

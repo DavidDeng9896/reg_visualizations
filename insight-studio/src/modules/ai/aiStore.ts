@@ -957,8 +957,8 @@ export const useAiStore = defineStore('ai', {
   },
 })
 
-/** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用）。 */
-function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
+/** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用；codeAiStore 亦复用）。 */
+export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
   return (e) => {
     if (e.type === 'round') {
       // 每轮重新累计可见正文与思考；避免多轮独白/reasoning 堆成墙

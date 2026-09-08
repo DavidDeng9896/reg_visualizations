@@ -249,6 +249,9 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
   const MAX_TOOL_SPIN = 3
   let toolSpinNudges = 0
   const MAX_TOOL_SPIN_NUDGES = 2
+  /** finish_reason=length 截断自动续写次数（防长输出整一半停住）。 */
+  let lengthContinues = 0
+  const MAX_LENGTH_CONTINUES = 2
 
   const noteToolSpin = (name: string, args: Record<string, unknown>, result: ToolExecResult) => {
     const argKey = JSON.stringify(args ?? {})
@@ -326,9 +329,23 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       onEvent({ type: 'error', message: msg })
       throw new AgentRunError(msg, messages)
     }
-    // reasoning 只用于 UI 展示，不回灌上游（兼容模式对未知字段可能 400）
-    const { reasoning: _reasoning, ...assistant } = streamed
+    // reasoning / finishReason 只用于 UI / 流程判断，不回灌上游（兼容模式对未知字段可能 400）
+    const { reasoning: _reasoning, finishReason, ...assistant } = streamed
     messages.push(assistant)
+
+    // 输出被 max_tokens 截断（长代码/长文写一半）：注入续写指令再进一轮，上限 2 次。
+    if (
+      finishReason === 'length' &&
+      !(assistant.tool_calls?.length) &&
+      lengthContinues < MAX_LENGTH_CONTINUES
+    ) {
+      lengthContinues += 1
+      messages.push({
+        role: 'system',
+        content: '（上一条输出因长度限制被截断。请从截断处继续输出剩余内容，不要重复已输出的部分，不要加任何说明。）',
+      })
+      continue
+    }
 
     const calls = assistant.tool_calls ?? []
     if (!calls.length) {
@@ -564,7 +581,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       (text) => onEvent({ type: 'token', text }),
       (text) => onEvent({ type: 'reasoning', text }),
     )
-    const { reasoning: _r2, ...finalMsg } = finalStream
+    const { reasoning: _r2, finishReason: _fr2, ...finalMsg } = finalStream
     messages.push(finalMsg)
     if (finalMsg.content) {
       emitIncompleteIfNeeded()
