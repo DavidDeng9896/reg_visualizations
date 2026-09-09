@@ -95,7 +95,28 @@ cd python-worker && npm run install-deps && npm start
 
 ## 测试
 
-需要本机可连的 MariaDB（同上 `docker compose up -d` 或 `INSIGHT_DB_*`）。每个测试会建独立 `insight_test_*` 库并在结束后删除。
+需要本机可连的 MariaDB（同上 `docker compose up -d` 或 `INSIGHT_DB_*`）。
+
+`storetest` 解析顺序：
+
+1. **`INSIGHT_TEST_DSN`**（推荐在无 CREATE 权限时）→ 使用已存在的测试库，测前清空表。
+2. 否则尝试 **`CREATE DATABASE insight_test_*`**（隔离最好；需要用户有 CREATE）。
+3. 若遇 **Error 1044**（无 CREATE）→ 回退到固定库 **`insight_test`**（可用 `INSIGHT_TEST_DB` 覆盖），测前清空表。
+4. 固定库也不可用 → **skip**，并提示跑授权脚本。
+
+`docker compose` 新 volume 会执行 `migrations/02-grants.sql`（创建 `insight_test` + GRANT）。**已有 volume** 不会重跑 init，请执行：
+
+```bash
+cd insight-api-go
+./scripts/grant-test-privileges.sh
+```
+
+或显式指定测试库 DSN：
+
+```bash
+export INSIGHT_TEST_DSN='insight:insight@tcp(127.0.0.1:3306)/insight_test'
+go test ./...
+```
 
 ```bash
 go test ./...
