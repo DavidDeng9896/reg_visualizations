@@ -36,17 +36,50 @@ export function normalizeLine(s: string): string {
     .replace(/[：:。.!！?？,，、；;]+$/g, '')
 }
 
+const FENCE_PLACEHOLDER = /@@FENCE_(\d+)@@/g
+const FENCE_BLOCK = /```[^\n]*\r?\n[\s\S]*?(?:```|$)/g
+
+/** 未加围栏的 Python / Custom Code：行级去重会砍掉合法重复语句。 */
+function looksLikePythonSource(s: string): boolean {
+  if (/\bdef\s+custom_code\s*\(/.test(s)) return true
+  const lines = s.split(/\n/).map((l) => l.trim()).filter(Boolean)
+  if (lines.length < 12) return false
+  let hits = 0
+  for (const l of lines) {
+    if (
+      /^(import\s+|from\s+\S+\s+import|def\s+|class\s+|if\s+|elif\s+|else:|for\s+|while\s+|return\s+|try:|except\b|with\s+|@|#\s*=+|print\()/.test(
+        l,
+      )
+    ) {
+      hits += 1
+    }
+  }
+  return hits / lines.length >= 0.45
+}
+
 /**
  * 去掉连续重复段落与「好，让我直接…」类填充句堆叠。
  * 保留首个出现；若全文几乎全是同一句循环，压成一句并加省略说明。
+ * 代码围栏与 Custom Code 源码整段保留，避免长脚本被当成复读墙截断。
  */
 export function scrubVisibleContent(text: string, opts?: { maxLines?: number }): string {
   const raw = String(text ?? '').trim()
   if (!raw) return ''
+  const fences: string[] = []
+  const masked = raw.replace(FENCE_BLOCK, (block) => {
+    fences.push(block)
+    return `\n\n@@FENCE_${fences.length - 1}@@\n\n`
+  })
+  if (fences.length === 0 && looksLikePythonSource(raw)) return raw
+
   const maxLines = opts?.maxLines ?? 40
+  const scrubbed = scrubProse(masked, maxLines)
+  return scrubbed.replace(FENCE_PLACEHOLDER, (_, n) => fences[Number(n)] ?? '')
+}
+
+function scrubProse(raw: string, maxLines: number): string {
   const parts = raw.split(/\n+/).map((p) => p.trim()).filter(Boolean)
   if (parts.length <= 1) {
-    // 单段内用句号切分再去重
     const sentences = raw.split(/(?<=[。！？\n])/).map((s) => s.trim()).filter(Boolean)
     if (sentences.length < 4) return raw
     return collapseSimilar(sentences, maxLines).join('')
@@ -60,6 +93,10 @@ function collapseSimilar(parts: string[], maxLines: number): string[] {
   let dropped = 0
   let fillerKept = 0
   for (const p of parts) {
+    if (/^@@FENCE_\d+@@$/.test(p)) {
+      out.push(p)
+      continue
+    }
     const key = normalizeLine(p)
     if (!key) continue
     const count = seen.get(key) ?? 0
