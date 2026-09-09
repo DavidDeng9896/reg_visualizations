@@ -6,7 +6,7 @@
 import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCodeAiStore } from '../../ai/codeAiStore'
 import ReasoningCard from '../../ai/ReasoningCard.vue'
-import { extractThinkLeakage } from '../../ai/contentScrub'
+import { assistantBubbleText } from '../../ai/contentScrub'
 import { IButton, IIcon } from '../../../ui'
 
 interface MsgPart {
@@ -59,7 +59,7 @@ watch(
 
 /** 气泡正文：先剥 MiniMax `<think>`，再拆 python 代码块（流式未闭合围栏也按代码块）。 */
 function splitParts(content: string): MsgPart[] {
-  const visible = extractThinkLeakage(content).visible
+  const visible = assistantBubbleText(content)
   const parts: MsgPart[] = []
   const re = /```(?:python)?[ \t]*\r?\n?([\s\S]*?)(?:```|$)/g
   let last = 0
@@ -163,7 +163,7 @@ defineExpose({ ingestError })
           </div>
         </div>
       </template>
-      <div v-if="loading && lastMsg && !lastMsg.content && !lastMsg.reasoning && !lastMsg.trace.length" class="ccc__typing">
+      <div v-if="loading && lastMsg && !assistantBubbleText(lastMsg.content) && !lastMsg.reasoning && !lastMsg.trace.length" class="ccc__typing">
         思考中…
       </div>
     </div>

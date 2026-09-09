@@ -14,7 +14,7 @@ import {
 } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
-import { isNearDuplicate, isProcessMonologue, scrubVisibleContent, extractThinkLeakage } from './contentScrub'
+import { isNearDuplicate, isProcessMonologue, scrubThinkTags, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 import { TABLE_CATALOG_MARK } from './tableSchema'
 
@@ -358,11 +358,11 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     }
     // reasoning / finishReason 只用于 UI / 流程判断，不回灌上游（兼容模式对未知字段可能 400）
     const { reasoning: _reasoning, finishReason, ...assistantRaw } = streamed
-    // P0-1：历史消息也剥 `<think>`，避免下一轮上下文/持久化带回推理墙
+    // P0-1：历史消息也剥 `<think>`（readSseStream/sanitize 已 scrub；此处再闸一次）
     const assistant: ChatMessage = {
       ...assistantRaw,
       ...(typeof assistantRaw.content === 'string'
-        ? { content: extractThinkLeakage(assistantRaw.content).visible }
+        ? { content: scrubThinkTags(assistantRaw.content) || null }
         : {}),
     }
     messages.push(assistant)
@@ -626,7 +626,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     const finalMsg: ChatMessage = {
       ...finalRaw,
       ...(typeof finalRaw.content === 'string'
-        ? { content: extractThinkLeakage(finalRaw.content).visible }
+        ? { content: scrubThinkTags(finalRaw.content) || null }
         : {}),
     }
     messages.push(finalMsg)

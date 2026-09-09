@@ -10,7 +10,7 @@ import AskCard from './AskCard.vue'
 import { useAiStore, type TraceItem, type UiMessage } from './aiStore'
 import { attachmentKindIcon } from './mentionIcons'
 import { renderMd } from './renderMd'
-import { extractThinkLeakage } from './contentScrub'
+import { assistantBubbleText } from './contentScrub'
 
 /** 消息流：无气泡纯文本风格（用户右对齐 + 时间戳；助手 markdown + 思考/计划/轨迹/产物）。 */
 const props = defineProps<{
@@ -52,7 +52,7 @@ function displayContent(m: UiMessage): string {
   const body = (m.content ?? '').trim()
   const joined = [notes, body].filter(Boolean).join('\n\n')
   // 流式过程中也剥离 MiniMax `<think>` 泄漏，避免闪现到气泡
-  return extractThinkLeakage(joined).visible
+  return assistantBubbleText(joined)
 }
 </script>
 

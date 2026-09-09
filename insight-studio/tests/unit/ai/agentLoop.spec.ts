@@ -864,6 +864,40 @@ describe('readSseStream（OpenAI SSE 聚合）', () => {
     expect(msg.finishReason).toBeUndefined()
   })
 
+  it('SSE content 中的 <think> 不进 token 气泡且进 reasoning；返回 content 已剥离', async () => {
+    const chunks = [
+      { choices: [{ delta: { role: 'assistant', content: '前言\n' } }] },
+      { choices: [{ delta: { content: '<think>\n密思\n' } }] },
+      { choices: [{ delta: { content: '</think>\n' } }] },
+      { choices: [{ delta: { content: '答案' } }] },
+    ]
+    const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n'
+    const res = new Response(
+      new ReadableStream({
+        start: (c) => {
+          c.enqueue(new TextEncoder().encode(body))
+          c.close()
+        },
+      }),
+    )
+    const tokens: string[] = []
+    const reasons: string[] = []
+    const msg = await readSseStream(
+      res,
+      (t) => tokens.push(t),
+      (t) => reasons.push(t),
+    )
+    const bubbled = tokens.join('')
+    expect(bubbled).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(bubbled).not.toContain('密思')
+    expect(bubbled).toContain('前言')
+    expect(bubbled).toContain('答案')
+    expect(reasons.join('')).toContain('密思')
+    expect(String(msg.content ?? '')).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(String(msg.content ?? '')).toContain('答案')
+    expect(msg.reasoning ?? '').toContain('密思')
+  })
+
   it('每帧重发完整 arguments 时不翻倍损坏 JSON', async () => {
     const args = '{"steps":["列出表","清空"]}'
     const chunks = [
@@ -905,6 +939,21 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(out[1].tool_calls?.[0].function.name).toBe('list_tables')
     // JSON 序列化不应出现 "content":null
     expect(JSON.stringify(out[1])).not.toContain('"content"')
+  })
+
+  it('回灌历史前剥离 assistant content 中的 <think>（sanitize 闸门）', () => {
+    const out = sanitizeChatMessages([
+      { role: 'user', content: '继续' },
+      {
+        role: 'assistant',
+        content: '可见结论\n<think>\n不该进下一轮上下文\n</think>\n收尾',
+      },
+    ])
+    const asst = out.find((m) => m.role === 'assistant')
+    expect(String(asst?.content ?? '')).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(String(asst?.content ?? '')).not.toContain('不该进下一轮')
+    expect(String(asst?.content ?? '')).toContain('可见结论')
+    expect(String(asst?.content ?? '')).toContain('收尾')
   })
 
   it('mergeStreamedToolName：重发/前缀/增量', () => {

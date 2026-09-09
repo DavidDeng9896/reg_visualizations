@@ -4,6 +4,7 @@
 
 import { getCurrentUserId, USER_ID_HEADER } from '../shell/currentUser'
 import { coerceArrayToolArgs } from './toolArgs'
+import { extractThinkLeakage } from './contentScrub'
 
 /* ------------------------------- 消息类型 ------------------------------- */
 
@@ -199,9 +200,24 @@ export function sanitizeChatMessages(messages: ChatMessage[]): ChatMessage[] {
       const t = contentText(flat).trim()
       next.content = t || '(空)'
     } else if (next.role === 'assistant' && next.tool_calls?.length) {
-      const t = contentText(flat).trim()
+      const t = extractThinkLeakage(contentText(flat)).visible.trim()
       // 火山/豆包：有 tool_calls 时不要发 content:null；有正文则保留，否则省略字段
-      if (t) next.content = typeof flat === 'string' ? flat : t
+      if (t) next.content = t
+    } else if (next.role === 'assistant') {
+      // P0-1：回灌前剥离 think；保留多模态 parts 结构
+      if (Array.isArray(flat)) {
+        const parts = flat
+          .map((p) =>
+            p.type === 'text' ? { type: 'text' as const, text: extractThinkLeakage(p.text).visible } : p,
+          )
+          .filter((p) => p.type !== 'text' || p.text.trim())
+        if (!parts.length) continue
+        next.content = parts
+      } else {
+        const t = extractThinkLeakage(contentText(flat)).visible.trim()
+        if (!t) continue
+        next.content = t
+      }
     } else {
       const empty =
         flat == null ||
@@ -231,10 +247,32 @@ export async function readSseStream(
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  let content = ''
+  /** 上游原始 content（可能含 `<think>`）；对外只暴露剥离后的可见正文。 */
+  let rawContent = ''
   let reasoning = ''
+  let emittedVisible = ''
+  let emittedThinkLeak = ''
   let finishReason: SseFinishReason | undefined
   const calls = new Map<number, ToolCall>()
+
+  function emitScrubbedContentProgress(): void {
+    const { visible, thinking } = extractThinkLeakage(rawContent, { trim: false })
+    if (visible.startsWith(emittedVisible)) {
+      const visDelta = visible.slice(emittedVisible.length)
+      if (visDelta) onToken?.(visDelta)
+      emittedVisible = visible
+    } else {
+      // 罕见重写：不再回放旧 token，最终返回仍用完整 visible
+      emittedVisible = visible
+    }
+    if (thinking.startsWith(emittedThinkLeak)) {
+      const thinkDelta = thinking.slice(emittedThinkLeak.length)
+      if (thinkDelta) onReasoningToken?.(thinkDelta)
+      emittedThinkLeak = thinking
+    } else {
+      emittedThinkLeak = thinking
+    }
+  }
 
   function applyChunk(chunk: SseChunk): void {
     const choice = chunk.choices?.[0]
@@ -242,8 +280,8 @@ export async function readSseStream(
     const delta = choice?.delta
     if (!delta) return
     if (delta.content) {
-      content += delta.content
-      onToken?.(delta.content)
+      rawContent += delta.content
+      emitScrubbedContentProgress()
     }
     if (delta.reasoning_content) {
       reasoning += delta.reasoning_content
@@ -291,6 +329,8 @@ export async function readSseStream(
     }
   }
 
+  const { visible, thinking: thinkLeak } = extractThinkLeakage(rawContent)
+  const mergedReasoning = [reasoning, thinkLeak].filter(Boolean).join('\n\n').trim()
   const toolCalls = [...calls.values()]
     .filter((c) => c.function.name)
     .map((c) => ({
@@ -302,9 +342,9 @@ export async function readSseStream(
     }))
   return {
     role: 'assistant',
-    content: content || null,
+    content: visible || null,
     ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
-    ...(reasoning ? { reasoning } : {}),
+    ...(mergedReasoning ? { reasoning: mergedReasoning } : {}),
     ...(finishReason ? { finishReason } : {}),
   }
 }

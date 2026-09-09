@@ -18,8 +18,17 @@ const THINK_BLOCK_RE =
 const THINK_OPEN_TAIL_RE = /<\s*(?:think|thinking|reason|reasoning)\s*>[\s\S]*$/i
 const THINK_TAG_STRIP_RE = /<\/?\s*(?:think|thinking|reason|reasoning)\s*>/gi
 
-/** 剥离 think 泄漏；thinking 可映射到 ReasoningCard。 */
-export function extractThinkLeakage(text: string): { visible: string; thinking: string } {
+export type ExtractThinkOptions = {
+  /** 流式中间态勿 trim，避免 visible 前缀回缩导致 token 丢字。默认 true。 */
+  trim?: boolean
+}
+
+/** 剥离 think 泄漏；thinking 可映射到 ReasoningCard / debug，绝不可进用户气泡。 */
+export function extractThinkLeakage(
+  text: string,
+  opts?: ExtractThinkOptions,
+): { visible: string; thinking: string } {
+  const doTrim = opts?.trim !== false
   const chunks: string[] = []
   let visible = String(text ?? '').replace(THINK_BLOCK_RE, (block) => {
     const inner = block.replace(THINK_TAG_STRIP_RE, '').trim()
@@ -31,8 +40,19 @@ export function extractThinkLeakage(text: string): { visible: string; thinking: 
     if (inner) chunks.push(inner)
     return ''
   })
-  visible = visible.replace(/\n{3,}/g, '\n\n').trim()
+  visible = visible.replace(/\n{3,}/g, '\n\n')
+  if (doTrim) visible = visible.trim()
   return { visible, thinking: chunks.join('\n\n').trim() }
+}
+
+/** 仅剥离 think 标签（不做复读折叠）。气泡与回灌历史共用。 */
+export function scrubThinkTags(text: string): string {
+  return extractThinkLeakage(text).visible
+}
+
+/** 用户可见气泡正文：零 think 标签。 */
+export function assistantBubbleText(text: string): string {
+  return scrubThinkTags(text)
 }
 
 /**
