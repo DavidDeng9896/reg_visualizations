@@ -95,6 +95,24 @@ export function normalizeAiChartConfigure(
   return next
 }
 
+/** 模型常见错别名 → 平台槽位（normalize 会 map 掉；勿当作合法 API）。 */
+export const CHART_CONFIGURE_ALIAS_PAIRS: readonly [string, string][] = [
+  ['x_field', 'x'],
+  ['y_field', 'y'],
+  ['xField', 'x'],
+  ['yField', 'y'],
+  ['category', 'categories'],
+  ['category_field', 'categories'],
+  ['categoryField', 'categories'],
+  ['value', 'values'],
+  ['value_field', 'values'],
+  ['valueField', 'values'],
+  ['y_values', 'values'],
+]
+
+/** 不应写入 ChartConfigure 的 ECharts option 键。 */
+const ECHARTS_OPTION_KEYS = ['xAxis', 'yAxis', 'radar', 'dataset', 'graphic'] as const
+
 /**
  * 模型常见别名 → 平台槽位。不把 ECharts option 当作映射。
  * 保留合法字符串槽位由后续 asMapping 处理。
@@ -103,54 +121,62 @@ export function mapChartConfigureAliases(
   raw: Record<string, unknown>,
 ): Partial<ChartConfigure> {
   const next: Record<string, unknown> = { ...raw }
-  const aliasPairs: [string, string][] = [
-    ['x_field', 'x'],
-    ['y_field', 'y'],
-    ['xField', 'x'],
-    ['yField', 'y'],
-    ['category', 'categories'],
-    ['category_field', 'categories'],
-    ['value', 'values'],
-    ['value_field', 'values'],
-    ['y_values', 'values'],
-  ]
-  for (const [from, to] of aliasPairs) {
+  for (const [from, to] of CHART_CONFIGURE_ALIAS_PAIRS) {
     if (next[from] != null && next[to] == null) {
       next[to] = next[from]
     }
     delete next[from]
   }
-  // 剥除不应进入 ChartConfigure 的 ECharts 轴键（真正拒绝在 rejectAiChartEChartsPayload）
+  // 剥除 ECharts 轴/系列方言键（真正硬拒在 rejectAiChartEChartsPayload）
+  for (const key of ECHARTS_OPTION_KEYS) {
+    delete next[key]
+  }
   return next as Partial<ChartConfigure>
 }
 
+function isLiteralPointArray(data: unknown): boolean {
+  if (!Array.isArray(data) || data.length === 0) return false
+  return data.every(
+    (d) =>
+      typeof d === 'number' ||
+      (Array.isArray(d) && d.every((x) => typeof x === 'number' || typeof x === 'string')) ||
+      typeof d === 'string',
+  )
+}
+
+function seriesItemHasHandFilledData(item: unknown): boolean {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+  // 平台槽位 series:{field} / [{field}] 无 data — 放行
+  if ('field' in item && (item as { field?: unknown }).field != null && !('data' in item)) {
+    return false
+  }
+  return isLiteralPointArray((item as { data?: unknown }).data)
+}
+
 function looksLikeHandFilledSeriesData(series: unknown): boolean {
+  // 单对象 ECharts series: { type, data:[...] }
+  if (series && typeof series === 'object' && !Array.isArray(series)) {
+    return seriesItemHasHandFilledData(series)
+  }
   if (!Array.isArray(series)) return false
-  return series.some((item) => {
-    if (!item || typeof item !== 'object') return false
-    const data = (item as { data?: unknown }).data
-    if (!Array.isArray(data) || data.length === 0) return false
-    // 数值点 / [x,y] 点 / 类别值混排 —— AI 手填图数据，非 field 映射
-    return data.every(
-      (d) =>
-        typeof d === 'number' ||
-        (Array.isArray(d) && d.every((x) => typeof x === 'number' || typeof x === 'string')) ||
-        typeof d === 'string',
-    )
-  })
+  return series.some(seriesItemHasHandFilledData)
 }
 
 function looksLikeEChartsAxis(axis: unknown): boolean {
-  if (!axis || typeof axis !== 'object') return false
+  if (axis == null) return false
+  // ECharts 简写：xAxis: ['a','b'] / yAxis: [1,2,3]
+  if (isLiteralPointArray(axis)) return true
+  if (typeof axis !== 'object') return false
   const o = axis as Record<string, unknown>
-  if (Array.isArray(o.data)) return true
-  if (typeof o.type === 'string' && ('data' in o || 'axisLabel' in o)) return true
+  if (Array.isArray(o.data) && (o.data.length === 0 || isLiteralPointArray(o.data))) return true
+  if (typeof o.type === 'string' && ('data' in o || 'axisLabel' in o || 'name' in o)) return true
   return false
 }
 
 /**
- * P0-2 / P0-5：拒绝 AI 工具配图里的 ECharts option / 手填 series[].data。
- * 不拒绝合法字符串槽位 `x:"field"`；不拦截 Custom Code 的 go.Figure。
+ * P0-2：拒绝 AI 工具配图里的 ECharts option / 手填 series[].data。
+ * 不拒绝合法字符串槽位 `x:"docking score"` / `x:{field}` / `values:[{field}]`；
+ * 不拦截 Custom Code 的 go.Figure。
  */
 export function rejectAiChartEChartsPayload(args: Record<string, unknown>): string | null {
   const blobs: Record<string, unknown>[] = [args]
@@ -161,25 +187,24 @@ export function rejectAiChartEChartsPayload(args: Record<string, unknown>): stri
   for (const blob of blobs) {
     if (looksLikeEChartsAxis(blob.xAxis) || looksLikeEChartsAxis(blob.yAxis)) {
       return (
-        '拒绝 ECharts 风格 xAxis/yAxis（含 data）。请用平台字段映射：' +
-        'create_chart / set_chart_config 的 configure.x / y / values（可用字符串槽位 x:"fieldName"）。'
+        '拒绝 ECharts 风格 xAxis/yAxis（含字面量 data）。请用平台字段映射：' +
+        'create_chart / set_chart_config 的 configure.x / y / values' +
+        '（合法例：configure:{x:"docking score",values:[{field:"localStrain(kcal)"}]} 或 x:{field}）。'
       )
     }
     if (looksLikeHandFilledSeriesData(blob.series)) {
       return (
         '拒绝手填 series[].data 数值点。AI 配图必须用表字段映射（x/y/values.field），' +
-        '不要写 ECharts series.data；复杂自定义图请走 Custom Code 返回 go.Figure。'
+        '不要写 ECharts series.data；复杂自定义图请走 Custom Code 返回 go.Figure。' +
+        '合法例：configure:{x:"species",y:{field:"sepal_length"}}。'
       )
     }
-    // 错误别名残留：已有 x_field 且未同时提供可映射形态时提示（normalize 会 map；此处拦裸 ECharts 混用）
-    if (
-      (blob.x_field != null || blob.y_field != null) &&
-      blob.x == null &&
-      blob.y == null &&
-      blob.values == null &&
-      (blob.xAxis != null || blob.yAxis != null || looksLikeHandFilledSeriesData(blob.series))
-    ) {
-      return '检测到错误别名 x_field/y_field 与 ECharts 轴混用；请改用 configure.x / y（字符串或 {field}）。'
+    // 裸 ECharts 键（即使无 data）也拒 — 避免半成品 option 漏写
+    if (blob.xAxis != null || blob.yAxis != null) {
+      return (
+        '拒绝 ECharts 键 xAxis/yAxis。请改用 configure.x / y / values 字段槽位' +
+        '（字符串或 {field}；勿用手填坐标轴数组）。'
+      )
     }
   }
   return null

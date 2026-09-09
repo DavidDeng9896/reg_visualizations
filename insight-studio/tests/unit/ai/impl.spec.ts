@@ -224,6 +224,19 @@ describe('AI 工具实现（execTool）', () => {
     expect(echarts.summary).toMatch(/ECharts|series\.data|字段映射/i)
     expect(iris.views.length).toBe(before)
 
+    const echartsArr = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        configure: { xAxis: ['setosa', 'versicolor'], yAxis: [1, 2], series: [{ data: [10, 20] }] },
+      },
+      ctx,
+    )
+    expect(echartsArr.ok).toBe(false)
+    expect(echartsArr.summary).toMatch(/ECharts|xAxis|字面量|series\.data/i)
+    expect(iris.views.length).toBe(before)
+
     const aliased = await execTool(
       'create_chart',
       {
@@ -249,6 +262,72 @@ describe('AI 工具实现（execTool）', () => {
     )
     expect(shorthand.ok, shorthand.summary).toBe(true)
     expect(iris.views.find((v) => v.name === '字符串槽')?.chart?.configure.x?.field).toBe('species')
+  })
+
+  it('P0-2：set_chart_config 与 create_chart 共用方言门；允许 docking 字符串槽', async () => {
+    const { analysis } = await seedStore()
+    const csv = [
+      '"Stars","Title","State Penalty","docking score","localStrain(kcal)","globalStrain(kcal)","glide gscore"',
+      '2,"20241105_D1_T1",0.0216,-8.121,3.249,10.450,',
+      '2,"20241105_D2_T1",0.0000,-6.465,3.008,6.630,',
+    ].join('\n')
+    const imported = await execTool('import_csv_text', { tableName: 'docking_p02', csv }, ctx)
+    expect(imported.ok).toBe(true)
+    const table = analysis.tables.find((t) => t.name === 'docking_p02')!
+
+    const created = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'scatter',
+        name: 'docking str slots',
+        configure: { x: 'docking score', values: [{ field: 'localStrain(kcal)' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
+    const viewId = created.artifact?.viewId
+    expect(viewId).toBeTruthy()
+    expect(table.views.find((v) => v.id === viewId)?.chart?.configure.x?.field).toBe('docking score')
+
+    const bad = await execTool(
+      'set_chart_config',
+      {
+        tableId: table.id,
+        viewId,
+        configure: { xAxis: ['a', 'b'], series: [{ data: [1, 2] }] },
+      },
+      ctx,
+    )
+    expect(bad.ok).toBe(false)
+    expect(bad.summary).toMatch(/ECharts|xAxis|series\.data|字段映射/i)
+    // 校验失败不污染已有合法映射
+    expect(table.views.find((v) => v.id === viewId)?.chart?.configure.x?.field).toBe('docking score')
+
+    const reconfig = await execTool(
+      'set_chart_config',
+      {
+        tableId: table.id,
+        viewId,
+        configure: { x: { field: 'docking score' }, values: [{ field: 'localStrain(kcal)' }] },
+      },
+      ctx,
+    )
+    expect(reconfig.ok, reconfig.summary).toBe(true)
+
+    const topAlias = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'bar',
+        name: 'top-level alias',
+        x_field: 'Title',
+        y_field: 'docking score',
+      },
+      ctx,
+    )
+    expect(topAlias.ok, topAlias.summary).toBe(true)
+    expect(table.views.find((v) => v.name === 'top-level alias')?.chart?.configure.x?.field).toBe('Title')
   })
 
   it('create_chart + 复杂表头（docking fixture）：模糊字段可配散点', async () => {

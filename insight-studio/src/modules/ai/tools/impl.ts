@@ -12,7 +12,14 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
-import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint, rejectAiChartEChartsPayload } from '../normalizeChartConfigure'
+import {
+  normalizeAiChartConfigure,
+  autofillRequiredChartSlots,
+  resolveConfigureFields,
+  formatChartMappingFailHint,
+  rejectAiChartEChartsPayload,
+  CHART_CONFIGURE_ALIAS_PAIRS,
+} from '../normalizeChartConfigure'
 import { formatTableSchema } from '../tableSchema'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
@@ -261,18 +268,18 @@ function extractChartConfigure(
   if (raw && typeof raw === 'object') {
     return normalizeAiChartConfigure(chartType, raw as Partial<ChartConfig['configure']>)
   }
-  const loose: Partial<ChartConfig['configure']> = {}
+  const loose: Record<string, unknown> = {}
   for (const key of ['x', 'y', 'series', 'color', 'shape', 'size', 'categories', 'measure', 'values'] as const) {
-    if (args[key] != null) loose[key] = args[key] as never
+    if (args[key] != null) loose[key] = args[key]
   }
-  // 别名也可能出现在顶层 args（无 configure 包裹）
-  for (const key of ['x_field', 'y_field', 'xField', 'yField'] as const) {
-    if (args[key] != null) (loose as Record<string, unknown>)[key] = args[key]
+  // 别名也可能出现在顶层 args（无 configure 包裹）；与 configure 内同一套 alias map
+  for (const [from] of CHART_CONFIGURE_ALIAS_PAIRS) {
+    if (args[from] != null) loose[from] = args[from]
   }
   if (typeof args.field === 'string' && args.field.trim()) {
     loose.values = [{ field: args.field.trim() }]
   }
-  return normalizeAiChartConfigure(chartType, loose)
+  return normalizeAiChartConfigure(chartType, loose as Partial<ChartConfig['configure']>)
 }
 
 /** create_chart / set_chart_config 共用：先拒 ECharts 手填，再抽 configure。 */
