@@ -140,17 +140,23 @@ function isLiteralPointArray(data: unknown): boolean {
     (d) =>
       typeof d === 'number' ||
       (Array.isArray(d) && d.every((x) => typeof x === 'number' || typeof x === 'string')) ||
-      typeof d === 'string',
+      typeof d === 'string' ||
+      // ECharts 常见手填：[{value:10}] / [{name,value}] / [{x,y}]
+      (d != null &&
+        typeof d === 'object' &&
+        !Array.isArray(d) &&
+        ('value' in d || 'x' in d || 'y' in d)),
   )
 }
 
 function seriesItemHasHandFilledData(item: unknown): boolean {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+  const o = item as { field?: unknown; data?: unknown }
   // 平台槽位 series:{field} / [{field}] 无 data — 放行
-  if ('field' in item && (item as { field?: unknown }).field != null && !('data' in item)) {
-    return false
-  }
-  return isLiteralPointArray((item as { data?: unknown }).data)
+  if (o.field != null && !('data' in o)) return false
+  // ChartConfigure.series 仅 FieldMapping；任意非空 data = AI 手填假系列（跨表编造数值点）
+  if (Array.isArray(o.data) && o.data.length > 0) return true
+  return false
 }
 
 function looksLikeHandFilledSeriesData(series: unknown): boolean {
@@ -174,7 +180,8 @@ function looksLikeEChartsAxis(axis: unknown): boolean {
 }
 
 /**
- * P0-2：拒绝 AI 工具配图里的 ECharts option / 手填 series[].data。
+ * P0-2/P0-5：拒绝 AI 工具配图里的 ECharts option / 手填 series[].data。
+ * 仅供 create_chart / set_chart_config（prepareAiChartConfigure）；
  * 不拒绝合法字符串槽位 `x:"docking score"` / `x:{field}` / `values:[{field}]`；
  * 不拦截 Custom Code 的 go.Figure。
  */
