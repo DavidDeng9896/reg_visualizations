@@ -2,7 +2,7 @@
  * 主区空图 / 坏轴检测：映射校验通过但仍无可见墨迹，或散点绑了分类轴。
  * 供 ChartView 空态门控使用（与 AI emptyChartViews 清理门控配合，不替代侧栏文案）。
  */
-import type { ChartConfig, ColumnMeta, DataType } from '../../shared/types'
+import type { ChartConfig, ColumnMeta, DataType, FieldMapping } from '../../shared/types'
 import type { ChartOption } from './types'
 
 const CATEGORICAL: ReadonlySet<DataType> = new Set(['string', 'boolean'])
@@ -43,6 +43,19 @@ export function scatterCategoryAxisField(
 
 export function categoryScatterWarning(field: string): string {
   return `「${field}」是分类，散点图通常不合适。建议改用柱状图。`
+}
+
+/**
+ * 空图门控「改用柱状图」：scatter 常用 aggregation=none，迁到 bar 后 none 不出柱。
+ * 有 y 字段且聚合为 none/空时改为 sum；其余原样返回（同引用）。
+ */
+export function yMappingForBarAfterScatterSwitch(
+  y: FieldMapping | undefined,
+): FieldMapping | undefined {
+  if (y?.field && (!y.aggregation || y.aggregation === 'none')) {
+    return { ...y, aggregation: 'sum' }
+  }
+  return y
 }
 
 /** 主区空图文案（Lumen UX P0）。 */
