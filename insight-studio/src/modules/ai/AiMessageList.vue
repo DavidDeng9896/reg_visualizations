@@ -54,6 +54,22 @@ function displayContent(m: UiMessage): string {
   // 流式过程中也剥离 MiniMax `<think>` 泄漏，避免闪现到气泡
   return assistantBubbleText(joined)
 }
+
+/** 从产物 / 工具参数推断图种，供思考过程折叠摘要。 */
+function chartHintOf(m: UiMessage): string | null {
+  for (let i = m.artifacts.length - 1; i >= 0; i -= 1) {
+    const a = m.artifacts[i]
+    if (a.kind === 'view' && a.viewType && a.viewType !== 'table') return a.viewType
+  }
+  for (let i = m.trace.length - 1; i >= 0; i -= 1) {
+    const t = m.trace[i]
+    if (t.name !== 'create_chart' && t.name !== 'create_view' && t.name !== 'set_chart_config') continue
+    const args = t.args ?? {}
+    const raw = args.chartType ?? args.type ?? args.viewType
+    if (typeof raw === 'string' && raw && raw !== 'table') return raw
+  }
+  return null
+}
 </script>
 
 <template>
@@ -74,7 +90,12 @@ function displayContent(m: UiMessage): string {
         <div v-if="m.at" class="msg__time">{{ fmtTime(m.at) }}</div>
       </div>
       <template v-else>
-        <ReasoningCard v-if="m.reasoning" :reasoning="m.reasoning" :streaming="m.streaming" />
+        <ReasoningCard
+          v-if="m.reasoning"
+          :reasoning="m.reasoning"
+          :streaming="m.streaming"
+          :chart-hint="chartHintOf(m)"
+        />
         <PlanChecklist v-if="m.planSteps?.length" :steps="m.planSteps" :done="m.planDone ?? []" :streaming="m.streaming" />
         <TraceCard
           v-if="m.trace.length"

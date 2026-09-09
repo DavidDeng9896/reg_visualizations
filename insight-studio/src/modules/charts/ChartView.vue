@@ -25,6 +25,12 @@ import ChartConfigPanel from './panel/ChartConfigPanel.vue'
 import ModelTables from './tables/ModelTables.vue'
 import { CHART_DRAFT_CONTEXT } from './panel/context'
 import type { ChartOption, MappingError } from './types'
+import {
+  EMPTY_CHART_COPY,
+  categoryScatterWarning,
+  scatterCategoryAxisField,
+  shouldShowEmptyChartGate,
+} from './chartEmptyState'
 
 /**
  * 图表视图总装：警告条 + ECharts 容器 + 悬停导出 + 右侧配置抽屉（草稿编辑 + 实时预览）。
@@ -180,6 +186,44 @@ function touch() {
 const previewErrors = computed<MappingError[]>(() => validateChartMapping(previewConfig.value, columns.value))
 const requiredMissing = computed(() => previewErrors.value.some((e) => e.kind === 'required'))
 const missingColumns = computed(() => previewErrors.value.filter((e) => e.kind === 'missing-column'))
+
+/** 用户点「仍用散点」后，本视图内不再挡分类散点警告（仍可走无墨迹空态）。 */
+const categoryWarnDismissed = ref(false)
+watch(
+  () => view.value?.id,
+  () => {
+    categoryWarnDismissed.value = false
+  },
+)
+
+const categoryAxisField = computed(() =>
+  categoryWarnDismissed.value ? null : scatterCategoryAxisField(previewConfig.value, columns.value),
+)
+
+const showEmptyChartGate = computed(() =>
+  shouldShowEmptyChartGate({
+    requiredMissing: requiredMissing.value,
+    categoryField: categoryAxisField.value,
+    option: previewOption.value,
+    // rebuild 会写入 previewOption；不依赖 ChartPanel @rendered（空态时面板不挂载）
+    hasBuilt: previewOption.value !== null,
+  }),
+)
+
+const emptyChartDescription = computed(() => {
+  if (categoryAxisField.value) return categoryScatterWarning(categoryAxisField.value)
+  return EMPTY_CHART_COPY.body
+})
+
+function keepScatterDespiteCategory(): void {
+  categoryWarnDismissed.value = true
+}
+
+function switchScatterToBar(): void {
+  changeType('bar')
+  categoryWarnDismissed.value = true
+  panelOpen.value = true
+}
 
 // 首次进入缺必填映射时自动打开面板
 watch(
@@ -558,7 +602,7 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 
       <!-- 图表区（构建警告收进工具条芯片，不占图面） -->
       <div class="cview__stage">
-        <template v-if="!requiredMissing">
+        <template v-if="!requiredMissing && !showEmptyChartGate">
           <ChartPanel
             ref="chartRef"
             :option="previewOption"
@@ -642,13 +686,50 @@ const chartHeight = computed(() => previewConfig.value.style.height)
 
         <!-- 必填缺失空态 -->
         <IEmptyState
-          v-else
+          v-else-if="requiredMissing"
           :icon="def.icon"
           title="开始配置图表"
           description="选择 X 轴与 Y 轴字段开始绘图"
         >
           <IButton variant="primary" icon="gear" @click="panelOpen = true">打开配置面板</IButton>
         </IEmptyState>
+
+        <!-- 映射齐但无可用墨迹 / 分类散点坏轴（主区大提示，不以侧栏「计划完成」为准） -->
+        <div v-else class="cview__empty-gate" data-testid="chart-empty-gate">
+          <IEmptyState
+            :icon="def.icon"
+            :title="EMPTY_CHART_COPY.title"
+            :description="emptyChartDescription"
+          >
+            <template v-if="categoryAxisField">
+              <IButton variant="secondary" data-testid="chart-keep-scatter" @click="keepScatterDespiteCategory">
+                {{ EMPTY_CHART_COPY.keepScatter }}
+              </IButton>
+              <IButton variant="primary" data-testid="chart-switch-bar" @click="switchScatterToBar">
+                {{ EMPTY_CHART_COPY.switchBar }}
+              </IButton>
+            </template>
+            <IButton
+              v-else
+              variant="primary"
+              icon="gear"
+              data-testid="chart-open-configure"
+              @click="panelOpen = true"
+            >
+              {{ EMPTY_CHART_COPY.openConfigure }}
+            </IButton>
+          </IEmptyState>
+          <p class="cview__empty-note">{{ EMPTY_CHART_COPY.aiSidebarNote }}</p>
+          <button
+            v-if="categoryAxisField"
+            type="button"
+            class="cview__empty-config"
+            data-testid="chart-open-configure"
+            @click="panelOpen = true"
+          >
+            {{ EMPTY_CHART_COPY.openConfigure }}
+          </button>
+        </div>
       </div>
 
       <!-- MODEL TABLES 底栏（6G-1） -->
@@ -946,6 +1027,37 @@ const chartHeight = computed(() => previewConfig.value.style.height)
   /* 底部 MODEL TABLES 面板展开会把 stage 压扁：裁掉溢出的绝对定位浮层
      （Flag 工具条 / 导出按钮），避免盖住 tab bar 上的按钮 */
   overflow: hidden;
+}
+.cview__empty-gate {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px 24px;
+}
+.cview__empty-note {
+  margin: 4px 0 0;
+  max-width: 420px;
+  text-align: center;
+  font-size: var(--is-text-xs);
+  line-height: 1.55;
+  color: var(--is-text-tertiary);
+}
+.cview__empty-config {
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: var(--is-text-xs);
+  color: var(--is-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cview__empty-config:hover {
+  color: var(--is-accent-hover, var(--is-accent));
 }
 .cview__chart {
   flex: 1;
