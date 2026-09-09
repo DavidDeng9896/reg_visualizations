@@ -118,8 +118,23 @@ describe('AI 工具实现（execTool）', () => {
   it('create_view + set_chart_config：视图创建与校验提示', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: 'AI 散点' }, ctx)
-    expect(created.ok).toBe(true)
+    // P0-4：裸 create_view(图表) 禁止留下空图；带 configure 的同调创建才允许
+    const bare = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '空散点' }, ctx)
+    expect(bare.ok).toBe(false)
+    expect(bare.summary).toMatch(/create_chart|configure|空图/i)
+    expect(iris.views.some((v) => v.name === '空散点')).toBe(false)
+
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: 'AI 散点',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
     const viewId = created.summary.match(/view id: ([0-9a-f-]+)/)?.[1]
     expect(viewId).toBeTruthy()
 
@@ -286,7 +301,16 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：bar 的 y 数组写法可成功', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    await execTool('create_view', { tableId: iris.id, type: 'bar', name: 'EC50柱' }, ctx)
+    await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'bar',
+        name: 'EC50柱',
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length', aggregation: 'sum' } },
+      },
+      ctx,
+    )
     const res = await execTool(
       'set_chart_config',
       {
@@ -306,7 +330,16 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：仅传 values 时自动补齐 X', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '只给Y' }, ctx)
+    await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: '只给Y',
+        __remainingTurnCalls: [{ name: 'set_chart_config' }],
+      },
+      ctx,
+    )
     const res = await execTool(
       'set_chart_config',
       { configure: { values: [{ field: 'sepal_width' }] } },
@@ -322,7 +355,16 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：可缺 viewId，回退最近创建的图表视图', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '自动回退视图' }, ctx)
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: '自动回退视图',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
     expect(created.ok).toBe(true)
     const res = await execTool(
       'set_chart_config',
@@ -341,7 +383,17 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：可仅用 viewId 反查表；configure 可为 values 数组', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: 'kon vs koff' }, ctx)
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: 'kon vs koff',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
     const viewId = created.summary.match(/view id: ([0-9a-f-]+)/)?.[1]!
     const res = await execTool(
       'set_chart_config',

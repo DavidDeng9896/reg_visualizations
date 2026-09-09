@@ -471,12 +471,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     }
     await yieldToUi()
 
-    for (const call of calls) {
+    for (let callIdx = 0; callIdx < calls.length; callIdx += 1) {
+      const call = calls[callIdx]!
       throwIfAborted()
       const name = call.function.name
       onEvent({ type: 'tool_call', call, running: true })
       await yieldToUi()
       const args = safeParseArgs(call.function.arguments, name)
+      // P0-4：同轮剩余工具（供 create_view 判断随后是否有 set_chart_config）
+      const remainingTurnCalls = calls.slice(callIdx + 1).map((c) => ({
+        name: c.function.name,
+        args: safeParseArgs(c.function.arguments, c.function.name),
+      }))
+      const argsWithTurn = { ...args, __remainingTurnCalls: remainingTurnCalls }
 
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
@@ -563,7 +570,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
       let result: ToolExecResult
       try {
-        result = await exec(call, args)
+        result = await exec(call, argsWithTurn)
       } catch (e) {
         result = { ok: false, summary: `工具执行失败：${e instanceof Error ? e.message : String(e)}` }
       }

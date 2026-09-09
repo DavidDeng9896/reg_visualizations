@@ -874,6 +874,39 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const t = requireTable(tableRefFromArgs(args))
     const type = String(args.type ?? '') as Parameters<typeof createViewNode>[0]
     const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : defaultViewName(type, t.views)
+    // P0-4：图表视图禁止留下空/半成品；无同调 configure 时失败，引导 create_chart
+    if (type && type !== 'table') {
+      const hasConfigure =
+        args.configure != null ||
+        args.mapping != null ||
+        args.config != null ||
+        args.x != null ||
+        args.y != null ||
+        args.values != null ||
+        args.x_field != null ||
+        args.y_field != null
+      const remaining = Array.isArray(args.__remainingTurnCalls)
+        ? (args.__remainingTurnCalls as { name?: string }[])
+        : []
+      const sameTurnConfigure = remaining.some((c) => c?.name === 'set_chart_config')
+      if (!hasConfigure && !sameTurnConfigure) {
+        return fail(
+          `create_view(${type}) 未带 configure，会留下空图，已拒绝。出图请优先 create_chart（原子配置）；或在本调用传入 configure，或同轮紧跟 set_chart_config。`,
+        )
+      }
+      if (hasConfigure) {
+        return impl.create_chart(
+          {
+            ...args,
+            chartType: type,
+            type,
+            name,
+          },
+          { confirmDestructive: false, confirmWrite: false },
+        )
+      }
+      // same-turn set_chart_config：允许先建壳，随后配置；若配置失败由 set_chart_config 不写半成品
+    }
     const view = createViewNode(type, name)
     store().mutate((a) => {
       findTable(a, t.id)?.views.push(view)

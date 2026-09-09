@@ -34,8 +34,10 @@ import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } 
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
 import { capReasoningText, extractThinkLeakage, scrubVisibleContent } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
+import { analysisPathForArtifact, latestOpenableChartArtifact } from './openArtifact'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import { router } from '../../app/router'
 
 export interface TraceItem {
   id: string
@@ -483,8 +485,11 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      // 模型错误不自动续跑，交给用户点「继续任务」
-      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
+      // P0-4：计划/工具跑完后自动打开最近图表产物（离开「正在生成」、进工作区）
+      if (!aborted && !assistant.error) {
+        this.autoOpenChartArtifact(assistant)
+        await this.maybeAutoContinue(assistant)
+      }
     },
 
     /**
@@ -614,7 +619,10 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
+      if (!aborted && !assistant.error) {
+        this.autoOpenChartArtifact(assistant)
+        await this.maybeAutoContinue(assistant)
+      }
     },
 
     /** 用户关闭「继续任务」卡片，不再自动/手动提示续跑。 */
@@ -635,6 +643,17 @@ export const useAiStore = defineStore('ai', {
       if (this.running) return
       autoContinueCount += 1
       await this.continueTask({ auto: true })
+    },
+
+    /** P0-4：成功产物出现后自动跳转工作区图表（关抽屉，避免卡住「正在生成」观感）。 */
+    autoOpenChartArtifact(assistant: UiMessage): void {
+      if (planIncomplete(assistant.planSteps, assistant.planDone)) return
+      const art = latestOpenableChartArtifact(assistant.artifacts)
+      if (!art) return
+      const path = analysisPathForArtifact(art)
+      if (!path) return
+      this.drawerOpen = false
+      void router.push(path)
     },
 
     /** 构建工具集与执行器（内置 + MCP）。 */

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { IIcon } from '../../ui'
 import { useAiStore } from './aiStore'
 import AiChartCard from './AiChartCard.vue'
+import { analysisPathForArtifact } from './openArtifact'
 import type { Artifact } from './types'
 
 /** 产物卡片：名称 + 类型徽标 + （视图）图表预览，点击直达工作区。 */
@@ -39,6 +40,11 @@ function open(): void {
   ai.drawerOpen = false
   if (a.kind === 'dashboard' && a.dashboardId) {
     void router.push(`/dashboards/${a.dashboardId}`)
+    return
+  }
+  const chartPath = analysisPathForArtifact(a)
+  if (chartPath) {
+    void router.push(chartPath)
     return
   }
   if (!a.analysisId) return
