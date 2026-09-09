@@ -30,6 +30,7 @@ import {
   categoryScatterWarning,
   scatterCategoryAxisField,
   shouldShowEmptyChartGate,
+  yMappingForBarAfterScatterSwitch,
 } from './chartEmptyState'
 
 /**
@@ -221,10 +222,10 @@ function keepScatterDespiteCategory(): void {
 
 function switchScatterToBar(): void {
   changeType('bar')
-  // scatter 常用 aggregation=none；迁到 bar 后 none 聚合不出柱，改为 sum
   const y = draftModel.draft.configure.y
-  if (y?.field && (!y.aggregation || y.aggregation === 'none')) {
-    draftModel.draft.configure.y = { ...y, aggregation: 'sum' }
+  const nextY = yMappingForBarAfterScatterSwitch(y)
+  if (nextY !== y) {
+    draftModel.draft.configure.y = nextY
     touch()
   }
   categoryWarnDismissed.value = true

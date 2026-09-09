@@ -5,6 +5,7 @@ import {
   chartOptionHasVisiblePoints,
   scatterCategoryAxisField,
   shouldShowEmptyChartGate,
+  yMappingForBarAfterScatterSwitch,
 } from '../../../src/modules/charts/chartEmptyState'
 import { createChartConfig } from '../../../src/shared/factories'
 import type { ColumnMeta } from '../../../src/shared/types'
@@ -89,5 +90,19 @@ describe('chartEmptyState', () => {
     expect(EMPTY_CHART_COPY.openConfigure).toBe('打开图表配置')
     expect(EMPTY_CHART_COPY.keepScatter).toBe('仍用散点')
     expect(EMPTY_CHART_COPY.switchBar).toBe('改用柱状图')
+  })
+
+  it('yMappingForBarAfterScatterSwitch：none/空聚合 → sum，保留已有聚合', () => {
+    expect(yMappingForBarAfterScatterSwitch(undefined)).toBeUndefined()
+    expect(yMappingForBarAfterScatterSwitch({ field: 'yield', aggregation: 'none' })).toEqual({
+      field: 'yield',
+      aggregation: 'sum',
+    })
+    expect(yMappingForBarAfterScatterSwitch({ field: 'yield' })).toEqual({
+      field: 'yield',
+      aggregation: 'sum',
+    })
+    const mean = { field: 'yield', aggregation: 'mean' as const }
+    expect(yMappingForBarAfterScatterSwitch(mean)).toBe(mean)
   })
 })
