@@ -31,7 +31,7 @@ test.describe('g) 流程图', () => {
     expect(after).not.toBe(before)
 
     // 切回工作区再切回 → 位置保留（KeepAlive + flowchartLayout 持久化）
-    await page.getByRole('button', { name: 'Workspace' }).click()
+    await page.getByRole('tab', { name: 'Workspace' }).click()
     await expect(page.getByTestId('grid-stats')).toBeVisible()
     await openFlowchart(page)
     await expect(node).toHaveAttribute('style', after ?? '')
@@ -64,7 +64,7 @@ test.describe('g) 流程图', () => {
     await banner.getByLabel('关闭提示').click()
     await expect(banner).toBeHidden()
     // 模式往返后仍保持关闭（localStorage 记忆）
-    await page.getByRole('button', { name: 'Workspace' }).click()
+    await page.getByRole('tab', { name: 'Workspace' }).click()
     await openFlowchart(page)
     await expect(page.locator('.flow-banner')).toHaveCount(0)
   })
