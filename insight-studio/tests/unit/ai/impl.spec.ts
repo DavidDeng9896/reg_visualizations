@@ -755,7 +755,7 @@ describe('AI 工具实现（execTool）', () => {
     const res = await execTool('import_ai_file', { fileId: 'file-md-1' }, ctx)
     expect(res.ok).toBe(false)
     expect(res.summary).toContain('说明文档')
-    expect(res.summary).toContain('不要 import_ai_file')
+    expect(res.summary).toMatch(/禁止 import_ai_file|不要 import_ai_file/)
     // P0-3：拒绝后不得引导「编造 CSV」；表目录不得新增文档假表
     expect(res.summary).not.toMatch(/import_csv_text|生成数据表|编造|虚构/i)
     expect(analysis.tables).toHaveLength(before)
@@ -776,6 +776,7 @@ describe('AI 工具实现（execTool）', () => {
     const res = await execTool('import_ai_file', { fileId: 'file-pdf-1' }, ctx)
     expect(res.ok).toBe(false)
     expect(res.summary).toMatch(/说明文档|不支持导入|仅 csv\/excel/i)
+    expect(res.summary).toContain('禁止 import_ai_file')
     expect(res.summary).not.toMatch(/import_csv_text|生成数据表/i)
     expect(analysis.tables).toHaveLength(before)
   })
