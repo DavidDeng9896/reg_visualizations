@@ -42,8 +42,8 @@ test.describe('产品面点击清单（MariaDB 实机）', () => {
     await dlg.getByPlaceholder('例如：Binding assay analysis').fill('surface-home')
     await dlg.getByRole('button', { name: '创建' }).click()
     await page.waitForURL(/\/analysis\//)
-    await expect(page.getByRole('button', { name: 'Workspace' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Flowchart' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Workspace' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Flowchart' })).toBeVisible()
   })
 
   test('看板：新建 → 添加表组件 → 外链 → 刷新后仍在 MariaDB', async ({ page }) => {
