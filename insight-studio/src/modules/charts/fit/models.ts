@@ -455,7 +455,8 @@ export function fit4PL(ts: number[], ys: number[], ws?: number[], constraints?: 
       // λ 已放大至无法再降 SSE。若梯度已落入浮点噪声区（典型 ~1e-7 于 r²≈1），
       // 实为数值局部最优，应标 converged；旧逻辑一律 false 会误报「未收敛」
       //（engine 线性轴 4PL fixture：|g|_∞≈2e-7 且 sse 无法再降）。
-      if (gradInf < 1e-4) converged = true
+      // 阈值 1e-5：仍覆盖该 fixture，比 1e-4 更不易把半收敛标成收敛。
+      if (gradInf < 1e-5) converged = true
       break
     }
   }
