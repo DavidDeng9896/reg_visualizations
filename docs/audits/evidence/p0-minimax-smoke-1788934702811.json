@@ -1,0 +1,100 @@
+{
+  "at": "2026-09-09T06:18:22.810Z",
+  "model": "MiniMax-M2.7-highspeed",
+  "baseUrl": "https://api.minimaxi.com/v1",
+  "key_fingerprint_sha256_12": "9e1096cd3f23",
+  "checks": [
+    {
+      "id": "P0-1",
+      "title": "bubbles scrub <think>",
+      "pass": true,
+      "detail": "raw leaked think; bubble clean=true; thinking_len=283",
+      "evidence": {
+        "leaked": true,
+        "bubble_preview": "准备好两组数据（docking score 和 localStrain），用 Python（matplotlib）或 Origin 等工具，X 轴放 localStrain，Y 轴放 docking score，添加标签即可绘制散点图。",
+        "content_preview": "<think> 用户想要了解如何制作 docking score 与 localStrain 的散点图。 Docking score 通常是分子对接中评估配体与受体结合亲和力的指标，而 localStrain 可能是指分子内部的应变能或局部应变。 制作这种散点图的基本步骤： 1. 准备数据：获取每个对接构象的 docking score 和对应的 localStrain 值 2. 使用绘图软件（如",
+        "thinking_preview": "用户想要了解如何制作 docking score 与 localStrain 的散点图。\n\nDocking score 通常是分子对接中评估配体与受体结合亲和力的指标，而 localStrain 可能是指分子内部的应变能或局部应变。\n\n制作"
+      }
+    },
+    {
+      "id": "P0-3",
+      "title": "说明 alone: product hard-fail + no invent CSV",
+      "pass": true,
+      "detail": "productOk=true; tools=[import_ai_file]; inventCsv=false",
+      "evidence": {
+        "failMsg": "附件「cadd_数据说明.txt」是说明文档（kind=text），内容仅供阅读（已在对话上下文中），禁止 import_ai_file，也不会写入 TableCatalog。请改用已上传的 CSV/Excel 附件导入。",
+        "tool_calls": [
+          "import_ai_file"
+        ],
+        "inventCsv": false
+      }
+    },
+    {
+      "id": "P0-2",
+      "title": "ECharts reject OR field-mapping chart validates",
+      "pass": true,
+      "detail": "productEchartsReject=true; stringAllowed=true; offlineDockingMapping=true; live: mapping OK {\"values\":[{\"field\":\"localStrain(kcal)\"}],\"x\":{\"field\":\"docking score\"}}; tools=create_chart",
+      "evidence": {
+        "echarts_reject": "拒绝 ECharts 风格 xAxis/yAxis（含字面量 data）。请用平台字段映射：create_chart / set_chart_config 的 configure.x / y / values（合法例：configure:{",
+        "tool_calls": [
+          "create_chart"
+        ],
+        "args": "{\"chartType\": \"scatter\", \"configure\": {\"xField\": \"docking score\", \"values\": [{\"field\": \"localStrain(kcal)\"}]}, \"tableId\": \"t-dock\"}",
+        "offline_configure": {
+          "x": {
+            "field": "docking score"
+          },
+          "values": [
+            {
+              "field": "localStrain(kcal)"
+            }
+          ]
+        },
+        "mappingOk": true,
+        "offlineOk": true
+      }
+    },
+    {
+      "id": "P0-4",
+      "title": "no empty chart left; idle/auto-open path (headed UI not in this smoke)",
+      "pass": true,
+      "detail": "autoOpenOk=true; productIncompleteDetect=true; completeCfg=true; bareEmptyAttempt=false; usedChartTool=true; tools=[create_chart]; headed_ui=false",
+      "evidence": {
+        "path": "/analysis/a1?tableId=t1&viewId=v1",
+        "tool_calls": [
+          "create_chart"
+        ],
+        "bareEmpty": false,
+        "usedChart": true,
+        "ui_headed": false,
+        "note": "UI idle/drawer open requires headed Playwright — not run"
+      }
+    },
+    {
+      "id": "P0-5",
+      "title": "no fake series without join; join both ids",
+      "pass": true,
+      "detail": "seriesReject=true; fieldSeriesAllowed=true; joinCalls=1; joinMissing=false; modelFakeSeries=false; tools=add_join_step",
+      "evidence": {
+        "joins": [
+          {
+            "leftTableId": "t-dock",
+            "rightTableId": "t-pk",
+            "joinType": "left",
+            "keys": [
+              {
+                "left": "Title",
+                "right": "Compound ID"
+              }
+            ]
+          }
+        ],
+        "tool_calls": [
+          "add_join_step"
+        ],
+        "fakeSeriesAttempt": false
+      }
+    }
+  ],
+  "all_pass": true
+}
