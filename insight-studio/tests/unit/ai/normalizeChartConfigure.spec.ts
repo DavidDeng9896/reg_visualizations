@@ -68,6 +68,51 @@ describe('normalizeAiChartConfigure', () => {
     expect(out.x?.field).toBe('weight')
     expect(out.values?.[0]?.field).toBe('length')
   })
+
+  it('P0-2：x_field/y_field 别名映射到 x/y；字符串槽位仍有效', () => {
+    const out = normalizeAiChartConfigure('bar', {
+      x_field: 'species',
+      y_field: 'sepal_length',
+    } as unknown as Partial<import('../../../src/shared/types').ChartConfigure>)
+    expect(out.x?.field).toBe('species')
+    expect(out.y?.field).toBe('sepal_length')
+  })
+})
+
+describe('rejectAiChartEChartsPayload (P0-2/P0-5)', () => {
+  it('拒绝 ECharts xAxis/yAxis + series.data 手填数值点', async () => {
+    const { rejectAiChartEChartsPayload } = await import(
+      '../../../src/modules/ai/normalizeChartConfigure'
+    )
+    expect(
+      rejectAiChartEChartsPayload({
+        configure: {
+          xAxis: { data: ['a', 'b'] },
+          yAxis: {},
+          series: [{ data: [1, 2, 3] }],
+        },
+      }),
+    ).toMatch(/ECharts|xAxis|series\.data|字段映射/i)
+  })
+
+  it('不拒绝合法字符串槽位 x:"field"', async () => {
+    const { rejectAiChartEChartsPayload } = await import(
+      '../../../src/modules/ai/normalizeChartConfigure'
+    )
+    expect(rejectAiChartEChartsPayload({ configure: { x: 'species', y: 'sepal_length' } })).toBeNull()
+    expect(rejectAiChartEChartsPayload({ x: 'species', y: 'sepal_length' })).toBeNull()
+  })
+
+  it('拒绝顶层手填 series[].data 数值点（AI 配图，非 Custom Code Figure）', async () => {
+    const { rejectAiChartEChartsPayload } = await import(
+      '../../../src/modules/ai/normalizeChartConfigure'
+    )
+    expect(
+      rejectAiChartEChartsPayload({
+        series: [{ name: 's1', data: [10, 20, 30] }],
+      }),
+    ).toMatch(/series\.data|手填|字段映射/i)
+  })
 })
 
 describe('autofillRequiredChartSlots', () => {

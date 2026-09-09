@@ -12,7 +12,7 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
-import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
+import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint, rejectAiChartEChartsPayload } from '../normalizeChartConfigure'
 import { formatTableSchema } from '../tableSchema'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
@@ -254,10 +254,24 @@ function extractChartConfigure(
   for (const key of ['x', 'y', 'series', 'color', 'shape', 'size', 'categories', 'measure', 'values'] as const) {
     if (args[key] != null) loose[key] = args[key] as never
   }
+  // 别名也可能出现在顶层 args（无 configure 包裹）
+  for (const key of ['x_field', 'y_field', 'xField', 'yField'] as const) {
+    if (args[key] != null) (loose as Record<string, unknown>)[key] = args[key]
+  }
   if (typeof args.field === 'string' && args.field.trim()) {
     loose.values = [{ field: args.field.trim() }]
   }
   return normalizeAiChartConfigure(chartType, loose)
+}
+
+/** create_chart / set_chart_config 共用：先拒 ECharts 手填，再抽 configure。 */
+function prepareAiChartConfigure(
+  args: Record<string, unknown>,
+  chartType: string,
+): { ok: true; configure: Partial<ChartConfig['configure']> } | { ok: false; error: string } {
+  const rejected = rejectAiChartEChartsPayload(args)
+  if (rejected) return { ok: false, error: rejected }
+  return { ok: true, configure: extractChartConfigure(args, chartType) }
 }
 
 /** 找到产出某表的步骤（输入连线的上游）；源表缺产出步骤时补一个 upload-csv 源步骤（与 migrateSteps 同构）。 */
@@ -882,7 +896,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       typeof coerced.name === 'string' && coerced.name.trim()
         ? coerced.name.trim()
         : defaultViewName(chartType as Parameters<typeof createViewNode>[0], t.views)
-    let configure = extractChartConfigure(coerced, chartType)
+    let configurePrep = prepareAiChartConfigure(coerced, chartType)
+    if (!configurePrep.ok) return fail(configurePrep.error)
+    let configure = configurePrep.configure
     configure = resolveConfigureFields(configure, t.columns)
     const autofilled = autofillRequiredChartSlots(chartType, configure, t.columns)
     configure = autofilled.configure
@@ -917,7 +933,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (!v?.chart) return fail('该视图不是图表视图')
     const chartType = typeof coerced.chartType === 'string' ? coerced.chartType : undefined
     const effectiveType = String(chartType || v.chart.chartType || 'bar')
-    let configure = extractChartConfigure(coerced, effectiveType)
+    const configurePrep = prepareAiChartConfigure(coerced, effectiveType)
+    if (!configurePrep.ok) return fail(configurePrep.error)
+    let configure = configurePrep.configure
     configure = resolveConfigureFields(configure, t.columns)
     const autofilled = autofillRequiredChartSlots(effectiveType, configure, t.columns)
     configure = autofilled.configure

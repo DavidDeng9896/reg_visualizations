@@ -148,6 +148,18 @@ describe('AI 工具实现（execTool）', () => {
     const view = findView(findTable(analysis, iris.id)!.views, viewId!)
     expect(view!.chart!.style.fitAnnotation).toBe(true)
     expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
+
+    const echarts = await execTool(
+      'set_chart_config',
+      {
+        tableId: iris.id,
+        viewId,
+        configure: { xAxis: { type: 'category', data: ['a'] }, series: [{ data: [1, 2, 3] }] },
+      },
+      ctx,
+    )
+    expect(echarts.ok).toBe(false)
+    expect(echarts.summary).toMatch(/ECharts|series\.data|字段映射/i)
   })
 
   it('create_chart：原子建图；失败不留空视图', async () => {
@@ -178,6 +190,50 @@ describe('AI 工具实现（execTool）', () => {
     const view = iris.views.find((v) => v.name === '物种柱')
     expect(view?.chart?.configure.x?.field).toBe('species')
     expect(view?.chart?.configure.y?.field).toBe('sepal_length')
+  })
+
+  it('create_chart：字符串槽位与 x_field 别名可用；拒绝 ECharts series.data', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.views.length
+    const echarts = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        configure: { xAxis: { data: ['a'] }, series: [{ data: [1, 2] }] },
+      },
+      ctx,
+    )
+    expect(echarts.ok).toBe(false)
+    expect(echarts.summary).toMatch(/ECharts|series\.data|字段映射/i)
+    expect(iris.views.length).toBe(before)
+
+    const aliased = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '别名柱',
+        configure: { x_field: 'species', y_field: 'sepal_length' },
+      },
+      ctx,
+    )
+    expect(aliased.ok, aliased.summary).toBe(true)
+    expect(iris.views.find((v) => v.name === '别名柱')?.chart?.configure.x?.field).toBe('species')
+
+    const shorthand = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '字符串槽',
+        configure: { x: 'species', y: 'petal_length' },
+      },
+      ctx,
+    )
+    expect(shorthand.ok, shorthand.summary).toBe(true)
+    expect(iris.views.find((v) => v.name === '字符串槽')?.chart?.configure.x?.field).toBe('species')
   })
 
   it('create_chart + 复杂表头（docking fixture）：模糊字段可配散点', async () => {
