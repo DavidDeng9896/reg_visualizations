@@ -6,6 +6,7 @@
 import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useCodeAiStore } from '../../ai/codeAiStore'
 import ReasoningCard from '../../ai/ReasoningCard.vue'
+import { extractThinkLeakage } from '../../ai/contentScrub'
 import { IButton, IIcon } from '../../../ui'
 
 interface MsgPart {
@@ -56,18 +57,19 @@ watch(
   },
 )
 
-/** 把消息文本拆成普通文本与 ```python 代码块（流式中未闭合的围栏也按代码块处理）。 */
+/** 气泡正文：先剥 MiniMax `<think>`，再拆 python 代码块（流式未闭合围栏也按代码块）。 */
 function splitParts(content: string): MsgPart[] {
+  const visible = extractThinkLeakage(content).visible
   const parts: MsgPart[] = []
   const re = /```(?:python)?[ \t]*\r?\n?([\s\S]*?)(?:```|$)/g
   let last = 0
   let m: RegExpExecArray | null
-  while ((m = re.exec(content))) {
-    if (m.index > last) parts.push({ kind: 'text', text: content.slice(last, m.index) })
+  while ((m = re.exec(visible))) {
+    if (m.index > last) parts.push({ kind: 'text', text: visible.slice(last, m.index) })
     parts.push({ kind: 'code', text: m[1].replace(/\s+$/, '') })
     last = re.lastIndex
   }
-  if (last < content.length) parts.push({ kind: 'text', text: content.slice(last) })
+  if (last < visible.length) parts.push({ kind: 'text', text: visible.slice(last) })
   return parts
 }
 

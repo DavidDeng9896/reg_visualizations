@@ -14,7 +14,7 @@ import {
 } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
-import { isNearDuplicate, isProcessMonologue, scrubVisibleContent } from './contentScrub'
+import { isNearDuplicate, isProcessMonologue, scrubVisibleContent, extractThinkLeakage } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
 import { TABLE_CATALOG_MARK } from './tableSchema'
 
@@ -357,7 +357,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       throw new AgentRunError(msg, messages)
     }
     // reasoning / finishReason 只用于 UI / 流程判断，不回灌上游（兼容模式对未知字段可能 400）
-    const { reasoning: _reasoning, finishReason, ...assistant } = streamed
+    const { reasoning: _reasoning, finishReason, ...assistantRaw } = streamed
+    // P0-1：历史消息也剥 `<think>`，避免下一轮上下文/持久化带回推理墙
+    const assistant: ChatMessage = {
+      ...assistantRaw,
+      ...(typeof assistantRaw.content === 'string'
+        ? { content: extractThinkLeakage(assistantRaw.content).visible }
+        : {}),
+    }
     messages.push(assistant)
 
     // 输出被 max_tokens 截断（长代码/长文写一半）：注入续写指令再进一轮，上限 2 次。

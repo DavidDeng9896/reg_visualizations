@@ -967,17 +967,32 @@ export const useAiStore = defineStore('ai', {
 
 /** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用；codeAiStore 亦复用）。 */
 export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
+  /** 本轮原始 token 缓冲：用于流式剥离 `<think>`，避免半截标签泄漏到气泡。 */
+  let streamRaw = ''
+  /** API reasoning_content 累计（与 content 内 think 泄漏分开）。 */
+  let apiReasoning = ''
+  const applyStreamVisible = () => {
+    const { visible, thinking } = extractThinkLeakage(streamRaw)
+    assistant.content = visible
+    const merged = [apiReasoning, thinking].filter(Boolean).join('\n\n')
+    assistant.reasoning = merged ? capReasoningText(merged) : undefined
+  }
   return (e) => {
     if (e.type === 'round') {
       // 每轮重新累计可见正文与思考；避免多轮独白/reasoning 堆成墙
+      streamRaw = ''
+      apiReasoning = ''
       assistant.content = ''
       assistant.reasoning = ''
     } else if (e.type === 'token') {
-      assistant.content += e.text
+      streamRaw += e.text
+      applyStreamVisible()
     } else if (e.type === 'reasoning') {
-      assistant.reasoning = capReasoningText((assistant.reasoning ?? '') + e.text)
+      apiReasoning += e.text
+      applyStreamVisible()
     } else if (e.type === 'tool_call') {
       // 本轮若进入工具调用，过程独白不展示（进展看 TraceCard）
+      streamRaw = ''
       assistant.content = ''
       let args: Record<string, unknown> = {}
       try {
@@ -1044,16 +1059,14 @@ export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) =
         assistant.trace.find((t) => t.id === e.id)
       if (item) item.summary = e.summary
     } else if (e.type === 'done') {
+      streamRaw = ''
       const notes = (assistant.interactionNotes ?? '').trim()
       const rawBody = (e.content || '').trim()
       const { visible, thinking } = extractThinkLeakage([notes, rawBody].filter(Boolean).join('\n\n'))
       assistant.content = scrubVisibleContent(visible)
       assistant.interactionNotes = undefined
-      if (thinking) {
-        assistant.reasoning = capReasoningText(
-          [assistant.reasoning, thinking].filter(Boolean).join('\n\n'),
-        )
-      }
+      const mergedReasoning = [apiReasoning || assistant.reasoning, thinking].filter(Boolean).join('\n\n')
+      assistant.reasoning = mergedReasoning ? capReasoningText(mergedReasoning) : undefined
     }
   }
 }
