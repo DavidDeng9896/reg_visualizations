@@ -546,12 +546,17 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       return fail(e instanceof Error ? e.message : '附件不存在或无法读取')
     }
     if (meta.kind !== 'csv' && meta.kind !== 'excel') {
-      if (meta.kind === 'text' || /\.(md|txt|markdown)$/i.test(meta.name)) {
+      // P0-3：非表格文档硬拒绝；禁止引导「编造 CSV」；文档不得进入 TableCatalog（拒绝后不建表）
+      const docLike =
+        meta.kind === 'text' ||
+        meta.kind === 'pdf' ||
+        /\.(md|txt|markdown|pdf|docx?|rtf)$/i.test(meta.name)
+      if (docLike) {
         return fail(
-          `附件「${meta.name}」是说明文档（kind=${meta.kind}），内容已在对话上下文中，不要 import_ai_file。请用 Custom Code 或 import_csv_text 生成数据表。`,
+          `附件「${meta.name}」是说明文档（kind=${meta.kind}），内容仅供阅读（已在对话上下文中），禁止 import_ai_file，也不会写入 TableCatalog。请改用已上传的 CSV/Excel 附件导入。`,
         )
       }
-      return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）`)
+      return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）；不会写入 TableCatalog。`)
     }
     const tableName =
       typeof args.tableName === 'string' && args.tableName.trim() ? args.tableName.trim() : undefined

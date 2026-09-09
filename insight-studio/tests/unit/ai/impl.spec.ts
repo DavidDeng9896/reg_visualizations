@@ -741,7 +741,8 @@ describe('AI 工具实现（execTool）', () => {
   })
 
   it('import_ai_file：md 说明文档拒绝导入并提示勿当表', async () => {
-    await seedStore()
+    const { analysis } = await seedStore()
+    const before = analysis.tables.length
     const { aiFilesApi } = await import('../../../src/modules/ai/client')
     vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
       id: 'file-md-1',
@@ -755,6 +756,28 @@ describe('AI 工具实现（execTool）', () => {
     expect(res.ok).toBe(false)
     expect(res.summary).toContain('说明文档')
     expect(res.summary).toContain('不要 import_ai_file')
+    // P0-3：拒绝后不得引导「编造 CSV」；表目录不得新增文档假表
+    expect(res.summary).not.toMatch(/import_csv_text|生成数据表|编造|虚构/i)
+    expect(analysis.tables).toHaveLength(before)
+  })
+
+  it('import_ai_file：pdf/非表格附件硬拒绝，不入表', async () => {
+    const { analysis } = await seedStore()
+    const before = analysis.tables.length
+    const { aiFilesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
+      id: 'file-pdf-1',
+      name: 'protocol.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 100,
+      createdAt: new Date().toISOString(),
+      kind: 'pdf',
+    })
+    const res = await execTool('import_ai_file', { fileId: 'file-pdf-1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toMatch(/说明文档|不支持导入|仅 csv\/excel/i)
+    expect(res.summary).not.toMatch(/import_csv_text|生成数据表/i)
+    expect(analysis.tables).toHaveLength(before)
   })
 
   it('cleanup_failed_ai_steps 不在模型工具表中', () => {

@@ -622,7 +622,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       (text) => onEvent({ type: 'token', text }),
       (text) => onEvent({ type: 'reasoning', text }),
     )
-    const { reasoning: _r2, finishReason: _fr2, ...finalMsg } = finalStream
+    const { reasoning: _r2, finishReason: _fr2, ...finalRaw } = finalStream
+    const finalMsg: ChatMessage = {
+      ...finalRaw,
+      ...(typeof finalRaw.content === 'string'
+        ? { content: extractThinkLeakage(finalRaw.content).visible }
+        : {}),
+    }
     messages.push(finalMsg)
     if (finalMsg.content) {
       emitIncompleteIfNeeded()
