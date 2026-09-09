@@ -4,6 +4,7 @@
 
 ```text
 docs/
+├── sales/               ← 售前 / 对外交流
 ├── features/charts/     ← 图表定稿（唯一依据）
 ├── requirements/        ← 功能需求
 ├── specs/               ← 设计规格
@@ -13,6 +14,7 @@ docs/
 
 | 目录 | 说明 |
 | --- | --- |
+| [sales/presales-feature-handbook.md](./sales/presales-feature-handbook.md) | 售前功能手册简版（给售前与客户交流） |
 | [features/charts/](./features/charts/) | LabKey + Benchling 合并后的图表功能点 |
 | [requirements/](./requirements/) | 表（vxe-table）+ 图一体化等 |
 | [specs/](./specs/) | Insight 框架设计、合并过程设计 |
