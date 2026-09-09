@@ -37,6 +37,9 @@ describe('pythonPackages', () => {
       'pyarrow',
       'openpyxl',
       'pydantic',
+      // statlib 依赖（与 python-worker/app/packages.py 对齐）
+      'pingouin',
+      'scikit-posthocs',
     ])
   })
 })
