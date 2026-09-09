@@ -34,7 +34,7 @@ import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } 
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
 import { capReasoningText, extractThinkLeakage, scrubVisibleContent } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
-import { analysisPathForArtifact, latestOpenableChartArtifact } from './openArtifact'
+import { analysisPathForArtifact, latestOpenableWorkspaceArtifact } from './openArtifact'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
 import { router } from '../../app/router'
@@ -645,10 +645,10 @@ export const useAiStore = defineStore('ai', {
       await this.continueTask({ auto: true })
     },
 
-    /** P0-4：成功产物出现后自动跳转工作区图表（关抽屉，避免卡住「正在生成」观感）。 */
+    /** P0-4：成功产物出现后自动跳转工作区图表/表（关抽屉，避免卡住「正在生成」观感）。 */
     autoOpenChartArtifact(assistant: UiMessage): void {
       if (planIncomplete(assistant.planSteps, assistant.planDone)) return
-      const art = latestOpenableChartArtifact(assistant.artifacts)
+      const art = latestOpenableWorkspaceArtifact(assistant.artifacts)
       if (!art) return
       const path = analysisPathForArtifact(art)
       if (!path) return
@@ -1080,6 +1080,9 @@ export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) =
         assistant.trace.find((t) => t.id === e.id)
       if (item) item.summary = e.summary
     } else if (e.type === 'done') {
+      // P0-4：计划/回合结束立刻离开「正在生成」（不等 finally）
+      assistant.streaming = false
+      for (const t of assistant.trace) t.running = false
       streamRaw = ''
       const notes = (assistant.interactionNotes ?? '').trim()
       const rawBody = (e.content || '').trim()
@@ -1088,6 +1091,12 @@ export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) =
       assistant.interactionNotes = undefined
       const mergedReasoning = [apiReasoning || assistant.reasoning, thinking].filter(Boolean).join('\n\n')
       assistant.reasoning = mergedReasoning ? capReasoningText(mergedReasoning) : undefined
+      try {
+        const s = useAiStore()
+        if (s.running) s.running = false
+      } catch {
+        /* 单测无 pinia 时忽略 */
+      }
     }
   }
 }

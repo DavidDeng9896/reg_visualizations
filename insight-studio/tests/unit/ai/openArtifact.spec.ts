@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { analysisPathForArtifact } from '../../../src/modules/ai/openArtifact'
+import {
+  analysisPathForArtifact,
+  latestOpenableChartArtifact,
+  latestOpenableWorkspaceArtifact,
+} from '../../../src/modules/ai/openArtifact'
 import type { Artifact } from '../../../src/modules/ai/types'
 
 describe('openArtifact (P0-4 auto-open)', () => {
@@ -15,10 +19,10 @@ describe('openArtifact (P0-4 auto-open)', () => {
     expect(analysisPathForArtifact(a)).toBe('/analysis/a1?tableId=t1&viewId=v1')
   })
 
-  it('非图表或不完整产物返回 null', () => {
+  it('表产物可打开；不完整返回 null', () => {
     expect(
       analysisPathForArtifact({ kind: 'table', name: 't', analysisId: 'a1', tableId: 't1' }),
-    ).toBeNull()
+    ).toBe('/analysis/a1?tableId=t1')
     expect(
       analysisPathForArtifact({
         kind: 'view',
@@ -28,6 +32,21 @@ describe('openArtifact (P0-4 auto-open)', () => {
         viewId: 'v1',
         viewType: 'table',
       }),
-    ).toBeNull()
+    ).toBe('/analysis/a1?tableId=t1&viewId=v1')
+    expect(analysisPathForArtifact({ kind: 'table', name: 't', analysisId: 'a1' })).toBeNull()
+  })
+
+  it('latestOpenable：优先图表再表', () => {
+    const tableArt: Artifact = { kind: 'table', name: '汇总', analysisId: 'a1', tableId: 't1' }
+    const chartArt: Artifact = {
+      kind: 'view',
+      name: '图',
+      analysisId: 'a1',
+      tableId: 't1',
+      viewId: 'v1',
+      viewType: 'bar',
+    }
+    expect(latestOpenableChartArtifact([tableArt, chartArt])?.viewId).toBe('v1')
+    expect(latestOpenableWorkspaceArtifact([tableArt])?.kind).toBe('table')
   })
 })

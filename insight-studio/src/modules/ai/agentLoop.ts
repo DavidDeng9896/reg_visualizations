@@ -198,6 +198,28 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
   const sweepFailedEmptyAiNodes = async () => {
     if (!shouldSweep) return
+    // P0-4：先静默清 pending 空图（无需确认），再扫失败空步骤
+    try {
+      const emptyCall: ToolCall = {
+        id: 'ai-sweep-empty-charts',
+        type: 'function',
+        function: { name: 'cleanup_empty_chart_views', arguments: '{}' },
+      }
+      const emptyResult = await exec(emptyCall, {})
+      const emptySummary = String(emptyResult.summary ?? '')
+      if (emptyResult.ok && /已删除/.test(emptySummary)) {
+        onEvent({ type: 'tool_call', call: emptyCall, running: false })
+        onEvent({
+          type: 'tool_result',
+          id: emptyCall.id,
+          name: 'cleanup_empty_chart_views',
+          ok: true,
+          summary: emptyResult.summary,
+        })
+      }
+    } catch {
+      /* mock exec 无此工具时忽略 */
+    }
     const call: ToolCall = {
       id: 'ai-sweep-empty',
       type: 'function',

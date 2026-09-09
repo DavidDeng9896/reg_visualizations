@@ -415,7 +415,12 @@ describe('AI 工具实现（execTool）', () => {
         tableId: iris.id,
         type: 'scatter',
         name: '只给Y',
-        __remainingTurnCalls: [{ name: 'set_chart_config' }],
+        __remainingTurnCalls: [
+          {
+            name: 'set_chart_config',
+            args: { configure: { values: [{ field: 'sepal_width' }] } },
+          },
+        ],
       },
       ctx,
     )

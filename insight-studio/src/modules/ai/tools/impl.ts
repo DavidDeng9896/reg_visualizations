@@ -46,6 +46,15 @@ import {
   unsupportedImportKindFailMessage,
   NON_TABULAR_INVENT_CSV_FAIL,
 } from '../nonTabularImport'
+import {
+  chartViewLacksValidMapping,
+  clearPendingEmptyChartView,
+  deleteEmptyChartViewIfUnmapped,
+  hasChartConfigurePayload,
+  sameTurnHasCompleteChartConfigure,
+  sweepPendingEmptyChartViews,
+  trackPendingEmptyChartView,
+} from '../emptyChartViews'
 
 export interface ToolCtx {
   confirmDestructive: boolean
@@ -901,24 +910,16 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const t = requireTable(tableRefFromArgs(args))
     const type = String(args.type ?? '') as Parameters<typeof createViewNode>[0]
     const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : defaultViewName(type, t.views)
-    // P0-4：图表视图禁止留下空/半成品；无同调 configure 时失败，引导 create_chart
+    // P0-4：图表视图禁止留下空/半成品；无同调完整 configure 时失败，引导 create_chart
     if (type && type !== 'table') {
-      const hasConfigure =
-        args.configure != null ||
-        args.mapping != null ||
-        args.config != null ||
-        args.x != null ||
-        args.y != null ||
-        args.values != null ||
-        args.x_field != null ||
-        args.y_field != null
+      const hasConfigure = hasChartConfigurePayload(args)
       const remaining = Array.isArray(args.__remainingTurnCalls)
-        ? (args.__remainingTurnCalls as { name?: string }[])
+        ? (args.__remainingTurnCalls as { name?: string; args?: Record<string, unknown> }[])
         : []
-      const sameTurnConfigure = remaining.some((c) => c?.name === 'set_chart_config')
+      const sameTurnConfigure = sameTurnHasCompleteChartConfigure(remaining)
       if (!hasConfigure && !sameTurnConfigure) {
         return fail(
-          `create_view(${type}) 未带 configure，会留下空图，已拒绝。出图请优先 create_chart（原子配置）；或在本调用传入 configure，或同轮紧跟 set_chart_config。`,
+          `create_view(${type}) 未带完整 configure，会留下空图，已拒绝。出图请优先 create_chart（原子配置）；或在本调用传入 configure，或同轮紧跟带 configure 的 set_chart_config。`,
         )
       }
       if (hasConfigure) {
@@ -932,12 +933,13 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
           { confirmDestructive: false, confirmWrite: false },
         )
       }
-      // same-turn set_chart_config：允许先建壳，随后配置；若配置失败由 set_chart_config 不写半成品
+      // same-turn 完整 set_chart_config：允许先建壳；失败/收束时删除 pending 空图
     }
     const view = createViewNode(type, name)
     store().mutate((a) => {
       findTable(a, t.id)?.views.push(view)
     })
+    if (type && type !== 'table') trackPendingEmptyChartView(view.id)
     return ok(`已在表「${t.name}」上创建视图「${name}」（view id: ${view.id}，${type}）`, artifactOf('view', name, { tableId: t.id, viewId: view.id, viewType: type }))
   },
 
@@ -1017,7 +1019,18 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     const errors = validateChartMapping(draftChart, t.columns)
     if (errors.length) {
-      return fail(formatChartMappingFailHint(effectiveType, t.columns, errors, configure))
+      // P0-4：当前仍是空/半成品壳时删除，避免工作区残留空散点
+      let deletedName: string | null = null
+      if (chartViewLacksValidMapping(v, t.columns)) {
+        store().mutate((a) => {
+          deletedName = deleteEmptyChartViewIfUnmapped(a, t.id, v.id)
+        })
+      }
+      const hint = formatChartMappingFailHint(effectiveType, t.columns, errors, configure)
+      if (deletedName) {
+        return fail(`${hint} 已删除空图「${deletedName}」。请改用 create_chart 一次写全 configure。`)
+      }
+      return fail(hint)
     }
     store().mutate((a) => {
       const table = findTable(a, t.id)
@@ -1027,11 +1040,23 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       Object.assign(view.chart.configure, configure)
       Object.assign(view.chart.style, style)
     })
+    clearPendingEmptyChartView(v.id)
     const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
     return ok(
       `图表「${v.name}」配置完成${fillNote}`,
       artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: draftChart.chartType }),
     )
+  },
+
+  /** P0-4 内部：计划收束时清掉仍无有效映射的 pending 空图（无需确认）。 */
+  cleanup_empty_chart_views() {
+    const a = requireAnalysis()
+    let removed: string[] = []
+    store().mutate((analysis) => {
+      removed = sweepPendingEmptyChartViews(analysis)
+    })
+    if (!removed.length) return ok('没有需要清理的空图')
+    return ok(`已删除 ${removed.length} 个空图：${removed.join('、')}`)
   },
 
   async create_dashboard(args) {
