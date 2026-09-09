@@ -64,13 +64,14 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'import_csv_text',
-    description: '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。用户已上传文件时优先用 import_ai_file。',
+    description:
+      '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。用户已上传 CSV/Excel 时优先用 import_ai_file。禁止根据说明文档（txt/md/pdf）编造 CSV。',
     parameters: { type: 'object', properties: { tableName: str('表名'), csv: str('完整 CSV 文本，首行为表头') }, required: ['tableName', 'csv'] },
   },
   {
     name: 'import_ai_file',
     description:
-      '将对话附件（fileId）导入为当前分析的表。仅支持 csv / excel。text/md/pdf 是说明文档，禁止导入。Excel 可指定 sheetNames。',
+      '将对话附件（fileId）导入为当前分析的表。仅支持 csv / excel。text/md/pdf/说明文档禁止导入、不得写入 TableCatalog。Excel 可指定 sheetNames。',
     parameters: {
       type: 'object',
       properties: {

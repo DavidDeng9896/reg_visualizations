@@ -33,10 +33,21 @@ import { attachmentFromMeta, importAiAttachment } from '../attachments'
 import { markStepCreatedByAi, listFailedEmptyAiSteps } from '../failedEmptySteps'
 import { coerceParsedToolArgs } from '../toolArgs'
 import { removeStepOwnedArtifacts } from '../../steps/pythonCharts'
+import {
+  isNonTabularAiFile,
+  nonTabularImportFailMessage,
+  unsupportedImportKindFailMessage,
+  NON_TABULAR_INVENT_CSV_FAIL,
+} from '../nonTabularImport'
 
 export interface ToolCtx {
   confirmDestructive: boolean
   confirmWrite: boolean
+  /**
+   * P0-3：本轮 agent 已拒绝的说明类附件 id。
+   * 用于 Aegis TWO_STEP——拒绝后禁止再 import_csv_text 编造 CSV。
+   */
+  rejectedDocFileIds?: Set<string>
 }
 
 /** 写入类工具（非删除）：开启 confirmWrite 时需用户批准。 */
@@ -448,7 +459,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     void args
     if (!analysis.tables.length) {
       return ok(
-        '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴 CSV。',
+        '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴**真实** CSV。禁止根据说明文档编造 CSV。',
       )
     }
     const lines = analysis.tables.map((t) => {
@@ -495,8 +506,21 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已创建并打开分析「${name}」（id: ${a.id}）`, artifactOf('analysis', name, { analysisId: a.id }))
   },
 
-  import_csv_text(args) {
+  async import_csv_text(args, ctx) {
     const a = requireAnalysis()
+    // P0-3 / Aegis TWO_STEP：刚拒绝说明文档且会话无真实表格附件时，禁止编造 CSV
+    if (ctx.rejectedDocFileIds?.size) {
+      let hasTabularAttachment = false
+      try {
+        const list = await aiFilesApi.list()
+        hasTabularAttachment = list.some((f) => f.kind === 'csv' || f.kind === 'excel')
+      } catch {
+        hasTabularAttachment = false
+      }
+      if (!hasTabularAttachment) {
+        return fail(NON_TABULAR_INVENT_CSV_FAIL)
+      }
+    }
     const tableName = String(args.tableName ?? '').trim() || '导入数据'
     const csv = String(args.csv ?? '')
     if (!csv.trim()) return fail('csv 内容为空')
@@ -549,7 +573,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
   },
 
-  async import_ai_file(args) {
+  async import_ai_file(args, ctx) {
     requireAnalysis()
     const fileId = String(args.fileId ?? '').trim()
     if (!fileId) return fail('fileId 不能为空')
@@ -561,16 +585,12 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
     if (meta.kind !== 'csv' && meta.kind !== 'excel') {
       // P0-3：非表格文档硬拒绝；禁止引导「编造 CSV」；文档不得进入 TableCatalog（拒绝后不建表）
-      const docLike =
-        meta.kind === 'text' ||
-        meta.kind === 'pdf' ||
-        /\.(md|txt|markdown|pdf|docx?|rtf)$/i.test(meta.name)
-      if (docLike) {
-        return fail(
-          `附件「${meta.name}」是说明文档（kind=${meta.kind}），内容仅供阅读（已在对话上下文中），禁止 import_ai_file，也不会写入 TableCatalog。请改用已上传的 CSV/Excel 附件导入。`,
-        )
+      if (isNonTabularAiFile(meta)) {
+        ctx.rejectedDocFileIds?.add(fileId)
+        return fail(nonTabularImportFailMessage(meta))
       }
-      return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）；不会写入 TableCatalog。`)
+      ctx.rejectedDocFileIds?.add(fileId)
+      return fail(unsupportedImportKindFailMessage(meta))
     }
     const tableName =
       typeof args.tableName === 'string' && args.tableName.trim() ? args.tableName.trim() : undefined

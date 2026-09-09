@@ -669,6 +669,8 @@ export const useAiStore = defineStore('ai', {
 
       const confirmDestructive = this.config?.confirmDestructive ?? true
       const confirmWrite = this.config?.confirmWrite ?? false
+      // P0-3：同一 agent 会话内共享，拒绝说明后禁止编造 CSV（Aegis TWO_STEP）
+      const rejectedDocFileIds = new Set<string>()
       const exec: ToolExecutor = async (call: ToolCall, args: Record<string, unknown>) => {
         const mcpRef = mcpBundle.resolve(call.function.name)
         if (mcpRef) {
@@ -684,7 +686,7 @@ export const useAiStore = defineStore('ai', {
             return { ok: false, summary: e instanceof Error ? e.message : String(e) }
           }
         }
-        return execTool(call.function.name, args, { confirmDestructive, confirmWrite })
+        return execTool(call.function.name, args, { confirmDestructive, confirmWrite, rejectedDocFileIds })
       }
       return { tools, exec }
     },
