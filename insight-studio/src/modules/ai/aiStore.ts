@@ -16,7 +16,7 @@ import {
 import type { ChatMessage, ChatPayload, ToolCall } from './client'
 import { OPENAI_TOOLS } from './tools/registry'
 import { execTool } from './tools/impl'
-import { buildAnalysisContext, buildMentionContext, type MentionTarget } from './context'
+import { buildAnalysisContext, buildMentionContext, buildTableCatalog, type MentionTarget } from './context'
 import {
   blobToDataUrl,
   buildAttachmentCatalog,
@@ -28,13 +28,16 @@ import {
   type ChatAttachmentSnapshot,
 } from './attachments'
 import { SYSTEM_PROMPT, buildSkillsCatalogPrompt, buildMemoriesPrompt } from './prompts'
+import { inferAnalysisIntent } from './intentHint'
 import { buildMcpToolsBundle } from './mcpTools'
 import { AUTO_COMPRESS_AT, estimateChatTokens, estimateTokens, summarizeTurns } from './tokens'
 import { continueTaskSystemMessage, planIncomplete } from './taskState'
-import { capReasoningText } from './contentScrub'
+import { capReasoningText, extractThinkLeakage, scrubVisibleContent } from './contentScrub'
 import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
+import { analysisPathForArtifact, latestOpenableWorkspaceArtifact } from './openArtifact'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import { router } from '../../app/router'
 
 export interface TraceItem {
   id: string
@@ -348,6 +351,10 @@ export const useAiStore = defineStore('ai', {
           .filter((m) => m.id !== assistant.id)
           .map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
       ]
+      const intent = inferAnalysisIntent(input)
+      if (intent.prompt) {
+        chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: intent.prompt })
+      }
       const mentionCtx = buildMentionContext(analysis, mentions)
       if (mentionCtx) chatMessages.splice(chatMessages.length - 1, 0, { role: 'system', content: mentionCtx })
 
@@ -448,6 +455,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -477,8 +485,11 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      // 模型错误不自动续跑，交给用户点「继续任务」
-      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
+      // P0-4：计划/工具跑完后自动打开最近图表产物（离开「正在生成」、进工作区）
+      if (!aborted && !assistant.error) {
+        this.autoOpenChartArtifact(assistant)
+        await this.maybeAutoContinue(assistant)
+      }
     },
 
     /**
@@ -564,6 +575,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           ...(planSteps ? { initialPlan: { steps: planSteps, done: doneSnapshot } } : {}),
           onEvent: makeOnEvent(assistant, pushArtifact),
         })
@@ -607,7 +619,10 @@ export const useAiStore = defineStore('ai', {
         }
         await this.persist()
       }
-      if (!aborted && !assistant.error) await this.maybeAutoContinue(assistant)
+      if (!aborted && !assistant.error) {
+        this.autoOpenChartArtifact(assistant)
+        await this.maybeAutoContinue(assistant)
+      }
     },
 
     /** 用户关闭「继续任务」卡片，不再自动/手动提示续跑。 */
@@ -630,6 +645,17 @@ export const useAiStore = defineStore('ai', {
       await this.continueTask({ auto: true })
     },
 
+    /** P0-4：成功产物出现后自动跳转工作区图表/表（关抽屉，避免卡住「正在生成」观感）。 */
+    autoOpenChartArtifact(assistant: UiMessage): void {
+      if (planIncomplete(assistant.planSteps, assistant.planDone)) return
+      const art = latestOpenableWorkspaceArtifact(assistant.artifacts)
+      if (!art) return
+      const path = analysisPathForArtifact(art)
+      if (!path) return
+      this.drawerOpen = false
+      void router.push(path)
+    },
+
     /** 构建工具集与执行器（内置 + MCP）。 */
     async buildToolsAndExec(): Promise<{ tools: ChatPayload['tools']; exec: ToolExecutor }> {
       let mcpBundle = buildMcpToolsBundle([])
@@ -643,6 +669,8 @@ export const useAiStore = defineStore('ai', {
 
       const confirmDestructive = this.config?.confirmDestructive ?? true
       const confirmWrite = this.config?.confirmWrite ?? false
+      // P0-3：同一 agent 会话内共享，拒绝说明后禁止编造 CSV（Aegis TWO_STEP）
+      const rejectedDocFileIds = new Set<string>()
       const exec: ToolExecutor = async (call: ToolCall, args: Record<string, unknown>) => {
         const mcpRef = mcpBundle.resolve(call.function.name)
         if (mcpRef) {
@@ -658,7 +686,7 @@ export const useAiStore = defineStore('ai', {
             return { ok: false, summary: e instanceof Error ? e.message : String(e) }
           }
         }
-        return execTool(call.function.name, args, { confirmDestructive, confirmWrite })
+        return execTool(call.function.name, args, { confirmDestructive, confirmWrite, rejectedDocFileIds })
       }
       return { tools, exec }
     },
@@ -739,6 +767,7 @@ export const useAiStore = defineStore('ai', {
           signal: ac.signal,
           askUser: this.makeAskUser(ac.signal),
           waitConfirm: this.makeWaitConfirm(ac.signal),
+          getTableCatalog: () => buildTableCatalog(useAnalysisStore().current),
           onEvent: makeOnEvent(assistant, (a) => pushArtifactSafe(assistant, a)),
         })
         assistant.rawTail = finalMessages.slice(baseLen)
@@ -959,17 +988,32 @@ export const useAiStore = defineStore('ai', {
 
 /** agent-loop 事件聚合到 assistant 消息（send 与确认续轮共用；codeAiStore 亦复用）。 */
 export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) => void): (e: AgentEvent) => void {
+  /** 本轮原始 token 缓冲：用于流式剥离 `<think>`，避免半截标签泄漏到气泡。 */
+  let streamRaw = ''
+  /** API reasoning_content 累计（与 content 内 think 泄漏分开）。 */
+  let apiReasoning = ''
+  const applyStreamVisible = () => {
+    const { visible, thinking } = extractThinkLeakage(streamRaw)
+    assistant.content = visible
+    const merged = [apiReasoning, thinking].filter(Boolean).join('\n\n')
+    assistant.reasoning = merged ? capReasoningText(merged) : undefined
+  }
   return (e) => {
     if (e.type === 'round') {
       // 每轮重新累计可见正文与思考；避免多轮独白/reasoning 堆成墙
+      streamRaw = ''
+      apiReasoning = ''
       assistant.content = ''
       assistant.reasoning = ''
     } else if (e.type === 'token') {
-      assistant.content += e.text
+      streamRaw += e.text
+      applyStreamVisible()
     } else if (e.type === 'reasoning') {
-      assistant.reasoning = capReasoningText((assistant.reasoning ?? '') + e.text)
+      apiReasoning += e.text
+      applyStreamVisible()
     } else if (e.type === 'tool_call') {
       // 本轮若进入工具调用，过程独白不展示（进展看 TraceCard）
+      streamRaw = ''
       assistant.content = ''
       let args: Record<string, unknown> = {}
       try {
@@ -1036,10 +1080,23 @@ export function makeOnEvent(assistant: UiMessage, pushArtifact: (a?: Artifact) =
         assistant.trace.find((t) => t.id === e.id)
       if (item) item.summary = e.summary
     } else if (e.type === 'done') {
-      const body = (e.content || '').trim()
+      // P0-4：计划/回合结束立刻离开「正在生成」（不等 finally）
+      assistant.streaming = false
+      for (const t of assistant.trace) t.running = false
+      streamRaw = ''
       const notes = (assistant.interactionNotes ?? '').trim()
-      assistant.content = [notes, body].filter(Boolean).join('\n\n')
+      const rawBody = (e.content || '').trim()
+      const { visible, thinking } = extractThinkLeakage([notes, rawBody].filter(Boolean).join('\n\n'))
+      assistant.content = scrubVisibleContent(visible)
       assistant.interactionNotes = undefined
+      const mergedReasoning = [apiReasoning || assistant.reasoning, thinking].filter(Boolean).join('\n\n')
+      assistant.reasoning = mergedReasoning ? capReasoningText(mergedReasoning) : undefined
+      try {
+        const s = useAiStore()
+        if (s.running) s.running = false
+      } catch {
+        /* 单测无 pinia 时忽略 */
+      }
     }
   }
 }

@@ -5,6 +5,8 @@ import {
   resolveColumnField,
   resolveConfigureFields,
   formatChartMappingFailHint,
+  rejectAiChartEChartsPayload,
+  mapChartConfigureAliases,
 } from '../../../src/modules/ai/normalizeChartConfigure'
 import { capReasoningText, isProcessMonologue } from '../../../src/modules/ai/contentScrub'
 import type { ColumnMeta } from '../../../src/shared/types'
@@ -68,6 +70,92 @@ describe('normalizeAiChartConfigure', () => {
     expect(out.x?.field).toBe('weight')
     expect(out.values?.[0]?.field).toBe('length')
   })
+
+  it('P0-2：x_field/y_field/category_field 别名映射到平台槽；字符串槽位仍有效', () => {
+    const out = normalizeAiChartConfigure('bar', {
+      x_field: 'species',
+      y_field: 'sepal_length',
+    } as unknown as Partial<import('../../../src/shared/types').ChartConfigure>)
+    expect(out.x?.field).toBe('species')
+    expect(out.y?.field).toBe('sepal_length')
+
+    const pie = normalizeAiChartConfigure('pie', {
+      category_field: 'species',
+      value_field: 'sepal_length',
+    } as unknown as Partial<import('../../../src/shared/types').ChartConfigure>)
+    expect(pie.categories?.field).toBe('species')
+    expect(pie.values?.[0]?.field).toBe('sepal_length')
+
+    const spaced = normalizeAiChartConfigure('scatter', {
+      x: 'docking score' as unknown as { field: string },
+      values: [{ field: 'localStrain(kcal)' }],
+    })
+    expect(spaced.x?.field).toBe('docking score')
+    expect(spaced.values?.[0]?.field).toBe('localStrain(kcal)')
+  })
+
+  it('P0-2：mapChartConfigureAliases 剥除 xAxis/yAxis，不丢合法 x', () => {
+    const out = mapChartConfigureAliases({
+      x: 'docking score',
+      x_field: 'ignored-when-x-present',
+      xAxis: { data: ['a'] },
+      yAxis: [1, 2],
+    })
+    expect(out.x).toBe('docking score')
+    expect((out as Record<string, unknown>).xAxis).toBeUndefined()
+    expect((out as Record<string, unknown>).yAxis).toBeUndefined()
+    expect((out as Record<string, unknown>).x_field).toBeUndefined()
+  })
+})
+
+describe('rejectAiChartEChartsPayload (P0-2)', () => {
+  it('拒绝 ECharts xAxis/yAxis + series.data 手填数值点', () => {
+    expect(
+      rejectAiChartEChartsPayload({
+        configure: {
+          xAxis: { data: ['a', 'b'] },
+          yAxis: {},
+          series: [{ data: [1, 2, 3] }],
+        },
+      }),
+    ).toMatch(/ECharts|xAxis|series\.data|字段映射/i)
+  })
+
+  it('拒绝 xAxis/yAxis 字面量数组简写', () => {
+    expect(
+      rejectAiChartEChartsPayload({
+        configure: { xAxis: ['a', 'b'], yAxis: [1, 2], series: [{ data: [3, 4] }] },
+      }),
+    ).toMatch(/ECharts|xAxis|字面量/i)
+  })
+
+  it('拒绝单对象 series.data（非数组包裹）', () => {
+    expect(
+      rejectAiChartEChartsPayload({
+        configure: { series: { type: 'bar', data: [1, 2, 3] } },
+      }),
+    ).toMatch(/series\.data|手填|字段映射/i)
+  })
+
+  it('不拒绝合法字符串槽位 / {field} / values:[{field}]（含空格表头）', () => {
+    expect(rejectAiChartEChartsPayload({ configure: { x: 'docking score', y: 'localStrain(kcal)' } })).toBeNull()
+    expect(
+      rejectAiChartEChartsPayload({
+        configure: { x: { field: 'docking score' }, values: [{ field: 'localStrain(kcal)' }] },
+      }),
+    ).toBeNull()
+    expect(rejectAiChartEChartsPayload({ x: 'species', y: 'sepal_length' })).toBeNull()
+    // 平台分组槽 series:{field} 不是 ECharts 手填
+    expect(rejectAiChartEChartsPayload({ configure: { x: 'a', series: { field: 'group' } } })).toBeNull()
+  })
+
+  it('拒绝顶层手填 series[].data 数值点（AI 配图，非 Custom Code Figure）', () => {
+    expect(
+      rejectAiChartEChartsPayload({
+        series: [{ name: 's1', data: [10, 20, 30] }],
+      }),
+    ).toMatch(/series\.data|手填|字段映射/i)
+  })
 })
 
 describe('autofillRequiredChartSlots', () => {
@@ -92,6 +180,16 @@ describe('autofillRequiredChartSlots', () => {
     expect(resolveColumnField('expression_mg_l', cols)).toBe('Expression_mg_L')
     const resolved = resolveConfigureFields({ values: [{ field: 'kd_nm' }] }, cols)
     expect(resolved.values?.[0]?.field).toBe('KD_nM')
+  })
+
+  it('去单位括号匹配 localStrain ↔ localStrain(kcal)', () => {
+    const withUnit: ColumnMeta[] = [
+      { field: 'Title', title: 'Title', dataType: 'string' },
+      { field: 'localStrain(kcal)', title: 'localStrain(kcal)', dataType: 'number' },
+      { field: 'docking score', title: 'docking score', dataType: 'number' },
+    ]
+    expect(resolveColumnField('localStrain', withUnit)).toBe('localStrain(kcal)')
+    expect(resolveColumnField('docking_score', withUnit)).toBe('docking score')
   })
 
   it('失败提示包含可用列与示例 configure', () => {

@@ -14,14 +14,28 @@ import {
 } from './client'
 import { clipToolResult, planIncomplete, planNudgeMessage, pendingPlanSteps } from './taskState'
 import { coerceArrayToolArgs, coerceParsedToolArgs } from './toolArgs'
-import { isNearDuplicate, isProcessMonologue, scrubVisibleContent } from './contentScrub'
+import { isNearDuplicate, isProcessMonologue, scrubThinkTags, scrubVisibleContent } from './contentScrub'
 import { isDelegateWorker, runDelegateWorker, workerOnlyExplored } from './tools/workers'
+import { TABLE_CATALOG_MARK } from './tableSchema'
 
 /** 让出到下一个宏任务，使 Vue 能绘制 tool_call 的进行中态后再执行工具。 */
 export function yieldToUi(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, 0)
   })
+}
+
+/** 替换消息列表中旧的 TableCatalog 系统块，再追加最新目录（每轮刷新、不堆叠）。 */
+export function replaceTableCatalogMessage(messages: ChatMessage[], catalog: string): void {
+  const text = catalog.trim()
+  if (!text) return
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i]
+    if (m?.role === 'system' && typeof m.content === 'string' && m.content.startsWith(TABLE_CATALOG_MARK)) {
+      messages.splice(i, 1)
+    }
+  }
+  messages.push({ role: 'system', content: text.startsWith(TABLE_CATALOG_MARK) ? text : `${TABLE_CATALOG_MARK}\n${text}` })
 }
 
 /** 工具执行结果。 */
@@ -157,6 +171,11 @@ export interface RunAgentOptions {
   /** 计划催促最大次数；默认 3。 */
   maxPlanNudges?: number
   /**
+   * 每轮注入最新 TableCatalog（列类型 + 样例行）。返回空则跳过。
+   * agentLoop 会替换旧的【TableCatalog】系统块，避免上下文堆叠。
+   */
+  getTableCatalog?: () => string | null | undefined
+  /**
    * Worker 严格模式：无 tool_calls / 仅探路就收工时催促继续。
    * 与 planGate 独立；分析师/工程师子 loop 应开启。
    */
@@ -179,6 +198,28 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
   const sweepFailedEmptyAiNodes = async () => {
     if (!shouldSweep) return
+    // P0-4：先静默清 pending 空图（无需确认），再扫失败空步骤
+    try {
+      const emptyCall: ToolCall = {
+        id: 'ai-sweep-empty-charts',
+        type: 'function',
+        function: { name: 'cleanup_empty_chart_views', arguments: '{}' },
+      }
+      const emptyResult = await exec(emptyCall, {})
+      const emptySummary = String(emptyResult.summary ?? '')
+      if (emptyResult.ok && /已删除/.test(emptySummary)) {
+        onEvent({ type: 'tool_call', call: emptyCall, running: false })
+        onEvent({
+          type: 'tool_result',
+          id: emptyCall.id,
+          name: 'cleanup_empty_chart_views',
+          ok: true,
+          summary: emptyResult.summary,
+        })
+      }
+    } catch {
+      /* mock exec 无此工具时忽略 */
+    }
     const call: ToolCall = {
       id: 'ai-sweep-empty',
       type: 'function',
@@ -307,6 +348,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     throwIfAborted()
     onEvent({ type: 'round', n: round })
 
+    // P0：每轮注入最新 TableCatalog（列类型 + 样例），替换旧块
+    try {
+      const catalog = opts.getTableCatalog?.()
+      if (catalog?.trim()) replaceTableCatalogMessage(messages, catalog.trim())
+    } catch {
+      /* catalog 构建失败不阻断分析 */
+    }
+
     let streamed: Awaited<ReturnType<typeof readSseStream>>
     try {
       const res = await post(
@@ -330,7 +379,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       throw new AgentRunError(msg, messages)
     }
     // reasoning / finishReason 只用于 UI / 流程判断，不回灌上游（兼容模式对未知字段可能 400）
-    const { reasoning: _reasoning, finishReason, ...assistant } = streamed
+    const { reasoning: _reasoning, finishReason, ...assistantRaw } = streamed
+    // P0-1：历史消息也剥 `<think>`（readSseStream/sanitize 已 scrub；此处再闸一次）
+    const assistant: ChatMessage = {
+      ...assistantRaw,
+      ...(typeof assistantRaw.content === 'string'
+        ? { content: scrubThinkTags(assistantRaw.content) || null }
+        : {}),
+    }
     messages.push(assistant)
 
     // 输出被 max_tokens 截断（长代码/长文写一半）：注入续写指令再进一轮，上限 2 次。
@@ -437,12 +493,19 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
     }
     await yieldToUi()
 
-    for (const call of calls) {
+    for (let callIdx = 0; callIdx < calls.length; callIdx += 1) {
+      const call = calls[callIdx]!
       throwIfAborted()
       const name = call.function.name
       onEvent({ type: 'tool_call', call, running: true })
       await yieldToUi()
       const args = safeParseArgs(call.function.arguments, name)
+      // P0-4：同轮剩余工具（供 create_view 判断随后是否有 set_chart_config）
+      const remainingTurnCalls = calls.slice(callIdx + 1).map((c) => ({
+        name: c.function.name,
+        args: safeParseArgs(c.function.arguments, c.function.name),
+      }))
+      const argsWithTurn = { ...args, __remainingTurnCalls: remainingTurnCalls }
 
       // 协议级工具：计划与进展（不落到平台）
       if (name === 'submit_plan') {
@@ -529,7 +592,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
 
       let result: ToolExecResult
       try {
-        result = await exec(call, args)
+        result = await exec(call, argsWithTurn)
       } catch (e) {
         result = { ok: false, summary: `工具执行失败：${e instanceof Error ? e.message : String(e)}` }
       }
@@ -557,6 +620,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       pushToolContent(call, name, result.summary, result)
       noteToolSpin(name, args, result)
     }
+
+    // P0：计划全部 mark_step_done 后强制收束，避免再等一轮模型收尾卡在「正在生成」
+    if (planGate && planSteps.length > 0 && !planIncomplete(planSteps, planDone)) {
+      await sweepFailedEmptyAiNodes()
+      onEvent({ type: 'done', content: scrubVisibleContent('计划已全部完成。') })
+      return messages
+    }
   }
 
   // 超轮兜底：不带工具再请一轮，让模型基于已有结果直接收尾（避免硬报错）
@@ -581,7 +651,13 @@ export async function runAgent(opts: RunAgentOptions): Promise<ChatMessage[]> {
       (text) => onEvent({ type: 'token', text }),
       (text) => onEvent({ type: 'reasoning', text }),
     )
-    const { reasoning: _r2, finishReason: _fr2, ...finalMsg } = finalStream
+    const { reasoning: _r2, finishReason: _fr2, ...finalRaw } = finalStream
+    const finalMsg: ChatMessage = {
+      ...finalRaw,
+      ...(typeof finalRaw.content === 'string'
+        ? { content: scrubThinkTags(finalRaw.content) || null }
+        : {}),
+    }
     messages.push(finalMsg)
     if (finalMsg.content) {
       emitIncompleteIfNeeded()

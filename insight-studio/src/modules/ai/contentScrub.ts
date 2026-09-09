@@ -10,6 +10,52 @@ export function capReasoningText(text: string, cap = REASONING_DISPLAY_CAP): str
 }
 
 /**
+ * MiniMax 等模型常把推理塞进 content 的 `<think>…</think>`（而非 reasoning_content）。
+ * 同步剥离未闭合尾部（流式半截块），避免泄漏到用户可见正文。
+ */
+const THINK_BLOCK_RE =
+  /<\s*(?:think|thinking|reason|reasoning)\s*>[\s\S]*?<\s*\/\s*(?:think|thinking|reason|reasoning)\s*>/gi
+const THINK_OPEN_TAIL_RE = /<\s*(?:think|thinking|reason|reasoning)\s*>[\s\S]*$/i
+const THINK_TAG_STRIP_RE = /<\/?\s*(?:think|thinking|reason|reasoning)\s*>/gi
+
+export type ExtractThinkOptions = {
+  /** 流式中间态勿 trim，避免 visible 前缀回缩导致 token 丢字。默认 true。 */
+  trim?: boolean
+}
+
+/** 剥离 think 泄漏；thinking 可映射到 ReasoningCard / debug，绝不可进用户气泡。 */
+export function extractThinkLeakage(
+  text: string,
+  opts?: ExtractThinkOptions,
+): { visible: string; thinking: string } {
+  const doTrim = opts?.trim !== false
+  const chunks: string[] = []
+  let visible = String(text ?? '').replace(THINK_BLOCK_RE, (block) => {
+    const inner = block.replace(THINK_TAG_STRIP_RE, '').trim()
+    if (inner) chunks.push(inner)
+    return '\n'
+  })
+  visible = visible.replace(THINK_OPEN_TAIL_RE, (block) => {
+    const inner = block.replace(/<\s*(?:think|thinking|reason|reasoning)\s*>/i, '').trim()
+    if (inner) chunks.push(inner)
+    return ''
+  })
+  visible = visible.replace(/\n{3,}/g, '\n\n')
+  if (doTrim) visible = visible.trim()
+  return { visible, thinking: chunks.join('\n\n').trim() }
+}
+
+/** 仅剥离 think 标签（不做复读折叠）。气泡与回灌历史共用。 */
+export function scrubThinkTags(text: string): string {
+  return extractThinkLeakage(text).visible
+}
+
+/** 用户可见气泡正文：零 think 标签。 */
+export function assistantBubbleText(text: string): string {
+  return scrubThinkTags(text)
+}
+
+/**
  * 可见回复去重：折叠连续高度相似的短句/段落，抑制 agent 复读墙。
  */
 const FILLER_LINE =
@@ -63,7 +109,8 @@ function looksLikePythonSource(s: string): boolean {
  * 代码围栏与 Custom Code 源码整段保留，避免长脚本被当成复读墙截断。
  */
 export function scrubVisibleContent(text: string, opts?: { maxLines?: number }): string {
-  const raw = String(text ?? '').trim()
+  const { visible } = extractThinkLeakage(text)
+  const raw = visible.trim()
   if (!raw) return ''
   const fences: string[] = []
   const masked = raw.replace(FENCE_BLOCK, (block) => {

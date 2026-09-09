@@ -1,0 +1,9 @@
+Compound ID,Species,Route,Dose (mg/kg),AUC_last (h*ng/mL),Cmax (ng/mL),T1/2 (h),F (%)
+HW356054,Mouse,PO,10,1250.4,320.1,2.8,45.2
+HW356054,Mouse,IV,2,560.0,890.5,1.9,
+HW356009,Mouse,PO,10,980.2,210.4,3.1,38.7
+HW356009,Mouse,IV,2,510.3,760.2,2.2,
+HW350003A,Mouse,PO,10,2100.8,540.0,4.5,62.1
+HW350003A,Mouse,IV,2,680.4,920.0,2.8,
+HW356072,Mouse,PO,10,450.1,95.3,1.6,22.0
+HW356072,Mouse,IV,2,410.0,700.2,1.4,

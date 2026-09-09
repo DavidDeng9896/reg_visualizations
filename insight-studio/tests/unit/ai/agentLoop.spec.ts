@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { runAgent, MaxIterError, type AgentEvent, type ToolExecutor } from '../../../src/modules/ai/agentLoop'
+import { runAgent, MaxIterError, replaceTableCatalogMessage, type AgentEvent, type ToolExecutor } from '../../../src/modules/ai/agentLoop'
 import type { ChatMessage, ChatPayload, ToolCall } from '../../../src/modules/ai/client'
 import { OPENAI_TOOLS } from '../../../src/modules/ai/tools/registry'
+import { TABLE_CATALOG_MARK } from '../../../src/modules/ai/tableSchema'
 
 /** 造一个 SSE Response：单 chunk 内含完整 tool_calls 或纯文本。 */
 function sseOf(payload: { toolCalls?: ToolCall[]; content?: string; finishReason?: string }): Response {
@@ -49,13 +50,77 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     expect(plan && plan.type === 'plan' ? plan.steps : null).toEqual(['看表', '出图'])
     // 两个 step_done
     expect(evts.filter((e) => e.type === 'step_done').map((e) => (e.type === 'step_done' ? e.index : -1))).toEqual([0, 1])
-    // done 事件
-    expect(evts.some((e) => e.type === 'done' && e.content === '完成')).toBe(true)
-    // 循环 5 轮请求；tool 结果已回灌进 messages
-    expect(rounds).toHaveLength(5)
+    // 计划完成后强制 idle，不再等收尾文本轮
+    expect(evts.some((e) => e.type === 'done' && e.content.includes('计划已全部完成'))).toBe(true)
+    // 4 轮请求（submit → list → done0 → done1）；不再发起第 5 轮
+    expect(rounds).toHaveLength(4)
     const toolResults = messages.filter((m) => m.role === 'tool')
     expect(toolResults.length).toBe(4)
     expect(toolResults[1].content).toBe('已执行 list_tables')
+  })
+
+  it('每轮注入 TableCatalog 并替换旧块', async () => {
+    let n = 0
+    const catalogs: string[] = []
+    const post = async (p: ChatPayload) => {
+      const cat = p.messages.filter((m) => m.role === 'system' && String(m.content).startsWith(TABLE_CATALOG_MARK))
+      catalogs.push(...cat.map((m) => String(m.content)))
+      n += 1
+      if (n === 1) return sseOf({ toolCalls: [call('submit_plan', { steps: ['A'] })] })
+      if (n === 2) return sseOf({ toolCalls: [call('mark_step_done', { index: 0 })] })
+      return sseOf({ content: '不应再到这里' })
+    }
+    let version = 0
+    await runAgent({
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'ok' }),
+      maxIterations: 8,
+      onEvent: () => {},
+      postChatFn: post,
+      getTableCatalog: () => {
+        version += 1
+        return `${TABLE_CATALOG_MARK}\nv${version}`
+      },
+    })
+    expect(catalogs.length).toBeGreaterThanOrEqual(2)
+    expect(catalogs[0]).toContain('v1')
+    expect(catalogs[1]).toContain('v2')
+    // 单次 payload 内不应堆叠多个 catalog
+    const msgs: ChatMessage[] = [
+      { role: 'system', content: `${TABLE_CATALOG_MARK}\nold` },
+      { role: 'user', content: 'x' },
+    ]
+    replaceTableCatalogMessage(msgs, `${TABLE_CATALOG_MARK}\nnew`)
+    expect(msgs.filter((m) => m.role === 'system' && String(m.content).startsWith(TABLE_CATALOG_MARK))).toHaveLength(1)
+    expect(msgs[msgs.length - 1]?.content).toContain('new')
+  })
+
+  it('计划全部完成后强制 done，不再请求下一轮模型', async () => {
+    let posts = 0
+    const post = async () => {
+      posts += 1
+      if (posts === 1) {
+        return sseOf({
+          toolCalls: [
+            call('submit_plan', { steps: ['只做一步'] }),
+            call('mark_step_done', { index: 0 }, 'd0'),
+          ],
+        })
+      }
+      return sseOf({ content: '这轮不该被调用' })
+    }
+    const evts = events()
+    await runAgent({
+      messages: [{ role: 'user', content: 'go' }],
+      tools: [],
+      exec: async () => ({ ok: true, summary: 'ok' }),
+      maxIterations: 8,
+      onEvent: (e) => evts.push(e),
+      postChatFn: post,
+    })
+    expect(posts).toBe(1)
+    expect(evts.some((e) => e.type === 'done' && e.content.includes('计划已全部完成'))).toBe(true)
   })
 
   it('首轮即文本（无工具调用）→ 单轮结束', async () => {
@@ -350,7 +415,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     })
     expect(nudges).toBeGreaterThanOrEqual(1)
     expect(evts.filter((e) => e.type === 'step_done').length).toBe(2)
-    expect(evts.some((e) => e.type === 'done' && e.content === '全部完成')).toBe(true)
+    expect(evts.some((e) => e.type === 'done' && e.content.includes('计划已全部完成'))).toBe(true)
     expect(evts.some((e) => e.type === 'incomplete')).toBe(false)
   })
 
@@ -682,7 +747,7 @@ describe('agentLoop（ReAct 多轮循环）', () => {
     const dones = evts.filter((e) => e.type === 'step_done').map((e) => (e.type === 'step_done' ? e.index : -1))
     expect(dones).toEqual([0, 1])
     expect(evts.filter((e) => e.type === 'plan')).toHaveLength(1)
-    expect(evts.some((e) => e.type === 'done' && e.content === '续跑完成')).toBe(true)
+    expect(evts.some((e) => e.type === 'done' && e.content.includes('计划已全部完成'))).toBe(true)
   })
 
   it('workerStrict：仅 schema 后空回复会催促继续 tool_calls', async () => {
@@ -799,6 +864,40 @@ describe('readSseStream（OpenAI SSE 聚合）', () => {
     expect(msg.finishReason).toBeUndefined()
   })
 
+  it('SSE content 中的 <think> 不进 token 气泡且进 reasoning；返回 content 已剥离', async () => {
+    const chunks = [
+      { choices: [{ delta: { role: 'assistant', content: '前言\n' } }] },
+      { choices: [{ delta: { content: '<think>\n密思\n' } }] },
+      { choices: [{ delta: { content: '</think>\n' } }] },
+      { choices: [{ delta: { content: '答案' } }] },
+    ]
+    const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n'
+    const res = new Response(
+      new ReadableStream({
+        start: (c) => {
+          c.enqueue(new TextEncoder().encode(body))
+          c.close()
+        },
+      }),
+    )
+    const tokens: string[] = []
+    const reasons: string[] = []
+    const msg = await readSseStream(
+      res,
+      (t) => tokens.push(t),
+      (t) => reasons.push(t),
+    )
+    const bubbled = tokens.join('')
+    expect(bubbled).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(bubbled).not.toContain('密思')
+    expect(bubbled).toContain('前言')
+    expect(bubbled).toContain('答案')
+    expect(reasons.join('')).toContain('密思')
+    expect(String(msg.content ?? '')).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(String(msg.content ?? '')).toContain('答案')
+    expect(msg.reasoning ?? '').toContain('密思')
+  })
+
   it('每帧重发完整 arguments 时不翻倍损坏 JSON', async () => {
     const args = '{"steps":["列出表","清空"]}'
     const chunks = [
@@ -840,6 +939,21 @@ describe('sanitizeChatMessages / mergeStreamedToolName', () => {
     expect(out[1].tool_calls?.[0].function.name).toBe('list_tables')
     // JSON 序列化不应出现 "content":null
     expect(JSON.stringify(out[1])).not.toContain('"content"')
+  })
+
+  it('回灌历史前剥离 assistant content 中的 <think>（sanitize 闸门）', () => {
+    const out = sanitizeChatMessages([
+      { role: 'user', content: '继续' },
+      {
+        role: 'assistant',
+        content: '可见结论\n<think>\n不该进下一轮上下文\n</think>\n收尾',
+      },
+    ])
+    const asst = out.find((m) => m.role === 'assistant')
+    expect(String(asst?.content ?? '')).not.toMatch(/<\/?\s*think\s*>/i)
+    expect(String(asst?.content ?? '')).not.toContain('不该进下一轮')
+    expect(String(asst?.content ?? '')).toContain('可见结论')
+    expect(String(asst?.content ?? '')).toContain('收尾')
   })
 
   it('mergeStreamedToolName：重发/前缀/增量', () => {

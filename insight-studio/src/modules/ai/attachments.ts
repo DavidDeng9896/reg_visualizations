@@ -169,7 +169,7 @@ export async function buildAttachmentContext(atts: ChatAttachment[]): Promise<st
   if (!targets.length) return ''
   const parts: string[] = [
     '## 用户本轮上传了以下附件',
-    'CSV/Excel 请用 import_ai_file({ fileId }) 导入为分析表，不要向用户索要 CSV 文本。text/md/pdf 仅供阅读，禁止 import_ai_file。下方预览仅供理解结构。',
+    'CSV/Excel 请用 import_ai_file({ fileId }) 导入为分析表，不要向用户索要 CSV 文本。text/md/pdf/说明文档仅供阅读，禁止 import_ai_file，禁止根据说明编造 CSV 再 import_csv_text。下方预览仅供理解结构。',
   ]
   for (const att of targets) {
     const body = await extractAttachmentText(att)
@@ -206,7 +206,7 @@ export function buildAttachmentCatalog(
   if (!lines.length) return ''
   return `## 会话附件目录
 ${lines.join('\n')}
-导入：仅 csv/excel 用 import_ai_file({ fileId, tableName?, sheetNames? })。text/md 已在对话上下文中，禁止导入为表。`
+导入：仅 csv/excel 用 import_ai_file({ fileId, tableName?, sheetNames? })。text/md/说明文档已在对话上下文中，禁止导入为表，禁止编造 CSV。`
 }
 
 /** 写入用户消息正文的附件摘要（含 id，便于多轮引用）。 */

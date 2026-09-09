@@ -64,13 +64,14 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'import_csv_text',
-    description: '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。用户已上传文件时优先用 import_ai_file。',
+    description:
+      '把 CSV 文本导入为当前分析的一张新表（自动推断列类型，并生成上传步骤节点）。用户已上传 CSV/Excel 时优先用 import_ai_file。禁止根据说明文档（txt/md/pdf）编造 CSV。',
     parameters: { type: 'object', properties: { tableName: str('表名'), csv: str('完整 CSV 文本，首行为表头') }, required: ['tableName', 'csv'] },
   },
   {
     name: 'import_ai_file',
     description:
-      '将对话附件（fileId）导入为当前分析的表。仅支持 csv / excel。text/md/pdf 是说明文档，禁止导入。Excel 可指定 sheetNames。',
+      '将对话附件（fileId）导入为当前分析的表。仅支持 csv / excel。text/md/pdf/说明文档禁止导入、不得写入 TableCatalog。Excel 可指定 sheetNames。',
     parameters: {
       type: 'object',
       properties: {
@@ -109,12 +110,13 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'add_join_step',
-    description: '以 key 连接两表（joinType: left/inner/right/full），产出合并表。',
+    description:
+      '以 key 连接两表（joinType: left/inner/right/full），产出合并表。必须显式传入 leftTableId 与 rightTableId（禁止省略；多表时勿猜测默认表）。',
     parameters: {
       type: 'object',
       properties: {
-        leftTableId: str('左表 id'),
-        rightTableId: str('右表 id'),
+        leftTableId: str('左表 id（必填，不可省略）'),
+        rightTableId: str('右表 id（必填，不可省略）'),
         joinType: { type: 'string', enum: ['left', 'inner', 'right', 'full'], description: '连接类型' },
         keys: { type: 'array', items: { type: 'object', properties: { left: str('左表列'), right: str('右表列') }, required: ['left', 'right'] } },
       },
@@ -215,13 +217,33 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'create_view',
-    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。',
+    description: '在表上新建视图（type: table/bar/line/scatter/box/pie/heatmap/bignumber）。出图请优先用 create_chart（原子配置，避免空图）。',
     parameters: { type: 'object', properties: { tableId: str('表 id'), type: str('视图类型'), name: str('视图名（可选）') }, required: ['tableId', 'type'] },
+  },
+  {
+    name: 'create_chart',
+    description:
+      '原子建图：创建图表视图并一次写全 configure；校验失败不留下空图。优先于 create_view+set_chart_config。field 必须来自 get_table_schema。bar: {x,y}；scatter/line: {x,values[]}。',
+    parameters: {
+      type: 'object',
+      properties: {
+        tableId: str('表 id（可省略：当前/唯一表）'),
+        chartType: str('图种：bar/line/scatter/box/pie/heatmap/bignumber'),
+        name: str('视图名（可选）'),
+        configure: {
+          type: 'object',
+          description:
+            '映射。bar: {x:{field}, y:{field, aggregation?}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}',
+        },
+        style: { type: 'object', description: '样式（部分更新）' },
+      },
+      required: ['chartType'],
+    },
   },
   {
     name: 'set_chart_config',
     description:
-      '配置图表。务必一次给出完整 configure。示例 bar: {x:{field}, y:{field, aggregation:"sum"}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}。y 是对象不是数组；聚合用 aggregation 不是 aggregate。缺槽会尽量自动补齐。tableId/viewId 可省略。已「配置完成」勿重复调用。勿为配图去 read_skill。',
+      '配置已有图表。务必一次给出完整 configure。示例 bar: {x:{field}, y:{field, aggregation:"sum"}}；scatter/line: {x:{field}, values:[{field}], color?:{field}}。y 是对象不是数组；聚合用 aggregation 不是 aggregate。缺槽会尽量自动补齐。校验失败不会写入半成品配置。tableId/viewId 可省略。已「配置完成」勿重复调用。新建图优先 create_chart。',
     parameters: {
       type: 'object',
       properties: {

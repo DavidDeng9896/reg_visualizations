@@ -27,6 +27,7 @@ const TOOL_LABELS: Record<string, string> = {
   rerun_stale_steps: '重跑过期步骤',
   refresh_sql_source: '刷新 SQL 数据源',
   create_view: '创建视图',
+  create_chart: '创建并配置图表',
   set_chart_config: '配置图表',
   create_dashboard: '创建看板',
   add_dashboard_widget: '添加看板组件',
@@ -94,9 +95,14 @@ function buildOpLabel(t: TraceItem, maxHint: number): string {
     const id = firstStr(args, ['tableId', 'tableName'])
     return id ? `查看表结构 ${clip(id, maxHint)}` : base
   }
-  if (name === 'create_view') {
+  if (name === 'create_view' || name === 'create_chart') {
     const typ = firstStr(args, ['type', 'chartType'])
     const nm = firstStr(args, ['name'])
+    if (name === 'create_chart') {
+      if (typ && nm) return `创建并配置${typ}图「${clip(nm, maxHint)}」`
+      if (typ) return `创建并配置${typ}图`
+      return base
+    }
     if (typ && nm) return `创建${typ}视图「${clip(nm, maxHint)}」`
     if (typ) return `创建${typ}视图`
     return base

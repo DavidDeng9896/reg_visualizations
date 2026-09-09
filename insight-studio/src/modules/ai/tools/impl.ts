@@ -12,7 +12,15 @@ import { dashboardRepository } from '../../../shared/dashboardRepository'
 import { findTable, findView, findViewParent, findCombineDependents } from '../../../shared/tree'
 import { inferColumnTypes } from '../../table/csv'
 import { validateChartMapping } from '../../charts/registry'
-import { normalizeAiChartConfigure, autofillRequiredChartSlots, resolveConfigureFields, formatChartMappingFailHint } from '../normalizeChartConfigure'
+import {
+  normalizeAiChartConfigure,
+  autofillRequiredChartSlots,
+  resolveConfigureFields,
+  formatChartMappingFailHint,
+  rejectAiChartEChartsPayload,
+  CHART_CONFIGURE_ALIAS_PAIRS,
+} from '../normalizeChartConfigure'
+import { formatTableSchema } from '../tableSchema'
 import { runStep, runStepAsync } from '../../steps/exec'
 import { createStepNode } from '../../steps/factory'
 import { tableOutputPortName } from '../../steps/registry'
@@ -32,10 +40,30 @@ import { attachmentFromMeta, importAiAttachment } from '../attachments'
 import { markStepCreatedByAi, listFailedEmptyAiSteps } from '../failedEmptySteps'
 import { coerceParsedToolArgs } from '../toolArgs'
 import { removeStepOwnedArtifacts } from '../../steps/pythonCharts'
+import {
+  isNonTabularAiFile,
+  nonTabularImportFailMessage,
+  unsupportedImportKindFailMessage,
+  NON_TABULAR_INVENT_CSV_FAIL,
+} from '../nonTabularImport'
+import {
+  chartViewLacksValidMapping,
+  clearPendingEmptyChartView,
+  deleteEmptyChartViewIfUnmapped,
+  hasChartConfigurePayload,
+  sameTurnHasCompleteChartConfigure,
+  sweepPendingEmptyChartViews,
+  trackPendingEmptyChartView,
+} from '../emptyChartViews'
 
 export interface ToolCtx {
   confirmDestructive: boolean
   confirmWrite: boolean
+  /**
+   * P0-3：本轮 agent 已拒绝的说明类附件 id。
+   * 用于 Aegis TWO_STEP——拒绝后禁止再 import_csv_text 编造 CSV。
+   */
+  rejectedDocFileIds?: Set<string>
 }
 
 /** 写入类工具（非删除）：开启 confirmWrite 时需用户批准。 */
@@ -56,6 +84,7 @@ const WRITE_TOOLS = new Set([
   'rerun_stale_steps',
   'refresh_sql_source',
   'create_view',
+  'create_chart',
   'set_chart_config',
   'create_dashboard',
   'add_dashboard_widget',
@@ -248,14 +277,28 @@ function extractChartConfigure(
   if (raw && typeof raw === 'object') {
     return normalizeAiChartConfigure(chartType, raw as Partial<ChartConfig['configure']>)
   }
-  const loose: Partial<ChartConfig['configure']> = {}
+  const loose: Record<string, unknown> = {}
   for (const key of ['x', 'y', 'series', 'color', 'shape', 'size', 'categories', 'measure', 'values'] as const) {
-    if (args[key] != null) loose[key] = args[key] as never
+    if (args[key] != null) loose[key] = args[key]
+  }
+  // 别名也可能出现在顶层 args（无 configure 包裹）；与 configure 内同一套 alias map
+  for (const [from] of CHART_CONFIGURE_ALIAS_PAIRS) {
+    if (args[from] != null) loose[from] = args[from]
   }
   if (typeof args.field === 'string' && args.field.trim()) {
     loose.values = [{ field: args.field.trim() }]
   }
-  return normalizeAiChartConfigure(chartType, loose)
+  return normalizeAiChartConfigure(chartType, loose as Partial<ChartConfig['configure']>)
+}
+
+/** create_chart / set_chart_config 共用：先拒 ECharts 手填，再抽 configure。 */
+function prepareAiChartConfigure(
+  args: Record<string, unknown>,
+  chartType: string,
+): { ok: true; configure: Partial<ChartConfig['configure']> } | { ok: false; error: string } {
+  const rejected = rejectAiChartEChartsPayload(args)
+  if (rejected) return { ok: false, error: rejected }
+  return { ok: true, configure: extractChartConfigure(args, chartType) }
 }
 
 /** 找到产出某表的步骤（输入连线的上游）；源表缺产出步骤时补一个 upload-csv 源步骤（与 migrateSteps 同构）。 */
@@ -432,7 +475,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     void args
     if (!analysis.tables.length) {
       return ok(
-        '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴 CSV。',
+        '当前分析还没有表。若用户上传了 CSV/Excel 附件，请用 list_ai_files 或系统提示中的附件 id，再调用 import_ai_file({ fileId }) 导入；也可 import_csv_text 粘贴**真实** CSV。禁止根据说明文档编造 CSV。',
       )
     }
     const lines = analysis.tables.map((t) => {
@@ -448,9 +491,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
 
   get_table_schema(args) {
     const t = requireTable(tableRefFromArgs(args))
-    const cols = t.columns.map((c) => `${c.title}(${c.dataType})`).join('、')
-    const sample = t.rows.slice(0, 5).map((r) => t.columns.map((c) => String(r[c.field] ?? '')).join(' | '))
-    return ok(`表「${t.name}」（id: ${t.id}，${t.rows.length} 行）：\n列：${cols}\n样例：\n${sample.join('\n')}`)
+    return ok(formatTableSchema(t, { sampleRows: 5 }))
   },
 
   async create_analysis(args) {
@@ -481,8 +522,21 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已创建并打开分析「${name}」（id: ${a.id}）`, artifactOf('analysis', name, { analysisId: a.id }))
   },
 
-  import_csv_text(args) {
+  async import_csv_text(args, ctx) {
     const a = requireAnalysis()
+    // P0-3 / Aegis TWO_STEP：刚拒绝说明文档且会话无真实表格附件时，禁止编造 CSV
+    if (ctx.rejectedDocFileIds?.size) {
+      let hasTabularAttachment = false
+      try {
+        const list = await aiFilesApi.list()
+        hasTabularAttachment = list.some((f) => f.kind === 'csv' || f.kind === 'excel')
+      } catch {
+        hasTabularAttachment = false
+      }
+      if (!hasTabularAttachment) {
+        return fail(NON_TABULAR_INVENT_CSV_FAIL)
+      }
+    }
     const tableName = String(args.tableName ?? '').trim() || '导入数据'
     const csv = String(args.csv ?? '')
     if (!csv.trim()) return fail('csv 内容为空')
@@ -535,7 +589,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     }
   },
 
-  async import_ai_file(args) {
+  async import_ai_file(args, ctx) {
     requireAnalysis()
     const fileId = String(args.fileId ?? '').trim()
     if (!fileId) return fail('fileId 不能为空')
@@ -546,12 +600,13 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       return fail(e instanceof Error ? e.message : '附件不存在或无法读取')
     }
     if (meta.kind !== 'csv' && meta.kind !== 'excel') {
-      if (meta.kind === 'text' || /\.(md|txt|markdown)$/i.test(meta.name)) {
-        return fail(
-          `附件「${meta.name}」是说明文档（kind=${meta.kind}），内容已在对话上下文中，不要 import_ai_file。请用 Custom Code 或 import_csv_text 生成数据表。`,
-        )
+      // P0-3：非表格文档硬拒绝；禁止引导「编造 CSV」；文档不得进入 TableCatalog（拒绝后不建表）
+      if (isNonTabularAiFile(meta)) {
+        ctx.rejectedDocFileIds?.add(fileId)
+        return fail(nonTabularImportFailMessage(meta))
       }
-      return fail(`附件「${meta.name}」kind=${meta.kind} 不支持导入为表（仅 csv/excel）`)
+      ctx.rejectedDocFileIds?.add(fileId)
+      return fail(unsupportedImportKindFailMessage(meta))
     }
     const tableName =
       typeof args.tableName === 'string' && args.tableName.trim() ? args.tableName.trim() : undefined
@@ -596,8 +651,15 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
   },
 
   add_join_step(args) {
-    const left = requireTable(String(args.leftTableId ?? ''))
-    const right = requireTable(String(args.rightTableId ?? ''))
+    const leftId = String(args.leftTableId ?? '').trim()
+    const rightId = String(args.rightTableId ?? '').trim()
+    if (!leftId || !rightId) {
+      return fail(
+        'Join 必须显式提供 leftTableId 与 rightTableId（不可省略、不可依赖默认表）；请先 list_tables 确认两表 id',
+      )
+    }
+    const left = requireTable(leftId)
+    const right = requireTable(rightId)
     const joinType = String(args.joinType ?? 'left')
     const keys = (Array.isArray(args.keys) ? args.keys : []) as { left: string; right: string }[]
     if (!keys.length) return fail('keys 不能为空')
@@ -848,11 +910,81 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const t = requireTable(tableRefFromArgs(args))
     const type = String(args.type ?? '') as Parameters<typeof createViewNode>[0]
     const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim() : defaultViewName(type, t.views)
+    // P0-4：图表视图禁止留下空/半成品；无同调完整 configure 时失败，引导 create_chart
+    if (type && type !== 'table') {
+      const hasConfigure = hasChartConfigurePayload(args)
+      const remaining = Array.isArray(args.__remainingTurnCalls)
+        ? (args.__remainingTurnCalls as { name?: string; args?: Record<string, unknown> }[])
+        : []
+      const sameTurnConfigure = sameTurnHasCompleteChartConfigure(remaining)
+      if (!hasConfigure && !sameTurnConfigure) {
+        return fail(
+          `create_view(${type}) 未带完整 configure，会留下空图，已拒绝。出图请优先 create_chart（原子配置）；或在本调用传入 configure，或同轮紧跟带 configure 的 set_chart_config。`,
+        )
+      }
+      if (hasConfigure) {
+        return impl.create_chart(
+          {
+            ...args,
+            chartType: type,
+            type,
+            name,
+          },
+          { confirmDestructive: false, confirmWrite: false },
+        )
+      }
+      // same-turn 完整 set_chart_config：允许先建壳；失败/收束时删除 pending 空图
+    }
     const view = createViewNode(type, name)
     store().mutate((a) => {
       findTable(a, t.id)?.views.push(view)
     })
+    if (type && type !== 'table') trackPendingEmptyChartView(view.id)
     return ok(`已在表「${t.name}」上创建视图「${name}」（view id: ${view.id}，${type}）`, artifactOf('view', name, { tableId: t.id, viewId: view.id, viewType: type }))
+  },
+
+  /**
+   * 原子建图：先在内存中组装完整 ChartConfig 并校验，通过后再写入。
+   * 避免 create_view 留下未映射空图、或 set_chart_config 校验失败却已污染 configure。
+   */
+  create_chart(args) {
+    const coerced = coerceParsedToolArgs('create_chart', args)
+    const t = requireTable(tableRefFromArgs(coerced))
+    const chartType = String(coerced.chartType ?? coerced.type ?? '').trim()
+    if (!chartType || chartType === 'table') {
+      return fail('create_chart 需要 chartType（bar/line/scatter/box/pie/heatmap/bignumber）')
+    }
+    const name =
+      typeof coerced.name === 'string' && coerced.name.trim()
+        ? coerced.name.trim()
+        : defaultViewName(chartType as Parameters<typeof createViewNode>[0], t.views)
+    let configurePrep = prepareAiChartConfigure(coerced, chartType)
+    if (!configurePrep.ok) return fail(configurePrep.error)
+    let configure = configurePrep.configure
+    configure = resolveConfigureFields(configure, t.columns)
+    const autofilled = autofillRequiredChartSlots(chartType, configure, t.columns)
+    configure = autofilled.configure
+    const stylePatch = { ...((coerced.style ?? {}) as Partial<ChartConfig['style']>) }
+    const draft = createViewNode(chartType as Parameters<typeof createViewNode>[0], name)
+    if (!draft.chart) return fail('无法创建图表视图')
+    Object.assign(draft.chart.configure, configure)
+    Object.assign(draft.chart.style, stylePatch)
+    const regModel = (configure.regression as { model?: string } | undefined)?.model
+    if (regModel && regModel !== 'none' && draft.chart.style.fitAnnotation === undefined) {
+      draft.chart.style.fitAnnotation = true
+    }
+    const errors = validateChartMapping(draft.chart, t.columns)
+    if (errors.length) {
+      return fail(formatChartMappingFailHint(chartType, t.columns, errors, configure))
+    }
+    store().mutate((a) => {
+      findTable(a, t.id)?.views.push(draft)
+    })
+    const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
+    return ok(
+      `已创建并配置图表「${name}」（view id: ${draft.id}，${chartType}）${fillNote}`,
+      artifactOf('view', name, { tableId: t.id, viewId: draft.id, viewType: chartType }),
+    )
   },
 
   set_chart_config(args) {
@@ -863,7 +995,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (!v?.chart) return fail('该视图不是图表视图')
     const chartType = typeof coerced.chartType === 'string' ? coerced.chartType : undefined
     const effectiveType = String(chartType || v.chart.chartType || 'bar')
-    let configure = extractChartConfigure(coerced, effectiveType)
+    const configurePrep = prepareAiChartConfigure(coerced, effectiveType)
+    if (!configurePrep.ok) return fail(configurePrep.error)
+    let configure = configurePrep.configure
     configure = resolveConfigureFields(configure, t.columns)
     const autofilled = autofillRequiredChartSlots(effectiveType, configure, t.columns)
     configure = autofilled.configure
@@ -876,6 +1010,28 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (regModel && regModel !== 'none' && style.fitAnnotation === undefined) {
       style.fitAnnotation = true
     }
+    // 先在副本上校验，通过后再写入 — 避免半成品配置导致 UI 空图
+    const draftChart: ChartConfig = {
+      ...v.chart,
+      chartType: (chartType || v.chart.chartType) as ChartConfig['chartType'],
+      configure: { ...v.chart.configure, ...configure },
+      style: { ...v.chart.style, ...style },
+    }
+    const errors = validateChartMapping(draftChart, t.columns)
+    if (errors.length) {
+      // P0-4：当前仍是空/半成品壳时删除，避免工作区残留空散点
+      let deletedName: string | null = null
+      if (chartViewLacksValidMapping(v, t.columns)) {
+        store().mutate((a) => {
+          deletedName = deleteEmptyChartViewIfUnmapped(a, t.id, v.id)
+        })
+      }
+      const hint = formatChartMappingFailHint(effectiveType, t.columns, errors, configure)
+      if (deletedName) {
+        return fail(`${hint} 已删除空图「${deletedName}」。请改用 create_chart 一次写全 configure。`)
+      }
+      return fail(hint)
+    }
     store().mutate((a) => {
       const table = findTable(a, t.id)
       const view = table ? findView(table.views, v.id) : null
@@ -884,19 +1040,23 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       Object.assign(view.chart.configure, configure)
       Object.assign(view.chart.style, style)
     })
-    // 校验映射完整性：失败返回 ok:false，并给出可用列 + 完整示例，避免同参空转
-    const updated = findView(requireTable(t.id).views, v.id)
-    const errors = validateChartMapping(updated!.chart!, requireTable(t.id).columns)
-    if (errors.length) {
-      return fail(
-        formatChartMappingFailHint(effectiveType, requireTable(t.id).columns, errors, configure),
-      )
-    }
+    clearPendingEmptyChartView(v.id)
     const fillNote = autofilled.filled.length ? `（已自动补齐 ${autofilled.filled.join('、')}）` : ''
     return ok(
       `图表「${v.name}」配置完成${fillNote}`,
-      artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: updated!.chart!.chartType }),
+      artifactOf('view', v.name, { tableId: t.id, viewId: v.id, viewType: draftChart.chartType }),
     )
+  },
+
+  /** P0-4 内部：计划收束时清掉仍无有效映射的 pending 空图（无需确认）。 */
+  cleanup_empty_chart_views() {
+    const a = requireAnalysis()
+    let removed: string[] = []
+    store().mutate((analysis) => {
+      removed = sweepPendingEmptyChartViews(analysis)
+    })
+    if (!removed.length) return ok('没有需要清理的空图')
+    return ok(`已删除 ${removed.length} 个空图：${removed.join('、')}`)
   },
 
   async create_dashboard(args) {

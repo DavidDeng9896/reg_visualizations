@@ -118,14 +118,32 @@ describe('AI 工具实现（execTool）', () => {
   it('create_view + set_chart_config：视图创建与校验提示', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: 'AI 散点' }, ctx)
-    expect(created.ok).toBe(true)
+    // P0-4：裸 create_view(图表) 禁止留下空图；带 configure 的同调创建才允许
+    const bare = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '空散点' }, ctx)
+    expect(bare.ok).toBe(false)
+    expect(bare.summary).toMatch(/create_chart|configure|空图/i)
+    expect(iris.views.some((v) => v.name === '空散点')).toBe(false)
+
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: 'AI 散点',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
     const viewId = created.summary.match(/view id: ([0-9a-f-]+)/)?.[1]
     expect(viewId).toBeTruthy()
 
     const bad = await execTool('set_chart_config', { tableId: iris.id, viewId, configure: { x: { field: 'nope' } } }, ctx)
     expect(bad.ok).toBe(false)
     expect(bad.summary).toContain('校验未通过')
+    // 校验失败不得写入半成品（空图根因）
+    const afterBad = findView(findTable(analysis, iris.id)!.views, viewId!)
+    expect(afterBad!.chart!.configure.x?.field).not.toBe('nope')
 
     const viaY = await execTool(
       'set_chart_config',
@@ -145,6 +163,204 @@ describe('AI 工具实现（execTool）', () => {
     const view = findView(findTable(analysis, iris.id)!.views, viewId!)
     expect(view!.chart!.style.fitAnnotation).toBe(true)
     expect(view!.chart!.configure.values?.[0]?.field).toBe('sepal_width')
+
+    const echarts = await execTool(
+      'set_chart_config',
+      {
+        tableId: iris.id,
+        viewId,
+        configure: { xAxis: { type: 'category', data: ['a'] }, series: [{ data: [1, 2, 3] }] },
+      },
+      ctx,
+    )
+    expect(echarts.ok).toBe(false)
+    expect(echarts.summary).toMatch(/ECharts|series\.data|字段映射/i)
+  })
+
+  it('create_chart：原子建图；失败不留空视图', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.views.length
+    const bad = await execTool(
+      'create_chart',
+      { tableId: iris.id, chartType: 'scatter', configure: { x: { field: 'nope' } } },
+      ctx,
+    )
+    expect(bad.ok).toBe(false)
+    expect(iris.views.length).toBe(before)
+
+    const good = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '物种柱',
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length', aggregation: 'mean' } },
+      },
+      ctx,
+    )
+    expect(good.ok).toBe(true)
+    expect(good.artifact?.viewType).toBe('bar')
+    expect(iris.views.length).toBe(before + 1)
+    const view = iris.views.find((v) => v.name === '物种柱')
+    expect(view?.chart?.configure.x?.field).toBe('species')
+    expect(view?.chart?.configure.y?.field).toBe('sepal_length')
+  })
+
+  it('create_chart：字符串槽位与 x_field 别名可用；拒绝 ECharts series.data', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.views.length
+    const echarts = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        configure: { xAxis: { data: ['a'] }, series: [{ data: [1, 2] }] },
+      },
+      ctx,
+    )
+    expect(echarts.ok).toBe(false)
+    expect(echarts.summary).toMatch(/ECharts|series\.data|字段映射/i)
+    expect(iris.views.length).toBe(before)
+
+    const echartsArr = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        configure: { xAxis: ['setosa', 'versicolor'], yAxis: [1, 2], series: [{ data: [10, 20] }] },
+      },
+      ctx,
+    )
+    expect(echartsArr.ok).toBe(false)
+    expect(echartsArr.summary).toMatch(/ECharts|xAxis|字面量|series\.data/i)
+    expect(iris.views.length).toBe(before)
+
+    const aliased = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '别名柱',
+        configure: { x_field: 'species', y_field: 'sepal_length' },
+      },
+      ctx,
+    )
+    expect(aliased.ok, aliased.summary).toBe(true)
+    expect(iris.views.find((v) => v.name === '别名柱')?.chart?.configure.x?.field).toBe('species')
+
+    const shorthand = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: 'bar',
+        name: '字符串槽',
+        configure: { x: 'species', y: 'petal_length' },
+      },
+      ctx,
+    )
+    expect(shorthand.ok, shorthand.summary).toBe(true)
+    expect(iris.views.find((v) => v.name === '字符串槽')?.chart?.configure.x?.field).toBe('species')
+  })
+
+  it('P0-2：set_chart_config 与 create_chart 共用方言门；允许 docking 字符串槽', async () => {
+    const { analysis } = await seedStore()
+    const csv = [
+      '"Stars","Title","State Penalty","docking score","localStrain(kcal)","globalStrain(kcal)","glide gscore"',
+      '2,"20241105_D1_T1",0.0216,-8.121,3.249,10.450,',
+      '2,"20241105_D2_T1",0.0000,-6.465,3.008,6.630,',
+    ].join('\n')
+    const imported = await execTool('import_csv_text', { tableName: 'docking_p02', csv }, ctx)
+    expect(imported.ok).toBe(true)
+    const table = analysis.tables.find((t) => t.name === 'docking_p02')!
+
+    const created = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'scatter',
+        name: 'docking str slots',
+        configure: { x: 'docking score', values: [{ field: 'localStrain(kcal)' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
+    const viewId = created.artifact?.viewId
+    expect(viewId).toBeTruthy()
+    expect(table.views.find((v) => v.id === viewId)?.chart?.configure.x?.field).toBe('docking score')
+
+    const bad = await execTool(
+      'set_chart_config',
+      {
+        tableId: table.id,
+        viewId,
+        configure: { xAxis: ['a', 'b'], series: [{ data: [1, 2] }] },
+      },
+      ctx,
+    )
+    expect(bad.ok).toBe(false)
+    expect(bad.summary).toMatch(/ECharts|xAxis|series\.data|字段映射/i)
+    // 校验失败不污染已有合法映射
+    expect(table.views.find((v) => v.id === viewId)?.chart?.configure.x?.field).toBe('docking score')
+
+    const reconfig = await execTool(
+      'set_chart_config',
+      {
+        tableId: table.id,
+        viewId,
+        configure: { x: { field: 'docking score' }, values: [{ field: 'localStrain(kcal)' }] },
+      },
+      ctx,
+    )
+    expect(reconfig.ok, reconfig.summary).toBe(true)
+
+    const topAlias = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'bar',
+        name: 'top-level alias',
+        x_field: 'Title',
+        y_field: 'docking score',
+      },
+      ctx,
+    )
+    expect(topAlias.ok, topAlias.summary).toBe(true)
+    expect(table.views.find((v) => v.name === 'top-level alias')?.chart?.configure.x?.field).toBe('Title')
+  })
+
+  it('create_chart + 复杂表头（docking fixture）：模糊字段可配散点', async () => {
+    const { analysis } = await seedStore()
+    const csv = [
+      '"Stars","Title","State Penalty","docking score","localStrain(kcal)","globalStrain(kcal)","glide gscore"',
+      '2,"20241105_D1_T1",0.0216,-8.121,3.249,10.450,',
+      '2,"20241105_D2_T1",0.0000,-6.465,3.008,6.630,',
+    ].join('\n')
+    const imported = await execTool('import_csv_text', { tableName: 'docking', csv }, ctx)
+    expect(imported.ok).toBe(true)
+    const table = analysis.tables.find((t) => t.name === 'docking')!
+    const schema = await execTool('get_table_schema', { tableId: table.id }, ctx)
+    expect(schema.summary).toContain('field=`docking score`')
+    expect(schema.summary).toContain('field=`localStrain(kcal)`')
+
+    const res = await execTool(
+      'create_chart',
+      {
+        tableId: table.id,
+        chartType: 'scatter',
+        name: 'docking vs strain',
+        configure: {
+          x: { field: 'docking score' },
+          values: [{ field: 'localStrain' }],
+        },
+      },
+      ctx,
+    )
+    expect(res.ok, res.summary).toBe(true)
+    const view = table.views.find((v) => v.name === 'docking vs strain')
+    expect(view?.chart?.configure.x?.field).toBe('docking score')
+    expect(view?.chart?.configure.values?.[0]?.field).toBe('localStrain(kcal)')
   })
 
   it('add_filter_step：缺 tableId 时回退分析内唯一/最近表', async () => {
@@ -164,7 +380,16 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：bar 的 y 数组写法可成功', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    await execTool('create_view', { tableId: iris.id, type: 'bar', name: 'EC50柱' }, ctx)
+    await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'bar',
+        name: 'EC50柱',
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length', aggregation: 'sum' } },
+      },
+      ctx,
+    )
     const res = await execTool(
       'set_chart_config',
       {
@@ -184,7 +409,21 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：仅传 values 时自动补齐 X', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '只给Y' }, ctx)
+    await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: '只给Y',
+        __remainingTurnCalls: [
+          {
+            name: 'set_chart_config',
+            args: { configure: { values: [{ field: 'sepal_width' }] } },
+          },
+        ],
+      },
+      ctx,
+    )
     const res = await execTool(
       'set_chart_config',
       { configure: { values: [{ field: 'sepal_width' }] } },
@@ -200,7 +439,16 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：可缺 viewId，回退最近创建的图表视图', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: '自动回退视图' }, ctx)
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: '自动回退视图',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
     expect(created.ok).toBe(true)
     const res = await execTool(
       'set_chart_config',
@@ -219,7 +467,17 @@ describe('AI 工具实现（execTool）', () => {
   it('set_chart_config：可仅用 viewId 反查表；configure 可为 values 数组', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
-    const created = await execTool('create_view', { tableId: iris.id, type: 'scatter', name: 'kon vs koff' }, ctx)
+    const created = await execTool(
+      'create_view',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        name: 'kon vs koff',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
+    expect(created.ok, created.summary).toBe(true)
     const viewId = created.summary.match(/view id: ([0-9a-f-]+)/)?.[1]!
     const res = await execTool(
       'set_chart_config',
@@ -475,6 +733,27 @@ describe('AI 工具实现（execTool）', () => {
     expect(out!.rows[0].label).toBe('Alpha')
   })
 
+  it('add_join_step：缺少 leftTableId/rightTableId 时拒绝（不回退默认表）', async () => {
+    const { analysis, store } = await seedStore()
+    const iris = analysis.tables[0]!
+    store.select({ kind: 'table', tableId: iris.id })
+    expect(analysis.tables.length).toBeGreaterThan(0)
+    const missingBoth = await execTool(
+      'add_join_step',
+      { joinType: 'left', keys: [{ left: 'id', right: 'id' }] },
+      ctx,
+    )
+    expect(missingBoth.ok).toBe(false)
+    expect(missingBoth.summary).toMatch(/必须显式|leftTableId|rightTableId/)
+    const missingRight = await execTool(
+      'add_join_step',
+      { leftTableId: iris.id, joinType: 'left', keys: [{ left: 'species', right: 'species' }] },
+      ctx,
+    )
+    expect(missingRight.ok).toBe(false)
+    expect(missingRight.summary).toMatch(/必须显式|rightTableId/)
+  })
+
   it('add_union_step：纵向合并结构兼容表', async () => {
     await seedStore()
     const a = await execTool('import_csv_text', { tableName: 'u1', csv: 'id,v\na,1' }, ctx)
@@ -654,7 +933,8 @@ describe('AI 工具实现（execTool）', () => {
   })
 
   it('import_ai_file：md 说明文档拒绝导入并提示勿当表', async () => {
-    await seedStore()
+    const { analysis } = await seedStore()
+    const before = analysis.tables.length
     const { aiFilesApi } = await import('../../../src/modules/ai/client')
     vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
       id: 'file-md-1',
@@ -667,7 +947,30 @@ describe('AI 工具实现（execTool）', () => {
     const res = await execTool('import_ai_file', { fileId: 'file-md-1' }, ctx)
     expect(res.ok).toBe(false)
     expect(res.summary).toContain('说明文档')
-    expect(res.summary).toContain('不要 import_ai_file')
+    expect(res.summary).toMatch(/禁止 import_ai_file|不要 import_ai_file/)
+    // P0-3：拒绝后不得引导「编造 CSV」；表目录不得新增文档假表
+    expect(res.summary).not.toMatch(/import_csv_text|生成数据表|编造|虚构/i)
+    expect(analysis.tables).toHaveLength(before)
+  })
+
+  it('import_ai_file：pdf/非表格附件硬拒绝，不入表', async () => {
+    const { analysis } = await seedStore()
+    const before = analysis.tables.length
+    const { aiFilesApi } = await import('../../../src/modules/ai/client')
+    vi.spyOn(aiFilesApi, 'meta').mockResolvedValue({
+      id: 'file-pdf-1',
+      name: 'protocol.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 100,
+      createdAt: new Date().toISOString(),
+      kind: 'pdf',
+    })
+    const res = await execTool('import_ai_file', { fileId: 'file-pdf-1' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toMatch(/说明文档|不支持导入|仅 csv\/excel/i)
+    expect(res.summary).toContain('禁止 import_ai_file')
+    expect(res.summary).not.toMatch(/import_csv_text|生成数据表/i)
+    expect(analysis.tables).toHaveLength(before)
   })
 
   it('cleanup_failed_ai_steps 不在模型工具表中', () => {
