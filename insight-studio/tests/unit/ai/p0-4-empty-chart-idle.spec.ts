@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
   clearAllPendingEmptyChartViews,
+  chartViewHasCategoryScatterMismatch,
   hasChartConfigurePayload,
   sameTurnHasCompleteChartConfigure,
   sweepPendingEmptyChartViews,
@@ -65,6 +66,20 @@ describe('P0-4 empty chart gate + idle', () => {
         { name: 'set_chart_config', args: { configure: { x: { field: 'a' }, values: [{ field: 'b' }] } } },
       ]),
     ).toBe(true)
+  })
+
+  it('chartViewHasCategoryScatterMismatch：分类 X 散点命中门控', async () => {
+    const { iris } = await seedIris()
+    const view = createViewNode('scatter', 'Step vs Yield')
+    view.chart = {
+      ...view.chart!,
+      chartType: 'scatter',
+      configure: { x: { field: 'species' }, values: [{ field: 'sepal_length' }] },
+    }
+    iris.views.push(view)
+    expect(chartViewHasCategoryScatterMismatch(view, iris.columns)).toBe(true)
+    view.chart!.configure.x = { field: 'sepal_width' }
+    expect(chartViewHasCategoryScatterMismatch(view, iris.columns)).toBe(false)
   })
 
   it('裸 create_view(chart) 拒绝且不留空图', async () => {

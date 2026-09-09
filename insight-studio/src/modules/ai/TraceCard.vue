@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { IIcon } from '../../ui'
 import type { TraceItem } from './aiStore'
 import { briefOpLabel, fullArgs, fullOpLabel, fullSummary } from './traceLabels'
@@ -7,7 +7,7 @@ import { briefOpLabel, fullArgs, fullOpLabel, fullSummary } from './traceLabels'
 /**
  * 工具调用轨迹卡：
  * - 标题「已处理 N 个操作（完成 M）」；进行中标题/子项光影掠过
- * - 进行中自动展开列表，便于看到实时任务；结束后可手动折叠
+ * - UX P0：默认折叠；标题一行已含进度，用户可手动展开明细
  * - 待确认审批卡始终外露
  * - 子项一行显示精简操作内容；展开后完整参数与结果
  */
@@ -26,7 +26,7 @@ defineEmits<{
   (e: 'reject', t: TraceItem): void
 }>()
 
-const expanded = ref(!!props.streaming)
+const expanded = ref(false)
 /** 已展开明细的子项 id。 */
 const openDetail = ref<Set<string>>(new Set())
 
@@ -47,14 +47,7 @@ const pending = computed(() => {
   })
 })
 
-/** 有操作开始跑、或本轮仍在生成时自动展开，避免「全部做完才看见任务列表」。 */
-watch(
-  () => [!!props.streaming, props.items.length, inProgress.value] as const,
-  ([streaming, n, busy]) => {
-    if (streaming && (busy || n > 0)) expanded.value = true
-  },
-  { immediate: true },
-)
+/** UX P0：进度轨默认折叠；标题一行已含进行中操作，不自动展开长列表。 */
 
 function toggleDetail(id: string): void {
   const next = new Set(openDetail.value)

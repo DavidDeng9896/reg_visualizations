@@ -8,7 +8,7 @@ function item(partial: Partial<TraceItem> & Pick<TraceItem, 'id' | 'name'>): Tra
 }
 
 describe('TraceCard 进行中展示', () => {
-  it('streaming 时自动展开，并显示正在执行的操作名', () => {
+  it('streaming 时默认折叠，标题一行含进行中操作', () => {
     const wrapper = mount(TraceCard, {
       props: {
         streaming: true,
@@ -16,13 +16,13 @@ describe('TraceCard 进行中展示', () => {
       },
     })
     expect(wrapper.get('[data-testid="ai-trace"]').attributes('data-in-progress')).toBe('true')
-    expect(wrapper.get('[data-testid="ai-trace-head"]').attributes('aria-expanded')).toBe('true')
-    expect(wrapper.get('[data-testid="ai-trace-list"]').isVisible()).toBe(true)
-    expect(wrapper.text()).toContain('列出数据表')
+    expect(wrapper.get('[data-testid="ai-trace-head"]').attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-testid="ai-trace-list"]').exists()).toBe(false)
     expect(wrapper.text()).toMatch(/已处理 1 个操作（完成 0）/)
+    expect(wrapper.text()).toContain('列出数据表')
   })
 
-  it('排队中的操作不显示失败叉', () => {
+  it('可手动展开查看排队中的操作', async () => {
     const wrapper = mount(TraceCard, {
       props: {
         streaming: true,
@@ -32,6 +32,8 @@ describe('TraceCard 进行中展示', () => {
         ],
       },
     })
+    await wrapper.get('[data-testid="ai-trace-head"]').trigger('click')
+    expect(wrapper.get('[data-testid="ai-trace-head"]').attributes('aria-expanded')).toBe('true')
     expect(wrapper.find('.trace__fail').exists()).toBe(false)
     expect(wrapper.find('.trace__queued').exists()).toBe(true)
     expect(wrapper.text()).toContain('查看表结构')
@@ -48,6 +50,7 @@ describe('TraceCard 进行中展示', () => {
       },
     })
     expect(wrapper.get('[data-testid="ai-trace"]').attributes('data-in-progress')).toBeUndefined()
+    expect(wrapper.get('[data-testid="ai-trace-head"]').attributes('aria-expanded')).toBe('false')
     expect(wrapper.text()).toContain('已处理 2 个操作（完成 2）')
   })
 })

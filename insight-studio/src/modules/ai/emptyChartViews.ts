@@ -5,6 +5,7 @@
  */
 import type { Analysis, AnalysisTable, ColumnMeta, ViewNode } from '../../shared/types'
 import { validateChartMapping } from '../charts/registry'
+import { scatterCategoryAxisField } from '../charts/chartEmptyState'
 import { findViewParent } from '../../shared/tree'
 
 const pendingEmptyChartViewIds = new Set<string>()
@@ -41,6 +42,12 @@ export function sameTurnHasCompleteChartConfigure(
 export function chartViewLacksValidMapping(view: ViewNode, columns: ColumnMeta[]): boolean {
   if (!view.chart || view.type === 'table') return false
   return validateChartMapping(view.chart, columns).length > 0
+}
+
+/** 映射槽位齐但散点绑了分类轴（主区坏轴门控；清理逻辑仍只看 lacksValidMapping）。 */
+export function chartViewHasCategoryScatterMismatch(view: ViewNode, columns: ColumnMeta[]): boolean {
+  if (!view.chart || view.type === 'table') return false
+  return scatterCategoryAxisField(view.chart, columns) != null
 }
 
 export function trackPendingEmptyChartView(viewId: string): void {
