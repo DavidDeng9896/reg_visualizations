@@ -97,4 +97,4 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
 
 CREATE INDEX IF NOT EXISTS ai_conv_updated ON ai_conversations (updated_at);
 CREATE INDEX IF NOT EXISTS idx_ai_conv_user_updated ON ai_conversations (user_id, updated_at);
-CREATE INDEX IF NOT EXISTS ai_conv_step ON ai_conversations (step_id);
+-- ai_conv_step is created in ensureAiConversationStepID after step_id is added on old tables.
