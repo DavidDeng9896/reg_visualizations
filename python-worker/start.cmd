@@ -2,16 +2,23 @@
 setlocal
 cd /d "%~dp0"
 
-where python >nul 2>nul
-if %ERRORLEVEL%==0 (
-  set PY=python
+if exist "%~dp0.venv\Scripts\python.exe" (
+  set "PY=%~dp0.venv\Scripts\python.exe"
+  echo [python-worker] using project venv: %PY%
 ) else (
-  where py >nul 2>nul
+  where python >nul 2>nul
   if %ERRORLEVEL%==0 (
-    set PY=py -3
+    set PY=python
   ) else (
-    echo [python-worker] Python not found. Install Python 3.11+ and re-run.
-    exit /b 1
+    where py >nul 2>nul
+    if %ERRORLEVEL%==0 (
+      set PY=py -3
+    ) else (
+      echo [python-worker] Python not found (no .venv and none on PATH).
+      echo Create one: python -m venv .venv
+      echo Then: .venv\Scripts\python.exe -m pip install -r requirements.txt
+      exit /b 1
+    )
   )
 )
 
