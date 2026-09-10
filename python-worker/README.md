@@ -42,9 +42,7 @@ cd python-worker
 npm start
 ```
 
-`npm start` / `start.cmd` / `start.sh` 优先使用项目 `.venv`（Windows: `.venv/Scripts/python.exe`；macOS/Linux: `.venv/bin/python`），否则回退 PATH 上的 python。
-
-`npm start` 若检测到缺 rdkit 等科学包，会先对所选解释器 `pip install -r requirements.txt` 再启动（有 `.venv` 时装进 venv，不强制全局 pip）。
+`npm start` / `start.cmd` / `start.sh` 优先使用项目 `.venv`（Windows: `.venv/Scripts/python.exe`；macOS/Linux: `.venv/bin/python`），否则回退 PATH 上的 python；缺包时对所选解释器 `pip install`（有 `.venv` 时装进 venv）。
 
 **Smoke（确认走 venv）：**
 
