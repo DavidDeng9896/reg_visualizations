@@ -67,3 +67,65 @@ func TestOpenUsesExplicitDSN(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Old MariaDB installs may have ai_conversations without step_id.
+// migrate must not CREATE INDEX on step_id before ensureAiConversationStepID adds the column.
+func TestMigrateOldAiConversationsWithoutStepID(t *testing.T) {
+	st := storetest.Open(t)
+
+	var dbName string
+	if err := st.DB.QueryRow("SELECT DATABASE()").Scan(&dbName); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := st.DB.Exec(`DROP TABLE IF EXISTS ai_conversations`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := st.DB.Exec(`
+		CREATE TABLE ai_conversations (
+		  id            VARCHAR(64) NOT NULL,
+		  analysis_id   VARCHAR(64) NULL,
+		  title         VARCHAR(512) NOT NULL DEFAULT '',
+		  created_at    VARCHAR(32) NOT NULL,
+		  updated_at    VARCHAR(32) NOT NULL,
+		  messages      JSON NOT NULL,
+		  user_id       VARCHAR(64) NOT NULL DEFAULT 'david',
+		  PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := store.ConfigFromEnv()
+	cfg.DSN = ""
+	cfg.Database = dbName
+	st2, err := store.Open(cfg)
+	if err != nil {
+		t.Fatalf("migrate old ai_conversations without step_id: %v", err)
+	}
+	defer st2.Close()
+
+	var colCount int
+	if err := st2.DB.QueryRow(`
+		SELECT COUNT(*) FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = 'ai_conversations'
+		   AND COLUMN_NAME = 'step_id'`).Scan(&colCount); err != nil {
+		t.Fatal(err)
+	}
+	if colCount != 1 {
+		t.Fatalf("step_id column count=%d want 1", colCount)
+	}
+
+	var idxCount int
+	if err := st2.DB.QueryRow(`
+		SELECT COUNT(*) FROM information_schema.STATISTICS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = 'ai_conversations'
+		   AND INDEX_NAME = 'ai_conv_step'`).Scan(&idxCount); err != nil {
+		t.Fatal(err)
+	}
+	if idxCount < 1 {
+		t.Fatalf("ai_conv_step index missing")
+	}
+}
