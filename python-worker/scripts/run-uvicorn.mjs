@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * Cross-platform uvicorn launcher (Windows/macOS/Linux).
- * Prefers `python`, falls back to `python3`.
- * Installs requirements.txt when scientific packages are missing (rdkit 等).
+ * Prefers project `.venv` (same idea as local start scripts), then PATH `python`/`python3`/`py`.
+ * Installs requirements.txt when scientific packages are missing (rdkit 等) into the chosen interpreter.
  */
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -46,7 +47,25 @@ async function tryPython(bin) {
   }
 }
 
+function venvPythonCandidates() {
+  if (process.platform === 'win32') {
+    return [path.join(root, '.venv', 'Scripts', 'python.exe')]
+  }
+  return [
+    path.join(root, '.venv', 'bin', 'python'),
+    path.join(root, '.venv', 'bin', 'python3'),
+  ]
+}
+
 async function resolvePython() {
+  for (const bin of venvPythonCandidates()) {
+    if (!fs.existsSync(bin)) continue
+    const ok = await tryPython(bin)
+    if (ok) {
+      console.log(`[python-worker] using project venv: ${bin}`)
+      return ok
+    }
+  }
   for (const bin of ['python', 'python3', 'py']) {
     const ok = await tryPython(bin)
     if (ok) return ok
@@ -73,11 +92,14 @@ async function ensureDeps(py) {
 const py = await resolvePython()
 if (!py) {
   console.error(
-    '[python-worker] Python not found on PATH.\n' +
-      'Install Python 3.11+, then:\n' +
+    '[python-worker] Python not found (no .venv and none on PATH).\n' +
+      'Recommended:\n' +
       '  cd python-worker\n' +
-      '  python -m pip install -r requirements.txt\n' +
-      '  npm start\n',
+      '  python -m venv .venv\n' +
+      '  # Windows: .venv\\Scripts\\python.exe -m pip install -r requirements.txt\n' +
+      '  # macOS/Linux: .venv/bin/python -m pip install -r requirements.txt\n' +
+      '  npm start\n' +
+      'Or install Python 3.11+ on PATH and re-run npm start.\n',
   )
   process.exit(1)
 }

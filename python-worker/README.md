@@ -42,7 +42,19 @@ cd python-worker
 npm start
 ```
 
-`npm start` 若检测到缺 rdkit 等科学包，会先 `pip install -r requirements.txt` 再启动。
+`npm start` / `start.cmd` / `start.sh` 优先使用项目 `.venv`（Windows: `.venv/Scripts/python.exe`；macOS/Linux: `.venv/bin/python`），否则回退 PATH 上的 python。
+
+`npm start` 若检测到缺 rdkit 等科学包，会先对所选解释器 `pip install -r requirements.txt` 再启动（有 `.venv` 时装进 venv，不强制全局 pip）。
+
+**Smoke（确认走 venv）：**
+
+```bash
+cd python-worker
+python3 -m venv .venv   # or: python -m venv .venv
+npm start
+# 日志应含: using project venv: .../.venv/bin/python  (Windows: ...\.venv\Scripts\python.exe)
+# 然后: curl -s http://127.0.0.1:8091/health
+```
 
 然后确认：`http://127.0.0.1:8091/health` → `ok: true` 且 `packages` 含 pandas / rdkit 等。
 不要只用 `python -m uvicorn ...` 跳过安装，否则 Custom Code 会报 `No module named 'rdkit'`。
