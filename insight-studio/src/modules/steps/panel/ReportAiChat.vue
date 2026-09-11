@@ -108,10 +108,7 @@ defineExpose({ ingestHint })
       <button type="button" class="rac__head-btn" title="清除对话" :disabled="loading" @click="clear">
         <IIcon name="trash" :size="13" />
       </button>
-      <button type="button" class="rac__head-btn" title="最小化" aria-label="最小化" @click="emit('minimize')">
-        <IIcon name="minus" :size="13" />
-      </button>
-      <button type="button" class="rac__head-btn" aria-label="关闭面板" @click="emit('close')">
+      <button type="button" class="rac__head-btn" title="关闭（可从顶栏「AI 撰写」再次打开）" aria-label="关闭面板" @click="emit('close')">
         <IIcon name="close" :size="13" />
       </button>
     </header>
