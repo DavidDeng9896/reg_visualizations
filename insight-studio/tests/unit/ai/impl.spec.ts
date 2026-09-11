@@ -207,6 +207,50 @@ describe('AI 工具实现（execTool）', () => {
     expect(view?.chart?.configure.y?.field).toBe('sepal_length')
   })
 
+  it('create_chart：图种别名/同义词可恢复；真缺 chartType 失败且不留空图', async () => {
+    const { analysis } = await seedStore()
+    const iris = analysis.tables[0]
+    const before = iris.views.length
+
+    const viaType = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        type: 'scatter',
+        configure: { x: { field: 'sepal_length' }, values: [{ field: 'sepal_width' }] },
+      },
+      ctx,
+    )
+    expect(viaType.ok).toBe(true)
+    expect(viaType.artifact?.viewType).toBe('scatter')
+
+    const viaCn = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        chartType: '柱状图',
+        name: '物种柱-同义',
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length', aggregation: 'mean' } },
+      },
+      ctx,
+    )
+    expect(viaCn.ok).toBe(true)
+    expect(viaCn.artifact?.viewType).toBe('bar')
+
+    const missing = await execTool(
+      'create_chart',
+      {
+        tableId: iris.id,
+        configure: { x: { field: 'species' }, y: { field: 'sepal_length' } },
+      },
+      ctx,
+    )
+    expect(missing.ok).toBe(false)
+    expect(missing.summary).toMatch(/chartType/)
+    expect(missing.summary).toMatch(/示例/)
+    expect(iris.views.length).toBe(before + 2)
+  })
+
   it('create_chart：字符串槽位与 x_field 别名可用；拒绝 ECharts series.data', async () => {
     const { analysis } = await seedStore()
     const iris = analysis.tables[0]
