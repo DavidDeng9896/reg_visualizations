@@ -140,7 +140,7 @@ function sectionItemsText(sec: ReportSection): string {
               size="sm"
               :options="templateOptions"
               :disabled="readonly"
-              @update:model-value="update({ templateId: String($event) as ReportTemplateId })"
+              @update:model-value="update({ templateId: String($event) as ReportTemplateId, theme: String($event) as ReportTemplateId })"
             />
             <IButton
               v-if="!readonly && analysis"

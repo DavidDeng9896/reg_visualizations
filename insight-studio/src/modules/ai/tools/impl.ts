@@ -824,6 +824,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       report = readReportConfig({ report: args.report })
       report.title = report.title || name
       report.templateId = report.templateId ?? templateId
+      report.theme = report.theme ?? templateId
     } else {
       // 无完整 report 时按内置模板从当前分析脚手架生成（图+说明+解读）→ draft
       fromScaffold = true
@@ -833,6 +834,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
         report = emptyReport(name, templateId)
       }
     }
+    // theme ↔ templateId 1:1
+    report.templateId = resolveTemplateId(report.templateId ?? templateId)
+    report.theme = report.templateId
     // scaffold→draft 不过质量门；仅当传入完整 report 且宣称 done 时拦截
     if (claimDone) {
       if (fromScaffold) {
@@ -872,6 +876,8 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     let nextReport: AnalysisReport | undefined
     if (args.report && typeof args.report === 'object') {
       nextReport = readReportConfig({ report: args.report })
+      nextReport.templateId = resolveTemplateId(nextReport.templateId ?? nextReport.theme)
+      nextReport.theme = nextReport.templateId
     }
     // draft 可多轮更新；宣称 done 时必须通过质量门（不 mutate）
     if (claimDone) {

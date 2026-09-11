@@ -10,6 +10,9 @@ import { useAnalysisStore } from '../../../stores/analysisStore'
 import { IButton, IIcon, type IconName } from '../../../ui'
 import { readReportConfig } from '../report/reportModel'
 import ReportPreview from './ReportPreview.vue'
+import ReportThemeThumbs from '../report/ReportThemeThumbs.vue'
+import type { ReportTemplateId } from '../../../shared/types'
+import { resolveTemplateId } from '../report/reportTemplates'
 import ReportEditor from './ReportEditor.vue'
 import ReportAiAssist from './ReportAiAssist.vue'
 
@@ -111,6 +114,23 @@ function onReportUpdate(v: AnalysisReport) {
   emit('change')
 }
 
+/** 仅切换 theme/templateId，不改写正文内容。 */
+function setTheme(id: ReportTemplateId) {
+  if (props.readonly) return
+  const nextId = resolveTemplateId(id)
+  const cur = reportDoc.value
+  props.step.config.report = {
+    ...cur,
+    theme: nextId,
+    templateId: nextId,
+  }
+  emit('change')
+}
+
+const activeTheme = computed((): ReportTemplateId =>
+  resolveTemplateId(reportDoc.value.theme ?? reportDoc.value.templateId),
+)
+
 function applyAiReport(r: AnalysisReport) {
   if (props.readonly) return
   props.step.config.report = r
@@ -164,9 +184,35 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
       </button>
     </div>
 
-    <!-- 报告预览 -->
+    <!-- 报告预览：左预览 / 右主题卡 + AI 撰写 -->
     <div v-show="activeTab === 'preview'" class="rpt__pane rpt__pane--preview">
-      <ReportPreview :report="reportDoc" :analysis="current" />
+      <div class="rpt__split">
+        <div class="rpt__split-main">
+          <ReportPreview :report="reportDoc" :analysis="current" />
+        </div>
+        <aside class="rpt__split-side" aria-label="报告主题">
+          <div class="rpt__side-head">
+            <span class="rpt__side-title">报告主题</span>
+            <IButton
+              v-if="!readonly"
+              size="sm"
+              variant="secondary"
+              icon="sparkle"
+              data-testid="report-ai-write"
+              @click="onAiToggle"
+            >
+              AI 撰写
+            </IButton>
+          </div>
+          <ReportThemeThumbs
+            :model-value="activeTheme"
+            variant="cards"
+            :disabled="readonly"
+            @update:model-value="setTheme"
+          />
+          <p class="rpt__side-hint">切换主题只改视觉样式，不改写报告正文。</p>
+        </aside>
+      </div>
     </div>
 
     <!-- 报告内容（与编辑页同组件，readonly 只读展示） -->
@@ -196,8 +242,8 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
 
     <!-- AI 悬浮窗：Teleport 到 body，固定悬浮在面板左侧，不参与面板布局 -->
     <Teleport to="body">
-      <div v-if="aiOpen && !readonly && aiMinimized" class="rpt__ai-fab" :style="aiFabStyle" title="展开 AI 写报告">
-        <button type="button" class="rpt__ai-fab-btn" aria-label="展开 AI 写报告" @click="aiMinimized = false">
+      <div v-if="aiOpen && !readonly && aiMinimized" class="rpt__ai-fab" :style="aiFabStyle" title="展开 AI 撰写">
+        <button type="button" class="rpt__ai-fab-btn" aria-label="展开 AI 撰写" @click="aiMinimized = false">
           <IIcon name="sparkle" :size="16" />
         </button>
       </div>
@@ -206,7 +252,7 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
         class="rpt__ai-float"
         :style="aiFloatStyle"
         role="complementary"
-        aria-label="AI 写报告"
+        aria-label="AI 撰写"
       >
         <ReportAiAssist
           :step="step"
@@ -394,5 +440,60 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
 }
 .rpt__ai-fab-btn:hover {
   background: var(--is-accent-soft);
+}
+
+.rpt__split {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.rpt__split-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rpt__split-side {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  border-left: 1px solid var(--is-border);
+  padding-left: 12px;
+  overflow-y: auto;
+}
+.rpt__side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rpt__side-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--is-text-secondary);
+}
+.rpt__side-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+  line-height: 1.4;
+}
+@media (max-width: 900px) {
+  .rpt__split {
+    flex-direction: column;
+  }
+  .rpt__split-side {
+    width: 100%;
+    border-left: 0;
+    border-top: 1px solid var(--is-border);
+    padding-left: 0;
+    padding-top: 10px;
+  }
 }
 </style>
