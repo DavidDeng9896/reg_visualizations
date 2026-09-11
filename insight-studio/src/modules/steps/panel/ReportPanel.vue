@@ -1,20 +1,19 @@
 <script setup lang="ts">
 /**
- * Report 节点专用面板：报告预览 / 报告内容编辑 + AI 写报告。
- * 编辑态与预览态共用本组件，预览态传入 readonly 只读展示。
+ * Report 节点专用面板：全宽预览 + 紧凑顶栏（主题 popover / AI 撰写 / 导出 PDF）。
+ * 删除右侧主题栏与双入口「AI 写报告」；AI 走 reportAiStore agent-loop。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { AnalysisReport, StepNode } from '../../../shared/types'
+import type { AnalysisReport, ReportTemplateId, StepNode } from '../../../shared/types'
 import { useAnalysisStore } from '../../../stores/analysisStore'
-import { IButton, IIcon, type IconName } from '../../../ui'
+import { IButton, IIcon, IPopover, type IconName } from '../../../ui'
 import { readReportConfig } from '../report/reportModel'
-import ReportPreview from './ReportPreview.vue'
-import ReportThemeThumbs from '../report/ReportThemeThumbs.vue'
-import type { ReportTemplateId } from '../../../shared/types'
 import { resolveTemplateId } from '../report/reportTemplates'
+import ReportThemeThumbs from '../report/ReportThemeThumbs.vue'
+import ReportPreview from './ReportPreview.vue'
 import ReportEditor from './ReportEditor.vue'
-import ReportAiAssist from './ReportAiAssist.vue'
+import ReportAiChat from './ReportAiChat.vue'
 
 const props = withDefaults(defineProps<{ step: StepNode; readonly?: boolean }>(), {
   readonly: false,
@@ -25,22 +24,38 @@ const store = useAnalysisStore()
 const { current } = storeToRefs(store)
 
 const activeTab = ref<'preview' | 'content'>('preview')
-
 const reportDoc = computed(() => readReportConfig(props.step.config))
 
-/* ------------------------------ AI 写报告 ------------------------------ */
+/* ------------------------------ 主题 popover ------------------------------ */
+
+const themeOpen = ref(false)
+
+const activeTheme = computed((): ReportTemplateId =>
+  resolveTemplateId(reportDoc.value.theme ?? reportDoc.value.templateId),
+)
+
+function setTheme(id: ReportTemplateId) {
+  if (props.readonly) return
+  const nextId = resolveTemplateId(id)
+  const cur = reportDoc.value
+  props.step.config.report = {
+    ...cur,
+    theme: nextId,
+    templateId: nextId,
+  }
+  emit('change')
+  themeOpen.value = false
+}
+
+/* ------------------------------ AI 撰写 ------------------------------ */
 
 const aiOpen = ref(false)
-const aiMinimized = ref(false)
 
-/* AI 窗为固定悬浮窗：浮在详情面板左侧（盖住 flowchart），不参与面板布局。
-   位置由本组件根节点的位置推算，窗口 resize / 面板尺寸变化时重算。 */
 const rpEl = ref<HTMLElement | null>(null)
 const aiFloatStyle = ref<Record<string, string>>({})
-const aiFabStyle = ref<Record<string, string>>({})
 let aiResizeObs: ResizeObserver | null = null
 
-const AI_FLOAT_W = 340
+const AI_FLOAT_W = 360
 const AI_FLOAT_GAP = 12
 
 function positionAiFloat() {
@@ -50,7 +65,6 @@ function positionAiFloat() {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const h = Math.min(Math.max(r.height, 360), vh - 16)
-  // 首选：面板左侧；放不下（如下侧布局贴左边界）则悬浮到面板上方
   let left = r.left - AI_FLOAT_W - AI_FLOAT_GAP
   let top = Math.max(8, Math.min(r.top, vh - h - 8))
   if (left < 8) {
@@ -62,10 +76,6 @@ function positionAiFloat() {
     top: `${Math.round(top)}px`,
     width: `${AI_FLOAT_W}px`,
     height: `${Math.round(h)}px`,
-  }
-  aiFabStyle.value = {
-    left: `${Math.round(left + AI_FLOAT_W - 36)}px`,
-    top: `${Math.round(top)}px`,
   }
 }
 
@@ -90,12 +100,7 @@ watch(aiOpen, (open) => {
 })
 
 function onAiToggle() {
-  if (aiOpen.value) {
-    aiOpen.value = false
-    aiMinimized.value = false
-  } else {
-    aiOpen.value = true
-  }
+  aiOpen.value = !aiOpen.value
 }
 
 if (typeof window !== 'undefined') {
@@ -106,6 +111,14 @@ onBeforeUnmount(() => {
   stopAiPositioning()
 })
 
+/* ------------------------------ 导出 PDF ------------------------------ */
+
+const previewRef = ref<{ printPdf: () => void | Promise<void> } | null>(null)
+
+async function onExportPdf() {
+  await previewRef.value?.printPdf()
+}
+
 /* ------------------------------ 配置写回 ------------------------------ */
 
 function onReportUpdate(v: AnalysisReport) {
@@ -114,40 +127,14 @@ function onReportUpdate(v: AnalysisReport) {
   emit('change')
 }
 
-/** 仅切换 theme/templateId，不改写正文内容。 */
-function setTheme(id: ReportTemplateId) {
-  if (props.readonly) return
-  const nextId = resolveTemplateId(id)
-  const cur = reportDoc.value
-  props.step.config.report = {
-    ...cur,
-    theme: nextId,
-    templateId: nextId,
-  }
-  emit('change')
-}
-
-const activeTheme = computed((): ReportTemplateId =>
-  resolveTemplateId(reportDoc.value.theme ?? reportDoc.value.templateId),
-)
-
-function applyAiReport(r: AnalysisReport) {
-  if (props.readonly) return
-  props.step.config.report = r
-  emit('change')
-}
-
 /* ------------------------------ 错误与日志 ------------------------------ */
 
 const errorOpen = ref(true)
 const reportStderr = computed(() => String(props.step.config.__stderr ?? ''))
 const reportStdout = computed(() => String(props.step.config.__stdout ?? ''))
-
 const hasErrorArea = computed(
   () => !!(props.step.error || reportStderr.value || reportStdout.value),
 )
-
-/* ------------------------------ 标签页 ------------------------------ */
 
 const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   { key: 'preview', label: '报告预览', icon: 'file-text' },
@@ -157,65 +144,83 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
 
 <template>
   <div ref="rpEl" class="rpt">
-    <!-- 状态栏 -->
-    <div class="rpt__status-bar">
-      <span class="rpt__meta">{{ reportDoc.sections.length }} 个章节 · 模板 {{ reportDoc.templateId || 'research' }}</span>
-      <div class="rpt__status-actions">
-        <IButton v-if="!readonly" size="sm" variant="ghost" icon="sparkle" @click="onAiToggle">
-          AI 写报告
+    <!-- 紧凑顶栏 (~36–40px)：tabs | 主题 popover | AI 撰写 | 导出 PDF -->
+    <div class="rpt__chrome" data-testid="report-chrome">
+      <div class="rpt__tabs" role="tablist">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          type="button"
+          role="tab"
+          class="rpt__tab"
+          :class="{ 'rpt__tab--active': activeTab === tab.key }"
+          :aria-selected="activeTab === tab.key"
+          @click="activeTab = tab.key"
+        >
+          <IIcon :name="tab.icon" :size="13" />
+          <span>{{ tab.label }}</span>
+        </button>
+      </div>
+
+      <div class="rpt__chrome-actions">
+        <IPopover :open="themeOpen" placement="bottom-end" :arrow="false" @update:open="themeOpen = $event">
+          <template #anchor>
+            <IButton
+              size="sm"
+              variant="ghost"
+              data-testid="report-theme-trigger"
+              :disabled="readonly"
+              @click="themeOpen = !themeOpen"
+            >
+              主题 · {{ activeTheme }}
+              <IIcon name="chevron-down" :size="12" />
+            </IButton>
+          </template>
+          <div class="rpt__theme-pop" data-testid="report-theme-popover">
+            <p class="rpt__theme-pop-hint">切换主题只改视觉样式，不改写正文。</p>
+            <ReportThemeThumbs
+              :model-value="activeTheme"
+              variant="mini"
+              :disabled="readonly"
+              @update:model-value="setTheme"
+            />
+          </div>
+        </IPopover>
+
+        <IButton
+          v-if="!readonly"
+          size="sm"
+          variant="secondary"
+          icon="sparkle"
+          data-testid="report-ai-write"
+          @click="onAiToggle"
+        >
+          AI 撰写
+        </IButton>
+
+        <IButton
+          v-if="activeTab === 'preview'"
+          size="sm"
+          variant="ghost"
+          icon="file-text"
+          data-testid="report-export-pdf"
+          @click="onExportPdf"
+        >
+          导出 PDF
         </IButton>
       </div>
     </div>
 
-    <!-- 标签页 -->
-    <div class="rpt__tabs" role="tablist">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        type="button"
-        role="tab"
-        class="rpt__tab"
-        :class="{ 'rpt__tab--active': activeTab === tab.key }"
-        :aria-selected="activeTab === tab.key"
-        @click="activeTab = tab.key"
-      >
-        <IIcon :name="tab.icon" :size="13" />
-        <span>{{ tab.label }}</span>
-      </button>
-    </div>
-
-    <!-- 报告预览：左预览 / 右主题卡 + AI 撰写 -->
+    <!-- 全宽预览（无右侧主题栏） -->
     <div v-show="activeTab === 'preview'" class="rpt__pane rpt__pane--preview">
-      <div class="rpt__split">
-        <div class="rpt__split-main">
-          <ReportPreview :report="reportDoc" :analysis="current" />
-        </div>
-        <aside class="rpt__split-side" aria-label="报告主题">
-          <div class="rpt__side-head">
-            <span class="rpt__side-title">报告主题</span>
-            <IButton
-              v-if="!readonly"
-              size="sm"
-              variant="secondary"
-              icon="sparkle"
-              data-testid="report-ai-write"
-              @click="onAiToggle"
-            >
-              AI 撰写
-            </IButton>
-          </div>
-          <ReportThemeThumbs
-            :model-value="activeTheme"
-            variant="cards"
-            :disabled="readonly"
-            @update:model-value="setTheme"
-          />
-          <p class="rpt__side-hint">切换主题只改视觉样式，不改写报告正文。</p>
-        </aside>
-      </div>
+      <ReportPreview
+        ref="previewRef"
+        :report="reportDoc"
+        :analysis="current"
+        hide-toolbar
+      />
     </div>
 
-    <!-- 报告内容（与编辑页同组件，readonly 只读展示） -->
     <div v-show="activeTab === 'content'" class="rpt__pane">
       <ReportEditor
         :report="reportDoc"
@@ -225,7 +230,6 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
       />
     </div>
 
-    <!-- 错误与日志 -->
     <section v-if="hasErrorArea" class="rpt__errbox">
       <div class="rpt__errbox-head">
         <button type="button" class="rpt__errbox-toggle" @click="errorOpen = !errorOpen">
@@ -240,28 +244,17 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
       </template>
     </section>
 
-    <!-- AI 悬浮窗：Teleport 到 body，固定悬浮在面板左侧，不参与面板布局 -->
+    <!-- 仅顶栏「AI 撰写」入口；无最小化 FAB / 无全局第二气泡 -->
     <Teleport to="body">
-      <div v-if="aiOpen && !readonly && aiMinimized" class="rpt__ai-fab" :style="aiFabStyle" title="展开 AI 撰写">
-        <button type="button" class="rpt__ai-fab-btn" aria-label="展开 AI 撰写" @click="aiMinimized = false">
-          <IIcon name="sparkle" :size="16" />
-        </button>
-      </div>
       <div
-        v-else-if="aiOpen && !readonly"
+        v-if="aiOpen && !readonly"
         class="rpt__ai-float"
         :style="aiFloatStyle"
         role="complementary"
         aria-label="AI 撰写"
+        data-testid="report-ai-float"
       >
-        <ReportAiAssist
-          :step="step"
-          :analysis="current"
-          :report="reportDoc"
-          @apply="applyAiReport"
-          @minimize="aiMinimized = true"
-          @close="onAiToggle"
-        />
+        <ReportAiChat :step-id="step.id" @minimize="onAiToggle" @close="onAiToggle" />
       </div>
     </Teleport>
   </div>
@@ -275,36 +268,30 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   min-height: 0;
 }
 
-.rpt__status-bar {
+.rpt__chrome {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  min-height: 36px;
+  max-height: 40px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--is-border);
-  background: var(--is-surface-hover);
+  background: var(--is-surface);
   flex-shrink: 0;
-}
-.rpt__meta {
-  font-size: 11px;
-  color: var(--is-text-tertiary);
-}
-.rpt__status-actions {
-  margin-left: auto;
 }
 
 .rpt__tabs {
   display: flex;
   gap: 2px;
-  padding: 6px 8px 0;
-  border-bottom: 1px solid var(--is-border);
-  background: var(--is-surface);
-  flex-shrink: 0;
+  align-items: stretch;
+  min-width: 0;
 }
+
 .rpt__tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -321,6 +308,25 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   font-weight: 600;
 }
 
+.rpt__chrome-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.rpt__theme-pop {
+  padding: 10px 12px;
+  min-width: 220px;
+}
+.rpt__theme-pop-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--is-text-tertiary);
+  line-height: 1.4;
+}
+
 .rpt__pane {
   flex: 1;
   min-height: 0;
@@ -331,6 +337,7 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0;
 }
 
 .rpt__errbox {
@@ -343,8 +350,6 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
 .rpt__errbox-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   padding: 6px 0;
   position: sticky;
   top: 0;
@@ -394,7 +399,6 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   color: #b42318;
 }
 
-/* AI 悬浮窗（Teleport 到 body）：固定定位、盖在面板左侧，不占布局 */
 .rpt__ai-float {
   position: fixed;
   z-index: 60;
@@ -406,94 +410,9 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
   overflow: hidden;
 }
-.rpt__ai-float :deep(.rai) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 0;
-  border: 0;
-  border-radius: 0;
-}
-.rpt__ai-float :deep(.rai__body) {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.rpt__ai-fab {
-  position: fixed;
-  z-index: 60;
-}
-.rpt__ai-fab-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--is-border);
-  border-radius: 8px;
-  background: var(--is-surface);
-  color: var(--is-accent);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
-  cursor: pointer;
-}
-.rpt__ai-fab-btn:hover {
-  background: var(--is-accent-soft);
-}
-
-.rpt__split {
-  display: flex;
-  gap: 12px;
+.rpt__ai-float :deep(.rac) {
   flex: 1;
   min-height: 0;
   height: 100%;
-}
-.rpt__split-main {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.rpt__split-side {
-  width: 220px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 4px 2px 8px;
-  border-left: 1px solid var(--is-border);
-  padding-left: 12px;
-  overflow-y: auto;
-}
-.rpt__side-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.rpt__side-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--is-text-secondary);
-}
-.rpt__side-hint {
-  margin: 0;
-  font-size: 11px;
-  color: var(--is-text-tertiary);
-  line-height: 1.4;
-}
-@media (max-width: 900px) {
-  .rpt__split {
-    flex-direction: column;
-  }
-  .rpt__split-side {
-    width: 100%;
-    border-left: 0;
-    border-top: 1px solid var(--is-border);
-    padding-left: 0;
-    padding-top: 10px;
-  }
 }
 </style>

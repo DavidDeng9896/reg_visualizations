@@ -12,6 +12,9 @@ import ReportEmbedChart from './ReportEmbedChart.vue'
 import ReportEmbedTable from './ReportEmbedTable.vue'
 
 const props = defineProps<{
+  /** 由父级顶栏托管「导出 PDF」时隐藏内置工具条 */
+  hideToolbar?: boolean
+
   report: AnalysisReport
   analysis: Analysis | null
 }>()
@@ -114,11 +117,13 @@ async function printPdf() {
     exporting.value = false
   }
 }
+
+defineExpose({ printPdf })
 </script>
 
 <template>
   <div class="rpv">
-    <div class="rpv__bar">
+    <div v-if="!props.hideToolbar" class="rpv__bar">
       <span class="rpv__hint">实况预览（可交互图表）· 导出 PDF 时嵌入静态图</span>
       <IButton size="sm" variant="secondary" :loading="exporting" @click="printPdf">
         <IIcon name="file-text" :size="14" />

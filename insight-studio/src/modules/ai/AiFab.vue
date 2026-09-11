@@ -2,15 +2,25 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { IIcon } from '../../ui'
 import { useAiStore } from './aiStore'
+import { useAnalysisStore } from '../../stores/analysisStore'
 import { storeToRefs } from 'pinia'
 
 const FAB_POS_KEY = 'insight.ai.fab.v1'
 
-/** 右下角全局 AI 入口；对话框打开时隐藏；支持拖拽定位。任务进行中时呼吸环 + 状态点。 */
+/** 右下角全局 AI 入口；对话框打开时隐藏；报告节点聚焦时隐藏（避免与「AI 撰写」双入口）。 */
 const ai = useAiStore()
+const analysis = useAnalysisStore()
 const { drawerOpen, running } = storeToRefs(ai)
+const { current, selectedStepId } = storeToRefs(analysis)
 
-const visible = computed(() => !drawerOpen.value)
+/** 选中报告步骤时只保留面板顶栏「AI 撰写」，不显示全局 FAB。 */
+const reportStepFocused = computed(() => {
+  const id = selectedStepId.value
+  if (!id || !current.value) return false
+  return current.value.steps.some((s) => s.id === id && s.type === 'report')
+})
+
+const visible = computed(() => !drawerOpen.value && !reportStepFocused.value)
 /** 抽屉关闭且任务仍在跑 → 入口动效提示。 */
 const busy = computed(() => visible.value && running.value)
 
