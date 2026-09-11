@@ -38,7 +38,7 @@ import { aiSkillsApi, aiMemoriesApi, aiFilesApi } from '../client'
 import { normalizeExpressionColumns } from '../../../shared/pipeline'
 import { attachmentFromMeta, importAiAttachment } from '../attachments'
 import { markStepCreatedByAi, listFailedEmptyAiSteps } from '../failedEmptySteps'
-import { coerceParsedToolArgs } from '../toolArgs'
+import { CREATE_CHART_TYPE_FAIL, coerceParsedToolArgs } from '../toolArgs'
 import { removeStepOwnedArtifacts } from '../../steps/pythonCharts'
 import {
   isNonTabularAiFile,
@@ -952,7 +952,7 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const t = requireTable(tableRefFromArgs(coerced))
     const chartType = String(coerced.chartType ?? coerced.type ?? '').trim()
     if (!chartType || chartType === 'table') {
-      return fail('create_chart 需要 chartType（bar/line/scatter/box/pie/heatmap/bignumber）')
+      return fail(CREATE_CHART_TYPE_FAIL)
     }
     const name =
       typeof coerced.name === 'string' && coerced.name.trim()

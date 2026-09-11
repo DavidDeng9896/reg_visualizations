@@ -223,12 +223,12 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'create_chart',
     description:
-      '原子建图：创建图表视图并一次写全 configure；校验失败不留下空图。优先于 create_view+set_chart_config。field 必须来自 get_table_schema。bar: {x,y}；scatter/line: {x,values[]}。',
+      '原子建图：须先给 chartType（bar/line/scatter/box/pie/heatmap/bignumber），再一次写全 configure；校验失败不留下空图。优先于 create_view+set_chart_config。field 必须来自 get_table_schema。bar: {x,y}；scatter/line: {x,values[]}。',
     parameters: {
       type: 'object',
       properties: {
         tableId: str('表 id（可省略：当前/唯一表）'),
-        chartType: str('图种：bar/line/scatter/box/pie/heatmap/bignumber'),
+        chartType: str('必填图种：bar/line/scatter/box/pie/heatmap/bignumber（放在 configure 之前）'),
         name: str('视图名（可选）'),
         configure: {
           type: 'object',
