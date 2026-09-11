@@ -24,7 +24,21 @@ const store = useAnalysisStore()
 const { current } = storeToRefs(store)
 
 const activeTab = ref<'preview' | 'content'>('preview')
-const reportDoc = computed(() => readReportConfig(props.step.config))
+
+/**
+ * AI（reportAiStore → update_report_step）经 analysisStore.mutate 写 step.config.report。
+ * 预览必须从 store 按 stepId 取 live step，并显式依赖 revision（与 ReportEmbedChart /
+ * TableChartWorkspace 同一套路），避免 props.step 快照或深层追踪漏失导致 ReportPreview 不刷新。
+ */
+const liveStep = computed(() => {
+  const id = props.step.id
+  return current.value?.steps.find((s) => s.id === id) ?? props.step
+})
+
+const reportDoc = computed(() => {
+  void current.value?.revision
+  return readReportConfig(liveStep.value.config)
+})
 
 /* ------------------------------ 主题 popover ------------------------------ */
 
@@ -38,11 +52,16 @@ function setTheme(id: ReportTemplateId) {
   if (props.readonly) return
   const nextId = resolveTemplateId(id)
   const cur = reportDoc.value
-  props.step.config.report = {
-    ...cur,
-    theme: nextId,
-    templateId: nextId,
-  }
+  const stepId = props.step.id
+  store.mutate((a) => {
+    const target = a.steps.find((s) => s.id === stepId)
+    if (!target) return
+    target.config.report = {
+      ...cur,
+      theme: nextId,
+      templateId: nextId,
+    }
+  })
   emit('change')
   themeOpen.value = false
 }
@@ -123,17 +142,22 @@ async function onExportPdf() {
 
 function onReportUpdate(v: AnalysisReport) {
   if (props.readonly) return
-  props.step.config.report = v
+  const stepId = props.step.id
+  store.mutate((a) => {
+    const target = a.steps.find((s) => s.id === stepId)
+    if (!target) return
+    target.config.report = v
+  })
   emit('change')
 }
 
 /* ------------------------------ 错误与日志 ------------------------------ */
 
 const errorOpen = ref(true)
-const reportStderr = computed(() => String(props.step.config.__stderr ?? ''))
-const reportStdout = computed(() => String(props.step.config.__stdout ?? ''))
+const reportStderr = computed(() => String(liveStep.value.config.__stderr ?? ''))
+const reportStdout = computed(() => String(liveStep.value.config.__stdout ?? ''))
 const hasErrorArea = computed(
-  () => !!(props.step.error || reportStderr.value || reportStdout.value),
+  () => !!(liveStep.value.error || reportStderr.value || reportStdout.value),
 )
 
 const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
@@ -238,7 +262,7 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
         </button>
       </div>
       <template v-if="errorOpen">
-        <p v-if="step.error" class="rpt__errbox-error">{{ step.error }}</p>
+        <p v-if="liveStep.error" class="rpt__errbox-error">{{ liveStep.error }}</p>
         <pre v-if="reportStderr" class="rpt__log rpt__log--err">{{ reportStderr }}</pre>
         <pre v-if="reportStdout" class="rpt__log">{{ reportStdout }}</pre>
       </template>
@@ -254,7 +278,7 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
         aria-label="AI 撰写"
         data-testid="report-ai-float"
       >
-        <ReportAiChat :step-id="step.id" @minimize="onAiToggle" @close="onAiToggle" />
+        <ReportAiChat :step-id="liveStep.id" @minimize="onAiToggle" @close="onAiToggle" />
       </div>
     </Teleport>
   </div>
