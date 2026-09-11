@@ -1,0 +1,7 @@
+{
+  "id": "report-format-common",
+  "name": "分析报告内容质量通则",
+  "version": "1.0.0",
+  "description": "三模板共享的报告硬性质量条：真实 id、caption+解读、禁止占位套话与 think/工具日志泄漏",
+  "tags": ["report", "format", "quality"]
+}

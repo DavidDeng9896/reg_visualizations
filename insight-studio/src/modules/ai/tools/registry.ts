@@ -160,7 +160,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'create_report_step',
     description:
-      '在当前分析流程图中创建独立「分析报告」节点（无需连线，内容可很长）。【硬门禁】仅当用户已勾选「生成报告」(wantReport=true) 时可用；未勾选会 FORBIDDEN，须先 ask_user 确认并由前端勾选后再调用。可选 templateId（research|antibody|dashboard-review）按内置模板脚手架生成图+caption+解读；也可直接传入完整 report JSON。AI 应自动撰写各图 caption 与解读段落，勿只放空壳。',
+      '在当前分析流程图中创建独立「分析报告」节点（无需连线，内容可很长）。【硬门禁】仅当用户已勾选「生成报告」(wantReport=true) 时可用；未勾选会 FORBIDDEN，须先 ask_user 确认并由前端勾选后再调用。写正文前须 read_skill(report-format-common) 与 read_skill(report-format-<templateId>)。可选 templateId（research|antibody|dashboard-review）脚手架 draft；也可传入完整 report JSON。done=true 时走质量门。AI 应自动撰写 caption 与解读，勿只放空壳。',
     parameters: {
       type: 'object',
       properties: {
@@ -171,13 +171,17 @@ export const TOOL_DEFS: ToolDef[] = [
           description:
             'AnalysisReport：title, subtitle?, templateId?, sections[]（含 chart/table 的 caption 与紧随的 paragraph 解读）, conclusion?, theme:"research"。章节与结论允许长文。',
         },
+        done: {
+          type: 'boolean',
+          description: '是否宣称完成。true 时必须通过内容质量门；脚手架 draft 不能 done=true。默认 false。',
+        },
       },
     },
   },
   {
     name: 'update_report_step',
     description:
-      '更新已有报告节点的内容（report JSON）或名称。未勾选「生成报告」时仍可更新已有节点；仅 create_report_step 受 wantReport 门禁。',
+      '更新已有报告节点的内容（report JSON）或名称。未勾选「生成报告」时仍可更新已有节点；仅 create_report_step 受 wantReport 门禁。draft 可多轮更新；done=true 时须通过质量门。写/改前应已 read_skill 对应 report-format-*。',
     parameters: {
       type: 'object',
       properties: {
@@ -186,6 +190,10 @@ export const TOOL_DEFS: ToolDef[] = [
         report: {
           type: 'object',
           description: '完整 AnalysisReport JSON',
+        },
+        done: {
+          type: 'boolean',
+          description: '是否宣称完成。true 时必须通过内容质量门；默认 false（允许 draft）。',
         },
       },
       required: ['stepId'],

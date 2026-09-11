@@ -1,0 +1,7 @@
+{
+  "id": "report-format-antibody",
+  "name": "抗体候选筛选报告结构",
+  "version": "1.0.0",
+  "description": "templateId=antibody：筛选目标 → 数据概况 → 动力学/表达证据图解读 → 候选一览与结论；写报告前必读",
+  "tags": ["report", "format", "antibody"]
+}

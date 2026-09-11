@@ -873,6 +873,57 @@ describe('AI 工具实现（execTool）', () => {
     expect(useAnalysisStore().current!.steps.some((s) => s.type === 'report' && s.name === '门禁放行')).toBe(true)
   })
 
+  
+  it('create_report_step 脚手架（无 report）在 wantReport=true 时仍可创建 draft', async () => {
+    await seedStore()
+    const res = await execTool(
+      'create_report_step',
+      { name: '脚手架草稿', templateId: 'research' },
+      { ...ctx, wantReport: true },
+    )
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.summary).toMatch(/draft|草稿|已创建/)
+  })
+
+  it('done=true：脚手架 create_report_step 被质量门拒绝', async () => {
+    await seedStore()
+    const before = useAnalysisStore().current!.steps.filter((s) => s.type === 'report').length
+    const res = await execTool(
+      'create_report_step',
+      { name: '不可 done 脚手架', templateId: 'research', done: true },
+      { ...ctx, wantReport: true },
+    )
+    expect(res.ok).toBe(false)
+    expect(res.summary).toMatch(/质量门|done|脚手架|draft/)
+    expect(useAnalysisStore().current!.steps.filter((s) => s.type === 'report')).toHaveLength(before)
+  })
+
+  it('done=true：含占位结论的 update_report_step 被质量门拒绝', async () => {
+    await seedStore()
+    const created = await execTool(
+      'create_report_step',
+      { name: '待洗报告', report: { title: 't', theme: 'research', sections: [], conclusion: '' } },
+      { ...ctx, wantReport: true },
+    )
+    const stepId = created.artifact?.stepId
+    const updated = await execTool(
+      'update_report_step',
+      {
+        stepId,
+        done: true,
+        report: {
+          title: '仍占位',
+          theme: 'research',
+          sections: [],
+          conclusion: '（待完善）请结合后续结果综合评估。',
+        },
+      },
+      ctx,
+    )
+    expect(updated.ok).toBe(false)
+    expect(updated.summary).toMatch(/质量门|placeholder|待完善|done/)
+  })
+
   it('wantReport=false：update_report_step 仍允许更新已有报告节点', async () => {
     await seedStore()
     const created = await execTool(

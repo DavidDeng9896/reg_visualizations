@@ -379,7 +379,7 @@ export const useAiStore = defineStore('ai', {
         chatMessages.splice(chatMessages.length - 1, 0, {
           role: 'system',
           content:
-            '【用户已勾选「生成报告」(wantReport=true)】工具层已放行 create_report_step。在分析相关步骤落地后，必须调用 create_report_step（可用 templateId=research|antibody|dashboard-review；或传入完整 report）生成独立报告节点。报告须含：目标、数据概况、关键图表（tableId/viewId）+ caption + 解读段落、结论；解读由你自动写，内容可较长。不要只在聊天正文贴长文代替报告节点。',
+            '【用户已勾选「生成报告」(wantReport=true)】工具层已放行 create_report_step。在分析相关步骤落地后，必须先 read_skill(report-format-common) 与 read_skill(report-format-<templateId>)（templateId=research|antibody|dashboard-review），再 create_report_step / update_report_step 写入报告——禁止未读 format skill 凭记忆编造结构。可先脚手架成 draft，洗掉占位套话后 done=true 宣称完成。报告须含：目标、数据概况、关键图表（真实 tableId/viewId 或 chartId）+ caption + 解读段落、结论；解读由你自动写。不要只在聊天正文贴长文代替报告节点。',
         })
       }
 
