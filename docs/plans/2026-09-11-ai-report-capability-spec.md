@@ -3,7 +3,7 @@
 **日期：** 2026-09-11  
 **仓库：** `DavidDeng9896/reg_visualizations`  
 **类型：** 产品 / 工程规格（**仅文档**；本 PR 不含功能代码）  
-**状态：** David 已锁定三项（见 §Product rules）；待 Voss 切片实现、Aegis 验收  
+**状态：** David 已锁定三项 + Team 已锁定原 Open Q1/Q2（见 §Product rules）；待 Voss 切片实现、Aegis 验收  
 
 **已核对 main 现状（勿发明）：**
 
@@ -42,20 +42,22 @@
 
 ## Product rules (David locks)
 
-> Locked 2026-09-11 by David.
+> Locked 2026-09-11 by David（1–3）；Team locked 2026-09-11（4–5，原 Open Q1/Q2）。
 
 1. **Checkbox「生成报告」** 在 AI 输入条；**默认未勾选**。未勾选时 **HARD FORBID** `create_report_step`。用户口头要报告 → agent 必须 `ask_user`（或等价确认），用户确认后 **勾选** 再允许创建；不得仅靠 prompt「口头也要建」。  
 2. **报告 CONTENT/结构格式走 Skills**；**VISUAL 风格挂在报告节点**（`report` JSON / step config 的 theme），不是只改输入条外观。  
-3. **节点级 AI 写报告** 必须对齐 Custom Code 的 agent-loop，**并且可以调用 Skills**（`list_skills` / `read_skill` 等现有工具，见白名单）。
+3. **节点级 AI 写报告** 必须对齐 Custom Code 的 agent-loop，**并且可以调用 Skills**（`list_skills` / `read_skill` 等现有工具，见白名单）。  
+4. **`ask_user` 肯定选项由前端落勾选（Team lock）：** 当「生成报告」相关 `ask_user` 的**肯定选项** resolve 时，**前端 MUST** 在续跑 / 下一轮工具调用之前设置 `wantReport=true`（可选同时写入默认或上次的 `templateId`）。**禁止**依赖模型再提示用户手动勾选；模型不应成为勾选的唯一路径。  
+5. **门禁只锁 create（Team lock）：** `wantReport=false` 时 **HARD FORBID 仅** `create_report_step`；对**已有**报告节点的 `update_report_step` **始终允许**（主会话与节点 AI 皆然）。不得把 `wantReport` 门禁套到 `update_report_step`。
 
-### Sticky 决策（本规格锁定推荐）
+### Sticky 决策（本规格锁定）
 
 | 场景 | 行为 |
 | --- | --- |
 | 新会话 / 切到另一会话 | `wantReport = false`（默认关） |
 | 同一会话内多次发送 | **保持勾选**直到用户手动取消（chip × 或菜单再点） |
 | 发送成功后 | **不**因 send 自动清空勾选 |
-| 口头确认后 | UI 将 `wantReport` 置 `true`（并可选弹出模板选择）后再续跑 / 下一轮允许 `create_report_step` |
+| `ask_user` 肯定选项 resolve | **前端**立刻 `wantReport=true`（可选默认 `templateId`），再续跑；不靠模型补勾选 |
 
 **相对现状：** 今日 `wantReport` 在 `newConversation`/`selectConversation` 不重置（跨会话粘性）→ 实现时改为 **按会话语义重置**，与上表一致。
 
@@ -63,20 +65,21 @@
 
 ## When to create (gate matrix)
 
-会话级标志：`wantReport === true`（来自输入条勾选，或口头确认后 UI 写入）。
+会话级标志：`wantReport === true`（来自输入条勾选，或 `ask_user` 肯定选项 resolve 时由**前端**写入）。
 
-| 用户状态 | 口头要报告？ | 允许的报告相关工具 | Agent 应有行为 |
-| --- | --- | --- | --- |
-| `wantReport=false` | 否 | **禁止** `create_report_step`；允许 `update_report_step`（仅当用户点名已有报告节点且上下文明确） | 正常分析；不得新建报告节点 |
-| `wantReport=false` | 是 | **禁止** `create_report_step` 直至勾选 | 调用 `ask_user`（选项含「勾选并生成报告」）；确认后由 UI 设 `wantReport=true`，必要时带上 `templateId`；再继续 |
-| `wantReport=true` | 任意 | 允许 `create_report_step`（须带/可解析 `templateId`）+ `update_report_step` | 分析落地后创建/更新报告；先 `read_skill` 对应 format skill（见 §Skill contract） |
-| 节点 AI（报告面板） | N/A | **仅** `update_report_step`（本 `stepId`）+ schema/skills 白名单；**禁止** `create_report_step` | 改写当前节点；empty→draft→done |
+| 用户状态 | 口头要报告？ | `create_report_step` | `update_report_step`（已有 report 节点） | Agent 应有行为 |
+| --- | --- | --- | --- | --- |
+| `wantReport=false` | 否 | **HARD FORBID** | **允许** | 正常分析；不得新建报告节点；可按需更新已有报告 |
+| `wantReport=false` | 是 | **HARD FORBID** 直至前端勾选 | **允许** | 调用 `ask_user`（肯定选项语义＝同意生成报告）；resolve 时**前端**设 `wantReport=true`（可选默认 `templateId`）后再续跑 |
+| `wantReport=true` | 任意 | **允许**（须带/可解析 `templateId`） | **允许** | 分析落地后创建/更新报告；先 `read_skill` 对应 format skill（见 §Skill contract） |
+| 节点 AI（报告面板） | N/A | **禁止**（不注册） | **允许**（锁定本 `stepId`） | 改写当前节点；empty→draft→done |
 
 **说明：**
 
 - 「口头」判定：用户自然语言表达要「报告 / 分析报告 / 写一份报告」等；实现可用既有 `intentHint` / prompt + 工具门禁兜底，**门禁优先于意图猜测**。  
-- `ask_user` 已存在于 `agentLoop.ts`；危险确认同构通道可复用交互模式，但产品路径以 **勾选 `wantReport`** 为唯一创建许可。  
-- Worker 白名单今日含报告工具（`tools/workers.ts` 分析师 allow 列表）→ 子 agent 同样必须读到同一 `wantReport` 会话标志，或从主会话剥夺 `create_report_step` 直至标志为真。
+- `ask_user` 已存在于 `agentLoop.ts`；肯定选项与前端 `wantReport=true` 的接线是**硬要求**（Product rule 4），不是可选优化。  
+- 工具层：仅 `create_report_step` 读 `wantReport`；`update_report_step` **不**检查该标志（Product rule 5）。  
+- Worker 白名单今日含报告工具（`tools/workers.ts` 分析师 allow 列表）→ 子 agent 对 `create_report_step` 必须共享同一 `wantReport` 门禁；`update_report_step` 不受影响。
 
 ---
 
@@ -87,12 +90,14 @@
 1. **Tool-layer reject**（主路径）：`tools/impl.ts` 的 `create_report_step`（及任何包装/worker 转发）在调用前检查会话 `wantReport`（或显式传入的 run 上下文 `ctx.wantReport`）。  
    - `wantReport !== true` → **立即 `fail(...)`**，不 mutate flowchart。  
    - 错误文案须 **对模型可读、可行动**，例如：  
-     `FORBIDDEN: create_report_step 需要用户勾选「生成报告」(wantReport)。请 ask_user 确认；用户勾选后再调用。`  
-2. **Registry / 描述同步**：`registry.ts` 中 `create_report_step` description 注明须 `wantReport`；避免模型误以为口头即可。  
-3. **Prompt 纠偏**：删除/改写 `prompts.ts` 中「口头要求时必须创建」为「口头 → ask_user → 勾选后才可 create」。`aiStore.ts` 仅在 `wantReport` 时注入「必须 create」块（现状已有注入，保留并加强 templateId）。  
-4. **Worker / 子循环**：`tools/workers.ts` 若仍放行 `create_report_step`，子循环 `exec` 必须共享同一门禁（同一 `ctx`），禁止旁路。  
-5. **节点 AI**：`reportAiStore` **不注册** `create_report_step`，从白名单物理排除。  
-6. **测试（Aegis / unit）**：`wantReport=false` 时直接 `execTool('create_report_step', …)` 必失败；`true` 时成功。不依赖模型是否听话。
+     `FORBIDDEN: create_report_step 需要用户勾选「生成报告」(wantReport)。请 ask_user 确认；前端勾选后再调用。`  
+   - **`update_report_step` 不做 `wantReport` 检查**（Team lock）。  
+2. **Registry / 描述同步**：`registry.ts` 中 `create_report_step` description 注明须 `wantReport`；`update_report_step` 注明可在未勾选时更新已有节点。  
+3. **Prompt 纠偏**：删除/改写 `prompts.ts` 中「口头要求时必须创建」为「口头 → ask_user → 前端勾选后才可 create」。`aiStore.ts` 仅在 `wantReport` 时注入「必须 create」块（现状已有注入，保留并加强 templateId）。  
+4. **`ask_user` resolve 接线**：肯定选项结算处（`aiStore` / AskCard 路径）**MUST** 设 `wantReport=true`（可选 `templateId`）再继续 agent-loop；单测覆盖「resolve 后标志已真」。  
+5. **Worker / 子循环**：`tools/workers.ts` 若仍放行 `create_report_step`，子循环 `exec` 必须共享同一门禁（同一 `ctx`），禁止旁路。  
+6. **节点 AI**：`reportAiStore` **不注册** `create_report_step`，从白名单物理排除。  
+7. **测试（Aegis / unit）**：`wantReport=false` 时 `create_report_step` 必失败；同条件下对已有节点 `update_report_step` 必成功；`wantReport=true` 时 create 成功。不依赖模型是否听话。
 
 ---
 
@@ -250,7 +255,8 @@
 - [ ] **AC1** 新会话打开时「生成报告」未勾选；`wantReport === false`。  
 - [ ] **AC2** `wantReport=false` 时，单元/集成直接调用 `create_report_step` → **失败**，错误信息含需勾选 / `wantReport`；flowchart **无**新 report 节点。  
 - [ ] **AC3** 勾选后选择 `antibody`（或另两模板），分析任务完成后存在 report 节点，且 `config.report.templateId` / `theme` 映射正确。  
-- [ ] **AC4** 用户口头「写一份分析报告」且未勾选 → 出现 `ask_user`（或确认 UI）；在确认勾选前 **零** `create_report_step` 成功。  
+- [ ] **AC4** 用户口头「写一份分析报告」且未勾选 → 出现 `ask_user`；肯定选项 resolve 后 **前端**已设 `wantReport=true`（不靠模型补勾）；确认前 **零** `create_report_step` 成功。  
+- [ ] **AC4b** `wantReport=false` 时对已有 report 节点调用 `update_report_step` **成功**；同条件下 `create_report_step` **失败**。  
 - [ ] **AC5** 同一会话勾选后连续两轮发送，`wantReport` 仍为 true；新开会话后为 false。  
 - [ ] **AC6** 写报告路径有 `read_skill` 指向 `report-format-*`（trace 可见）或等价强制注入 skill 正文。  
 - [ ] **AC7** 报告预览随 `theme` 变化（三主题视觉可区分；Lumen 验收截图）。  
@@ -266,7 +272,7 @@
 
 1. **Gate + prompt 纠偏**  
    - `impl.ts` / worker ctx：`wantReport` 硬拒；`prompts.ts` / `aiStore` 文案；unit tests。  
-   - 验收：AC2、AC4（工具层部分）。
+   - 验收：AC2、AC4、AC4b（工具层部分）。
 
 2. **wantReport 会话语义 + 输入条模板 picker**  
    - `aiStore` 重置策略；`AiInputBar` checkbox + 3 thumbs；`reportTemplateId` 传入 create。  
@@ -292,9 +298,9 @@
 
 ## Open questions（仅不可化约项）
 
-1. **口头确认 UX：** `ask_user` 选项点选后，是否由 **前端**在 resolve 时直接 `wantReport=true`，还是模型再发一轮依赖用户手动勾选？→ 建议前端在肯定选项 resolve 时自动勾选并带默认/上次 `templateId`，减少摩擦（仍满足「先确认再 create」）。  
-2. **`update_report_step` 在 `wantReport=false` 时：** 主会话是否允许改已有报告？→ 本规格建议 **允许**（避免无法修报告），仅锁 **create**。若产品要「完全静默报告」，需 David 再锁。  
-3. **Lumen 主题交付物格式：** CSS 变量挂在 `ReportPreview` vs 独立 theme pack 包名——交 Lumen 定，不影响内容 skill 契约。
+1. **Lumen 主题交付物格式：** CSS 变量挂在 `ReportPreview` vs 独立 theme pack 包名——交 Lumen 定，不影响内容 skill 契约。
+
+> ~~原 Q1（ask_user → 前端设 wantReport）~~、~~原 Q2（update 是否允许）~~ 已于 2026-09-11 Team lock，迁入 §Product rules 4–5 与 §Gate matrix。
 
 ---
 
