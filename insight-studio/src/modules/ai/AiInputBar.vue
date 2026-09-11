@@ -24,7 +24,7 @@ import {
  * AI 输入条：圆角盒子 + 自动增高输入区 + 精简工具行
  *（+ 菜单 · 权限图标 · 模型 · 上下文/压缩 · 发送）。
  * + 菜单：一级入口；引用上下文 / 快捷指令在二级侧栏展开。
- * 「完成后生成报告」在 + 选项，勾选后以 chip 显示。
+ * 工具行（输入框正下方）：[+] · 「生成报告」勾选（默认关）·（勾选后模板缩略图 TODO）· 右侧模型/发送。文案统一「生成报告」；不进 + 菜单。
  */
 const ai = useAiStore()
 const { running, config, sessionFiles } = storeToRefs(ai)
@@ -492,18 +492,6 @@ watch(
               </div>
             </div>
           </div>
-          <div v-if="ai.wantReport" class="bar__flags" data-testid="ai-want-report-chip">
-            <button
-              type="button"
-              class="bar__flag"
-              title="点击取消「完成后生成报告」"
-              @click="ai.wantReport = false"
-            >
-              <IIcon name="file-text" :size="11" />
-              <span>生成报告</span>
-              <span class="bar__flag-x" aria-hidden="true">×</span>
-            </button>
-          </div>
           <textarea
             ref="inputEl"
             v-model="text"
@@ -526,6 +514,23 @@ watch(
             >
               <IIcon name="plus" :size="15" />
             </button>
+            <button
+              type="button"
+              class="bar__want"
+              :class="{ 'bar__want--on': ai.wantReport }"
+              role="checkbox"
+              :aria-checked="ai.wantReport"
+              aria-label="生成报告"
+              title="生成报告"
+              data-testid="ai-want-report"
+              @click="toggleWantReport"
+            >
+              <span class="bar__want-box" aria-hidden="true">
+                <IIcon v-if="ai.wantReport" name="check" :size="10" />
+              </span>
+              <span class="bar__want-label">生成报告</span>
+            </button>
+            <!-- TODO(Lumen/slice): when wantReport, show template thumbs inline here (research|antibody|dashboard-review). Out of scope for gate UX. -->
             <button
               type="button"
               class="bar__tbtn"
@@ -617,21 +622,6 @@ watch(
               <span class="bar__menu-slash">/</span>
               <span class="bar__menu-label">快捷指令</span>
               <IIcon name="chevron-right" :size="12" class="bar__menu-chev" />
-            </button>
-            <div class="bar__menu-sep" />
-            <button
-              type="button"
-              class="bar__menu-item"
-              role="menuitemcheckbox"
-              :aria-checked="ai.wantReport"
-              data-testid="ai-want-report"
-              title="分析任务完成后自动创建/更新科研风格报告节点"
-              @click="toggleWantReport"
-            >
-              <IIcon v-if="ai.wantReport" name="check" :size="12" class="bar__menu-check" />
-              <span v-else class="bar__menu-check-space" />
-              <IIcon name="file-text" :size="12" class="bar__menu-icon" />
-              完成后生成报告
             </button>
           </div>
           <div
@@ -949,31 +939,50 @@ watch(
   opacity: 0.45;
   cursor: not-allowed;
 }
-.bar__flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 10px 2px;
-}
-.bar__flag {
+
+.bar__want {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 8px;
-  border-radius: 999px;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px 0 6px;
   border: 1px solid var(--is-border);
-  background: var(--is-surface-hover);
-  font-size: 11px;
+  border-radius: var(--is-radius-sm);
+  background: transparent;
   color: var(--is-text-secondary);
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
+  flex-shrink: 0;
 }
-.bar__flag:hover {
+.bar__want:hover {
+  background: var(--is-surface-hover);
   color: var(--is-text);
 }
-.bar__flag-x {
-  margin-left: 2px;
-  opacity: 0.55;
+.bar__want--on {
+  border-color: var(--is-accent);
+  background: var(--is-accent-soft);
+  color: var(--is-accent);
+}
+.bar__want-box {
+  width: 12px;
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.bar__want--on .bar__want-box {
+  background: var(--is-accent);
+  border-color: var(--is-accent);
+  color: var(--is-surface);
+  opacity: 1;
+}
+.bar__want-label {
+  white-space: nowrap;
 }
 .bar__model {
   display: inline-flex;

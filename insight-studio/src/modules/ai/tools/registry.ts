@@ -160,7 +160,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: 'create_report_step',
     description:
-      '在当前分析流程图中创建独立「分析报告」节点（无需连线，内容可很长）。可选 templateId（research|antibody|dashboard-review）按内置模板脚手架生成图+caption+解读；也可直接传入完整 report JSON。AI 应自动撰写各图 caption 与解读段落，勿只放空壳。',
+      '在当前分析流程图中创建独立「分析报告」节点（无需连线，内容可很长）。【硬门禁】仅当用户已勾选「生成报告」(wantReport=true) 时可用；未勾选会 FORBIDDEN，须先 ask_user 确认并由前端勾选后再调用。可选 templateId（research|antibody|dashboard-review）按内置模板脚手架生成图+caption+解读；也可直接传入完整 report JSON。AI 应自动撰写各图 caption 与解读段落，勿只放空壳。',
     parameters: {
       type: 'object',
       properties: {
@@ -176,7 +176,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'update_report_step',
-    description: '更新已有报告节点的内容（report JSON）或名称。',
+    description:
+      '更新已有报告节点的内容（report JSON）或名称。未勾选「生成报告」时仍可更新已有节点；仅 create_report_step 受 wantReport 门禁。',
     parameters: {
       type: 'object',
       properties: {

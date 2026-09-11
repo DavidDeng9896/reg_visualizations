@@ -123,6 +123,21 @@ let autoContinueCount = 0
 const MAX_AUTO_CONTINUE = 2
 const MODEL_KEY = 'insight.ai.model'
 
+
+/** 粗判 ask_user 是否在征求「生成报告」许可。 */
+function looksLikeReportConsentAsk(question: string): boolean {
+  return /生成报告|写.*报告|分析报告|出一份报告|要报告|做.*报告/.test(question)
+}
+
+/** 粗判作答是否为肯定（含点选肯定选项文案）。 */
+function isAffirmativeAskAnswer(answer: string, options: string[]): boolean {
+  const a = answer.trim()
+  if (!a) return false
+  if (/^(是|好|好的|可以|同意|确认|要|行|生成|创建报告|生成报告|yes|y|ok)$/i.test(a)) return true
+  if (options.some((o) => o === a && /是|要|生成|同意|确认|创建|好/.test(o))) return true
+  return false
+}
+
 export const useAiStore = defineStore('ai', {
   state: (): AiState => ({
     drawerOpen: false,
@@ -245,6 +260,7 @@ export const useAiStore = defineStore('ai', {
         const doc = await aiConvApi.create({ analysisId: analysis?.id ?? null, title: '新会话' })
         this.currentId = doc.id
         this.messages = []
+        this.wantReport = false
         await this.refreshConversations()
       } finally {
         this.switching = false
@@ -262,6 +278,7 @@ export const useAiStore = defineStore('ai', {
         const doc = await aiConvApi.get(id)
         this.currentId = doc.id
         this.messages = Array.isArray(doc.messages) ? (doc.messages as UiMessage[]) : []
+        this.wantReport = false
         // 回看时清理瞬态：历史回答绝不能带着 streaming/running 转圈
         for (const m of this.messages) {
           if (!Array.isArray(m.trace)) m.trace = []
@@ -362,7 +379,7 @@ export const useAiStore = defineStore('ai', {
         chatMessages.splice(chatMessages.length - 1, 0, {
           role: 'system',
           content:
-            '【用户已勾选「完成后生成报告」】在分析相关步骤落地后，必须调用 create_report_step（可用 templateId=research|antibody|dashboard-review；或传入完整 report）生成独立报告节点。报告须含：目标、数据概况、关键图表（tableId/viewId）+ caption + 解读段落、结论；解读由你自动写，内容可较长。不要只在聊天正文贴长文代替报告节点。',
+            '【用户已勾选「生成报告」(wantReport=true)】工具层已放行 create_report_step。在分析相关步骤落地后，必须调用 create_report_step（可用 templateId=research|antibody|dashboard-review；或传入完整 report）生成独立报告节点。报告须含：目标、数据概况、关键图表（tableId/viewId）+ caption + 解读段落、结论；解读由你自动写，内容可较长。不要只在聊天正文贴长文代替报告节点。',
         })
       }
 
@@ -686,7 +703,12 @@ export const useAiStore = defineStore('ai', {
             return { ok: false, summary: e instanceof Error ? e.message : String(e) }
           }
         }
-        return execTool(call.function.name, args, { confirmDestructive, confirmWrite, rejectedDocFileIds })
+        return execTool(call.function.name, args, {
+          confirmDestructive,
+          confirmWrite,
+          rejectedDocFileIds,
+          wantReport: this.wantReport,
+        })
       }
       return { tools, exec }
     },
@@ -709,7 +731,11 @@ export const useAiStore = defineStore('ai', {
       if (decision === 'confirm') {
         item.confirmed = true
         item.running = true
-        const res = await execTool(item.name, { ...(item.args ?? {}), __confirmed: true }, { confirmDestructive: false, confirmWrite: false })
+        const res = await execTool(
+          item.name,
+          { ...(item.args ?? {}), __confirmed: true },
+          { confirmDestructive: false, confirmWrite: false, wantReport: this.wantReport },
+        )
         item.running = false
         item.ok = res.ok
         item.summary = res.summary
@@ -853,7 +879,12 @@ export const useAiStore = defineStore('ai', {
         .find((m) => m.role === 'assistant' && m.trace.some((t) => t.id === id))
       const item = assistant?.trace.find((t) => t.id === id)
       const question = item?.ask?.question ?? this.pendingAsk.question
+      const options = this.pendingAsk.options ?? []
       const trimmed = answer?.trim()
+      // Product rule：与「生成报告」相关的 ask_user 肯定作答 → 前端落勾选（工具门禁同源）
+      if (trimmed && looksLikeReportConsentAsk(question) && isAffirmativeAskAnswer(trimmed, options)) {
+        this.wantReport = true
+      }
       if (assistant && item) {
         item.askSettled = true
         item.ask = undefined
