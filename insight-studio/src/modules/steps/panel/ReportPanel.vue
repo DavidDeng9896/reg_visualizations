@@ -50,11 +50,9 @@ function setTheme(id: ReportTemplateId) {
 /* ------------------------------ AI 撰写 ------------------------------ */
 
 const aiOpen = ref(false)
-const aiMinimized = ref(false)
 
 const rpEl = ref<HTMLElement | null>(null)
 const aiFloatStyle = ref<Record<string, string>>({})
-const aiFabStyle = ref<Record<string, string>>({})
 let aiResizeObs: ResizeObserver | null = null
 
 const AI_FLOAT_W = 360
@@ -79,10 +77,6 @@ function positionAiFloat() {
     width: `${AI_FLOAT_W}px`,
     height: `${Math.round(h)}px`,
   }
-  aiFabStyle.value = {
-    left: `${Math.round(left + AI_FLOAT_W - 36)}px`,
-    top: `${Math.round(top)}px`,
-  }
 }
 
 function startAiPositioning() {
@@ -106,13 +100,7 @@ watch(aiOpen, (open) => {
 })
 
 function onAiToggle() {
-  if (aiOpen.value) {
-    aiOpen.value = false
-    aiMinimized.value = false
-  } else {
-    aiOpen.value = true
-    aiMinimized.value = false
-  }
+  aiOpen.value = !aiOpen.value
 }
 
 if (typeof window !== 'undefined') {
@@ -256,26 +244,17 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
       </template>
     </section>
 
+    <!-- 仅顶栏「AI 撰写」入口；无最小化 FAB / 无全局第二气泡 -->
     <Teleport to="body">
       <div
-        v-if="aiOpen && !readonly && aiMinimized"
-        class="rpt__ai-fab"
-        :style="aiFabStyle"
-        title="展开 AI 撰写"
-      >
-        <button type="button" class="rpt__ai-fab-btn" aria-label="展开 AI 撰写" @click="aiMinimized = false">
-          <IIcon name="sparkle" :size="16" />
-        </button>
-      </div>
-      <div
-        v-else-if="aiOpen && !readonly"
+        v-if="aiOpen && !readonly"
         class="rpt__ai-float"
         :style="aiFloatStyle"
         role="complementary"
         aria-label="AI 撰写"
         data-testid="report-ai-float"
       >
-        <ReportAiChat :step-id="step.id" @minimize="aiMinimized = true" @close="onAiToggle" />
+        <ReportAiChat :step-id="step.id" @minimize="onAiToggle" @close="onAiToggle" />
       </div>
     </Teleport>
   </div>
@@ -435,26 +414,5 @@ const tabs: { key: 'preview' | 'content'; label: string; icon: IconName }[] = [
   flex: 1;
   min-height: 0;
   height: 100%;
-}
-
-.rpt__ai-fab {
-  position: fixed;
-  z-index: 60;
-}
-.rpt__ai-fab-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--is-border);
-  border-radius: 8px;
-  background: var(--is-surface);
-  color: var(--is-accent);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
-  cursor: pointer;
-}
-.rpt__ai-fab-btn:hover {
-  background: var(--is-accent-soft);
 }
 </style>
