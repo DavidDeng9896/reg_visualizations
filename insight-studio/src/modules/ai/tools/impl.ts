@@ -27,6 +27,7 @@ import { tableOutputPortName } from '../../steps/registry'
 import { CUSTOM_CODE_DEFAULT_TEMPLATE, annotateCustomCodeError } from '../../steps/customCodeTemplate'
 import { emptyReport, readReportConfig } from '../../steps/report/reportModel'
 import { resolveTemplateId, scaffoldReportFromAnalysis } from '../../steps/report/reportTemplates'
+import { assertReportDone } from '../../steps/report/reportQuality'
 import type { AnalysisReport } from '../../../shared/types'
 import { rerunStaleSteps, hasStaleSteps } from '../../steps/rerun'
 import { refreshSqlSourceStep } from '../../table/refreshSqlSource'
@@ -816,18 +817,31 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     const name =
       typeof args.name === 'string' && args.name.trim() ? args.name.trim() : '分析报告'
     const templateId = resolveTemplateId(args.templateId ?? ctx.reportTemplateId)
+    const claimDone = args.done === true || args.status === 'done'
     let report: AnalysisReport
+    let fromScaffold = false
     if (args.report && typeof args.report === 'object') {
       report = readReportConfig({ report: args.report })
       report.title = report.title || name
       report.templateId = report.templateId ?? templateId
     } else {
-      // 无完整 report 时按内置模板从当前分析脚手架生成（图+说明+解读）
+      // 无完整 report 时按内置模板从当前分析脚手架生成（图+说明+解读）→ draft
+      fromScaffold = true
       try {
         report = scaffoldReportFromAnalysis(requireAnalysis(), templateId, name)
       } catch {
         report = emptyReport(name, templateId)
       }
+    }
+    // scaffold→draft 不过质量门；仅当传入完整 report 且宣称 done 时拦截
+    if (claimDone) {
+      if (fromScaffold) {
+        return fail(
+          '报告质量门：脚手架草稿不能宣称 done。请先 read_skill(report-format-common 与 report-format-<templateId>)，用 update_report_step 写入完整正文后再 done=true。',
+        )
+      }
+      const gate = assertReportDone(report, requireAnalysis())
+      if (!gate.ok) return fail(gate.summary)
     }
     let stepId = ''
     store().mutate((a) => {
@@ -837,8 +851,9 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
       a.steps.push(step)
       stepId = step.id
     })
+    const phase = claimDone ? 'done' : 'draft'
     return ok(
-      `已创建分析报告「${name}」（模板 ${templateId}，step id: ${stepId}）`,
+      `已创建分析报告「${name}」（模板 ${templateId}，${phase}，step id: ${stepId}）`,
       artifactOf('report', name, { stepId }),
     )
   },
@@ -853,17 +868,34 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     if (!args.report && !(typeof args.name === 'string' && args.name.trim())) {
       return fail('请提供 report 或 name')
     }
+    const claimDone = args.done === true || args.status === 'done'
+    let nextReport: AnalysisReport | undefined
+    if (args.report && typeof args.report === 'object') {
+      nextReport = readReportConfig({ report: args.report })
+    }
+    // draft 可多轮更新；宣称 done 时必须通过质量门（不 mutate）
+    if (claimDone) {
+      const candidate =
+        nextReport ??
+        (step.config.report && typeof step.config.report === 'object'
+          ? readReportConfig({ report: step.config.report })
+          : null)
+      if (!candidate) {
+        return fail('报告质量门：宣称 done 时需要提供完整 report JSON')
+      }
+      const gate = assertReportDone(candidate, a)
+      if (!gate.ok) return fail(gate.summary)
+    }
     store().mutate((analysis) => {
       const target = analysis.steps.find((s) => s.id === stepId)
       if (!target || target.type !== 'report') return
       if (typeof args.name === 'string' && args.name.trim()) target.name = args.name.trim()
-      if (args.report && typeof args.report === 'object') {
-        target.config.report = readReportConfig({ report: args.report })
-      }
+      if (nextReport) target.config.report = nextReport
       target.status = 'configured'
       target.error = undefined
     })
-    return ok(`已更新报告「${step.name}」`, artifactOf('report', step.name, { stepId }))
+    const phase = claimDone ? 'done' : 'draft'
+    return ok(`已更新报告「${step.name}」（${phase}）`, artifactOf('report', step.name, { stepId }))
   },
 
   async run_step(args) {

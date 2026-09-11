@@ -1,0 +1,7 @@
+{
+  "id": "report-format-research",
+  "name": "科研通用报告结构",
+  "version": "1.0.0",
+  "description": "templateId=research：目标与范围 → 数据概况 → 关键发现（图/表+caption+解读）→ 结论；写报告前必读",
+  "tags": ["report", "format", "research"]
+}

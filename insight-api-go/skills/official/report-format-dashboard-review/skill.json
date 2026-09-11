@@ -1,0 +1,7 @@
+{
+  "id": "report-format-dashboard-review",
+  "name": "数据复盘报告结构",
+  "version": "1.0.0",
+  "description": "templateId=dashboard-review：复盘范围 → 指标与视图一览 → 逐图解读 → 行动项结论；写报告前必读",
+  "tags": ["report", "format", "dashboard-review"]
+}
