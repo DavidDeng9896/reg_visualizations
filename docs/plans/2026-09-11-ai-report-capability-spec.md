@@ -1,0 +1,363 @@
+# AI Report Capability Spec
+
+**日期：** 2026-09-11  
+**仓库：** `DavidDeng9896/reg_visualizations`  
+**类型：** 产品 / 工程规格（**仅文档**；本 PR 不含功能代码）  
+**状态：** David 已批准本计划（2026-09-11「行干吧」）：Product rules 1–5 + Lumen 三主题已锁定；**Voss 从 Gate 切片开工**；Aegis 按 AC 验收  
+
+**已核对 main 现状（勿发明）：**
+
+| 能力 | 现状路径 | 行为摘要 |
+| --- | --- | --- |
+| 创建/更新报告工具 | `insight-studio/src/modules/ai/tools/registry.ts`、`tools/impl.ts`（`create_report_step` / `update_report_step`） | 流程图独立 `report` 节点；无 `wantReport` 门禁 |
+| 主会话勾选 | `insight-studio/src/modules/ai/aiStore.ts`（`wantReport`，默认 `false`）+ `AiInputBar.vue`（「完成后生成报告」） | 勾选后注入 system 提示；**发送后不自动清**；`newConversation` / `selectConversation` **亦不重置** → 跨会话粘性 |
+| 模板脚手架 | `insight-studio/src/modules/steps/report/reportTemplates.ts` | `templateId`: `research` \| `antibody` \| `dashboard-review`；骨架文案含「后续可由 AI 改写」类占位 |
+| 主题类型 | `insight-studio/src/shared/types.ts`（`AnalysisReport.theme`） | **现状**字面量仅 `'research'`（脚手架写死）；**本规格锁定**扩展为 `'research' \| 'antibody' \| 'dashboard-review'`（与 `templateId` 对齐） |
+| 节点 AI 写报告 | `insight-studio/src/modules/steps/panel/ReportAiAssist.vue` | **单轮** `postChat` + SSE，无工具循环 |
+| Custom Code AI | `insight-studio/src/modules/ai/codeAiStore.ts` + `agentLoop.ts` | 多轮 agent-loop；工具含 `list_skills` / `read_skill` / `save_memory` / `run_python_code` |
+| Skills 平台 | `insight-studio/src/modules/ai/client.ts`（`aiSkillsApi`）；工具 `list_skills` / `read_skill`；官方例 `insight-api-go/skills/official/statlib-*/` | Skill = `skill.json` + `SKILL.md`；主会话 / code 场景均可读 |
+| 报告面板 | `ReportPanel.vue` → `ReportPreview` / `ReportEditor` / `ReportAiAssist` | 预览/编辑 + 悬浮 AI 小窗 |
+| Prompt 现状冲突点 | `insight-studio/src/modules/ai/prompts.ts` | 写「用户勾选或**口头要求**时必须创建报告」→ 与 David 锁定冲突，须改 |
+
+---
+
+## Goal / non-goals
+
+### Goal
+
+1. **门禁**：仅当用户显式开启「生成报告」（会话级 `wantReport`）时，主会话 agent 才允许调用 `create_report_step`；口头要报告须先 `ask_user` / 确认并勾选，**禁止**在未勾选时直接建报告节点。  
+2. **内容 vs 视觉分离**：报告 **CONTENT/结构** 由 Skills（`SKILL.md`）定义；**VISUAL 风格**挂在报告节点 / `AnalysisReport`（theme），由 Lumen 渲染，不只是输入条皮肤。  
+3. **节点级 AI 写报告** 对齐 Custom Code 的 agent-loop（`reportAiStore` 类比 `codeAiStore`），且可调用现有 Skills 工具；写完直接 `update_report_step` 落到本节点，不另造流程图节点。  
+4. **质量**：真实 `tableId`/`viewId`/`chartId`；AI 宣称完成时不得残留脚手架占位；可测验收给 Aegis。
+
+### Non-goals
+
+- 本规格 **不实现** 功能代码（仅计划 / 契约）。  
+- 不重写主会话 ReAct 到后端；不合并主会话与节点 AI 历史。  
+- 不为报告场景开放全套分析工具（建表/删表/出图流水线）；节点 AI 白名单见 §Node AI write。  
+- 不在本规格内设计全新报告编辑器 UI 大改；Lumen 主题实现可并行切片，但契约先定。  
+- 不强制迁移已有报告 JSON 到新 theme 枚举以外的破坏性 schema（见 §Migration）。
+
+---
+
+## Product rules (David locks)
+
+> Locked 2026-09-11 by David（1–3）；Team locked 2026-09-11（4–5，原 Open Q1/Q2）。
+
+1. **Checkbox「生成报告」** 在 AI 输入条；**默认未勾选**。未勾选时 **HARD FORBID** `create_report_step`。用户口头要报告 → agent 必须 `ask_user`（或等价确认），用户确认后 **勾选** 再允许创建；不得仅靠 prompt「口头也要建」。  
+2. **报告 CONTENT/结构格式走 Skills**；**VISUAL 风格挂在报告节点**（`report` JSON / step config 的 theme），不是只改输入条外观。  
+3. **节点级 AI 写报告** 必须对齐 Custom Code 的 agent-loop，**并且可以调用 Skills**（`list_skills` / `read_skill` 等现有工具，见白名单）。  
+4. **`ask_user` 肯定选项由前端落勾选（Team lock）：** 当「生成报告」相关 `ask_user` 的**肯定选项** resolve 时，**前端 MUST** 在续跑 / 下一轮工具调用之前设置 `wantReport=true`（可选同时写入默认或上次的 `templateId`）。**禁止**依赖模型再提示用户手动勾选；模型不应成为勾选的唯一路径。  
+5. **门禁只锁 create（Team lock）：** `wantReport=false` 时 **HARD FORBID 仅** `create_report_step`；对**已有**报告节点的 `update_report_step` **始终允许**（主会话与节点 AI 皆然）。不得把 `wantReport` 门禁套到 `update_report_step`。
+
+### Sticky 决策（本规格锁定）
+
+| 场景 | 行为 |
+| --- | --- |
+| 新会话 / 切到另一会话 | `wantReport = false`（默认关） |
+| 同一会话内多次发送 | **保持勾选**直到用户手动取消（chip × 或菜单再点） |
+| 发送成功后 | **不**因 send 自动清空勾选 |
+| `ask_user` 肯定选项 resolve | **前端**立刻 `wantReport=true`（可选默认 `templateId`），再续跑；不靠模型补勾选 |
+
+**相对现状：** 今日 `wantReport` 在 `newConversation`/`selectConversation` 不重置（跨会话粘性）→ 实现时改为 **按会话语义重置**，与上表一致。
+
+---
+
+## When to create (gate matrix)
+
+会话级标志：`wantReport === true`（来自输入条勾选，或 `ask_user` 肯定选项 resolve 时由**前端**写入）。
+
+| 用户状态 | 口头要报告？ | `create_report_step` | `update_report_step`（已有 report 节点） | Agent 应有行为 |
+| --- | --- | --- | --- | --- |
+| `wantReport=false` | 否 | **HARD FORBID** | **允许** | 正常分析；不得新建报告节点；可按需更新已有报告 |
+| `wantReport=false` | 是 | **HARD FORBID** 直至前端勾选 | **允许** | 调用 `ask_user`（肯定选项语义＝同意生成报告）；resolve 时**前端**设 `wantReport=true`（可选默认 `templateId`）后再续跑 |
+| `wantReport=true` | 任意 | **允许**（须带/可解析 `templateId`） | **允许** | 分析落地后创建/更新报告；先 `read_skill` 对应 format skill（见 §Skill contract） |
+| 节点 AI（报告面板） | N/A | **禁止**（不注册） | **允许**（锁定本 `stepId`） | 改写当前节点；empty→draft→done |
+
+**说明：**
+
+- 「口头」判定：用户自然语言表达要「报告 / 分析报告 / 写一份报告」等；实现可用既有 `intentHint` / prompt + 工具门禁兜底，**门禁优先于意图猜测**。  
+- `ask_user` 已存在于 `agentLoop.ts`；肯定选项与前端 `wantReport=true` 的接线是**硬要求**（Product rule 4），不是可选优化。  
+- 工具层：仅 `create_report_step` 读 `wantReport`；`update_report_step` **不**检查该标志（Product rule 5）。  
+- Worker 白名单今日含报告工具（`tools/workers.ts` 分析师 allow 列表）→ 子 agent 对 `create_report_step` 必须共享同一 `wantReport` 门禁；`update_report_step` 不受影响。
+
+---
+
+## Hard enforcement points (prompt alone insufficient)
+
+仅改 `prompts.ts` **不够**。必须在工具执行层硬拒：
+
+1. **Tool-layer reject**（主路径）：`tools/impl.ts` 的 `create_report_step`（及任何包装/worker 转发）在调用前检查会话 `wantReport`（或显式传入的 run 上下文 `ctx.wantReport`）。  
+   - `wantReport !== true` → **立即 `fail(...)`**，不 mutate flowchart。  
+   - 错误文案须 **对模型可读、可行动**，例如：  
+     `FORBIDDEN: create_report_step 需要用户勾选「生成报告」(wantReport)。请 ask_user 确认；前端勾选后再调用。`  
+   - **`update_report_step` 不做 `wantReport` 检查**（Team lock）。  
+2. **Registry / 描述同步**：`registry.ts` 中 `create_report_step` description 注明须 `wantReport`；`update_report_step` 注明可在未勾选时更新已有节点。  
+3. **Prompt 纠偏**：删除/改写 `prompts.ts` 中「口头要求时必须创建」为「口头 → ask_user → 前端勾选后才可 create」。`aiStore.ts` 仅在 `wantReport` 时注入「必须 create」块（现状已有注入，保留并加强 templateId）。  
+4. **`ask_user` resolve 接线**：肯定选项结算处（`aiStore` / AskCard 路径）**MUST** 设 `wantReport=true`（可选 `templateId`）再继续 agent-loop；单测覆盖「resolve 后标志已真」。  
+5. **Worker / 子循环**：`tools/workers.ts` 若仍放行 `create_report_step`，子循环 `exec` 必须共享同一门禁（同一 `ctx`），禁止旁路。  
+6. **节点 AI**：`reportAiStore` **不注册** `create_report_step`，从白名单物理排除。  
+7. **测试（Aegis / unit）**：`wantReport=false` 时 `create_report_step` 必失败；同条件下对已有节点 `update_report_step` 必成功；`wantReport=true` 时 create 成功。不依赖模型是否听话。
+
+---
+
+## Skill contract for report content
+
+### 职责切分
+
+| 层 | 负责 | 不负责 |
+| --- | --- | --- |
+| **Skill（内容）** | 章节 schema、语气、篇幅上限、必填 caption+解读、禁止 think/日志/占位套话 | 颜色、字体、页边距、封面皮肤 |
+| **节点 theme（视觉）** | Lumen 主题 tokens / CSS / 打印样式 | 章节逻辑与科学表述细则 |
+| **`templateId`** | 选用哪份内容 skill + 默认主题映射 | 替代 Skill 全文 |
+
+### 建议 Skill ids / names（与 `statlib-*` 并列的官方 skill）
+
+落地目录建议：`insight-api-go/skills/official/report-format-*/`（`skill.json` + `SKILL.md`），经现有 `/api/ai/skills` 安装。
+
+| skill id（提案） | name | 对应 `templateId` |
+| --- | --- | --- |
+| `report-format-research` | 科研通用报告结构 | `research` |
+| `report-format-antibody` | 抗体候选筛选报告结构 | `antibody` |
+| `report-format-dashboard-review` | 数据复盘报告结构 | `dashboard-review` |
+
+可选聚合 skill：`report-format-common`（三模板共享的硬性质量条：真实 id、禁止占位、caption 规则）；若引入，agent 先读 common 再读具体 template skill。
+
+### Skill body（`SKILL.md`）必须定义
+
+1. **Section schema**：允许的 `kind`（与 `ReportSectionKind` 对齐：`heading`/`paragraph`/`bullets`/`chart`/`table`/`divider`）；推荐章节顺序（目标 → 数据概况 → 关键发现 → 结论）。  
+2. **Tone**：中文、专业、无 emoji；禁止模型 think 标签泄漏进正文。  
+3. **Length caps**：例如单段解读上限、conclusion 上限（具体数字写入 skill，避免代码魔法数分叉）。  
+4. **Required**：每个 `chart`/`table` 节必须有 **非空 caption**，且紧跟 **解读 paragraph**（引用趋势/离群/分组等，基于真实数据语境）。  
+5. **Forbid**：`待完善`、`后续由 AI 改写`、`请结合…综合评估` 等脚手架套话；禁止把 `<think>`/工具日志/原始 tool JSON 写入报告。  
+6. **Id 绑定**：`tableId`/`viewId`/`chartId` 必须来自当前分析（经 `get_table_schema` / 上下文），禁止虚构。
+
+### Agent 如何加载 Skill
+
+1. 主会话：`wantReport=true` 且即将写报告前 → `list_skills`（若目录未注入）→ **`read_skill(report-format-<template>)`**（及 optional common）。  
+2. 节点 AI：`reportAiStore` 在首轮 system 注入 skills catalog（同 `buildSkillsCatalogPrompt`），写/改前同样 `read_skill`。  
+3. **禁止**在未 `read_skill` 时凭记忆编造该模板的特殊结构（与主会话「配图不要乱读 skill」相反：**写报告必须读 format skill**）。  
+4. 脚手架 `scaffoldReportFromAnalysis`（`reportTemplates.ts`）仍可用于 **empty→draft** 初稿，但 AI **宣称 done 前**须用 skill 规则洗掉占位（见 §Content quality gates）。
+
+---
+
+## Node visual styles
+
+> **Locked 2026-09-11 by David（「行干吧」）** — 批准 Lumen 三主题视觉方向；实现须对齐下列基线，不得另起一套皮肤。
+
+### 基线产物（共享工作区；本 PR **不**提交大 PNG）
+
+引用路径（实现/验收时对照，勿把大图塞进本仓库，除非已有小号引用图）：
+
+- `/workspace/reg-ux/report-templates/` — `README.md`、`index.html`、`styles.css`
+- 预览图：`/workspace/reg-ux/report-templates/preview/overview.png`、`preview/research.png`、`preview/antibody.png`、`preview/dashboard-review.png`
+- 方向说明：`/workspace/reg-ux/report-templates/2026-09-11-report-style-directions.md`
+
+### 三主题锁定（`templateId` ↔ `AnalysisReport.theme`）
+
+| `templateId` / `theme` | 名称 | 锁定视觉（Lumen approved） |
+| --- | --- | --- |
+| `research` | Academic paper | 白底、细线分隔、图注「图 N.」学术论文风 |
+| `antibody` | Screening booklet | 海军蓝顶栏、候选摘要 chips、状态 tags |
+| `dashboard-review` | Review board | 灰画布、KPI 行、图表卡片、行动 checklist |
+
+**类型契约（必须改代码类型，本 PR 仅规格）：** `AnalysisReport.theme` 今日仅为字面量 `'research'`（`insight-studio/src/shared/types.ts`）。实现时 **MUST** 扩展为：
+
+```ts
+theme: 'research' | 'antibody' | 'dashboard-review'
+```
+
+与 `ReportTemplateId` / `templateId` 对齐；缺省或缺字段回退 `research`（兼容旧 JSON）。脚手架 `reportTemplates.ts` / `reportModel.ts` 不得再写死唯一 `theme: 'research'`——应按所选 `templateId` 写入对应 theme。
+
+### 契约
+
+- **存储**：`AnalysisReport.theme` + `templateId` 写入 `step.config.report`（`create_report_step` / `update_report_step` / 节点 AI apply）；二者应一致（创建时由 `templateId` 映射默认 `theme`）。  
+- **所有权**：Lumen 拥有 `ReportPreview`（及导出 HTML）主题 CSS/tokens，以实现上述三套视觉；内容作者（Skill/AI）只设 `theme`/`templateId`，不内联颜色。  
+- **选择器 vs 皮肤**：输入条模板缩略图与节点 chrome 缩略图都是 **选择器**；真正皮肤在 **报告节点预览**（挂在节点上的 theme，不是输入条皮肤）。
+
+### 节点 chrome（报告节点 UI）
+
+报告节点面板 chrome **MUST** 提供：
+
+1. **三主题缩略图**（research / antibody / dashboard-review）——切换即更新节点 `theme`（及对齐的 `templateId`），预览即时换肤。  
+2. **「AI 撰写」按钮** — 入口对齐 Custom Code 的节点 AI 入口范式，打开节点 AI 写报告浮层 / `reportAiStore`（见 §Node AI write）。
+
+### 输入条 ↔ 节点
+
+- `wantReport` 勾选后，输入条展示 **模板 picker**（三 thumbs，对应上表）。  
+- 选中的 `templateId` 传入 `create_report_step`；创建时写入对齐的 `theme`。  
+- **theme 挂在报告节点**上渲染；输入条只负责选型，不承担最终视觉。
+
+### 输入条模板选择 → 创建参数
+
+勾选后展示 **3 个模板缩略图**（元数据可来自 `REPORT_TEMPLATES` / `reportTemplates.ts`，视觉对齐 `reg-ux/report-templates/preview/*.png`）；选中的 `templateId`：
+
+- 写入会话态（如 `aiStore.reportTemplateId`，默认 `research`）；  
+- 传入 `create_report_step({ templateId })`；  
+- 并映射默认 `theme`（上表一一对应）。
+
+---
+
+## Input bar UX
+
+**现状：** `AiInputBar.vue` 在「+」菜单内「完成后生成报告」；勾选后 chip「生成报告」；**无**模板 picker。
+
+**目标：**
+
+1. Checkbox / 菜单项文案可收敛为「生成报告」（与 chip 一致）；**默认 off**。  
+2. **勾选后**展开/弹出 **模板 picker**（3 thumbs：research / antibody / dashboard-review，对齐 Lumen 基线）；未选时默认 `research`。  
+3. `templateId`（及映射的 `theme`）进入 `create_report_step`；**视觉挂在报告节点**，输入条只选型。  
+4. 取消勾选 → 收起 picker；清除「本会话要建报告」许可（`wantReport=false`）。  
+5. Sticky：见 §Product rules；**新会话默认 off**。
+
+---
+
+## Node AI write
+
+### 问题
+
+`ReportAiAssist.vue` 单轮聊天；Custom Code 已用 `codeAiStore` + `runAgent` 多轮工具。报告节点必须达到同等可靠度，并能读 Skills。
+
+### 方案：`reportAiStore`（命名提案）
+
+类比 `insight-studio/src/modules/ai/codeAiStore.ts`：
+
+- 复用 `agentLoop.runAgent`、`makeOnEvent`、会话按 `(analysisId, stepId)` 挂载（`conversationScope.ts` / `pickStepConversation`）。  
+- **不**拆改主 `aiStore` 主路径（与 Custom Code 设计一致：`docs/superpowers/specs/2026-08-25-custom-code-ai-agent-loop-design.md`）。
+
+### Tools whitelist（节点 AI）
+
+| 工具 | 用途 |
+| --- | --- |
+| `update_report_step` | 唯一写入途径；`stepId` 锁定当前报告节点 |
+| `get_table_schema` | 绑定真实字段/表 |
+| `list_skills` | 发现 format skills |
+| `read_skill` | 加载 `report-format-*` 正文 |
+
+**可选（若主注册表已有且无害）：** `list_tables`（只读探路）。  
+
+**禁止：** `create_report_step`、删表/清空、建图流水线、`run_python_code`（除非后续单列需求）、delegate_* worker（默认禁止，防跑偏）。
+
+> 注：今日工具名是 `list_skills` / `read_skill`（**无**独立 `run_skill`）。规格要求 **匹配现有 skill 工具**；不要发明新的 `run_skill`，除非平台先增加该 API。
+
+### Apply 语义
+
+- 工具成功 → 报告 JSON 已在 step config；UI 预览刷新。  
+- **不**新建额外 flowchart 节点。  
+- 状态机：**empty**（空/`emptyReport`）→ **draft**（脚手架或未通过质量门）→ **done**（通过 §Content quality gates）。  
+- Agent 在 draft 可多轮 `update_report_step`；宣称完成前自检占位与 id。
+
+### UI
+
+- `ReportPanel.vue` 浮窗改为驱动 `reportAiStore`（替换/渐进替换 `ReportAiAssist` 单轮）；交互对齐 `CustomCodeAiChat.vue`（多轮、续跑、trace）。
+
+---
+
+## Content quality gates
+
+在 `update_report_step` / 节点 AI 收束 /（可选）主会话 create 之后校验：
+
+1. **真实引用**：每个 `chart`/`table` section 的 `tableId`+`viewId` 或 `chartId` 必须在当前 `Analysis` 可解析；否则 fail 并让模型修正。  
+2. **Caption + 解读**：有图/表则必须有非空 `caption`，且后续存在解读性 `paragraph`（允许同轮多 section）。  
+3. **占位扫描**：若正文匹配禁止列表（如 `待完善`、`后续由 AI`、`请结合` 脚手架句式、空 conclusion），且模型已标记完成 / 用户点「完成」→ **拒绝 done**，返回明确错误。  
+4. **Think/日志**：剥离或拒绝含 `<think>`、大量 tool trace 粘贴的 body。  
+5. **主会话 create**：允许先 scaffold 成 draft；同一轮或紧随 `update_report_step` 洗到 done；若仅 scaffold 且 agent 说「已完成」→ 测试判失败。
+
+实现位置建议：共享 `reportQuality.ts`（名称提案），供 `impl.ts` 与 `reportAiStore` 复用。
+
+---
+
+## Migration / backward compat
+
+| 项目 | 策略 |
+| --- | --- |
+| 已有 `report` 步骤 | 继续可预览/编辑；缺 `theme` → 视为 `research`；缺 `templateId` → `research` |
+| 旧会话 `wantReport` 粘性 | 实现重置逻辑后，老用户可能感到「新会话要重新勾选」——符合产品默认 off |
+| `AnalysisReport.theme` 类型扩展 | 旧 JSON `"theme":"research"` 合法；新主题仅新写入 |
+| `ReportAiAssist` | 可先双轨：feature flag 切到 `reportAiStore`；稳定后删单轮路径 |
+| Skills 未安装 | agent 仍可读内置 prompt 降级，但 Aegis 验收环境须预装三份 `report-format-*` |
+| Worker / e2e | 更新 `tests/unit/ai/impl.spec.ts`、`ports.spec.ts`、`e2e/ai.spec.ts` 中与报告相关的假定 |
+
+---
+
+## Acceptance criteria for Aegis（可测）
+
+- [ ] **AC1** 新会话打开时「生成报告」未勾选；`wantReport === false`。  
+- [ ] **AC2** `wantReport=false` 时，单元/集成直接调用 `create_report_step` → **失败**，错误信息含需勾选 / `wantReport`；flowchart **无**新 report 节点。  
+- [ ] **AC3** 勾选后选择 `antibody`（或另两模板），分析任务完成后存在 report 节点，且 `config.report.templateId` / `theme` 映射正确。  
+- [ ] **AC4** 用户口头「写一份分析报告」且未勾选 → 出现 `ask_user`；肯定选项 resolve 后 **前端**已设 `wantReport=true`（不靠模型补勾）；确认前 **零** `create_report_step` 成功。  
+- [ ] **AC4b** `wantReport=false` 时对已有 report 节点调用 `update_report_step` **成功**；同条件下 `create_report_step` **失败**。  
+- [ ] **AC5** 同一会话勾选后连续两轮发送，`wantReport` 仍为 true；新开会话后为 false。  
+- [ ] **AC6** 写报告路径有 `read_skill` 指向 `report-format-*`（trace 可见）或等价强制注入 skill 正文。  
+- [ ] **AC7** 报告预览随 `theme` 在 `research` / `antibody` / `dashboard-review` 间切换（视觉对齐 `reg-ux/report-templates` 基线；Lumen 验收截图）。  
+- [ ] **AC8** 节点 AI：多轮工具调用；仅 `update_report_step` 写当前节点；无额外 report 节点。  
+- [ ] **AC9** 节点 AI 可 `list_skills` + `read_skill`；可根据 skill 改结构。  
+- [ ] **AC10** 完成态报告：无 `待完善` 等占位；图/表 id 可解析；缺 caption/解读则不能算 done。  
+- [ ] **AC11** 旧报告节点（仅 `theme: research`）仍能打开预览。  
+- [ ] **AC12b** 报告节点 chrome 可见三主题缩略图 +「AI 撰写」按钮（对齐 Custom Code 入口范式）。  
+- [ ] **AC12** MiniMax（或项目指定验收模型）主路径：勾选 + 简单分析 → 独立报告节点，正文非聊天长文替代（回归 `prompts` 要求）。
+
+---
+
+## Suggested PR slices for Voss（顺序）
+
+> David「行干吧」（2026-09-11）：**Voss 从切片 1（Gate）开工**。
+
+1. **Gate + prompt 纠偏** ← **当前开工**  
+   - `impl.ts` / worker ctx：`wantReport` 硬拒；`prompts.ts` / `aiStore` 文案；unit tests。  
+   - 验收：AC2、AC4、AC4b（工具层部分）。
+
+2. **wantReport 会话语义 + 输入条模板 picker**  
+   - `aiStore` 重置策略；`AiInputBar` checkbox + 3 thumbs；`reportTemplateId` 传入 create。  
+   - 验收：AC1、AC3、AC5。
+
+3. **Skill 包 + 主会话读 skill 写报告**  
+   - 官方 `report-format-*`；create/update 前 read_skill；质量门 `reportQuality` 初版。  
+   - 验收：AC6、AC10、AC12。
+
+4. **Theme 类型 + Lumen 三主题挂节点**  
+   - `types.ts` / `reportModel`；`ReportPreview` 主题；scaffold 写入映射。  
+   - 验收：AC7、AC11、AC12b（缩略图部分）。
+
+5. **`reportAiStore` agent-loop**  
+   - 对齐 `codeAiStore`；白名单工具；`ReportPanel` 接线；empty→draft→done。  
+   - 验收：AC8、AC9、AC10、AC12b（AI 撰写入口）。
+
+6. **Aegis 矩阵与 e2e 加固**  
+   - 扩展 `docs/dev/ai-agent-lifecycle-test/` 或 studio unit/e2e；口头门禁 + 主题截图清单。  
+   - 验收：全 AC 清单勾完。
+
+---
+
+## Open questions（仅不可化约项）
+
+（无。）Lumen 三主题视觉与基线路径已于 2026-09-11 由 David 批准锁定（见 §Node visual styles）。
+
+> ~~原 Q1（ask_user → 前端设 wantReport）~~、~~原 Q2（update 是否允许）~~ → Team lock → §Product rules 4–5。  
+> ~~原 Q3（Lumen 主题交付物格式）~~ → David「行干吧」批准 `reg-ux/report-templates` 基线 → §Node visual styles。
+
+---
+
+---
+
+## 关键文件索引（实现时优先打开）
+
+```
+insight-studio/src/modules/ai/aiStore.ts
+insight-studio/src/modules/ai/AiInputBar.vue
+insight-studio/src/modules/ai/prompts.ts
+insight-studio/src/modules/ai/tools/registry.ts
+insight-studio/src/modules/ai/tools/impl.ts
+insight-studio/src/modules/ai/tools/workers.ts
+insight-studio/src/modules/ai/codeAiStore.ts          # 节点 AI 范式
+insight-studio/src/modules/ai/agentLoop.ts
+insight-studio/src/modules/ai/client.ts               # aiSkillsApi
+insight-studio/src/modules/steps/report/reportTemplates.ts
+insight-studio/src/modules/steps/report/reportModel.ts
+insight-studio/src/modules/steps/panel/ReportAiAssist.vue
+insight-studio/src/modules/steps/panel/ReportPanel.vue
+insight-studio/src/shared/types.ts                    # AnalysisReport
+reg-ux/report-templates/                            # Lumen 三主题基线（共享区；勿大图入库）
+insight-api-go/skills/official/                       # 新 report-format-* 并列处
+docs/superpowers/specs/2026-08-25-custom-code-ai-agent-loop-design.md
+```
