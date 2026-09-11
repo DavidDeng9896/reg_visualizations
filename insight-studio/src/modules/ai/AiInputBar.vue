@@ -24,7 +24,7 @@ import {
  * AI 输入条：圆角盒子 + 自动增高输入区 + 精简工具行
  *（+ 菜单 · 权限图标 · 模型 · 上下文/压缩 · 发送）。
  * + 菜单：一级入口；引用上下文 / 快捷指令在二级侧栏展开。
- * 「生成报告」勾选直接显示在输入条工具行（默认未勾选）；文案统一为「生成报告」。
+ * 工具行（输入框正下方）：[+] · 「生成报告」勾选（默认关）·（勾选后模板缩略图 TODO）· 右侧模型/发送。文案统一「生成报告」；不进 + 菜单。
  */
 const ai = useAiStore()
 const { running, config, sessionFiles } = storeToRefs(ai)
@@ -516,17 +516,6 @@ watch(
             </button>
             <button
               type="button"
-              class="bar__tbtn"
-              :class="{ 'bar__tbtn--on': menuMode === 'permissions' }"
-              :title="`操作权限：${permissionOption.label}`"
-              :aria-label="`操作权限：${permissionOption.label}`"
-              data-testid="ai-permission"
-              @click="menuMode = menuMode === 'permissions' ? null : 'permissions'"
-            >
-              <IIcon :name="permissionOption.icon" :size="14" />
-            </button>
-            <button
-              type="button"
               class="bar__want"
               :class="{ 'bar__want--on': ai.wantReport }"
               role="checkbox"
@@ -540,6 +529,18 @@ watch(
                 <IIcon v-if="ai.wantReport" name="check" :size="10" />
               </span>
               <span class="bar__want-label">生成报告</span>
+            </button>
+            <!-- TODO(Lumen/slice): when wantReport, show template thumbs inline here (research|antibody|dashboard-review). Out of scope for gate UX. -->
+            <button
+              type="button"
+              class="bar__tbtn"
+              :class="{ 'bar__tbtn--on': menuMode === 'permissions' }"
+              :title="`操作权限：${permissionOption.label}`"
+              :aria-label="`操作权限：${permissionOption.label}`"
+              data-testid="ai-permission"
+              @click="menuMode = menuMode === 'permissions' ? null : 'permissions'"
+            >
+              <IIcon :name="permissionOption.icon" :size="14" />
             </button>
             <span class="bar__spacer" />
             <button
