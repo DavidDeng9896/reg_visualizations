@@ -169,7 +169,7 @@ export const TOOL_DEFS: ToolDef[] = [
         report: {
           type: 'object',
           description:
-            'AnalysisReport：title, subtitle?, templateId?, sections[]（含 chart/table 的 caption 与紧随的 paragraph 解读）, conclusion?, theme:"research"。章节与结论允许长文。',
+            'AnalysisReport：title, subtitle?, templateId?, sections[]（含 chart/table 的 caption 与紧随的 paragraph 解读）, conclusion?, theme:"research|antibody|dashboard-review"（与 templateId 1:1）。章节与结论允许长文。',
         },
         done: {
           type: 'boolean',

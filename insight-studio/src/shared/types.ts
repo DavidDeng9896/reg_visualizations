@@ -429,8 +429,8 @@ export interface AnalysisReport {
   title: string
   subtitle?: string
   generatedAt: string
-  /** 目前仅 research；预留扩展 */
-  theme: 'research'
+  /** 视觉主题，与 templateId 1:1（缺省/非法 → research） */
+  theme: ReportTemplateId
   /** 选用的内置模板 */
   templateId?: ReportTemplateId
   sections: ReportSection[]

@@ -242,7 +242,7 @@ export function scaffoldReportFromAnalysis(
     title,
     subtitle,
     generatedAt: nowIso(),
-    theme: 'research',
+    theme: templateId,
     templateId,
     sections,
     conclusion,
@@ -254,3 +254,46 @@ export function resolveTemplateId(raw: unknown): ReportTemplateId {
   if (id === 'antibody' || id === 'dashboard-review' || id === 'research') return id
   return 'research'
 }
+
+/** theme ↔ templateId 1:1；缺省或非法时用 fallback（默认 research）。 */
+export function resolveReportTheme(raw: unknown, fallback: ReportTemplateId = 'research'): ReportTemplateId {
+  const id = String(raw ?? '').trim()
+  if (id === 'antibody' || id === 'dashboard-review' || id === 'research') return id
+  return resolveTemplateId(fallback)
+}
+
+/** Lumen mock CSS page class：research-page | antibody-page | dash-page */
+export function reportThemePageClass(theme: ReportTemplateId): string {
+  if (theme === 'antibody') return 'antibody-page'
+  if (theme === 'dashboard-review') return 'dash-page'
+  return 'research-page'
+}
+
+export type ReportThemeOption = {
+  id: ReportTemplateId
+  label: string
+  shortLabel: string
+  description: string
+}
+
+/** 输入条缩略图 / 节点主题卡共用顺序：research → antibody → dashboard-review */
+export const REPORT_THEME_OPTIONS: ReportThemeOption[] = [
+  {
+    id: 'research',
+    label: '科研论文',
+    shortLabel: 'research',
+    description: '白底衬线标题 · 图表编号',
+  },
+  {
+    id: 'antibody',
+    label: '筛选手册',
+    shortLabel: 'antibody',
+    description: '深蓝顶栏 · 候选摘要',
+  },
+  {
+    id: 'dashboard-review',
+    label: '评审看板',
+    shortLabel: 'dashboard',
+    description: 'KPI 卡片 · 行动项',
+  },
+]

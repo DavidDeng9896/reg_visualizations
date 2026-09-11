@@ -4,14 +4,14 @@
 import type { Analysis, AnalysisReport, ReportSection, ReportTemplateId } from '../../../shared/types'
 import { uuid } from '../../../shared/id'
 import { nowIso } from '../../../shared/datetime'
-import { resolveTemplateId } from './reportTemplates'
+import { reportThemePageClass, resolveReportTheme, resolveTemplateId } from './reportTemplates'
 
 export function emptyReport(title = '分析报告', templateId: ReportTemplateId = 'research'): AnalysisReport {
   return {
     title,
     subtitle: '',
     generatedAt: nowIso(),
-    theme: 'research',
+    theme: templateId,
     templateId,
     sections: [
       {
@@ -34,8 +34,9 @@ export function readReportConfig(config: Record<string, unknown>): AnalysisRepor
       title: String(r.title ?? '分析报告'),
       subtitle: r.subtitle ? String(r.subtitle) : '',
       generatedAt: String(r.generatedAt ?? nowIso()),
-      theme: 'research',
-      templateId: resolveTemplateId(r.templateId),
+      // theme ↔ templateId 1:1；优先 templateId（旧数据常把 theme 写死为 research）
+      templateId: resolveTemplateId(r.templateId ?? r.theme),
+      theme: resolveReportTheme(r.templateId ?? r.theme),
       sections: Array.isArray(r.sections) ? (r.sections as ReportSection[]) : base.sections,
       conclusion: r.conclusion ? String(r.conclusion) : '',
     }
@@ -198,6 +199,149 @@ body {
   .rp { max-width: none; padding: 0; }
   .rp__embed-img { break-inside: avoid; page-break-inside: avoid; }
 }
+
+/* ---- Lumen theme pages: research-page / antibody-page / dash-page ---- */
+.research-page {
+  --rp-ink: #1a1d21;
+  --rp-muted: #5c6570;
+  --rp-line: #d8dde3;
+  --rp-paper: #ffffff;
+  --rp-accent: #1a1d21;
+  --rp-accent-soft: #f3f4f6;
+  background: #fff;
+}
+.research-page .rp__title,
+.research-page .rp__h2,
+.research-page .rp__conclusion h2 {
+  font-family: "Source Serif 4", "IBM Plex Serif", "Noto Serif SC", "Songti SC", Georgia, serif;
+  color: var(--rp-ink);
+}
+.research-page .rp__header {
+  border-bottom: 1px solid var(--rp-line);
+}
+.research-page .rp__kicker { color: var(--rp-muted); letter-spacing: 0.08em; }
+.research-page .rp__figure {
+  background: #fff;
+  border: 0;
+  border-top: 1px solid var(--rp-line);
+  border-bottom: 1px solid var(--rp-line);
+  border-radius: 0;
+  padding: 12px 0;
+}
+.research-page .rp__figure-label { color: var(--rp-ink); font-weight: 600; }
+.research-page .rp__embed-table th {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.research-page .rp__caption { font-style: normal; }
+
+.antibody-page {
+  --rp-ink: #0f172a;
+  --rp-muted: #64748b;
+  --rp-line: #e2e8f0;
+  --rp-paper: #f8fafc;
+  --rp-accent: #1e3a5f;
+  --rp-accent-soft: #e8eef5;
+  --rp-status-ok: #15803d;
+  --rp-status-warn: #c2410c;
+  --rp-status-bad: #b91c1c;
+  background: var(--rp-paper);
+  font-family: "Source Sans 3", "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+}
+.antibody-page .rp__title,
+.antibody-page .rp__h2,
+.antibody-page .rp__conclusion h2 {
+  font-family: inherit;
+  color: var(--rp-accent);
+}
+.antibody-page .rp__header {
+  margin: -48px -40px 28px;
+  padding: 20px 40px 24px;
+  background: var(--rp-accent);
+  border-bottom: 0;
+  color: #fff;
+}
+.antibody-page .rp__kicker {
+  color: rgba(255,255,255,0.75);
+  letter-spacing: 0.16em;
+}
+.antibody-page .rp__title { color: #fff; }
+.antibody-page .rp__subtitle,
+.antibody-page .rp__meta { color: rgba(255,255,255,0.8); }
+.antibody-page .rp__figure {
+  background: #fff;
+  border: 1px solid var(--rp-line);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.antibody-page .rp__embed-table th {
+  background: var(--rp-accent);
+  color: #fff;
+  border-color: var(--rp-accent);
+}
+.antibody-page .rp__conclusion {
+  border-left-color: var(--rp-accent);
+  border-radius: 0 8px 8px 0;
+}
+
+.dash-page {
+  --rp-ink: #0f172a;
+  --rp-muted: #64748b;
+  --rp-line: #e5e7eb;
+  --rp-paper: #f3f4f6;
+  --rp-accent: #2563eb;
+  --rp-accent-soft: #eff6ff;
+  --rp-card: #ffffff;
+  --rp-danger: #dc2626;
+  background: var(--rp-paper);
+  font-family: "Source Sans 3", "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+}
+.dash-page .rp__title,
+.dash-page .rp__h2,
+.dash-page .rp__conclusion h2 {
+  font-family: inherit;
+  color: var(--rp-ink);
+}
+.dash-page .rp__header {
+  background: var(--rp-card);
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  border-bottom: 1px solid var(--rp-line);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.dash-page .rp__kicker {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+.dash-page .rp__section {
+  background: var(--rp-card);
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.dash-page .rp__figure {
+  background: #f9fafb;
+  border: 1px solid var(--rp-line);
+  border-radius: 10px;
+}
+.dash-page .rp__figure-label { color: var(--rp-accent); }
+.dash-page .rp__conclusion {
+  border: 1px solid var(--rp-line);
+  border-left: 3px solid var(--rp-accent);
+  border-radius: 12px;
+  background: var(--rp-card);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.dash-page .rp__conclusion h2 { color: var(--rp-accent); }
 `
 
 export type ReportEmbedImages = Record<string, string>
@@ -308,6 +452,8 @@ export function renderReportHtml(
     report.templateId && report.templateId !== 'research'
       ? ` · 模板 ${escapeHtml(report.templateId)}`
       : ''
+  const theme = resolveReportTheme(report.theme, resolveTemplateId(report.templateId))
+  const pageClass = reportThemePageClass(theme)
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -317,7 +463,7 @@ export function renderReportHtml(
 <style>${RESEARCH_REPORT_CSS}</style>
 </head>
 <body>
-<article class="rp">
+<article class="rp ${pageClass}">
   <header class="rp__header">
     <p class="rp__kicker">Analysis Report</p>
     <h1 class="rp__title">${escapeHtml(report.title)}</h1>
@@ -353,8 +499,8 @@ export function parseReportFromModelText(text: string): AnalysisReport | null {
       title: String(obj.title ?? base.title),
       subtitle: obj.subtitle ? String(obj.subtitle) : '',
       generatedAt: nowIso(),
-      theme: 'research',
-      templateId: resolveTemplateId(obj.templateId ?? base.templateId),
+      templateId: resolveTemplateId(obj.templateId ?? obj.theme ?? base.templateId),
+      theme: resolveReportTheme(obj.templateId ?? obj.theme ?? base.templateId),
       sections: Array.isArray(obj.sections) ? (obj.sections as ReportSection[]) : base.sections,
       conclusion: obj.conclusion ? String(obj.conclusion) : '',
     }

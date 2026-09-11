@@ -8,7 +8,9 @@ import {
 } from '../../../src/modules/steps/report/reportModel'
 import {
   REPORT_TEMPLATES,
+  resolveReportTheme,
   resolveTemplateId,
+  reportThemePageClass,
   scaffoldReportFromAnalysis,
 } from '../../../src/modules/steps/report/reportTemplates'
 import { createEmptyAnalysis, createTable, createViewNode } from '../../../src/shared/factories'
@@ -57,7 +59,7 @@ describe('reportModel', () => {
     expect(r.theme).toBe('research')
   })
 
-  it('readReportConfig reads nested report object and templateId', () => {
+    it('readReportConfig reads nested report object and templateId', () => {
     const r = readReportConfig({
       report: {
         title: 'T1',
@@ -70,8 +72,39 @@ describe('reportModel', () => {
     })
     expect(r.title).toBe('T1')
     expect(r.templateId).toBe('antibody')
+    // 旧数据常写死 theme=research；与 templateId 1:1 时以 templateId ?? theme 恢复
+    expect(r.theme).toBe('antibody')
     expect(r.sections).toHaveLength(1)
     expect(r.conclusion).toBe('显著')
+  })
+
+  it('readReportConfig missing theme/templateId defaults to research', () => {
+    const r = readReportConfig({
+      report: {
+        title: 'T3',
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        sections: [],
+      },
+    })
+    expect(r.theme).toBe('research')
+    expect(r.templateId).toBe('research')
+  })
+
+  it('renderReportHtml applies Lumen page class for each theme', () => {
+    for (const [theme, cls] of [
+      ['research', 'research-page'],
+      ['antibody', 'antibody-page'],
+      ['dashboard-review', 'dash-page'],
+    ] as const) {
+      const html = renderReportHtml({
+        title: 'X',
+        theme,
+        templateId: theme,
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        sections: [],
+      })
+      expect(html).toContain(cls)
+    }
   })
 
   it('renderReportHtml includes title and sections', () => {
@@ -137,6 +170,20 @@ describe('reportTemplates', () => {
     expect(resolveTemplateId('nope')).toBe('research')
   })
 
+  it('resolveReportTheme accepts three themes and defaults to research', () => {
+    expect(resolveReportTheme('research')).toBe('research')
+    expect(resolveReportTheme('antibody')).toBe('antibody')
+    expect(resolveReportTheme('dashboard-review')).toBe('dashboard-review')
+    expect(resolveReportTheme(undefined)).toBe('research')
+    expect(resolveReportTheme('nope', 'antibody')).toBe('antibody')
+  })
+
+  it('reportThemePageClass maps to Lumen page classes', () => {
+    expect(reportThemePageClass('research')).toBe('research-page')
+    expect(reportThemePageClass('antibody')).toBe('antibody-page')
+    expect(reportThemePageClass('dashboard-review')).toBe('dash-page')
+  })
+
   it('scaffoldReportFromAnalysis builds chart+interpretation pairs', () => {
     const r = scaffoldReportFromAnalysis(miniAnalysis(), 'research')
     expect(r.templateId).toBe('research')
@@ -173,7 +220,14 @@ describe('reportTemplates', () => {
   it('antibody template adds candidate table block', () => {
     const r = scaffoldReportFromAnalysis(miniAnalysis(), 'antibody')
     expect(r.templateId).toBe('antibody')
+    expect(r.theme).toBe('antibody')
     expect(r.sections.some((s) => s.title === '候选一览')).toBe(true)
     expect(r.sections.some((s) => s.kind === 'table')).toBe(true)
+  })
+
+  it('scaffold sets theme 1:1 with templateId for dashboard-review', () => {
+    const r = scaffoldReportFromAnalysis(miniAnalysis(), 'dashboard-review')
+    expect(r.templateId).toBe('dashboard-review')
+    expect(r.theme).toBe('dashboard-review')
   })
 })

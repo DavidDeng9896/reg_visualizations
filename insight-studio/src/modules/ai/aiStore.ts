@@ -37,6 +37,7 @@ import { applyUserAbortToMessages, clearTransientProgress } from './userAbort'
 import { analysisPathForArtifact, latestOpenableWorkspaceArtifact } from './openArtifact'
 import type { Artifact } from './types'
 import { useAnalysisStore } from '../../stores/analysisStore'
+import type { ReportTemplateId } from '../../shared/types'
 import { router } from '../../app/router'
 
 export interface TraceItem {
@@ -109,6 +110,8 @@ interface AiState {
   sessionFiles: AiFileMeta[]
   /** 输入条勾选：本轮任务完成后生成分析报告节点。 */
   wantReport: boolean
+  /** 勾选「生成报告」后选用的模板/主题（与 theme 1:1）；取消勾选仍保留以便再次勾选恢复。 */
+  reportTemplateId: ReportTemplateId
 }
 
 let uid = 0
@@ -154,6 +157,7 @@ export const useAiStore = defineStore('ai', {
     panelMode: 'docked',
     sessionFiles: [],
     wantReport: false,
+    reportTemplateId: 'research',
   }),
 
   getters: {
@@ -708,6 +712,7 @@ export const useAiStore = defineStore('ai', {
           confirmWrite,
           rejectedDocFileIds,
           wantReport: this.wantReport,
+          reportTemplateId: this.reportTemplateId,
         })
       }
       return { tools, exec }
@@ -734,7 +739,7 @@ export const useAiStore = defineStore('ai', {
         const res = await execTool(
           item.name,
           { ...(item.args ?? {}), __confirmed: true },
-          { confirmDestructive: false, confirmWrite: false, wantReport: this.wantReport },
+          { confirmDestructive: false, confirmWrite: false, wantReport: this.wantReport, reportTemplateId: this.reportTemplateId },
         )
         item.running = false
         item.ok = res.ok

@@ -2,8 +2,10 @@
 /**
  * 报告实况预览：Vue 文档内嵌 Plotly 图表；导出 PDF 时截取静态图再打印。
  */
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { Analysis, AnalysisReport, ReportSection } from '../../../shared/types'
+import type { ReportTemplateId } from '../../../shared/types'
+import { reportThemePageClass, resolveReportTheme } from '../report/reportTemplates'
 import { renderReportHtmlWithImages, type ReportEmbedImages } from '../report/reportModel'
 import { IButton, IIcon } from '../../../ui'
 import ReportEmbedChart from './ReportEmbedChart.vue'
@@ -13,6 +15,11 @@ const props = defineProps<{
   report: AnalysisReport
   analysis: Analysis | null
 }>()
+
+const themeId = computed((): ReportTemplateId =>
+  resolveReportTheme(props.report.theme, props.report.templateId),
+)
+const themePageClass = computed(() => reportThemePageClass(themeId.value))
 
 const chartRefs = ref<Record<string, InstanceType<typeof ReportEmbedChart> | null>>({})
 const exporting = ref(false)
@@ -120,7 +127,7 @@ async function printPdf() {
     </div>
 
     <div class="rpv__scroll">
-      <article class="rp">
+      <article class="rp" :class="themePageClass">
         <header class="rp__header">
           <p class="rp__kicker">Analysis Report</p>
           <h1 class="rp__title">{{ report.title }}</h1>
@@ -335,4 +342,122 @@ async function printPdf() {
   margin: 0 0 8px;
   color: var(--rp-accent);
 }
+
+/* Lumen theme pages on live preview */
+.rp.research-page {
+  --rp-ink: #1a1d21;
+  --rp-muted: #5c6570;
+  --rp-line: #d8dde3;
+  --rp-paper: #ffffff;
+  --rp-accent: #1a1d21;
+  --rp-accent-soft: #f3f4f6;
+  background: #fff;
+}
+.rp.research-page .rp__title,
+.rp.research-page .rp__h2,
+.rp.research-page .rp__conclusion h2 {
+  font-family: "Source Serif 4", "IBM Plex Serif", "Noto Serif SC", Georgia, serif;
+  color: var(--rp-ink);
+}
+.rp.research-page .rp__header { border-bottom: 1px solid var(--rp-line); }
+.rp.research-page .rp__kicker { color: var(--rp-muted); }
+.rp.research-page .rp__figure {
+  background: #fff;
+  border: 0;
+  border-top: 1px solid var(--rp-line);
+  border-bottom: 1px solid var(--rp-line);
+  border-radius: 0;
+  padding: 12px 0;
+}
+
+.rp.antibody-page {
+  --rp-ink: #0f172a;
+  --rp-muted: #64748b;
+  --rp-line: #e2e8f0;
+  --rp-paper: #f8fafc;
+  --rp-accent: #1e3a5f;
+  --rp-accent-soft: #e8eef5;
+  background: var(--rp-paper);
+  font-family: "Source Sans 3", "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+}
+.rp.antibody-page .rp__title,
+.rp.antibody-page .rp__h2,
+.rp.antibody-page .rp__conclusion h2 {
+  font-family: inherit;
+}
+.rp.antibody-page .rp__header {
+  margin: -36px -28px 28px;
+  padding: 18px 28px 22px;
+  background: var(--rp-accent);
+  border-bottom: 0;
+  color: #fff;
+}
+.rp.antibody-page .rp__kicker { color: rgba(255,255,255,0.75); letter-spacing: 0.16em; }
+.rp.antibody-page .rp__title { color: #fff; }
+.rp.antibody-page .rp__subtitle,
+.rp.antibody-page .rp__meta { color: rgba(255,255,255,0.8); }
+.rp.antibody-page .rp__h2 { color: var(--rp-accent); }
+.rp.antibody-page .rp__figure {
+  background: #fff;
+  border: 1px solid var(--rp-line);
+  border-radius: 8px;
+}
+.rp.antibody-page .rp__conclusion { border-left-color: var(--rp-accent); }
+
+.rp.dash-page {
+  --rp-ink: #0f172a;
+  --rp-muted: #64748b;
+  --rp-line: #e5e7eb;
+  --rp-paper: #f3f4f6;
+  --rp-accent: #2563eb;
+  --rp-accent-soft: #eff6ff;
+  background: var(--rp-paper);
+  font-family: "Source Sans 3", "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+}
+.rp.dash-page .rp__title,
+.rp.dash-page .rp__h2,
+.rp.dash-page .rp__conclusion h2 {
+  font-family: inherit;
+  color: var(--rp-ink);
+}
+.rp.dash-page .rp__header {
+  background: #fff;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.rp.dash-page .rp__kicker {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 10px;
+}
+.rp.dash-page .rp__section {
+  background: #fff;
+  border: 1px solid var(--rp-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.rp.dash-page .rp__figure {
+  background: #f9fafb;
+  border: 1px solid var(--rp-line);
+  border-radius: 10px;
+}
+.rp.dash-page .rp__conclusion {
+  border: 1px solid var(--rp-line);
+  border-left: 3px solid var(--rp-accent);
+  border-radius: 12px;
+  background: #fff;
+}
+.rp.dash-page .rp__conclusion h2 { color: var(--rp-accent); }
+
+/* scroll bg follows theme paper */
+.rpv__scroll:has(.antibody-page) { background: #f8fafc; }
+.rpv__scroll:has(.dash-page) { background: #f3f4f6; }
+.rpv__scroll:has(.research-page) { background: #fff; }
 </style>
