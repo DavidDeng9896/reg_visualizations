@@ -64,6 +64,14 @@ export interface ToolCtx {
    * 用于 Aegis TWO_STEP——拒绝后禁止再 import_csv_text 编造 CSV。
    */
   rejectedDocFileIds?: Set<string>
+  /**
+   * 会话级「生成报告」勾选。仅 create_report_step 硬门禁；
+   * wantReport !== true 时拒绝创建且不 mutate flowchart。
+   * update_report_step 不检查该标志。
+   */
+  wantReport?: boolean
+  /** 可选：勾选后选定的报告模板，供 create 缺省 templateId（后续切片）。 */
+  reportTemplateId?: string
 }
 
 /** 写入类工具（非删除）：开启 confirmWrite 时需用户批准。 */
@@ -799,10 +807,15 @@ const impl: Record<string, (args: Record<string, unknown>, ctx: ToolCtx) => Prom
     return ok(`已更新并执行 Custom Code「${nextName}」`)
   },
 
-  create_report_step(args) {
+  create_report_step(args, ctx) {
+    if (ctx.wantReport !== true) {
+      return fail(
+        'FORBIDDEN: create_report_step 需要用户勾选「生成报告」(wantReport)。请 ask_user 确认；用户勾选后再调用。',
+      )
+    }
     const name =
       typeof args.name === 'string' && args.name.trim() ? args.name.trim() : '分析报告'
-    const templateId = resolveTemplateId(args.templateId)
+    const templateId = resolveTemplateId(args.templateId ?? ctx.reportTemplateId)
     let report: AnalysisReport
     if (args.report && typeof args.report === 'object') {
       report = readReportConfig({ report: args.report })

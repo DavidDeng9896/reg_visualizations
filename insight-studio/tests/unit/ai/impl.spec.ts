@@ -825,7 +825,7 @@ describe('AI 工具实现（execTool）', () => {
     const created = await execTool(
       'create_report_step',
       { name: '亲和力小结', report: { title: 'hlx69', theme: 'research', sections: [] } },
-      ctx,
+      { ...ctx, wantReport: true },
     )
     expect(created.ok, created.summary).toBe(true)
     expect(created.artifact?.kind).toBe('report')
@@ -840,6 +840,55 @@ describe('AI 工具实现（execTool）', () => {
     const step = useAnalysisStore().current!.steps.find((s) => s.id === stepId)
     expect(step!.name).toBe('更新后的报告')
     expect((step!.config.report as { title?: string })?.title).toBe('r1 结论')
+  })
+
+
+  it('wantReport=false：create_report_step HARD REJECT，不新建节点', async () => {
+    await seedStore()
+    const before = useAnalysisStore().current!.steps.filter((s) => s.type === 'report').length
+    const res = await execTool('create_report_step', { name: '应被拒绝' }, { ...ctx, wantReport: false })
+    expect(res.ok).toBe(false)
+    expect(res.summary).toMatch(/FORBIDDEN.*wantReport|勾选.*生成报告/)
+    expect(useAnalysisStore().current!.steps.filter((s) => s.type === 'report')).toHaveLength(before)
+  })
+
+  it('wantReport 缺省：create_report_step 同样拒绝，不 mutate', async () => {
+    await seedStore()
+    const before = useAnalysisStore().current!.steps.length
+    const res = await execTool('create_report_step', { name: '缺省拒绝' }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.summary).toContain('FORBIDDEN')
+    expect(useAnalysisStore().current!.steps).toHaveLength(before)
+  })
+
+  it('wantReport=true：create_report_step 仍可创建', async () => {
+    await seedStore()
+    const res = await execTool(
+      'create_report_step',
+      { name: '门禁放行', templateId: 'research' },
+      { ...ctx, wantReport: true },
+    )
+    expect(res.ok, res.summary).toBe(true)
+    expect(res.artifact?.kind).toBe('report')
+    expect(useAnalysisStore().current!.steps.some((s) => s.type === 'report' && s.name === '门禁放行')).toBe(true)
+  })
+
+  it('wantReport=false：update_report_step 仍允许更新已有报告节点', async () => {
+    await seedStore()
+    const created = await execTool(
+      'create_report_step',
+      { name: '已有报告', report: { title: 'old', theme: 'research', sections: [] } },
+      { ...ctx, wantReport: true },
+    )
+    const stepId = created.artifact?.stepId
+    const updated = await execTool(
+      'update_report_step',
+      { stepId, name: '未勾选也可更新', report: { title: 'new', theme: 'research', sections: [] } },
+      { ...ctx, wantReport: false },
+    )
+    expect(updated.ok, updated.summary).toBe(true)
+    const step = useAnalysisStore().current!.steps.find((s) => s.id === stepId)
+    expect(step!.name).toBe('未勾选也可更新')
   })
 
   it('create_dashboard + add_dashboard_widget', async () => {
@@ -961,7 +1010,7 @@ describe('AI 工具实现（execTool）', () => {
       ctx,
     )
     expect(hidden.ok, hidden.summary).toBe(true)
-    const report = await execTool('create_report_step', { name: '管道报告' }, ctx)
+    const report = await execTool('create_report_step', { name: '管道报告' }, { ...ctx, wantReport: true })
     expect(report.ok).toBe(true)
 
     const a = useAnalysisStore().current!

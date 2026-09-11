@@ -430,6 +430,10 @@ test.describe('AI 助手（mock SSE 回放）', () => {
     await mockAi(page, mockSsePipeline)
     await createDemoAndEnter(page)
     await page.getByTestId('ai-fab').click()
+    // Gate：create_report_step 需要 wantReport；先勾选「生成报告」
+    await page.getByTestId('ai-plus').click()
+    await page.getByTestId('ai-want-report').click()
+    await expect(page.getByTestId('ai-want-report-chip')).toBeVisible()
     await page.getByTestId('ai-input').fill('把 hits 与 meta 做成过滤+Join 管道并出图放到看板')
     await page.getByTestId('ai-send').click()
 
